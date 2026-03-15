@@ -1,0 +1,2076 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refrigerator Survey Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-Pending {
+            background-color: #fef3c7;
+            color: #d97706;
+            border: 1px solid #fde68a;
+        }
+
+        .status-Acknowledged {
+            background-color: #d1fae5;
+            color: #059669;
+            border: 1px solid #a7f3d0;
+        }
+
+        .status-Corrected {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+
+        .status-Closed {
+            background-color: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        .status-Rejected {
+            background-color: #ffe4e6;
+            color: #9f1239;
+            border: 1px solid #fecdd3;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #0369a1;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        .detail-row {
+            display: flex;
+            gap: 8px;
+            padding: 6px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .detail-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            min-width: 140px;
+        }
+
+        .detail-value {
+            font-size: 0.85rem;
+            color: #1e293b;
+        }
+
+        /* ── Bottom-sheet (mobile) / Scale-fade (desktop) modal animation ── */
+        #detailModal { transition: opacity 0.28s ease; }
+        #detailModal.modal-open { opacity: 1; }
+        #detailModal:not(.modal-open) { opacity: 0; }
+        /* Mobile: content slides up */
+        #modalContent {
+            transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+            will-change: transform;
+        }
+        #detailModal:not(.modal-open) #modalContent { transform: translateY(100%); }
+        #detailModal.modal-open #modalContent { transform: translateY(0); }
+        /* Desktop: scale-from-center instead */
+        @media (min-width: 768px) {
+            #modalContent { transition: transform 0.28s ease, opacity 0.28s ease; }
+            #detailModal:not(.modal-open) #modalContent { transform: scale(0.95); opacity: 0; }
+            #detailModal.modal-open #modalContent { transform: scale(1); opacity: 1; }
+        }
+        /* ── Print: A4 layout ── */
+        @media print {
+            @page { size: A4 portrait; margin: 15mm; }
+            body > *:not(#printArea) { display: none !important; }
+            nav, #detailModal { display: none !important; }
+            #printArea { display: block !important; font-family: sans-serif; color: #1e293b; }
+            #printArea .detail-row { display: flex; padding: 4px 0; font-size: 11pt; border-bottom: 1px solid #f1f5f9; }
+            #printArea .detail-label { width: 35%; font-weight: 600; color: #475569; flex-shrink: 0; }
+            #printArea .detail-value { flex: 1; }
+            #printArea img { max-width: 100%; break-inside: avoid; }
+            #printArea .no-print, #printArea button { display: none !important; }
+        }
+        #printArea { display: none; }
+        /* Mobile: full-page replacement (no dark mask overlay) */
+        @media (max-width: 767px) {
+            #detailModal {
+                background: #f1f5f9 !important;
+                backdrop-filter: none !important;
+            }
+            #detailModal #modalContent {
+                max-height: 100dvh !important;
+                height: 100dvh;
+                border-radius: 0 !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-sm bg-opacity-95">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Left: Home + Title -->
+                <div class="flex items-center gap-4">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>"
+                        class="text-slate-500 hover:text-sky-600 transition-colors p-2 rounded-lg hover:bg-slate-50 relative group">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                            </path>
+                        </svg>
+                        <span
+                            class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none">กลับหน้าหลัก</span>
+                    </a>
+                    <div class="h-8 w-1 bg-sky-600 rounded-full"></div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">รายงานการสำรวจตู้แช่</h1>
+                        <p class="text-xs text-slate-500 font-medium">Refrigerator Survey — Interactive Dashboard</p>
+                    </div>
+                </div>
+                <!-- Right: Loader + Refresh -->
+                <div class="flex items-center gap-4">
+                    <div class="loader" id="mainLoader"></div>
+                    <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                    <button onclick="window.location.reload()"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-sky-600 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                        <span class="hidden sm:inline">Refresh</span>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200"></div>
+                    <div class="flex flex-col items-end">
+                        <span id="nav-user-name" class="text-xs font-bold text-slate-700"></span>
+                        <span id="access-level-display" class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide">User Access</span>
+                    </div>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>" onclick="localStorage.removeItem('app_auth_token'); localStorage.removeItem('app_user_data');" title="Logout"
+                        class="text-slate-500 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Wrapper -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Stat Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-sky-500 cursor-pointer hover:shadow-md transition-all group"
+                id="cardAll" onclick="filterByStat('all')">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">ทั้งหมด</p>
+                        <h3 class="text-3xl font-bold text-slate-800" id="statTotal">0</h3>
+                    </div>
+                    <div class="bg-sky-50 p-2 rounded-lg text-sky-600 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-amber-500 cursor-pointer hover:shadow-md transition-all group"
+                id="cardPending" onclick="filterByStat('Pending')">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Pending</p>
+                        <h3 class="text-3xl font-bold text-slate-800" id="statPending">0</h3>
+                    </div>
+                    <div class="bg-amber-50 p-2 rounded-lg text-amber-600 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-emerald-500 cursor-pointer hover:shadow-md transition-all group"
+                id="cardAck" onclick="filterByStat('Acknowledged')">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Acknowledged</p>
+                        <h3 class="text-3xl font-bold text-slate-800" id="statAck">0</h3>
+                    </div>
+                    <div class="bg-emerald-50 p-2 rounded-lg text-emerald-600 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-blue-500 cursor-pointer hover:shadow-md transition-all group"
+                id="cardCorrected" onclick="filterByStat('Corrected')">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Corrected</p>
+                        <h3 class="text-3xl font-bold text-slate-800" id="statCorrected">0</h3>
+                    </div>
+                    <div class="bg-blue-50 p-2 rounded-lg text-blue-600 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-400 cursor-pointer hover:shadow-md transition-all group"
+                id="cardClosed" onclick="filterByStat('Closed')">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Closed</p>
+                        <h3 class="text-3xl font-bold text-slate-800" id="statClosed">0</h3>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded-lg text-slate-500 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-rose-500 cursor-pointer hover:shadow-md transition-all group"
+                id="cardRejected" onclick="filterByStat('Rejected')">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Rejected</p>
+                        <h3 class="text-3xl font-bold text-slate-800" id="statRejected">0</h3>
+                    </div>
+                    <div class="bg-rose-50 p-2 rounded-lg text-rose-600 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500 cursor-pointer hover:shadow-md transition-all group"
+                id="cardBroken" onclick="filterByStat('broken')">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">มีตู้ชำรุด</p>
+                        <h3 class="text-3xl font-bold text-slate-800" id="statBroken">0</h3>
+                    </div>
+                    <div class="bg-red-50 p-2 rounded-lg text-red-600 group-hover:scale-110 transition-transform">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="glass-panel p-5 rounded-xl">
+                <h3 class="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-sky-500 inline-block"></span>สถานะรายงาน
+                </h3>
+                <div class="relative" style="height:180px"><canvas id="refStatusChart"></canvas></div>
+            </div>
+            <div class="glass-panel p-5 rounded-xl">
+                <h3 class="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span>ตู้แช่ชำรุด
+                </h3>
+                <div class="relative" style="height:180px"><canvas id="refBrokenChart"></canvas></div>
+            </div>
+            <div class="glass-panel p-5 rounded-xl">
+                <h3 class="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>แนวโน้มรายเดือน
+                </h3>
+                <div class="relative" style="height:180px"><canvas id="refTrendChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Combined Aircon + Ref Monthly Aggregation Chart -->
+        <div class="glass-panel p-5 rounded-xl">
+            <div class="flex flex-wrap items-start justify-between gap-y-2 mb-3">
+                <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-violet-500 inline-block"></span>ภาพรวม Aircon &amp; Refrigerator รายเดือน
+                </h3>
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center gap-3 text-xs text-slate-500">
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-2.5 rounded-sm inline-block" style="background:#6366f1"></span>Aircon</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-2.5 rounded-sm inline-block" style="background:#38bdf8"></span>Refrigerator</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <input type="date" id="combinedDateFrom" class="border border-slate-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-violet-400 outline-none" onchange="applyCombinedDateFilter()">
+                        <span class="text-xs text-slate-400">–</span>
+                        <input type="date" id="combinedDateTo" class="border border-slate-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-violet-400 outline-none" onchange="applyCombinedDateFilter()">
+                        <button onclick="resetCombinedDateFilter()" id="combinedResetBtn" class="hidden text-xs text-slate-400 hover:text-red-500 border border-slate-200 hover:border-red-200 px-2 py-1 rounded-lg transition-colors" title="ล้าง filter">✕</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Summary bar (shown when date filter active) -->
+            <div id="combinedSummaryBar" class="hidden mb-3 flex flex-wrap gap-4 text-xs bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 text-slate-700"></div>
+            <div id="combinedChartLoader" class="flex items-center justify-center text-sm text-slate-400" style="height:200px">⏳ กำลังโหลดข้อมูล...</div>
+            <div class="relative hidden" id="combinedChartWrap" style="height:200px"><canvas id="combinedSurveyChart"></canvas></div>
+        </div>
+
+    <!-- Filters (inside wrapper) -->
+    <div class="glass-panel rounded-xl p-4">
+        <div class="flex flex-wrap gap-3 items-end">
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">ค้นหาสาขา</label>
+                <div class="flex gap-1">
+                    <input type="text" id="filterBranch" placeholder="รหัส / ชื่อ / ผู้รายงาน..." oninput="_debouncedApplyFilters()" onkeydown="if(event.key==='Enter'){clearTimeout(_filterDebounceTimer);applyFilters();}" 
+                        class="border border-slate-200 rounded-lg p-2 text-sm w-48 focus:ring-2 focus:ring-sky-400 focus:border-sky-400 outline-none">
+                    <button onclick="applyFilters()" title="ค้นหา"
+                        class="bg-sky-500 hover:bg-sky-600 text-white px-3 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        ค้นหา
+                    </button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">DM</label>
+                <select id="filterDM" onchange="applyFilters()"
+                    class="border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-400 outline-none">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">CM</label>
+                <select id="filterCM" onchange="applyFilters()"
+                    class="border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-400 outline-none">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">AM (MTN)</label>
+                <select id="filterAM" onchange="applyFilters()"
+                    class="border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-400 outline-none">
+                    <option value="">ทั้งหมด</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">สถานะ</label>
+                <select id="filterStatus" onchange="applyFilters()"
+                    class="border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-400 outline-none">
+                    <option value="">ทั้งหมด</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Acknowledged">Acknowledged</option>
+                    <option value="Corrected">Corrected</option>
+                    <option value="Closed">Closed</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">มีตู้ชำรุด</label>
+                <select id="filterBroken" onchange="applyFilters()"
+                    class="border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-400 outline-none">
+                    <option value="">ทั้งหมด</option>
+                    <option value="Yes">มี</option>
+                    <option value="No">ไม่มี</option>
+                </select>
+            </div>
+            <button onclick="resetFilters()"
+                class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium px-4 py-2 rounded-lg transition">
+                Reset
+            </button>
+        </div>
+    </div>
+
+    <!-- Result Summary -->
+    <div class="flex justify-between items-center text-sm">
+        <span class="text-slate-500 font-medium" id="filterSummary"></span>
+    </div>
+
+    <!-- Desktop Table (md and above) -->
+    <div id="desktopTable" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden md:block">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm whitespace-nowrap">
+                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                    <tr>
+                        <th class="p-4">วันที่</th>
+                        <th class="p-4">รหัส / ชื่อสาขา</th>
+                        <th class="p-4">ผู้รายงาน</th>
+                        <th class="p-4">ตู้ชำรุด</th>
+                        <th class="p-4">สถานะ</th>
+                        <th class="p-4 text-right">รายละเอียด</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+        </div>
+        <!-- Empty State inside table wrapper -->
+        <div id="emptyState" class="hidden flex-col items-center justify-center py-16 px-4 text-center">
+            <div class="bg-slate-50 p-4 rounded-full mb-4">
+                <svg class="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <p class="text-slate-500 font-medium">ไม่พบข้อมูล</p>
+        </div>
+    </div>
+
+    <!-- Mobile Cards (below md) -->
+    <div id="mobileCards" class="md:hidden grid gap-3"></div>
+    <!-- Mobile Empty State -->
+    <div id="mobileEmptyState" class="hidden md:hidden text-center py-16">
+        <svg class="mx-auto h-12 w-12 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <p class="text-slate-400 font-medium">ไม่พบข้อมูล</p>
+    </div>
+
+    <!-- Pagination bar -->
+    <div id="paginationBar" class="mt-4 flex justify-center"></div>
+
+    </div><!-- end main content wrapper -->
+
+    <!-- Detail Modal: bottom-sheet on mobile, centered on desktop -->
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex flex-col justify-end md:justify-center md:items-center md:p-6"
+         style="background:rgba(15,23,42,0.55);backdrop-filter:blur(4px)"
+         onclick="if(event.target===this)closeModal()">
+
+        <div id="modalContent" class="relative w-full max-h-[93vh] md:max-w-3xl bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+
+            <!-- Back button (mobile only) -->
+            <div class="md:hidden flex items-center px-4 pt-3 pb-2 flex-shrink-0 border-b border-slate-100">
+                <button onclick="closeModal()" class="flex items-center gap-1.5 text-sky-600 hover:text-sky-800 text-sm font-medium transition py-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+                    กลับ
+                </button>
+            </div>
+
+            <!-- Header -->
+            <div class="bg-sky-700 text-white px-5 py-4 flex justify-between items-start flex-shrink-0">
+                <div>
+                    <h3 class="text-lg font-bold" id="modalTitle">รายละเอียด</h3>
+                    <p class="text-sky-200 text-sm mt-0.5" id="modalSubtitle"></p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="refDeleteBtn" class="admin-only-link hidden text-white hover:text-red-200 bg-white/10 hover:bg-red-500/40 p-1.5 rounded-lg transition" title="ลบรายงานนี้" onclick="deleteRefRecord()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                    <button onclick="closeModal()" class="text-white hover:text-sky-200 bg-white/10 hover:bg-white/20 p-1.5 rounded-lg transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Scrollable body -->
+            <div class="overflow-y-auto flex-1 p-5" id="modalBody"></div>
+            <!-- Edit Panel (admin only, hidden by default, replaces modalBody) -->
+            <div id="refEditPanel" class="hidden flex-1 overflow-y-auto">
+                <div class="p-4 space-y-4 min-h-full">
+                    <!-- Tab nav -->
+                    <div class="flex gap-1 flex-wrap border-b border-amber-200 pb-2 mb-1">
+                        <button onclick="_editTab('general')" id="_etab_general" class="text-xs font-semibold px-3 py-1.5 rounded-t-lg border-b-2 border-amber-500 text-amber-700 bg-amber-50">ทั่วไป</button>
+                        <button onclick="_editTab('qty')" id="_etab_qty" class="text-xs font-semibold px-3 py-1.5 rounded-t-lg text-slate-500 hover:text-amber-700">📦 จำนวนตู้</button>
+                        <button onclick="_editTab('units')" id="_etab_units" class="text-xs font-semibold px-3 py-1.5 rounded-t-lg text-slate-500 hover:text-amber-700">🔧 ข้อมูลตู้</button>
+                        <button onclick="_editTab('broken')" id="_etab_broken" class="text-xs font-semibold px-3 py-1.5 rounded-t-lg text-slate-500 hover:text-amber-700">🔴 ตู้ชำรุด</button>
+                    </div>
+                    <!-- Tab: General -->
+                    <div id="_epanel_general" class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">สถานะ</label>
+                                <select id="refEditStatus" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white">
+                                    <option value="Pending">Pending</option>
+                                    <option value="Rejected">⛔ Rejected</option>
+                                    <option value="Acknowledged">Acknowledged</option>
+                                    <option value="Corrected">Corrected</option>
+                                    <option value="Closed">Closed</option>
+                                    <option value="Draft">Draft</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">มีตู้ชำรุด</label>
+                                <select id="refEditHasBroken" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white" onchange="_refreshBrokenTab()">
+                                    <option value="No">ไม่มี (No)</option>
+                                    <option value="Yes">มี (Yes)</option>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">เบอร์ตู้ที่ชำรุด (คั่นด้วย ,)</label>
+                                <input id="refEditBrokenUnits" type="text" placeholder="เช่น 1, 3, 5" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white" onchange="_refreshBrokenTab()">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">หมายเหตุ</label>
+                                <textarea id="refEditComments" rows="3" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white resize-none"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Tab: Qty -->
+                    <div id="_epanel_qty" class="hidden">
+                        <div id="_refEditQtyBody"></div>
+                    </div>
+                    <!-- Tab: Unit Details -->
+                    <div id="_epanel_units" class="hidden">
+                        <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">💡 แก้ไขจำนวนตู้ในแท็บ <b>จำนวนตู้</b> ก่อน จากนั้นกดแท็บนี้เพื่อแก้ข้อมูลรายตู้</p>
+                        <div id="_refEditUnitsBody"></div>
+                    </div>
+                    <!-- Tab: Broken Units -->
+                    <div id="_epanel_broken" class="hidden">
+                        <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">💡 ตั้งค่า <b>มีตู้ชำรุด = มี</b> และ <b>เบอร์ตู้ที่ชำรุด</b> ในแท็บ <b>ทั่วไป</b> ก่อน</p>
+                        <div id="_refEditBrokenBody"></div>
+                    </div>
+                    <!-- Save/Cancel -->
+                    <div class="flex gap-2 justify-end pt-3 border-t border-amber-200">
+                        <button onclick="_refCancelEdit()" class="px-4 py-1.5 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition">ยกเลิก</button>
+                        <button id="refSaveEditBtn" onclick="saveRefEdit()" class="px-4 py-1.5 text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            บันทึก
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- Footer -->
+            <div class="p-4 border-t border-slate-100 flex justify-between gap-3 flex-shrink-0">
+                <button id="refEditBtn" class="admin-only-link hidden px-4 py-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition flex items-center gap-1.5" onclick="toggleRefEditPanel()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    แก้ไข
+                </button>
+                <div class="flex gap-3 ml-auto">
+                    <button onclick="printModal()" class="no-print px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition flex items-center gap-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                        พิมพ์
+                    </button>
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition">ปิด</button>
+                </div>
+            </div>
+
+        </div><!-- /#modalContent -->
+    </div><!-- /#detailModal -->
+
+    <!-- Hidden print area (populated by printModal()) -->
+    <div id="printArea"></div>
+    <!-- Hidden file input for per-unit photo upload -->
+    <input type="file" id="refPhotoUploadInput" multiple accept="image/*" style="display:none">
+
+    <!-- Preloaded server-side data (injected by doGet for guest access) -->
+    <script>var _PRELOADED_REF = <?!= preloadedData ?>;</script>
+    <script>
+        let allData = [];
+        let _fullRecordCache = {};  // id → full record (lazy-loaded on modal open)
+        let currentId = null;
+        let currentStatFilter = 'all';
+        let isAdmin = false;
+        let isSMF = false;
+        // Pagination
+        const PAGE_SIZE = 25;
+        let currentPage = 1;
+        let _currentFiltered = [];
+        let refStatusChart = null;
+        let refBrokenChart = null;
+        let refTrendChart = null;
+        let combinedChart = null;
+
+        // Debounce helper for search input
+        let _filterDebounceTimer = null;
+        function _debouncedApplyFilters() {
+            clearTimeout(_filterDebounceTimer);
+            _filterDebounceTimer = setTimeout(applyFilters, 220);
+        }
+
+        function htmlEscape(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        function formatRecordDate(ts) {
+            if (!ts) return '-';
+            const d = new Date(ts);
+            if (isNaN(d)) return String(ts);
+            return d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Read display name from localStorage only — admin status is verified server-side below.
+            // Do NOT set isAdmin from localStorage: stale data could grant incorrect admin access.
+            try {
+                var _lsUser = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                if (_lsUser && localStorage.getItem('app_auth_token')) {
+                    var navName = document.getElementById('nav-user-name');
+                    if (navName) navName.textContent = _lsUser.name || _lsUser.email || '';
+                }
+            } catch(e) {}
+            // Apply admin UI with default false — server will correct below
+            applyAdminUI();
+            // Load combined Aircon + Ref monthly aggregation chart — independent of main data
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) renderCombinedChart(res);
+                    else document.getElementById('combinedChartLoader').textContent = 'ไม่สามารถโหลดข้อมูลได้';
+                })
+                .withFailureHandler(function() {
+                    document.getElementById('combinedChartLoader').textContent = 'โหลดไม่สำเร็จ';
+                })
+                .getCombinedSurveyMonthlyTrend();
+            // Verify real flags from server — Session.getActiveUser() is unreliable in web app
+            // context, so we pass the email from localStorage for a definitive check.
+            try {
+                var _lsEmailRef = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                var _refUserEmail = (_lsEmailRef && _lsEmailRef.email) ? _lsEmailRef.email : '';
+                if (_refUserEmail) {
+                    google.script.run
+                        .withSuccessHandler(function(flags) {
+                            if (!flags) return;
+                            // Use server as ground truth — prevents stale localStorage from granting admin
+                            var serverAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
+                            if (serverAdmin !== isAdmin) {
+                                isAdmin = serverAdmin;
+                                const ad = document.getElementById('access-level-display');
+                                if (ad) {
+                                    ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
+                                    ad.className = isAdmin
+                                        ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
+                                        : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
+                                }
+                                applyAdminUI();
+                            }
+                            isSMF = !!flags.isSMF;
+                        })
+                        .getUserFlags(_refUserEmail);
+                }
+            } catch(e) {}
+            // Use server-side preloaded data when available (allows guest access)
+            if (typeof _PRELOADED_REF !== 'undefined' && _PRELOADED_REF) {
+                var res = (typeof _PRELOADED_REF === 'string') ? JSON.parse(_PRELOADED_REF) : _PRELOADED_REF;
+                // Server-side elevation — trust isSMF/isAdmin from server (handles users cached before flag existed)
+                if ((res.isAdmin === true || res.isScheduleAdmin === true) && !isAdmin) { isAdmin = true; applyAdminUI(); }
+                if (res.isSMF === true && !isSMF) { isSMF = true; }
+                if (res.success) {
+                    allData = res.data;
+                    initRefCharts();
+                    populateRefFilterOptions();
+                    applyFilters();
+                } else {
+                    document.getElementById('tableBody').innerHTML =
+                        '<tr><td colspan="6" class="p-8 text-center text-red-500">Error: ' + res.error + '</td></tr>';
+                }
+                document.getElementById('mainLoader').classList.add('hidden');
+                return;
+            }
+            // Fallback: load via google.script.run (logged-in users)
+            document.getElementById('mainLoader').classList.remove('hidden');
+
+            var _MAX_RETRIES = 3;
+            var _dataLoadTimer = null;
+
+            function _fetchRefSlim(attempt) {
+                // Reset the per-attempt timeout
+                clearTimeout(_dataLoadTimer);
+                _dataLoadTimer = setTimeout(function() {
+                    document.getElementById('mainLoader').classList.add('hidden');
+                    document.getElementById('tableBody').innerHTML =
+                        '<tr><td colspan="6" class="p-8 text-center">' +
+                        '<p class="text-red-500 font-medium mb-3">โหลดข้อมูลนานเกินไป กรุณาลองใหม่</p>' +
+                        '<button onclick="location.reload()" class="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700 transition">โหลดซ้ำ</button>' +
+                        '</td></tr>';
+                }, 25000);
+
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        clearTimeout(_dataLoadTimer);
+                        console.log('[RefSurvey] attempt', attempt, '— data received:', res ? res.success : 'NULL', 'rows:', res && res.data ? res.data.length : 0);
+                        if (!res) {
+                            // GAS cold-start can return null on the first call — auto-retry silently
+                            if (attempt < _MAX_RETRIES) {
+                                console.log('[RefSurvey] null response, retrying (' + attempt + '/' + _MAX_RETRIES + ')...');
+                                setTimeout(function() { _fetchRefSlim(attempt + 1); }, 1500);
+                            } else {
+                                document.getElementById('mainLoader').classList.add('hidden');
+                                document.getElementById('tableBody').innerHTML =
+                                    '<tr><td colspan="6" class="p-8 text-center">' +
+                                    '<p class="text-amber-600 font-medium mb-2">⚠️ ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง</p>' +
+                                    '<p class="text-xs text-slate-400 mb-3">(Server returned null after ' + _MAX_RETRIES + ' attempts)</p>' +
+                                    '<button onclick="location.reload()" class="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700 transition">โหลดซ้ำ</button>' +
+                                    '</td></tr>';
+                            }
+                            return;
+                        }
+                        document.getElementById('mainLoader').classList.add('hidden');
+                        if ((res.isAdmin === true || res.isScheduleAdmin === true) && !isAdmin) { isAdmin = true; applyAdminUI(); }
+                        if (res.isSMF === true && !isSMF) { isSMF = true; }
+                        if (!res.success) {
+                            document.getElementById('tableBody').innerHTML =
+                                '<tr><td colspan="6" class="p-8 text-center text-red-500">Server Error: ' + htmlEscape(res.error || 'Unknown') + '</td></tr>';
+                            return;
+                        }
+                        try {
+                            allData = res.data;
+                            initRefCharts();
+                            populateRefFilterOptions();
+                            applyFilters();
+                        } catch(clientErr) {
+                            console.error('RefSurveyReport render error:', clientErr);
+                            document.getElementById('tableBody').innerHTML =
+                                '<tr><td colspan="6" class="p-8 text-center">' +
+                                '<p class="text-red-500 font-medium mb-2">เกิดข้อผิดพลาดในการแสดงผล</p>' +
+                                '<p class="text-xs text-slate-400 mb-3 font-mono">' + htmlEscape(String(clientErr)) + '</p>' +
+                                '<button onclick="location.reload()" class="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700 transition">โหลดซ้ำ</button>' +
+                                '</td></tr>';
+                        }
+                    })
+                    .withFailureHandler(function (err) {
+                        clearTimeout(_dataLoadTimer);
+                        document.getElementById('mainLoader').classList.add('hidden');
+                        document.getElementById('tableBody').innerHTML =
+                            '<tr><td colspan="6" class="p-8 text-center">' +
+                            '<p class="text-red-500 font-medium mb-3">เกิดข้อผิดพลาด: ' + (err.message || err) + '</p>' +
+                            '<button onclick="location.reload()" class="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700 transition">โหลดซ้ำ</button>' +
+                            '</td></tr>';
+                    })
+                    .getRefSurveyListSlim();
+            }
+
+            _fetchRefSlim(1);
+        });
+
+        let _combinedRawData = null;
+
+        function renderCombinedChart(data, filterFrom, filterTo) {
+            if (data) _combinedRawData = data;
+            const src = _combinedRawData;
+            if (!src) return;
+            const loader = document.getElementById('combinedChartLoader');
+            const wrap   = document.getElementById('combinedChartWrap');
+            if (loader) loader.classList.add('hidden');
+            if (wrap)   wrap.classList.remove('hidden');
+            if (combinedChart) { combinedChart.destroy(); combinedChart = null; }
+
+            // --- Date range filtering ---
+            const fullDates  = src.fullDates  || [];
+            const allLabels  = src.labels     || [];
+            const airconD    = src.airconDaily || [];
+            const refD       = src.refDaily   || [];
+            let fromTs = filterFrom ? new Date(filterFrom).getTime() : -Infinity;
+            let toTs   = filterTo   ? new Date(filterTo  ).getTime() :  Infinity;
+
+            let labels = [], airconVals = [], refVals = [];
+            let sumAircon = 0, sumRef = 0, cumA = 0, cumR = 0;
+            let hasFilter = filterFrom || filterTo;
+
+            for (let i = 0; i < allLabels.length; i++) {
+                const dts = fullDates[i] ? new Date(fullDates[i]).getTime() : NaN;
+                const inRange = isNaN(dts) || (dts >= fromTs && dts <= toTs);
+                if (inRange) {
+                    cumA += airconD[i] || 0;
+                    cumR += refD[i]   || 0;
+                    sumAircon += airconD[i] || 0;
+                    sumRef    += refD[i]   || 0;
+                    labels.push(allLabels[i]);
+                    airconVals.push(cumA);
+                    refVals.push(cumR);
+                }
+            }
+
+            // Summary bar
+            const summaryBar = document.getElementById('combinedSummaryBar');
+            const resetBtn   = document.getElementById('combinedResetBtn');
+            if (hasFilter && summaryBar) {
+                const fmtDate = v => v ? v.split('-').reverse().join('/') : '';
+                const rangeTxt = (filterFrom || filterTo)
+                    ? ((filterFrom ? fmtDate(filterFrom) : '...') + ' – ' + (filterTo ? fmtDate(filterTo) : '...'))
+                    : '';
+                summaryBar.innerHTML =
+                    '<span class="font-semibold text-violet-700">📅 ' + rangeTxt + '</span>' +
+                    '<span class="flex items-center gap-1"><span class="w-2.5 h-2 rounded-sm inline-block" style="background:#6366f1"></span>Aircon เพิ่มขึ้น <b class="ml-1 text-indigo-700">+' + sumAircon.toLocaleString() + '</b> รายการ</span>' +
+                    '<span class="flex items-center gap-1"><span class="w-2.5 h-2 rounded-sm inline-block" style="background:#38bdf8"></span>Ref เพิ่มขึ้น <b class="ml-1 text-sky-700">+' + sumRef.toLocaleString() + '</b> รายการ</span>' +
+                    '<span class="text-slate-500">รวม <b>' + (sumAircon + sumRef).toLocaleString() + '</b> รายการ</span>';
+                summaryBar.classList.remove('hidden');
+                if (resetBtn) resetBtn.classList.remove('hidden');
+            } else {
+                if (summaryBar) summaryBar.classList.add('hidden');
+                if (resetBtn)   resetBtn.classList.add('hidden');
+            }
+
+            // Thin out x-axis labels when many days
+            const skip = labels.length > 60 ? Math.ceil(labels.length / 30) : 1;
+            combinedChart = new Chart(document.getElementById('combinedSurveyChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Aircon',
+                            data: airconVals,
+                            borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)',
+                            borderWidth: 2, tension: 0.35, fill: true,
+                            pointRadius: labels.length > 60 ? 0 : 3, pointHoverRadius: 5,
+                            pointBackgroundColor: '#6366f1'
+                        },
+                        {
+                            label: 'Refrigerator',
+                            data: refVals,
+                            borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.08)',
+                            borderWidth: 2, tension: 0.35, fill: true,
+                            pointRadius: labels.length > 60 ? 0 : 3, pointHoverRadius: 5,
+                            pointBackgroundColor: '#38bdf8'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 10 }, maxRotation: 45,
+                                     callback: function(val, i) { return i % skip === 0 ? this.getLabelForValue(val) : ''; } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function applyCombinedDateFilter() {
+            const from = document.getElementById('combinedDateFrom').value;
+            const to   = document.getElementById('combinedDateTo').value;
+            renderCombinedChart(null, from || null, to || null);
+        }
+
+        function resetCombinedDateFilter() {
+            document.getElementById('combinedDateFrom').value = '';
+            document.getElementById('combinedDateTo').value   = '';
+            renderCombinedChart(null, null, null);
+        }
+
+        function initRefCharts() {
+            const fontFamily = 'Prompt, sans-serif';
+            Chart.defaults.font.family = fontFamily;
+
+            refStatusChart = new Chart(document.getElementById('refStatusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'Acknowledged', 'Corrected', 'Closed', 'Rejected'],
+                    datasets: [{ data: [0, 0, 0, 0, 0], backgroundColor: ['#fbbf24', '#10b981', '#3b82f6', '#94a3b8', '#f43f5e'], borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '62%',
+                    plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } } }
+                }
+            });
+
+            refBrokenChart = new Chart(document.getElementById('refBrokenChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['ปกติ', 'มีชำรุด'],
+                    datasets: [{ data: [0, 0], backgroundColor: ['#38bdf8', '#f87171'], borderRadius: 6, borderSkipped: false }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
+                }
+            });
+
+            refTrendChart = new Chart(document.getElementById('refTrendChart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{ label: 'รายงาน', data: [], borderColor: '#0ea5e9', backgroundColor: 'rgba(14,165,233,0.1)', tension: 0.4, fill: true, pointBackgroundColor: '#0ea5e9', pointRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function updateRefDashboard() {
+            const total = allData.length;
+            // Single-pass stat computation (replaces 6 separate .filter() calls)
+            let pending = 0, ack = 0, corrected = 0, closed = 0, rejected = 0, broken = 0;
+            for (let i = 0; i < allData.length; i++) {
+                const st = allData[i]['Status'] || 'Pending';
+                if      (st === 'Pending')      pending++;
+                else if (st === 'Acknowledged') ack++;
+                else if (st === 'Corrected')    corrected++;
+                else if (st === 'Closed')       closed++;
+                else if (st === 'Rejected')     rejected++;
+                if (allData[i]['Has Broken Ref'] === 'Yes') broken++;
+            }
+
+            document.getElementById('statTotal').textContent = total;
+            document.getElementById('statPending').textContent = pending;
+            document.getElementById('statAck').textContent = ack;
+            document.getElementById('statCorrected').textContent = corrected;
+            document.getElementById('statClosed').textContent = closed;
+            document.getElementById('statRejected').textContent = rejected;
+            document.getElementById('statBroken').textContent = broken;
+
+            // Highlight active stat card
+            const cardMap = { all: 'cardAll', Pending: 'cardPending', Acknowledged: 'cardAck', Corrected: 'cardCorrected', Closed: 'cardClosed', Rejected: 'cardRejected', broken: 'cardBroken' };
+            const ringMap = { all: 'ring-sky-400', Pending: 'ring-amber-400', Acknowledged: 'ring-emerald-400', Corrected: 'ring-blue-400', Closed: 'ring-slate-400', Rejected: 'ring-rose-400', broken: 'ring-red-400' };
+            Object.keys(cardMap).forEach(k => {
+                const el = document.getElementById(cardMap[k]);
+                if (el) el.classList.remove('ring-2', 'ring-sky-400', 'ring-amber-400', 'ring-emerald-400', 'ring-blue-400', 'ring-slate-400', 'ring-rose-400', 'ring-red-400', 'shadow-lg');
+            });
+            const active = document.getElementById(cardMap[currentStatFilter]);
+            if (active) active.classList.add('ring-2', ringMap[currentStatFilter], 'shadow-lg');
+
+            // Update charts
+            if (refStatusChart) {
+                refStatusChart.data.datasets[0].data = [pending, ack, corrected, closed, rejected];
+                refStatusChart.update();
+            }
+            if (refBrokenChart) {
+                refBrokenChart.data.datasets[0].data = [total - broken, broken];
+                refBrokenChart.update();
+            }
+            if (refTrendChart) {
+                // Determine date range of data
+                const dayMap = {};
+                const monthMap = {};
+                let minTs = Infinity, maxTs = -Infinity;
+                allData.forEach(d => {
+                    if (!d['Timestamp']) return;
+                    const dt = new Date(d['Timestamp']);
+                    if (isNaN(dt)) return;
+                    const ms = dt.getTime();
+                    if (ms < minTs) minTs = ms;
+                    if (ms > maxTs) maxTs = ms;
+                    // Both daily and monthly keys
+                    const dayKey = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+                    const monKey = dt.getFullYear() + '/' + String(dt.getMonth() + 1).padStart(2, '0');
+                    dayMap[dayKey] = (dayMap[dayKey] || 0) + 1;
+                    monthMap[monKey] = (monthMap[monKey] || 0) + 1;
+                });
+                const spanDays = maxTs > minTs ? (maxTs - minTs) / 86400000 : 0;
+                let labels, values;
+                if (spanDays <= 60) {
+                    // Daily grouping — fill gaps so line is continuous
+                    const sorted = Object.keys(dayMap).sort();
+                    if (sorted.length > 0) {
+                        const start = new Date(sorted[0]);
+                        const end   = new Date(sorted[sorted.length - 1]);
+                        labels = []; values = [];
+                        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                            const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                            labels.push(String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'));
+                            values.push(dayMap[k] || 0);
+                        }
+                    } else { labels = []; values = []; }
+                } else {
+                    const sorted = Object.keys(monthMap).sort();
+                    labels = sorted;
+                    values = sorted.map(k => monthMap[k]);
+                }
+                refTrendChart.data.labels = labels;
+                refTrendChart.data.datasets[0].data = values;
+                refTrendChart.update();
+            }
+        }
+
+        function filterByStat(stat) {
+            currentStatFilter = stat;
+            applyFilters();
+        }
+
+        function populateRefFilterOptions() {
+            var dmSet = {}, cmSet = {}, amSet = {};
+            allData.forEach(function(d) {
+                var dm = (d['DM Area'] || '').trim();
+                var cm = (d['CM Area'] || '').trim();
+                var am = (d['AMM MTN'] || '').trim();
+                if (dm) dmSet[dm] = true;
+                if (cm) cmSet[cm] = true;
+                if (am) amSet[am] = true;
+            });
+            function fillSel(id, map) {
+                var sel = document.getElementById(id);
+                if (!sel) return;
+                // Remove existing dynamic options (keep first 'ทั้งหมด')
+                while (sel.options.length > 1) sel.remove(1);
+                Object.keys(map).sort().forEach(function(v) {
+                    var opt = document.createElement('option');
+                    opt.value = v; opt.textContent = v;
+                    sel.appendChild(opt);
+                });
+            }
+            fillSel('filterDM', dmSet);
+            fillSel('filterCM', cmSet);
+            fillSel('filterAM', amSet);
+        }
+
+        function applyFilters() {
+            const branch = (document.getElementById('filterBranch').value || '').toLowerCase().trim();
+            const status = document.getElementById('filterStatus').value;
+            const broken = document.getElementById('filterBroken').value;
+            const dm  = document.getElementById('filterDM').value;
+            const cm  = document.getElementById('filterCM').value;
+            const am  = document.getElementById('filterAM').value;
+
+            const filtered = allData.filter(d => {
+                const matchBranch = !branch
+                    || String(d['Branch Code'] || '').toLowerCase().includes(branch)
+                    || String(d['Branch Name'] || '').toLowerCase().includes(branch)
+                    || String(d['Reporter Name'] || '').toLowerCase().includes(branch);
+                const matchStatus = !status || d['Status'] === status;
+                const matchBroken = !broken || d['Has Broken Ref'] === broken;
+                const matchDM = !dm || (d['DM Area'] || '').trim() === dm;
+                const matchCM = !cm || (d['CM Area'] || '').trim() === cm;
+                const matchAM = !am || (d['AMM MTN'] || '').trim() === am;
+                const matchStat = currentStatFilter === 'all'
+                    || (currentStatFilter === 'Pending' && (d['Status'] || 'Pending') === 'Pending')
+                    || (currentStatFilter === 'Acknowledged' && d['Status'] === 'Acknowledged')
+                    || (currentStatFilter === 'Corrected' && d['Status'] === 'Corrected')
+                    || (currentStatFilter === 'Closed' && d['Status'] === 'Closed')
+                    || (currentStatFilter === 'Rejected' && d['Status'] === 'Rejected')
+                    || (currentStatFilter === 'broken' && d['Has Broken Ref'] === 'Yes');
+                return matchBranch && matchStatus && matchBroken && matchDM && matchCM && matchAM && matchStat;
+            });
+
+            renderList(filtered);
+        }
+
+        function resetFilters() {
+            document.getElementById('filterBranch').value = '';
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterBroken').value = '';
+            document.getElementById('filterDM').value = '';
+            document.getElementById('filterCM').value = '';
+            document.getElementById('filterAM').value = '';
+            currentStatFilter = 'all';
+            applyFilters();
+        }
+
+        function renderList(data) {
+            _currentFiltered = data;
+            currentPage = 1;
+            const count = document.getElementById('recordCount');
+            const filterSummary = document.getElementById('filterSummary');
+            if (count) { count.textContent = data.length + ' รายการ'; count.classList.remove('hidden'); }
+            if (filterSummary) filterSummary.textContent = 'แสดง ' + data.length + ' จาก ' + allData.length + ' รายการ';
+            updateRefDashboard();
+            _renderPage();
+        }
+
+        function _renderPage() {
+            const start = (currentPage - 1) * PAGE_SIZE;
+            const pageData = _currentFiltered.slice(start, start + PAGE_SIZE);
+            const totalPages = Math.ceil(_currentFiltered.length / PAGE_SIZE);
+
+            const tableBody = document.getElementById('tableBody');
+            const mobileCards = document.getElementById('mobileCards');
+            const emptyState = document.getElementById('emptyState');
+            const mobileEmptyState = document.getElementById('mobileEmptyState');
+
+            tableBody.innerHTML = '';
+            mobileCards.innerHTML = '';
+
+            if (_currentFiltered.length === 0) {
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+                mobileEmptyState.classList.remove('hidden');
+                renderPaginationBar(0, 0);
+                return;
+            }
+            emptyState.classList.add('hidden');
+            emptyState.classList.remove('flex');
+            mobileEmptyState.classList.add('hidden');
+
+            const tableFragment  = document.createDocumentFragment();
+            const mobileFragment = document.createDocumentFragment();
+
+            pageData.forEach(function(d) {
+                const ts = formatRecordDate(d["Timestamp"]);
+                const hasBroken = d["Has Broken Ref"] === 'Yes';
+                const status = d["Status"] || 'Pending';
+                const branchCode = htmlEscape(d["Branch Code"] || '-');
+                const branchName = htmlEscape(d["Branch Name"] || '-');
+                const reporter = htmlEscape(d["Reporter Name"] || d["Reporter Email"] || '-');
+                const safeId = htmlEscape(d["ID"] || '');
+                const hierarchyInfo = (d['DM Area'] || d['CM Area'] || d['AMM MTN'])
+                    ? [d['DM Area'] ? '<span class="font-medium text-slate-500">DM:</span> ' + htmlEscape(d['DM Area']) : '',
+                       d['CM Area'] ? '<span class="font-medium text-slate-500">CM:</span> ' + htmlEscape(d['CM Area']) : '',
+                       d['AMM MTN'] ? '<span class="font-medium text-slate-500">AM:</span> ' + htmlEscape(d['AMM MTN']) : ''].filter(Boolean).join('  ')
+                    : '';
+
+                // Desktop row
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition cursor-pointer';
+                tr.onclick = function() { openModal(d["ID"]); };
+                tr.innerHTML =
+                    '<td class="p-4 text-slate-500 text-sm">' + ts + '</td>' +
+                    '<td class="p-4">' +
+                        '<div class="font-bold text-slate-800">' + branchCode + ' \u2014 ' + branchName + '</div>' +
+                        (hierarchyInfo ? '<div class="text-xs text-slate-400 mt-0.5 flex flex-wrap gap-x-2">' + hierarchyInfo + '</div>' : '') +
+                    '</td>' +
+                    '<td class="p-4 text-slate-700">' + reporter + '</td>' +
+                    '<td class="p-4">' + (hasBroken ? '<span class="inline-block bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full border border-red-200">\u0e21\u0e35\u0e15\u0e39\u0e49\u0e0a\u0e33\u0e23\u0e38\u0e14</span>' : '<span class="text-slate-300 text-xs">\u2014</span>') + '</td>' +
+                    '<td class="p-4"><span class="status-badge status-' + htmlEscape(status) + '">' + htmlEscape(status) + '</span></td>' +
+                    '<td class="p-4 text-right">' +
+                        '<button onclick="event.stopPropagation(); openModal(\'' + safeId + '\')" class="text-sky-600 hover:text-sky-800 font-medium text-sm hover:bg-sky-50 px-3 py-1.5 rounded-lg transition border border-transparent hover:border-sky-100 shadow-sm">\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14</button>' +
+                    '</td>';
+                tableFragment.appendChild(tr);
+
+                // Mobile card — uses slim _photoCount instead of computing from Attachments_JSON
+                const photoCount = d['_photoCount'] || 0;
+                const mc = document.createElement('div');
+                mc.className = 'bg-white p-4 rounded-xl shadow-sm border border-slate-200 transition-all hover:shadow-md';
+                mc.innerHTML =
+                    '<div class="flex justify-between items-start mb-2">' +
+                        '<div class="flex-1 min-w-0 mr-2">' +
+                            '<h3 class="font-bold text-slate-800 leading-tight">' + branchCode + ' \u2014 ' + branchName + '</h3>' +
+                            (hasBroken ? '<span class="inline-block mt-1 bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200">\u0e21\u0e35\u0e15\u0e39\u0e49\u0e0a\u0e33\u0e23\u0e38\u0e14</span>' : '') +
+                        '</div>' +
+                        '<span class="status-badge status-' + htmlEscape(status) + ' text-[10px] shrink-0">' + htmlEscape(status) + '</span>' +
+                    '</div>' +
+                    (hierarchyInfo ? '<p class="text-xs text-slate-400 mb-1">' + hierarchyInfo + '</p>' : '') +
+                    '<div class="flex justify-between items-center text-xs text-slate-500 pt-3 border-t border-slate-100 mt-2">' +
+                        '<span class="flex items-center gap-2">' + reporter +
+                            (photoCount > 0 ? ' <span class="text-slate-400">\u00b7 ' + photoCount + ' \u0e23\u0e39\u0e1b</span>' : '') +
+                        '</span>' +
+                        '<button onclick="openModal(\'' + safeId + '\')" class="bg-sky-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-sky-700 transition shadow-sm">\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14</button>' +
+                    '</div>';
+                mobileFragment.appendChild(mc);
+            });
+
+            tableBody.appendChild(tableFragment);
+            mobileCards.appendChild(mobileFragment);
+            renderPaginationBar(currentPage, totalPages);
+        }
+
+        function renderPaginationBar(page, totalPages) {
+            const bar = document.getElementById('paginationBar');
+            if (!bar) return;
+            if (totalPages <= 1) { bar.innerHTML = ''; return; }
+            const start = (page - 1) * PAGE_SIZE + 1;
+            const end = Math.min(page * PAGE_SIZE, _currentFiltered.length);
+            let html = '<div class="flex flex-wrap items-center justify-between gap-2 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm">';
+            html += '<span class="text-slate-500 text-xs">\u0e41\u0e2a\u0e14\u0e07 ' + start + '\u2013' + end + ' \u0e08\u0e32\u0e01 ' + _currentFiltered.length + ' \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23</span>';
+            html += '<div class="flex items-center gap-1">';
+            html += '<button onclick="goToPage(' + (page - 1) + ')" ' + (page <= 1 ? 'disabled' : '') + ' class="px-2.5 py-1.5 rounded-lg font-medium transition ' + (page <= 1 ? 'text-slate-300 cursor-default' : 'text-slate-600 hover:bg-slate-100') + '">\u2039 \u0e01\u0e48\u0e2d\u0e19</button>';
+            for (var p = 1; p <= totalPages; p++) {
+                if (p === 1 || p === totalPages || (p >= page - 2 && p <= page + 2)) {
+                    html += '<button onclick="goToPage(' + p + ')" class="w-8 h-8 rounded-lg text-sm font-semibold transition ' + (p === page ? 'bg-sky-600 text-white' : 'text-slate-600 hover:bg-slate-100') + '">' + p + '</button>';
+                } else if (p === page - 3 || p === page + 3) {
+                    html += '<span class="px-1 text-slate-400">\u2026</span>';
+                }
+            }
+            html += '<button onclick="goToPage(' + (page + 1) + ')" ' + (page >= totalPages ? 'disabled' : '') + ' class="px-2.5 py-1.5 rounded-lg font-medium transition ' + (page >= totalPages ? 'text-slate-300 cursor-default' : 'text-slate-600 hover:bg-slate-100') + '">\u0e16\u0e31\u0e14\u0e44\u0e1b \u203a</button>';
+            html += '</div></div>';
+            bar.innerHTML = html;
+        }
+
+        function goToPage(p) {
+            const totalPages = Math.ceil(_currentFiltered.length / PAGE_SIZE);
+            if (p < 1 || p > totalPages) return;
+            currentPage = p;
+            _renderPage();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function openModal(id) {
+            const slim = allData.find(r => r["ID"] === id);
+            if (!slim) return;
+            currentId = id;
+
+            // Set header immediately from slim data (no server call needed)
+            document.getElementById('modalTitle').textContent = (slim["Branch Code"] || '') + ' — ' + (slim["Branch Name"] || '');
+            document.getElementById('modalSubtitle').textContent = formatRecordDate(slim["Timestamp"]) + ' • ' + (slim["Reporter Name"] || slim["Reporter Email"] || '-');
+            document.getElementById('refEditPanel').classList.add('hidden');
+            document.getElementById('modalBody').classList.remove('hidden');
+            document.getElementById('modalBody').innerHTML =
+                '<div class="flex flex-col items-center justify-center py-16 gap-3">' +
+                '<div class="loader mx-auto"></div>' +
+                '<p class="text-slate-400 text-sm mt-3">กำลังโหลดรายละเอียด...</p></div>';
+
+            // Show modal immediately (no waiting for data)
+            const m = document.getElementById('detailModal');
+            m.classList.remove('hidden');
+            requestAnimationFrame(() => requestAnimationFrame(() => m.classList.add('modal-open')));
+
+            // Serve from cache if available, else lazy-fetch
+            if (_fullRecordCache[id]) {
+                _renderModalContent(_fullRecordCache[id]);
+                return;
+            }
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        _fullRecordCache[id] = res.data;
+                        if (currentId === id) _renderModalContent(res.data);
+                    } else {
+                        if (currentId === id) document.getElementById('modalBody').innerHTML =
+                            '<div class="p-8 text-center text-red-500">โหลดข้อมูลไม่สำเร็จ: ' + htmlEscape((res && res.error) || '') + '</div>';
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    if (currentId === id) document.getElementById('modalBody').innerHTML =
+                        '<div class="p-8 text-center text-red-500">Server Error: ' + htmlEscape((err && err.message) || '') + '</div>';
+                })
+                .getRefSurveyRecordById(id);
+        }
+
+        function _renderModalContent(d) {
+            const st = d["Status"] || 'Pending';
+            const canChangeStatus = isAdmin || isSMF;
+
+            // Admin-only buttons — now controlled by admin-only-link class set at page load (applyAdminUI)
+            // Pre-fill edit panel with current values
+            document.getElementById('refEditStatus').value = d["Status"] || 'Pending';
+            document.getElementById('refEditHasBroken').value = d["Has Broken Ref"] || 'No';
+            document.getElementById('refEditBrokenUnits').value = d["Broken Units"] || '';
+            document.getElementById('refEditComments').value = d["Comments"] || '';
+            document.getElementById('refEditPanel').classList.add('hidden');
+            document.getElementById('modalBody').classList.remove('hidden'); // ensure detail content is visible even if modal was closed while edit panel was open
+
+            const attachments = d["Attachments_JSON"] || {};
+            const branchCode = d["Branch Code"] || '';
+
+            let html = '';
+
+            // Section: Branch Info
+            html += sectionHeader('ข้อมูลสาขา', 'sky');
+            html += detailRow('รหัสสาขา', d["Branch Code"]);
+            html += detailRow('ชื่อสาขา', d["Branch Name"]);
+            html += detailRow('วันที่/เวลา', formatRecordDate(d["Timestamp"]));
+            html += detailRow('ผู้รายงาน', d["Reporter Name"] || d["Reporter Email"]);
+            if (d["DM Area"]) html += detailRow('DM', d["DM Area"]);
+            if (d["CM Area"]) html += detailRow('CM (Cluster)', d["CM Area"]);
+            if (d["AMM MTN"]) html += detailRow('AM (MTN)', d["AMM MTN"]);
+
+            // Section: Ref Qty — with per-unit detail
+            // Helper: render a grid of photo thumbnails
+            function photoBlockHtml(urls, unitKey, blockId) {
+                if (!urls || !urls.length) return '';
+                const thumbs = urls.map(url => {
+                    const viewUrl = url.replace('thumbnail?sz=w1000&id=', 'file/d/').replace(/&.*/, '') + '/view';
+                    const _esc = htmlEscape(url);
+                    const delBtn = (unitKey && blockId)
+                        ? `<button onclick="deleteRefPhoto(this,'${unitKey}','${blockId}')" data-url="${_esc}" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button>`
+                        : '';
+                    return `<div class="relative group"><a href="${viewUrl}" target="_blank"><img src="${url}" class="w-full rounded-lg border border-slate-200 hover:opacity-90 transition object-cover h-28" onerror="this.style.display='none'"></a>${delBtn}</div>`;
+                }).join('');
+                return `<div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">${thumbs}</div>`;
+            }
+
+            // Helper: build per-unit rows from row data using a given key prefix, starting at startIdx
+            // attachKeyPrefix: the idPrefix used when the form created the file input, e.g. 'ref_open', 'ref_bev_plugin'
+            //   The attachment key is attachKeyPrefix + '_' + u  (e.g. 'ref_open_1', 'ref_frozen_3')
+            function buildUnitRows(keyPrefix, qty, unitLabel, startIdx, typeCode, typeSeqStart, attachKeyPrefix, headerBg) {
+                const n = parseInt(qty) || 0;
+                if (n === 0) return '';
+                const start = startIdx || 1;
+                const tCode = typeCode || 'RF';
+                const tSeqStart = typeSeqStart || 1;
+                const hdrBg = headerBg || 'bg-sky-700';
+                let rows = '';
+                for (let u = start; u < start + n; u++) {
+                    const localSeq = tSeqStart + (u - start);
+                    const equipId = branchCode ? `${branchCode}-${tCode}${String(localSeq).padStart(2,'0')}` : `${tCode}${String(localSeq).padStart(2,'0')}`;
+                    const supplier     = d[keyPrefix + 'Supplier_' + u]      || '';
+                    const supplierOther = d[keyPrefix + 'Supplier Other_' + u] || '';
+                    const brand      = d[keyPrefix + 'Brand_' + u]    || '-';
+                    const assetNo    = d[keyPrefix + 'Asset No_' + u]  || '-';
+                    const unitStatus = d[keyPrefix + 'Status_' + u]    || 'ใช้งาน';
+                    const product    = d[keyPrefix + 'Product_' + u]   || '';
+                    // Primary lookup: idPrefix_globalIndex key (e.g. 'ref_open_1')
+                    let photos = attachKeyPrefix ? (attachments[attachKeyPrefix + '_' + u] || []) : [];
+                    // Fallback: old format — key contains equipment ID in parentheses
+                    if (!photos.length) {
+                        const photoKey = Object.keys(attachments).find(k => k.includes('(' + equipId + ')'));
+                        if (photoKey) photos = attachments[photoKey] || [];
+                    }
+
+                    rows += `<div class="border border-slate-200 rounded-xl overflow-hidden mb-3 shadow-sm">`;
+                    // Card header
+                    rows += `<div class="${hdrBg} text-white px-3 py-2 flex items-center justify-between">`;
+                    rows += `<span class="text-sm font-bold flex items-center gap-1.5">`;
+                    rows += `<svg class="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>`;
+                    rows += `${unitLabel} ที่ ${u - start + 1}</span>`;
+                    rows += `<span class="font-mono text-xs bg-white/20 px-2 py-0.5 rounded font-bold">${equipId}</span>`;
+                    rows += `</div>`;
+                    // Card body
+                    rows += `<div class="p-3 bg-white">`;
+                    // Top row: QR column + info
+                    rows += `<div class="flex items-start gap-3 mb-1">`;
+                    // QR column wrapper (flex-col so download button goes below QR image)
+                    rows += `<div class="flex-shrink-0 flex flex-col items-center gap-1">`;
+                    rows += `<div id="qr-ref-${tCode}-${localSeq}" data-qr="${equipId}" class="w-14 h-14"></div>`;
+                    rows += `</div>`;
+                    // Info column
+                    rows += `<div class="flex-1 min-w-0 space-y-0.5">`;
+                    if (supplier) rows += detailRow('แบรนด์ไอศกรีม', supplier + (supplierOther ? ` (${supplierOther})` : ''));
+                    rows += detailRow(supplier ? 'ยี่ห้อตู้' : 'ยี่ห้อ', brand);
+                    if (assetNo !== '-') rows += detailRow('Asset No.', assetNo);
+                    rows += `<div class="flex items-center gap-2 py-0.5 text-xs">
+                        <span class="text-slate-500">สถานะ:</span>
+                        ${unitStatus === 'ใช้งาน'
+                            ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-green-100 text-green-700 border border-green-300">✓ ใช้งาน</span>'
+                            : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-red-100 text-red-700 border border-red-300">✗ ไม่ใช้งาน</span>'}
+                    </div>`;
+                    if (product) rows += detailRow('สินค้าที่วาง', product);
+                    rows += `</div>`;
+                    rows += `</div>`; // end top flex row
+                    // Photos — full width, below info+QR row
+                    const photoBlockId = `ref-photos-${tCode}-${localSeq}`;
+                    const unitAttachKey = attachKeyPrefix ? (attachKeyPrefix + '_' + u) : '';
+                    rows += `<div id="${photoBlockId}">`;
+                    if (photos.length > 0) {
+                        rows += `<div class="mt-3 pt-3 border-t border-slate-100">`;
+                        rows += `<p class="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1">`;
+                        rows += `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`;
+                        rows += `รูปภาพ (${photos.length} รูป)</p>`;
+                        rows += photoBlockHtml(photos, unitAttachKey, photoBlockId);
+                        rows += `</div>`;
+                    }
+                    rows += `</div>`; // end photo container
+                    if (unitAttachKey) {
+                        rows += `<div class="mt-2 flex justify-end">`;
+                        rows += `<button onclick="pickRefUnitPhoto('${unitAttachKey}','${photoBlockId}')" class="text-xs text-sky-600 hover:text-sky-800 border border-sky-200 hover:bg-sky-50 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5">`;
+                        rows += `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>เพิ่มรูปภาพ</button>`;
+                        rows += `</div>`;
+                    }
+                    rows += `</div>`; // end card body
+                    rows += `</div>`; // end card
+                }
+                return rows;
+            }
+
+            // 2.1 OPEN (sky)
+            const openQty = parseInt(d['Ref Open Qty']) || 0;
+            html += sectionHeader('2.1 ตู้แช่ OPEN' + (openQty > 0 ? ' — ' + openQty + ' ตู้' : ' — ไม่มี'), 'sky');
+            html += buildUnitRows('Ref Open ', openQty, 'ตู้ OPEN', 1, 'OC', 1, 'ref_open', 'bg-sky-700');
+
+            // 2.2 Beverage (teal)
+            const pluginQty = parseInt(d['Ref Bev Plugin Qty']) || 0;
+            const walkinQty = parseInt(d['Ref Bev Walk In Qty']) || 0;
+            const remoteQty = parseInt(d['Ref Bev Remote Qty']) || 0;
+            const totalBev = pluginQty + walkinQty + remoteQty;
+            html += sectionHeader('2.2 ตู้ทำความเย็นเครื่องดื่ม' + (totalBev > 0 ? ' — ' + totalBev + ' ตู้' : ' — ไม่มี'), 'teal');
+            html += buildUnitRows('Ref Bev Plugin ', pluginQty, 'ตู้ Plugin', 1, 'BP', 1, 'ref_bev_plugin', 'bg-teal-600');
+            html += buildUnitRows('Ref Bev Walk In ', walkinQty, 'ตู้ Walk-in', 1, 'BW', 1, 'ref_bev_walkin', 'bg-teal-600');
+            html += buildUnitRows('Ref Bev Remote ', remoteQty, 'ตู้ Remote', 1, 'BR', 1, 'ref_bev_remote', 'bg-teal-600');
+
+            // 2.3 Frozen (indigo)
+            const f1qty = parseInt(d['Ref Frozen1 Door Qty']) || 0;
+            const f2qty = parseInt(d['Ref Frozen2 Door Qty']) || 0;
+            const f3qty = parseInt(d['Ref Frozen3 Door Qty']) || 0;
+            const totalFrozen = f1qty + f2qty + f3qty;
+            html += sectionHeader('2.3 ตู้แช่อาหารแช่แข็ง' + (totalFrozen > 0 ? ' — ' + totalFrozen + ' ตู้' : ' — ไม่มี'), 'indigo');
+            html += buildUnitRows('Ref Frozen ', f1qty, 'ตู้แช่แข็ง 1 ประตู', 1, 'FC', 1, 'ref_frozen', 'bg-indigo-700');
+            html += buildUnitRows('Ref Frozen ', f2qty, 'ตู้แช่แข็ง 2 ประตู', f1qty + 1, 'FC', f1qty + 1, 'ref_frozen', 'bg-indigo-700');
+            html += buildUnitRows('Ref Frozen ', f3qty, 'ตู้แช่แข็ง 3 ประตู', f1qty + f2qty + 1, 'FC', f1qty + f2qty + 1, 'ref_frozen', 'bg-indigo-700');
+
+            // 2.4 Ice Cream (rose)
+            const icQty = parseInt(d['Ref Ice Cream Qty']) || 0;
+            html += sectionHeader('2.4 ตู้แช่ไอศกรีม' + (icQty > 0 ? ' — ' + icQty + ' ตู้' : ' — ไม่มี'), 'rose');
+            html += buildUnitRows('Ref Ice Cream ', icQty, 'ตู้ไอศกรีม', 1, 'IC', 1, 'ref_icecream', 'bg-rose-600');
+
+            // 2.5 Ice (cyan)
+            const iceQty = parseInt(d['Ref Ice Qty']) || 0;
+            html += sectionHeader('2.5 ตู้แช่น้ำแข็ง' + (iceQty > 0 ? ' — ' + iceQty + ' ตู้' : ' — ไม่มี'), 'cyan');
+            html += buildUnitRows('Ref Ice ', iceQty, 'ตู้น้ำแข็ง', 1, 'IM', 1, 'ref_ice', 'bg-cyan-600');
+
+            // 2.6 Stainless 4-Door (slate)
+            const ss4Qty = parseInt(d['Ref Ss4 Door Qty']) || 0;
+            if (ss4Qty > 0) {
+                html += sectionHeader('2.6 ตู้ 4 ประตู Stainless — ' + ss4Qty + ' ตู้', 'slate');
+                html += buildUnitRows('Ref Ss4 Door ', ss4Qty, 'ตู้ 4 ประตู SS', 1, 'SS', 1, 'ref_ss4door', 'bg-slate-600');
+            }
+
+            // Section: Broken Ref
+            if (d["Has Broken Ref"] === 'Yes') {
+                html += sectionHeader('ตู้แช่ชำรุด', 'red');
+                html += detailRow('ตู้ที่ชำรุด (เบอร์)', d["Broken Units"] || '-');
+
+                try {
+                    const detailStr = d["Broken Units Detail"];
+                    if (detailStr) {
+                        const parsedDetail = JSON.parse(detailStr);
+                        const symptomLabels = {
+                            temp: 'อุณหภูมิตู้ไม่ถึงค่า',
+                            frost: 'น้ำแข็งสะสม/คอยล์เย็น',
+                            compressor: 'คอมเพรสเซอร์เสียหาย',
+                            evapFan: 'พัดลมคอยล์เย็น',
+                            condFan: 'พัดลมคอนเดนเซอร์',
+                            gasket: 'ขอบยางประตู',
+                            drain: 'น้ำล้น/ท่ออุดตัน',
+                            refrigerant: 'น้ำยาทำความเย็น',
+                            condenser: 'คอยล์ร้อนอุดตัน',
+                            controller: 'คอนโทรลเลอร์ Error',
+                            note: 'หมายเหตุเพิ่มเติม'
+                        };
+
+                        for (const key in parsedDetail) {
+                            const detail = parsedDetail[key];
+                            if (detail && detail.type) {
+                                let unitTitle = detail.type;
+                                if (detail.assetNo) {
+                                    unitTitle += ` <span class="text-xs font-mono text-slate-500 bg-slate-100 px-1 py-0.5 rounded ml-2">Asset No: ${detail.assetNo}</span>`;
+                                }
+                                html += `<p class="text-xs font-bold text-slate-600 mt-4 mb-2 border-l-2 border-red-400 pl-2 bg-slate-50 p-1 flex items-center">
+                                            ตู้เบอร์ ${key.replace('unit', '')} — ${unitTitle}
+                                         </p>`;
+
+                                for (const symKey in symptomLabels) {
+                                    if (detail[symKey]) {
+                                        html += detailRow(symptomLabels[symKey], detail[symKey]);
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        html += detailRow('ข้อมูลรายละเอียดตู้ชำรุด', 'ไม่มีบันทึกรายละเอียดตู้ชำรุดแบบรายตู้ (Old Data Format)');
+                    }
+                } catch (e) {
+                    console.log("Error parsing broken unit details:", e);
+                }
+            }
+
+            // Section: Comments
+            if (d["Comments"]) {
+                html += sectionHeader('หมายเหตุ', 'amber');
+                html += `<p class="text-sm text-slate-700 bg-amber-50 p-3 rounded-lg">${d["Comments"]}</p>`;
+            }
+
+            // Status panel — rendered inside scrollable body
+            if (canChangeStatus) {
+                html += `<div id="refStatusPanel" class="mt-5 border border-indigo-200 bg-indigo-50 rounded-xl px-5 py-4 no-print">
+                    <h4 class="font-bold text-indigo-800 text-sm mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        เปลี่ยน Status
+                    </h4>
+                    <div class="flex flex-col sm:flex-row gap-3 items-end">
+                        <div class="w-full sm:w-1/3">
+                            <label class="block text-xs font-semibold text-indigo-900 mb-1">Status</label>
+                            <select id="refStatusSelect" onchange="toggleRefRejectReason(this.value)" class="w-full border border-indigo-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 bg-white">
+                                <option value="Pending">Pending</option>
+                                <option value="Acknowledged">Acknowledged</option>
+                                <option value="Corrected">Corrected</option>
+                                <option value="Closed">Closed</option>
+                                <option value="Rejected">⛔ Rejected</option>
+                            </select>
+                        </div>
+                        <div class="w-full sm:w-auto">
+                            <button id="refSaveStatusBtn" onclick="saveRefStatus()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-lg transition shadow-sm flex items-center justify-center gap-2 text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Save Status
+                            </button>
+                        </div>
+                    </div>
+                    <div id="refRejectReasonWrap" class="hidden mt-3">
+                        <label class="block text-xs font-semibold text-rose-700 mb-1">เหตุผลที่ Reject <span class="text-red-500">*</span></label>
+                        <textarea id="refRejectReason" rows="2" class="w-full border border-rose-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-rose-400 bg-white resize-none outline-none" placeholder="ระบุเหตุผลที่ไม่ผ่านการ Acknowledge..."></textarea>
+                    </div>
+                </div>`;
+                // Set value after injecting into DOM (below)
+            }
+
+            document.getElementById('modalBody').innerHTML = html;
+            applyAdminUI(); // re-apply to show/hide upload buttons injected by buildUnitRows
+            if (canChangeStatus) {
+                const sel = document.getElementById('refStatusSelect');
+                if (sel) sel.value = st;
+            }
+            // Generate QR codes
+            if (typeof QRCode !== 'undefined') {
+                document.querySelectorAll('#modalBody [data-qr]').forEach(function(el) {
+                    const qrVal = el.getAttribute('data-qr');
+                    if (qrVal) {
+                        try {
+                            new QRCode(el, { text: qrVal, width: 56, height: 56, correctLevel: QRCode.CorrectLevel.L });
+                            var dlBtn = document.createElement('button');
+                            dlBtn.className = 'w-full text-[10px] flex items-center justify-center gap-0.5 text-sky-600 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-100 rounded px-1 py-0.5 transition leading-none';
+                            dlBtn.title = 'ดาวน์โหลด QR';
+                            dlBtn.innerHTML = '<svg class="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>ดาวน์โหลด';
+                            dlBtn.onclick = (function(id, name) { return function() { downloadQR(id, name); }; })(el.id, qrVal);
+                            // Append inside the flex-col QR column wrapper (parent of QR div), not as flex sibling
+                            el.parentElement.appendChild(dlBtn);
+                        } catch(e) { el.textContent = qrVal; }
+                    }
+                });
+            }
+        }
+
+        function printModal() {
+            const title    = document.getElementById('modalTitle').textContent;
+            const subtitle = document.getElementById('modalSubtitle').textContent;
+            const bodyHtml = document.getElementById('modalBody').innerHTML;
+
+            // GAS web apps run inside a sandboxed iframe, so window.print() on the
+            // current window prints the outer Google wrapper — not this page.
+            // Opening a dedicated print window is the reliable workaround.
+            const pw = window.open('', '_blank',
+                'width=900,height=700,menubar=yes,toolbar=yes,scrollbars=yes');
+            if (!pw) {
+                alert('กรุณาอนุญาต Pop-up สำหรับหน้านี้แล้วลองใหม่อีกครั้ง\n(Allow pop-up for this page and try again)');
+                return;
+            }
+            pw.document.write(`<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+<style>
+  @page { size: A4 portrait; margin: 15mm; }
+  body  { font-family: sans-serif; color: #1e293b; font-size: 11pt; }
+  .no-print, button { display: none !important; }
+  .detail-row   { display: flex; padding: 4px 0; font-size: 11pt; border-bottom: 1px solid #f1f5f9; }
+  .detail-label { width: 35%; font-weight: 600; color: #475569; flex-shrink: 0; }
+  .detail-value { flex: 1; }
+  img { max-width: 100%; break-inside: avoid; }
+  @media print { .no-print, button { display: none !important; } }
+</style>
+</head>
+<body>
+<div style="background:#0c4a6e;color:white;padding:14px 18px;margin-bottom:14px;border-radius:6px;">
+  <h2 style="margin:0 0 4px 0;font-size:16pt;">${title}</h2>
+  <p  style="margin:0;font-size:10pt;opacity:0.85;">${subtitle}</p>
+</div>
+${bodyHtml}
+<script>
+  window.onload = function() { window.print(); setTimeout(function(){ window.close(); }, 800); };
+<\/script>
+</body>
+</html>`);
+            pw.document.close();
+        }
+
+        let _modalCloseTimer = null;
+        function closeModal() {
+            const m = document.getElementById('detailModal');
+            m.classList.remove('modal-open');
+            clearTimeout(_modalCloseTimer);
+            _modalCloseTimer = setTimeout(() => {
+                m.classList.add('hidden');
+                currentId = null;
+            }, 360);
+        }
+
+        function toggleRefEditPanel() {
+            const panel = document.getElementById('refEditPanel');
+            const body  = document.getElementById('modalBody');
+            if (panel.classList.contains('hidden')) {
+                // Open edit panel
+                body.classList.add('hidden');
+                panel.classList.remove('hidden');
+                const d = _fullRecordCache[currentId];
+                if (d) {
+                    _buildRefEditQtyFields(d);
+                    _buildRefEditUnitsFields(d);
+                    _buildRefEditBrokenFields();
+                }
+                _editTab('general');
+            } else {
+                _refCancelEdit();
+            }
+        }
+
+        function _refCancelEdit() {
+            document.getElementById('refEditPanel').classList.add('hidden');
+            document.getElementById('modalBody').classList.remove('hidden');
+        }
+
+        function _editTab(tab) {
+            ['general','qty','units','broken'].forEach(t => {
+                document.getElementById('_epanel_' + t).classList.toggle('hidden', t !== tab);
+                const btn = document.getElementById('_etab_' + t);
+                if (!btn) return;
+                if (t === tab) {
+                    btn.classList.add('border-b-2','border-amber-500','text-amber-700','bg-amber-50');
+                    btn.classList.remove('text-slate-500');
+                } else {
+                    btn.classList.remove('border-b-2','border-amber-500','text-amber-700','bg-amber-50');
+                    btn.classList.add('text-slate-500');
+                }
+            });
+            if (tab === 'units') {
+                const d = _fullRecordCache[currentId];
+                if (d) _buildRefEditUnitsFields(d);
+            }
+            if (tab === 'broken') _buildRefEditBrokenFields();
+        }
+
+        function _refreshBrokenTab() {
+            if (!document.getElementById('_epanel_broken').classList.contains('hidden')) _buildRefEditBrokenFields();
+        }
+
+        function _buildRefEditQtyFields(d) {
+            const container = document.getElementById('_refEditQtyBody');
+            if (!container) return;
+            const defs = [
+                { id:'refEditQtyOpen',      col:'Ref Open Qty',         label:'2.1 ตู้ OPEN',              c:'sky'    },
+                { id:'refEditQtyBevPlugin', col:'Ref Bev Plugin Qty',   label:'2.2 ตู้ Bev Plugin',        c:'teal'   },
+                { id:'refEditQtyBevWalkin', col:'Ref Bev Walk In Qty',  label:'2.2 ตู้ Bev Walk-in',       c:'teal'   },
+                { id:'refEditQtyBevRemote', col:'Ref Bev Remote Qty',   label:'2.2 ตู้ Bev Remote',        c:'teal'   },
+                { id:'refEditQtyFrozen1',   col:'Ref Frozen1 Door Qty', label:'2.3 ตู้แช่แข็ง 1 ประตู',   c:'indigo' },
+                { id:'refEditQtyFrozen2',   col:'Ref Frozen2 Door Qty', label:'2.3 ตู้แช่แข็ง 2 ประตู',   c:'indigo' },
+                { id:'refEditQtyFrozen3',   col:'Ref Frozen3 Door Qty', label:'2.3 ตู้แช่แข็ง 3 ประตู',   c:'indigo' },
+                { id:'refEditQtyIceCream',  col:'Ref Ice Cream Qty',    label:'2.4 ตู้ไอศกรีม',            c:'rose'   },
+                { id:'refEditQtyIce',       col:'Ref Ice Qty',          label:'2.5 ตู้น้ำแข็ง',            c:'cyan'   },
+                { id:'refEditQtySs4',       col:'Ref Ss4 Door Qty',     label:'2.6 ตู้ 4 ประตู Stainless', c:'slate'  },
+            ];
+            const cmap = { sky:'border-sky-200 bg-sky-50 text-sky-800', teal:'border-teal-200 bg-teal-50 text-teal-800', indigo:'border-indigo-200 bg-indigo-50 text-indigo-800', rose:'border-rose-200 bg-rose-50 text-rose-800', cyan:'border-cyan-200 bg-cyan-50 text-cyan-800', slate:'border-slate-200 bg-slate-100 text-slate-700' };
+            let html = '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">';
+            defs.forEach(df => {
+                const cls = cmap[df.c] || cmap.slate;
+                html += `<div class="border rounded-lg p-2.5 ${cls}"><label class="block text-xs font-semibold mb-1.5">${df.label}</label><input id="${df.id}" type="number" min="0" max="99" value="${parseInt(d[df.col])||0}" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white text-slate-800"></div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function _buildRefEditUnitsFields(d) {
+            function _qty(inputId, colKey) {
+                const el = document.getElementById(inputId);
+                return el ? (parseInt(el.value)||0) : (parseInt(d[colKey])||0);
+            }
+            const defs = [
+                { prefix:'Ref Open ',      qty:_qty('refEditQtyOpen','Ref Open Qty'),                                                                                                                             label:'ตู้ OPEN',          b:'border-sky-200',    bg:'bg-sky-50',    hc:'text-sky-700',    sup:false },
+                { prefix:'Ref Bev Plugin ',qty:_qty('refEditQtyBevPlugin','Ref Bev Plugin Qty'),                                                                                                                  label:'ตู้ Bev Plugin',   b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false },
+                { prefix:'Ref Bev Walk In ',qty:_qty('refEditQtyBevWalkin','Ref Bev Walk In Qty'),                                                                                                                label:'ตู้ Bev Walk-in',  b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false },
+                { prefix:'Ref Bev Remote ',qty:_qty('refEditQtyBevRemote','Ref Bev Remote Qty'),                                                                                                                  label:'ตู้ Bev Remote',   b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false },
+                { prefix:'Ref Frozen ',    qty:_qty('refEditQtyFrozen1','Ref Frozen1 Door Qty')+_qty('refEditQtyFrozen2','Ref Frozen2 Door Qty')+_qty('refEditQtyFrozen3','Ref Frozen3 Door Qty'),                label:'ตู้แช่แข็ง',       b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false },
+                { prefix:'Ref Ice Cream ', qty:_qty('refEditQtyIceCream','Ref Ice Cream Qty'),                                                                                                                     label:'ตู้ไอศกรีม',       b:'border-rose-200',   bg:'bg-rose-50',   hc:'text-rose-700',   sup:true  },
+                { prefix:'Ref Ice ',       qty:_qty('refEditQtyIce','Ref Ice Qty'),                                                                                                                               label:'ตู้น้ำแข็ง',       b:'border-cyan-200',   bg:'bg-cyan-50',   hc:'text-cyan-700',   sup:false },
+                { prefix:'Ref Ss4 Door ',  qty:_qty('refEditQtySs4','Ref Ss4 Door Qty'),                                                                                                                          label:'ตู้ 4 ประตู SS',   b:'border-slate-200',  bg:'bg-slate-100', hc:'text-slate-700',  sup:false },
+            ];
+            const container = document.getElementById('_refEditUnitsBody');
+            if (!container) return;
+            let html = '';
+            defs.forEach(def => {
+                if (def.qty <= 0) return;
+                html += `<div class="mb-4"><p class="text-xs font-bold ${def.hc} mb-2 ${def.bg} border ${def.b} rounded-lg px-2.5 py-1.5">📦 ${def.label} (${def.qty} ตู้)</p>`;
+                const REF_BRANDS = ['Themedez', 'Systemform', 'Carrier', 'Pattana Inter Cool', 'LG', 'ETSR', 'Panasonic', 'Sanden', 'The Cool', 'Haier', 'VSR'];
+                for (let u = 1; u <= def.qty; u++) {
+                    const rawBrand = d[def.prefix+'Brand_'+u] || '';
+                    const brand    = htmlEscape(rawBrand);
+                    const assetNo  = htmlEscape(d[def.prefix+'Asset No_'+u] || '');
+                    const status   = d[def.prefix+'Status_'+u] || 'ใช้งาน';
+                    const product  = htmlEscape(d[def.prefix+'Product_'+u]  || '');
+                    const supplier = def.sup ? htmlEscape(d[def.prefix+'Supplier_'+u] || '') : null;
+                    const note     = htmlEscape(d[def.prefix+'Note_'+u]     || '');
+                    const isOtherBrand = !!rawBrand && !REF_BRANDS.includes(rawBrand);
+                    const brandOtherId = `refBrandOther_${def.prefix}_${u}`;
+                    const brandOpts = REF_BRANDS.map(b => `<option value="${b}" ${rawBrand === b ? 'selected' : ''}>${b}</option>`).join('')
+                        + `<option value="Other" ${isOtherBrand ? 'selected' : ''}>อื่นๆ โปรดระบุ</option>`;
+                    html += `<div class="border ${def.b} rounded-lg p-3 mb-2 bg-white"><p class="text-xs font-semibold text-slate-400 mb-2 border-b border-slate-100 pb-1">ตู้ที่ ${u}</p><div class="grid grid-cols-2 gap-2">`;
+                    if (def.sup) html += `<div class="col-span-2"><label class="block text-xs text-slate-500 mb-0.5">แบรนด์ไอศกรีม</label><input type="text" data-edit-field="${def.prefix}Supplier_${u}" value="${supplier}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
+                    html += `<div class="col-span-2 sm:col-span-1"><label class="block text-xs text-slate-500 mb-0.5">ยี่ห้อ</label><select data-edit-field="${def.prefix}Brand_${u}" onchange="(function(el){var inp=document.getElementById('${brandOtherId}');if(inp)inp.style.display=el.value==='Other'?'':'none';})(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white"><option value="">-- เลือก --</option>${brandOpts}</select><input type="text" id="${brandOtherId}" placeholder="ระบุยี่ห้อ..." value="${isOtherBrand ? brand : ''}" style="display:${isOtherBrand ? '' : 'none'}" class="mt-1 w-full border border-orange-300 rounded p-1.5 text-sm bg-orange-50"></div>`;
+                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><input type="text" data-edit-field="${def.prefix}Asset No_${u}" value="${assetNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
+                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">สถานะ</label><select data-edit-field="${def.prefix}Status_${u}" class="w-full border border-slate-300 rounded p-1.5 text-sm"><option value="ใช้งาน" ${status==='ใช้งาน'?'selected':''}>ใช้งาน</option><option value="ไม่ใช้งาน" ${status!=='ใช้งาน'?'selected':''}>ไม่ใช้งาน</option></select></div>`;
+                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">สินค้าที่วาง</label><input type="text" data-edit-field="${def.prefix}Product_${u}" value="${product}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
+                    html += `<div class="col-span-2"><label class="block text-xs text-slate-500 mb-0.5">หมายเหตุ</label><textarea data-edit-field="${def.prefix}Note_${u}" rows="2" class="w-full border border-slate-300 rounded p-1.5 text-sm resize-none">${note}</textarea></div>`;
+                    html += `</div></div>`;
+                }
+                html += `</div>`;
+            });
+            container.innerHTML = html || '<p class="text-xs text-slate-400 text-center py-6">ไม่มีข้อมูลตู้</p>';
+        }
+
+        function _buildRefEditBrokenFields() {
+            const container = document.getElementById('_refEditBrokenBody');
+            if (!container) return;
+            const d = _fullRecordCache[currentId];
+            if (!d) return;
+            if (document.getElementById('refEditHasBroken').value !== 'Yes') {
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ตั้งค่า "มีตู้ชำรุด = มี" ในแท็บ ทั่วไป ก่อน</p>'; return;
+            }
+            const brokenStr = document.getElementById('refEditBrokenUnits').value || '';
+            const brokenNums = brokenStr.split(',').map(s=>s.trim()).filter(Boolean);
+            if (!brokenNums.length) {
+                container.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ระบุเบอร์ตู้ที่ชำรุดในแท็บ ทั่วไป ก่อน (เช่น 1, 3)</p>'; return;
+            }
+            let existing = {};
+            try { existing = JSON.parse(d["Broken Units Detail"] || '{}'); } catch(e) {}
+            const sflds = [['temp','อุณหภูมิตู้'],['frost','น้ำแข็งสะสม'],['compressor','คอมเพรสเซอร์'],['evapFan','พัดลมคอยล์เย็น'],['condFan','พัดลมคอนเดนเซอร์'],['gasket','ขอบยางประตู'],['drain','ท่อระบาย'],['refrigerant','น้ำยาทำความเย็น'],['condenser','คอยล์ร้อน'],['controller','คอนโทรลเลอร์']];
+            let html = '';
+            brokenNums.forEach(n => {
+                const ex = existing['unit'+n] || {};
+                html += `<div class="border border-red-200 rounded-xl p-3 mb-3 bg-red-50"><p class="text-xs font-bold text-red-700 mb-2 border-b border-red-100 pb-1.5">🔴 ตู้ชำรุดเบอร์ ${n}</p><div class="grid grid-cols-2 gap-2">`;
+                html += `<div><label class="block text-xs text-slate-500 mb-0.5">ประเภทตู้</label><input type="text" data-broken-field="unit${n}_type" value="${htmlEscape(ex.type||'')}" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white"></div>`;
+                html += `<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><input type="text" data-broken-field="unit${n}_assetNo" value="${htmlEscape(ex.assetNo||'')}" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white"></div>`;
+                sflds.forEach(([k,lbl]) => {
+                    html += `<div class="col-span-2"><label class="block text-xs text-slate-500 mb-0.5">${lbl}</label><input type="text" data-broken-field="unit${n}_${k}" value="${htmlEscape(ex[k]||'')}" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white" placeholder="สถานะ / อาการ"></div>`;
+                });
+                html += `<div class="col-span-2"><label class="block text-xs text-slate-500 mb-0.5">หมายเหตุ</label><textarea data-broken-field="unit${n}_note" rows="2" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white resize-none">${htmlEscape(ex.note||'')}</textarea></div>`;
+                html += `</div></div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        // Mirrors updateUserUI() in index.html — show/hide .admin-only-link elements
+        function applyAdminUI() {
+            document.querySelectorAll('.admin-only-link').forEach(function(el) {
+                if (isAdmin) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+        }
+
+        // ─── Per-unit Photo Upload (admin only) ──────────────────────────────
+        var _refPhotoTarget = null; // { unitKey, photoBlockId }
+
+        function pickRefUnitPhoto(unitKey, photoBlockId) {
+            _refPhotoTarget = { unitKey: unitKey, photoBlockId: photoBlockId };
+            var inp = document.getElementById('refPhotoUploadInput');
+            inp.value = '';
+            inp.click();
+        }
+
+        document.getElementById('refPhotoUploadInput').addEventListener('change', function() {
+            if (!_refPhotoTarget || !currentId) return;
+            const files = Array.from(this.files);
+            if (!files.length) return;
+            const { unitKey, photoBlockId } = _refPhotoTarget;
+            _refPhotoTarget = null;
+
+            const photoBlockEl = document.getElementById(photoBlockId);
+
+            // Show inline loading indicator
+            const loadingId = 'ref-ul-' + Date.now();
+            const loadingHtml = `<div id="${loadingId}" class="mt-2 flex items-center gap-2 text-xs text-sky-600 bg-sky-50 border border-sky-100 rounded-lg px-3 py-2">` +
+                `<svg class="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>` +
+                `กำลังอัปโหลด ${files.length} รูป...</div>`;
+            if (photoBlockEl) photoBlockEl.insertAdjacentHTML('afterend', loadingHtml);
+
+            // Convert to base64
+            Promise.all(files.map(function(file) {
+                return new Promise(function(resolve, reject) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        resolve({ name: file.name, mimeType: file.type || 'image/jpeg', data: e.target.result.split(',')[1] });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            })).then(function(fileData) {
+                google.script.run
+                    .withSuccessHandler(function(res) {
+                        const loadingEl = document.getElementById(loadingId);
+                        if (loadingEl) loadingEl.remove();
+                        if (!res.success) { alert('อัปโหลดรูปไม่สำเร็จ: ' + res.error); return; }
+
+                        // Update full record cache so re-opening the modal shows the new photos
+                        const rec = _fullRecordCache[currentId];
+                        if (rec) {
+                            if (!rec["Attachments_JSON"] || typeof rec["Attachments_JSON"] !== 'object') rec["Attachments_JSON"] = {};
+                            rec["Attachments_JSON"][unitKey] = (rec["Attachments_JSON"][unitKey] || []).concat(res.newUrls);
+                        }
+
+                        // Inject new thumbnails into the photo container in the open modal
+                        if (photoBlockEl) {
+                            const thumbHtml = res.newUrls.map(function(url) {
+                                const viewUrl = url.replace('thumbnail?sz=w1000&id=', 'file/d/').replace(/&.*/, '') + '/view';
+                                const _esc = htmlEscape(url);
+                                return `<div class="relative group"><a href="${viewUrl}" target="_blank"><img src="${url}" class="w-full rounded-lg border border-slate-200 hover:opacity-90 transition object-cover h-28" onerror="this.style.display='none'"></a><button onclick="deleteRefPhoto(this,'${unitKey}','${photoBlockId}')" data-url="${_esc}" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button></div>`;
+                            }).join('');
+                            const existingGrid = photoBlockEl.querySelector('.grid');
+                            if (existingGrid) {
+                                existingGrid.insertAdjacentHTML('beforeend', thumbHtml);
+                                const countEl = photoBlockEl.querySelector('p');
+                                if (countEl) {
+                                    const total = photoBlockEl.querySelectorAll('img').length;
+                                    countEl.innerHTML = countEl.innerHTML.replace(/\d+ รูป/, total + ' รูป');
+                                }
+                            } else {
+                                // No photos existed yet — create the block
+                                photoBlockEl.innerHTML =
+                                    `<div class="mt-3 pt-3 border-t border-slate-100">` +
+                                    `<p class="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1">` +
+                                    `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>` +
+                                    `รูปภาพ (${res.newUrls.length} รูป)</p>` +
+                                    `<div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">${thumbHtml}</div>` +
+                                    `</div>`;
+                            }
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        const loadingEl = document.getElementById(loadingId);
+                        if (loadingEl) loadingEl.remove();
+                        alert('Error: ' + err.message);
+                    })
+                    .addRefSurveyPhotos(currentId, unitKey, fileData);
+            });
+        });
+        // ─────────────────────────────────────────────────────────────────────
+
+        function deleteRefPhoto(btn, unitKey, photoBlockId) {
+            if (!currentId) return;
+            if (!confirm('ลบรูปภาพนี้?')) return;
+            const url = btn.dataset.url;
+            const wrapper = btn.parentElement;
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '…';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) { alert('ลบรูปไม่สำเร็จ: ' + res.error); btn.disabled = false; btn.textContent = origText; return; }
+                    wrapper.remove();
+                    const photoBlockEl = document.getElementById(photoBlockId);
+                    if (photoBlockEl) {
+                        const remaining = photoBlockEl.querySelectorAll('img').length;
+                        const countEl = photoBlockEl.querySelector('p');
+                        if (countEl) countEl.innerHTML = countEl.innerHTML.replace(/\d+ รูป/, remaining + ' รูป');
+                    }
+                    const rec = _fullRecordCache[currentId];
+                    if (rec && rec['Attachments_JSON'] && rec['Attachments_JSON'][unitKey]) {
+                        rec['Attachments_JSON'][unitKey] = rec['Attachments_JSON'][unitKey].filter(function(u) { return u !== url; });
+                    }
+                })
+                .withFailureHandler(function(err) { alert('Error: ' + err.message); btn.disabled = false; btn.textContent = origText; })
+                .deleteRefSurveyPhoto(currentId, unitKey, url);
+        }
+
+        function deleteRefRecord() {
+            if (!currentId) return;
+            if (!confirm('ลบรายงานนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+            const btn = document.getElementById('refDeleteBtn');
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            btn.disabled = true;
+            // Pass clientEmail from localStorage — Session.getActiveUser() returns empty in web app context
+            var _lsUser = null;
+            try { _lsUser = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsUser && _lsUser.email) ? _lsUser.email : '';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                    if (res.success) {
+                        allData = allData.filter(r => r["ID"] !== currentId);
+                        closeModal();
+                        applyFilters();
+                    } else {
+                        alert('ลบไม่สำเร็จ: ' + res.error);
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    alert('Error: ' + err.message);
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                })
+                .deleteRefSurveyRecord(currentId, clientEmail);
+        }
+
+        function saveRefEdit() {
+            if (!currentId) return;
+            const d = _fullRecordCache[currentId];
+            if (!d) return;
+            const btn = document.getElementById('refSaveEditBtn');
+            const origHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> กำลังบันทึก...';
+
+            const status       = document.getElementById('refEditStatus').value;
+            const hasBrokenRef = document.getElementById('refEditHasBroken').value;
+            const brokenUnits  = document.getElementById('refEditBrokenUnits').value;
+            const comments     = document.getElementById('refEditComments').value;
+
+            // Collect qty
+            const qtyMap = { refEditQtyOpen:'Ref Open Qty', refEditQtyBevPlugin:'Ref Bev Plugin Qty', refEditQtyBevWalkin:'Ref Bev Walk In Qty', refEditQtyBevRemote:'Ref Bev Remote Qty', refEditQtyFrozen1:'Ref Frozen1 Door Qty', refEditQtyFrozen2:'Ref Frozen2 Door Qty', refEditQtyFrozen3:'Ref Frozen3 Door Qty', refEditQtyIceCream:'Ref Ice Cream Qty', refEditQtyIce:'Ref Ice Qty', refEditQtySs4:'Ref Ss4 Door Qty' };
+            const unitQty = {};
+            Object.entries(qtyMap).forEach(([inputId, colKey]) => {
+                const el = document.getElementById(inputId);
+                if (el) unitQty[colKey] = parseInt(el.value) || 0;
+            });
+
+            // Collect per-unit fields
+            const unitFields = {};
+            document.querySelectorAll('[data-edit-field]').forEach(el => {
+                unitFields[el.getAttribute('data-edit-field')] = el.value;
+            });
+            // Replace "Other" brand values with the typed custom text
+            Object.keys(unitFields).forEach(key => {
+                if (unitFields[key] === 'Other' && /Brand_\d+$/.test(key)) {
+                    const match = key.match(/^(.+)Brand_(\d+)$/);
+                    if (match) {
+                        const otherId = `refBrandOther_${match[1]}_${match[2]}`;
+                        const otherEl = document.getElementById(otherId);
+                        if (otherEl && otherEl.value.trim()) unitFields[key] = otherEl.value.trim();
+                    }
+                }
+            });
+
+            // Collect broken unit details
+            const brokenDetail = {};
+            brokenUnits.split(',').map(s=>s.trim()).filter(Boolean).forEach(n => {
+                const ud = {};
+                document.querySelectorAll(`[data-broken-field^="unit${n}_"]`).forEach(el => {
+                    ud[el.getAttribute('data-broken-field').replace('unit'+n+'_', '')] = el.value;
+                });
+                if (Object.keys(ud).length) brokenDetail['unit'+n] = ud;
+            });
+
+            var _lsUserRefEdit = null;
+            try { _lsUserRefEdit = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var _refEditClientEmail = (_lsUserRefEdit && _lsUserRefEdit.email) ? _lsUserRefEdit.email : '';
+
+            const form = { id:currentId, status, hasBrokenRef, brokenUnits, comments, unitQty, unitFields, brokenDetail:JSON.stringify(brokenDetail), clientEmail:_refEditClientEmail };
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                    if (res.success) {
+                        // Update full record cache
+                        d["Status"] = status;
+                        d["Has Broken Ref"] = hasBrokenRef;
+                        d["Broken Units"] = brokenUnits;
+                        d["Comments"] = comments;
+                        d["Broken Units Detail"] = JSON.stringify(brokenDetail);
+                        Object.entries(unitQty).forEach(([k,v]) => { d[k] = v; });
+                        Object.entries(unitFields).forEach(([k,v]) => { d[k] = v; });
+                        // Update slim allData record too
+                        const slimR = allData.find(r => r["ID"] === currentId);
+                        if (slimR) { slimR["Status"] = status; slimR["Has Broken Ref"] = hasBrokenRef; slimR["Broken Units"] = brokenUnits; }
+                        _refCancelEdit();
+                        _renderModalContent(d);
+                        applyFilters();
+                    } else {
+                        alert('บันทึกไม่สำเร็จ: ' + res.error);
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                    alert('Error: ' + err.message);
+                })
+                .updateRefSurveyRecord(form);
+        }
+
+        function toggleRefRejectReason(val) {
+            const wrap = document.getElementById('refRejectReasonWrap');
+            if (wrap) wrap.classList.toggle('hidden', val !== 'Rejected');
+        }
+
+        function saveRefStatus() {
+            if (!currentId) return;
+            const newStatus = document.getElementById('refStatusSelect').value;
+            const rejectReason = newStatus === 'Rejected'
+                ? (document.getElementById('refRejectReason') ? document.getElementById('refRejectReason').value.trim() : '')
+                : '';
+            if (newStatus === 'Rejected' && !rejectReason) {
+                alert('กรุณาระบุเหตุผลที่ Reject ก่อนบันทึก');
+                return;
+            }
+            const btn = document.getElementById('refSaveStatusBtn');
+            const origHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...';
+            var _lsUserRef = null;
+            try { _lsUserRef = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsUserRef && _lsUserRef.email) ? _lsUserRef.email : '';
+
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHTML;
+                    if (res.success) {
+                        const slimRec = allData.find(r => r["ID"] === currentId);
+                        if (slimRec) slimRec["Status"] = newStatus;
+                        const fullRec = _fullRecordCache[currentId];
+                        if (fullRec) fullRec["Status"] = newStatus;
+                        closeModal();
+                        applyFilters();
+                    } else {
+                        alert("Error: " + res.error);
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHTML;
+                    alert("Error: " + err.message);
+                })
+                .updateRefSurveyStatus(currentId, newStatus, clientEmail, rejectReason);
+        }
+
+        function sectionHeader(title, color) {
+            const colors = {
+                sky:    'bg-sky-50 text-sky-800 border-sky-200',
+                blue:   'bg-blue-50 text-blue-800 border-blue-200',
+                teal:   'bg-teal-50 text-teal-800 border-teal-200',
+                indigo: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+                rose:   'bg-rose-50 text-rose-800 border-rose-200',
+                cyan:   'bg-cyan-50 text-cyan-800 border-cyan-200',
+                slate:  'bg-slate-100 text-slate-700 border-slate-300',
+                red:    'bg-red-50 text-red-800 border-red-200',
+                amber:  'bg-amber-50 text-amber-800 border-amber-200',
+                violet: 'bg-violet-50 text-violet-800 border-violet-200'
+            };
+            return `<div class="mt-5 mb-2 px-3 py-1.5 rounded-lg border text-xs font-bold uppercase tracking-wider ${colors[color] || colors.sky}">${title}</div>`;
+        }
+
+        function detailRow(label, value) {
+            return `<div class="detail-row">
+                <span class="detail-label">${label}</span>
+                <span class="detail-value">${value || '-'}</span>
+            </div>`;
+        }
+
+        function downloadQR(divId, filename) {
+            var div = document.getElementById(divId);
+            if (!div) return;
+            var canvas = div.querySelector('canvas');
+            var img = div.querySelector('img');
+            var dataUrl;
+            if (canvas) {
+                dataUrl = canvas.toDataURL('image/png');
+            } else if (img) {
+                var c = document.createElement('canvas');
+                c.width = img.naturalWidth || 56; c.height = img.naturalHeight || 56;
+                c.getContext('2d').drawImage(img, 0, 0);
+                dataUrl = c.toDataURL('image/png');
+            } else return;
+            var a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = (filename || 'qrcode') + '.png';
+            a.click();
+        }
+    </script>
+
+</body>
+
+</html>

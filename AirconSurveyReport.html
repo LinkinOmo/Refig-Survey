@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Conditioner Survey Report</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-Pending {
+            background-color: #fef3c7;
+            color: #d97706;
+            border: 1px solid #fde68a;
+        }
+
+        .status-Acknowledged {
+            background-color: #d1fae5;
+            color: #059669;
+            border: 1px solid #a7f3d0;
+        }
+
+        .status-Corrected {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+
+        .status-Closed {
+            background-color: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 24px;
+            height: 24px;
+            -webkit-animation: spin 1s linear infinite;
+            animation: spin 1s linear infinite;
+        }
+
+        @-webkit-keyframes spin {
+            0% {
+                -webkit-transform: rotate(0deg);
+            }
+
+            100% {
+                -webkit-transform: rotate(360deg);
+            }
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Hide scrollbar for clean look */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        .sort-indicator {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-bottom: 4px solid #cbd5e1;
+            margin-left: 5px;
+            vertical-align: middle;
+            transition: transform 0.2s;
+        }
+
+        .sort-indicator.sort-desc {
+            transform: rotate(180deg);
+            border-bottom-color: #3b82f6;
+        }
+
+        .sort-indicator.sort-asc {
+            border-bottom-color: #3b82f6;
+        }
+
+        /* ── Print: A4 layout ── */
+        @media print {
+            @page { size: A4 portrait; margin: 15mm; }
+            body > *:not(#printArea) { display: none !important; }
+            #printArea { display: block !important; font-family: sans-serif; color: #1e293b; }
+            #printArea img { max-width: 100%; break-inside: avoid; }
+            #printArea .no-print, #printArea button { display: none !important; }
+        }
+        #printArea { display: none; }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 bg-opacity-95 backdrop-blur-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Left side: Logo & Title -->
+                <div class="flex items-center gap-4">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>"
+                        class="text-slate-500 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-slate-50 relative group">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        <span
+                            class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none">Back
+                            to Home</span>
+                    </a>
+                    <div class="h-8 w-1 bg-blue-600 rounded-full"></div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">Air Conditioner Survey Report</h1>
+                        <p class="text-xs text-slate-500 font-medium">Real-time overview & status</p>
+                    </div>
+                </div>
+
+                <!-- Right side: Actions & User Info -->
+                <div class="flex items-center gap-4">
+                    <button onclick="window.location.reload()"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                        <span class="hidden sm:inline">Refresh</span>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200"></div>
+                    <div class="flex flex-col items-end">
+                        <span id="nav-user-name" class="text-xs font-bold text-slate-700"></span>
+                        <span id="access-level-display"
+                            class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 uppercase tracking-wide">
+                            Loading Access Level...
+                        </span>
+                    </div>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>" onclick="localStorage.removeItem('app_auth_token'); localStorage.removeItem('app_user_data');" title="Logout"
+                        class="text-slate-500 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Loading State -->
+        <div id="loading" class="flex flex-col items-center justify-center py-20">
+            <div class="loader mb-4"></div>
+            <p class="text-slate-500 font-medium animate-pulse">Loading Survey Data...</p>
+        </div>
+
+        <!-- Content Structure -->
+        <div id="content" class="hidden space-y-6">
+
+            <!-- Global Stats Summary Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-blue-500 cursor-pointer hover:shadow-md transition-all group"
+                    id="statTotalCard">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Reports
+                            </p>
+                            <h3 class="text-3xl font-bold text-slate-800" id="statTotal">0</h3>
+                        </div>
+                        <div class="bg-blue-50 p-2 rounded-lg text-blue-600 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-amber-500 cursor-pointer hover:shadow-md transition-all group"
+                    id="statPendingCard">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Pending Review
+                            </p>
+                            <h3 class="text-3xl font-bold text-slate-800" id="statPending">0</h3>
+                        </div>
+                        <div
+                            class="bg-amber-50 p-2 rounded-lg text-amber-600 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-emerald-500 cursor-pointer hover:shadow-md transition-all group"
+                    id="statAckCard">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Acknowledged</p>
+                            <h3 class="text-3xl font-bold text-slate-800" id="statAck">0</h3>
+                        </div>
+                        <div class="bg-emerald-50 p-2 rounded-lg text-emerald-600 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-blue-500 cursor-pointer hover:shadow-md transition-all group"
+                    id="statCorrectedCard">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Corrected</p>
+                            <h3 class="text-3xl font-bold text-slate-800" id="statCorrected">0</h3>
+                        </div>
+                        <div class="bg-blue-50 p-2 rounded-lg text-blue-600 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-400 cursor-pointer hover:shadow-md transition-all group"
+                    id="statClosedCard">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Closed</p>
+                            <h3 class="text-3xl font-bold text-slate-800" id="statClosed">0</h3>
+                        </div>
+                        <div class="bg-slate-50 p-2 rounded-lg text-slate-500 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Charts Dashboard -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="glass-panel p-5 rounded-xl">
+                    <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>สถานะรายงาน
+                    </h3>
+                    <div class="relative" style="height:175px"><canvas id="acStatusChart"></canvas></div>
+                </div>
+                <div class="glass-panel p-5 rounded-xl">
+                    <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>แนวโน้มรายเดือน
+                    </h3>
+                    <div class="relative" style="height:175px"><canvas id="acTrendChart"></canvas></div>
+                </div>
+                <div class="glass-panel p-5 rounded-xl">
+                    <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>Top 5 ผู้รายงาน
+                    </h3>
+                    <div class="relative" style="height:175px"><canvas id="acReporterChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Combined Aircon + Ref Monthly Aggregation Chart -->
+            <div class="glass-panel p-5 rounded-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-violet-500 inline-block"></span>ภาพรวม Aircon &amp; Refrigerator รายเดือน
+                    </h3>
+                    <div class="flex items-center gap-4 text-xs text-slate-500">
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-2.5 rounded-sm inline-block" style="background:#6366f1"></span>Aircon</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-2.5 rounded-sm inline-block" style="background:#38bdf8"></span>Refrigerator</span>
+                    </div>
+                </div>
+                <div id="combinedChartLoader" class="flex items-center justify-center text-sm text-slate-400" style="height:200px">⏳ กำลังโหลดข้อมูล...</div>
+                <div class="relative hidden" id="combinedChartWrap" style="height:200px"><canvas id="combinedSurveyChart"></canvas></div>
+            </div>
+
+            <!-- Filters & Controls Bar -->
+            <div
+                class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-4 justify-between items-end lg:items-center">
+                <!-- Search -->
+                <div class="w-full lg:w-1/3 relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <input type="text" id="searchInput" placeholder="Search by Station, RM, Reporter..."
+                        oninput="filters.search=this.value; renderTable();"
+                        onkeydown="if(event.key==='Enter'){filters.search=this.value; renderTable();}"
+                        class="w-full pl-10 pr-24 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-sm">
+                    <button onclick="filters.search=document.getElementById('searchInput').value; renderTable();" title="Search"
+                        class="absolute inset-y-0 right-0 px-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-r-lg flex items-center gap-1 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        Search
+                    </button>
+                </div>
+
+                <!-- Select Filters -->
+                <div class="flex flex-wrap gap-3 w-full lg:w-auto">
+                    <!-- Status Filter -->
+                    <div class="flex flex-col">
+                        <label
+                            class="text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1 tracking-wider">Status</label>
+                        <select id="statusFilter"
+                            class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 py-2 outline-none w-32 cursor-pointer hover:bg-slate-100 transition">
+                            <option value="all">All</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Acknowledged">Acknowledged</option>
+                            <option value="Corrected">Corrected</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                    </div>
+
+                    <!-- Recorder Filter -->
+                    <div class="flex flex-col">
+                        <label class="text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1 tracking-wider">Reporter
+                            Name</label>
+                        <select id="recorderFilter"
+                            class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 py-2 outline-none w-40 cursor-pointer hover:bg-slate-100 transition">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <!-- DM Filter -->
+                    <div class="flex flex-col">
+                        <label class="text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1 tracking-wider">DM</label>
+                        <select id="dmFilter"
+                            class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 py-2 outline-none w-28 cursor-pointer hover:bg-slate-100 transition">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <!-- CM Filter -->
+                    <div class="flex flex-col">
+                        <label class="text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1 tracking-wider">CM</label>
+                        <select id="clusterFilter"
+                            class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 py-2 outline-none w-28 cursor-pointer hover:bg-slate-100 transition">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <!-- AM MTN Filter -->
+                    <div class="flex flex-col">
+                        <label class="text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1 tracking-wider">AM (MTN)</label>
+                        <select id="ammMtnFilter"
+                            class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 py-2 outline-none w-36 cursor-pointer hover:bg-slate-100 transition">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <!-- Date Range -->
+                    <div class="flex flex-col">
+                        <label class="text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1 tracking-wider">From
+                            Date</label>
+                        <input type="date" id="dateFrom"
+                            class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 outline-none cursor-pointer hover:bg-slate-100 transition">
+                    </div>
+                    <div class="flex flex-col">
+                        <label class="text-[10px] uppercase font-bold text-slate-400 mb-1 ml-1 tracking-wider">To
+                            Date</label>
+                        <input type="date" id="dateTo"
+                            class="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 outline-none cursor-pointer hover:bg-slate-100 transition">
+                    </div>
+
+                    <!-- Clear Button -->
+                    <div class="flex items-end">
+                        <button id="clearFilters"
+                            class="text-slate-500 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                            title="Clear all filters">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Results Display -->
+            <div class="flex justify-between items-center text-sm">
+                <span class="text-slate-500 font-medium" id="filterSummary">Showing 0 reports</span>
+            </div>
+
+            <!-- Data Table (Desktop) -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hidden md:block">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                            <tr>
+                                <th class="p-4 cursor-pointer hover:bg-slate-100 transition select-none sortable"
+                                    data-sort="timestamp">
+                                    Date <span class="sort-indicator"></span>
+                                </th>
+                                <th class="p-4 cursor-pointer hover:bg-slate-100 transition select-none sortable"
+                                    data-sort="station">
+                                    Branch / Station <span class="sort-indicator"></span>
+                                </th>
+
+                                <th class="p-4 cursor-pointer hover:bg-slate-100 transition select-none sortable"
+                                    data-sort="recorder">
+                                    Reporter <span class="sort-indicator"></span>
+                                </th>
+                                <th class="p-4 cursor-pointer hover:bg-slate-100 transition select-none sortable"
+                                    data-sort="status">
+                                    Status <span class="sort-indicator"></span>
+                                </th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-100">
+                            <!-- Rows rendered via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State within Table Wrapper -->
+                <div id="emptyState" class="hidden flex-col items-center justify-center py-16 px-4 text-center">
+                    <div class="bg-slate-50 p-4 rounded-full mb-4">
+                        <svg class="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                            </path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">No reports found</h3>
+                    <p class="text-slate-500 text-sm max-w-sm">No survey reports match your current filters. Try
+                        relaxing your search criteria or date range.</p>
+                </div>
+            </div>
+
+            <!-- Mobile View Cards -->
+            <div id="mobileCards" class="md:hidden grid gap-4">
+                <!-- Mobile empty state uses same mechanism -->
+            </div>
+
+        </div> <!-- End Content -->
+    </div> <!-- End Main Container -->
+
+    <!-- Detail Modal -->
+    <div id="detailModal"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden opacity-0 transition-opacity duration-300 overflow-y-auto">
+        <div class="min-h-screen px-4 text-center">
+            <!-- Modal Overlay trick to center -->
+            <span class="inline-block h-screen align-middle" aria-hidden="true">&#8203;</span>
+
+            <div class="inline-block w-full max-w-4xl text-left align-middle transition-all transform bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 scale-95 duration-300 relative my-8"
+                id="modalContent">
+
+                <!-- Modal Header -->
+                <div
+                    class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl flex justify-between items-start sticky top-0 z-10 backdrop-blur-md">
+                    <div>
+                        <h2 id="modalTitle" class="text-xl font-bold text-slate-900 leading-tight">Branch / Station Name
+                        </h2>
+                        <p id="modalSubtitle" class="text-sm text-slate-500 font-medium mt-1">Date • Reporter</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <!-- Print Button -->
+                        <button onclick="printAcModal()" title="พิมพ์ A4"
+                            class="no-print text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-lg transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                            </svg>
+                        </button>
+                        <!-- Admin Edit Button -->
+                        <button id="editBtn"
+                            class="admin-only-link hidden text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 p-2 rounded-lg transition-colors"
+                            title="แก้ไขข้อมูล" onclick="toggleAcEditPanel()">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </button>
+                        <!-- Admin Delete Button -->
+                        <button id="deleteBtn"
+                            class="admin-only-link hidden text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 p-2 rounded-lg transition-colors"
+                            title="ลบรายงานนี้" onclick="deleteAcRecord()">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                </path>
+                            </svg>
+                        </button>
+                        <button onclick="closeModal()"
+                            class="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-lg transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6">
+                    <!-- General Details Block -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" id="generalInfoSection">
+                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                            <h4 class="font-bold text-blue-900 mb-3 text-sm uppercase tracking-wider">General
+                                Information</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">Branch</span>
+                                    <span class="font-medium text-blue-900" id="mBranch"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">Record Date</span>
+                                    <span class="font-medium text-blue-900" id="mDate"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">Reporter</span>
+                                    <span class="font-medium text-blue-900" id="mReporter"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">DM</span>
+                                    <span class="font-medium text-blue-900" id="mDM"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">CM (Cluster)</span>
+                                    <span class="font-medium text-blue-900" id="mCM"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">AM (MTN)</span>
+                                    <span class="font-medium text-blue-900" id="mAMM"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">AC Quantity</span>
+                                    <span class="font-medium text-blue-900" id="mACQuantity"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">AC Brand</span>
+                                    <span class="font-medium text-blue-900" id="mACBrand"></span>
+                                </div>
+                                <div class="flex justify-between items-start mt-2 pt-2 border-t border-blue-100">
+                                    <span class="text-red-500 font-semibold min-w-max mr-4">Broken Units</span>
+                                    <span class="font-medium text-red-700 text-right" id="mACBroken"></span>
+                                </div>
+                                <div class="flex justify-between items-start pt-2 border-t border-blue-100">
+                                    <span class="text-blue-600">Comments</span>
+                                    <span class="font-medium text-blue-900 text-right" id="mComments"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Per-Unit Section -->
+                    <div id="unitSection" class="mb-6"></div>
+
+                    <!-- Status Update Section -->
+                    <div class="mt-8 border-t border-slate-200 pt-6">
+                        <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Report Status Management
+                        </h4>
+
+                        <div
+                            class="bg-indigo-50 p-5 rounded-xl border border-indigo-100 flex flex-col md:flex-row gap-4 items-end">
+                            <div class="w-full md:w-1/3">
+                                <label class="block text-sm font-semibold text-indigo-900 mb-1">Status</label>
+                                <select id="statusSelect"
+                                    class="w-full border-indigo-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 bg-white">
+                                    <option value="Pending">Pending</option>
+                                    <option value="Acknowledged">Acknowledged</option>
+                                    <option value="Corrected">Corrected</option>
+                                    <option value="Closed">Closed</option>
+                                </select>
+                            </div>
+                            <div class="w-full md:w-1/3">
+                                <button id="saveStatusBtn"
+                                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg transition shadow-sm flex items-center justify-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    Save Status
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div> <!-- End Modal Body -->
+
+                <!-- AC Edit Panel (admin only, hidden by default) -->
+                <div id="acEditPanel" class="hidden border-t border-amber-200 bg-amber-50 p-5">
+                    <h4 class="text-sm font-bold text-amber-800 mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        แก้ไขข้อมูล (Admin)
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">สถานะ</label>
+                            <select id="acEditStatus" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white">
+                                <option value="Pending">Pending</option>
+                                <option value="Acknowledged">Acknowledged</option>
+                                <option value="Corrected">Corrected</option>
+                                <option value="Closed">Closed</option>
+                                <option value="Draft">Draft</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">แอร์ชำรุด (เบอร์ คั่นด้วย ,)</label>
+                            <input id="acEditBrokenUnits" type="text" placeholder="เช่น 1, 3" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">หมายเหตุ</label>
+                            <textarea id="acEditComments" rows="2" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white resize-none"></textarea>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 justify-end">
+                        <button onclick="document.getElementById('acEditPanel').classList.add('hidden')" class="px-4 py-1.5 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition">ยกเลิก</button>
+                        <button id="acSaveEditBtn" onclick="saveAcEdit()" class="px-4 py-1.5 text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            บันทึก
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden print area -->
+    <div id="printArea"></div> (injected by doGet for guest access) -->
+    <script>var _PRELOADED_AC = <?!= preloadedData ?>;</script>
+    <!-- Include Apps Script APIs or JS Bundle -->
+    <script>
+        let allReports = [];
+        let allReportsMap = {};
+        let currentReportId = null;
+        let isAdmin = false;
+        let isSMF = false;
+
+        let filters = {
+            search: '',
+            status: 'all',
+            recorder: 'all',
+            dateFrom: '',
+            dateTo: '',
+            stat: 'all',
+            dm: 'all',
+            cluster: 'all',
+            ammMtn: 'all'
+        };
+
+        let sortState = { key: 'timestamp', dir: 'desc' };
+
+        // Global HTML escape function
+        function htmlEscape(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function formatRecordDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const dt = new Date(timestamp);
+            if (isNaN(dt)) return String(timestamp);
+            return dt.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        // --- DASHBOARD MOUNTING ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Step 1: Read auth from localStorage — identical to RefSurveyReport pattern
+            try {
+                var _lsUser = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                if (_lsUser && localStorage.getItem('app_auth_token')) {
+                    isAdmin = !!_lsUser.isAdmin;
+                    isSMF = !!_lsUser.isSMF;
+                    var navName = document.getElementById('nav-user-name');
+                    if (navName) navName.textContent = _lsUser.name || _lsUser.email || '';
+                }
+            } catch(e) {}
+
+            // Step 2: Update access display and apply admin UI — done ONCE, based on localStorage
+            var accessDisplay = document.getElementById('access-level-display');
+            if (accessDisplay) {
+                accessDisplay.textContent = isAdmin ? 'Administrator Access' : 'User Access';
+                accessDisplay.className = isAdmin
+                    ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
+                    : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
+            }
+            applyAdminUI();
+
+            // Load combined Aircon + Ref monthly aggregation chart — independent of main data
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) renderCombinedChart(res);
+                    else document.getElementById('combinedChartLoader').textContent = 'ไม่สามารถโหลดข้อมูลได้';
+                })
+                .withFailureHandler(function() {
+                    document.getElementById('combinedChartLoader').textContent = 'โหลดไม่สำเร็จ';
+                })
+                .getCombinedSurveyMonthlyTrend();
+
+            // Verify real flags from server — Session.getActiveUser() is unreliable in web app
+            // context, so we pass the email from localStorage for a definitive check.
+            try {
+                var _lsEmailAc = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                var _acUserEmail = (_lsEmailAc && _lsEmailAc.email) ? _lsEmailAc.email : '';
+                if (_acUserEmail) {
+                    google.script.run
+                        .withSuccessHandler(function(flags) {
+                            if (!flags) return;
+                            if (flags.isAdmin && !isAdmin) {
+                                isAdmin = true;
+                                const ad = document.getElementById('access-level-display');
+                                if (ad) ad.textContent = 'Administrator Access';
+                                applyAdminUI();
+                            }
+                            if (flags.isSMF && !isSMF) { isSMF = true; }
+                        })
+                        .getUserFlags(_acUserEmail);
+                }
+            } catch(e) {}
+
+            // Step 3: Use server-side preloaded data for survey records — NOT for admin status
+            if (typeof _PRELOADED_AC !== 'undefined' && _PRELOADED_AC) {
+                init(_PRELOADED_AC);
+                return;
+            }
+
+            // Fallback: load data via google.script.run (no separate auth check — localStorage handles admin UI)
+            loadData();
+        });
+
+        function loadData() {
+            google.script.run
+                .withSuccessHandler(init)
+                .withFailureHandler((err) => {
+                    console.error(err);
+                    alert("Failed to load air conditioner survey reports. Please check console.");
+                })
+                .getAirConSurveysReport();
+        }
+
+        function init(jsonString) {
+            let data;
+            try {
+                if (typeof jsonString === 'string') data = JSON.parse(jsonString);
+                else data = jsonString;
+            } catch (e) {
+                alert("Failed to parse data from backend"); return;
+            }
+
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+
+            if (data.error) {
+                alert("Error loading data: " + data.error);
+                return;
+            }
+
+            allReports = data.orders || [];
+            allReportsMap = {};
+            allReports.forEach(r => { if (r.id) allReportsMap[r.id] = r; });
+
+            if (data.isAdmin === true && !isAdmin) {
+                isAdmin = true;
+                const ad = document.getElementById('access-level-display');
+                if (ad) ad.textContent = 'Administrator Access';
+                applyAdminUI();
+            }
+            if (data.isSMF === true && !isSMF) {
+                isSMF = true;
+            }
+
+            setupFilters();
+            renderTable();
+            initAcCharts();
+        }
+
+        function setupFilters() {
+            const statusFilter = document.getElementById('statusFilter');
+            const recorderFilter = document.getElementById('recorderFilter');
+            const searchInput = document.getElementById('searchInput');
+
+            const recorders = Array.from(new Set(allReports.map(r => r.recorderName).filter(Boolean)));
+            recorderFilter.innerHTML = '<option value="all">All</option>';
+            recorders.sort().forEach(u => {
+                let html = `<option value="` + htmlEscape(u) + `">` + htmlEscape(u) + `</option>`;
+                recorderFilter.innerHTML += html;
+            });
+
+            searchInput.addEventListener('input', e => { filters.search = e.target.value; renderTable(); });
+            statusFilter.addEventListener('change', e => { filters.status = e.target.value; renderTable(); });
+            recorderFilter.addEventListener('change', e => { filters.recorder = e.target.value; renderTable(); });
+            document.getElementById('dateFrom').addEventListener('change', e => { filters.dateFrom = e.target.value; renderTable(); });
+            document.getElementById('dateTo').addEventListener('change', e => { filters.dateTo = e.target.value; renderTable(); });
+
+            // DM / CM / AM MTN filters
+            const dmFilter = document.getElementById('dmFilter');
+            const clusterFilter = document.getElementById('clusterFilter');
+            const ammMtnFilter = document.getElementById('ammMtnFilter');
+            function fillDynSel(el, values) {
+                el.innerHTML = '<option value="all">All</option>';
+                values.forEach(function(v) { el.innerHTML += '<option value="' + htmlEscape(v) + '">' + htmlEscape(v) + '</option>'; });
+            }
+            fillDynSel(dmFilter, Array.from(new Set(allReports.map(function(r){return r.dm;}).filter(Boolean))).sort());
+            fillDynSel(clusterFilter, Array.from(new Set(allReports.map(function(r){return r.cluster;}).filter(Boolean))).sort());
+            fillDynSel(ammMtnFilter, Array.from(new Set(allReports.map(function(r){return r.ammMtn;}).filter(Boolean))).sort());
+            dmFilter.addEventListener('change', function(e) { filters.dm = e.target.value; renderTable(); });
+            clusterFilter.addEventListener('change', function(e) { filters.cluster = e.target.value; renderTable(); });
+            ammMtnFilter.addEventListener('change', function(e) { filters.ammMtn = e.target.value; renderTable(); });
+
+            document.getElementById('clearFilters').addEventListener('click', () => {
+                filters = { search: '', status: 'all', recorder: 'all', dateFrom: '', dateTo: '', stat: 'all', dm: 'all', cluster: 'all', ammMtn: 'all' };
+                searchInput.value = ''; statusFilter.value = 'all'; recorderFilter.value = 'all';
+                document.getElementById('dateFrom').value = ''; document.getElementById('dateTo').value = '';
+                dmFilter.value = 'all'; clusterFilter.value = 'all'; ammMtnFilter.value = 'all';
+                document.getElementById('statTotalCard').classList.add('border-blue-500', 'bg-blue-50/20');
+                ['statPendingCard', 'statAckCard', 'statCorrectedCard', 'statClosedCard'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.remove('border-amber-500', 'border-emerald-500', 'border-blue-500', 'border-slate-400', 'bg-amber-50/20', 'bg-emerald-50/20', 'bg-blue-50/20', 'bg-slate-50/20');
+                });
+                renderTable();
+            });
+
+            document.querySelectorAll('th.sortable').forEach(th => {
+                th.addEventListener('click', () => {
+                    const key = th.getAttribute('data-sort');
+                    if (sortState.key === key) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+                    else { sortState.key = key; sortState.dir = 'desc'; }
+                    renderTable();
+                })
+            });
+
+            // Stat Cards click
+            const _allStatCards = [
+                { id: 'statTotalCard',     stat: 'all',         cls: ['border-blue-500',    'bg-blue-50/20'] },
+                { id: 'statPendingCard',   stat: 'pending',     cls: ['border-amber-500',   'bg-amber-50/20'] },
+                { id: 'statAckCard',       stat: 'acknowledged',cls: ['border-emerald-500', 'bg-emerald-50/20'] },
+                { id: 'statCorrectedCard', stat: 'corrected',   cls: ['border-blue-500',    'bg-blue-50/20'] },
+                { id: 'statClosedCard',    stat: 'closed',      cls: ['border-slate-400',   'bg-slate-50/20'] }
+            ];
+            _allStatCards.forEach(cfg => {
+                const el = document.getElementById(cfg.id);
+                if (!el) return;
+                el.addEventListener('click', function () {
+                    filters.stat = cfg.stat;
+                    _allStatCards.forEach(c => {
+                        const e2 = document.getElementById(c.id);
+                        if (e2) e2.classList.remove(...c.cls);
+                    });
+                    this.classList.add(...cfg.cls);
+                    renderTable();
+                });
+            });
+        }
+
+        function applyFilters() {
+            const q = filters.search.toLowerCase();
+            const fromD = filters.dateFrom ? new Date(filters.dateFrom) : null;
+            let toD = null;
+            if (filters.dateTo) { toD = new Date(filters.dateTo); toD.setHours(23, 59, 59, 999); }
+
+            if (fromD) fromD.setHours(0, 0, 0, 0);
+
+            return allReports.filter(r => {
+                if (filters.status !== 'all' && r.status !== filters.status) return false;
+                if (filters.recorder !== 'all' && r.recorderName !== filters.recorder) return false;
+                if (filters.dm !== 'all' && r.dm !== filters.dm) return false;
+                if (filters.cluster !== 'all' && r.cluster !== filters.cluster) return false;
+                if (filters.ammMtn !== 'all' && r.ammMtn !== filters.ammMtn) return false;
+                if (filters.stat === 'pending'      && r.status !== 'Pending')      return false;
+                if (filters.stat === 'acknowledged'  && r.status !== 'Acknowledged') return false;
+                if (filters.stat === 'corrected'     && r.status !== 'Corrected')    return false;
+                if (filters.stat === 'closed'        && r.status !== 'Closed')       return false;
+
+                if (fromD && r.timestamp) {
+                    const d = new Date(r.timestamp); d.setHours(0, 0, 0, 0);
+                    if (d < fromD) return false;
+                }
+                if (toD && r.timestamp) {
+                    const d = new Date(r.timestamp);
+                    if (d > toD) return false;
+                }
+                if (q) {
+                    const hay = `${r.station} ${r.recorderName}`.toLowerCase();
+                    if (!hay.includes(q)) return false;
+                }
+                return true;
+            });
+        }
+
+        function sortReports(reports) {
+            const key = sortState.key;
+            const dir = sortState.dir === 'asc' ? 1 : -1;
+            return reports.slice().sort((a, b) => {
+                let av = a[key] || '';
+                let bv = b[key] || '';
+                if (key === 'timestamp' || key === 'visitDate') {
+                    av = new Date(av).getTime() || 0;
+                    bv = new Date(bv).getTime() || 0;
+                } else {
+                    av = String(av).toLowerCase();
+                    bv = String(bv).toLowerCase();
+                }
+
+                if (av < bv) return -1 * dir;
+                if (av > bv) return 1 * dir;
+                return 0;
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const mobile = document.getElementById('mobileCards');
+
+            tbody.innerHTML = '';
+            mobile.innerHTML = '';
+
+            const filtered = applyFilters();
+            const sorted = sortReports(filtered);
+
+            // Update stats
+            document.getElementById('statTotal').innerText = sorted.length;
+            document.getElementById('statPending').innerText = sorted.filter(r => r.status === 'Pending').length;
+            document.getElementById('statAck').innerText = sorted.filter(r => r.status === 'Acknowledged').length;
+            document.getElementById('statCorrected').innerText = sorted.filter(r => r.status === 'Corrected').length;
+            document.getElementById('statClosed').innerText = sorted.filter(r => r.status === 'Closed').length;
+            document.getElementById('filterSummary').innerText = `Showing ${sorted.length} of ${allReports.length} reports`;
+
+            document.querySelectorAll('.sort-indicator').forEach(i => {
+                i.className = 'sort-indicator';
+                if (i.parentElement.getAttribute('data-sort') === sortState.key) {
+                    i.classList.add(`sort-${sortState.dir}`);
+                }
+            });
+
+            if (sorted.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+                tbody.parentElement.parentElement.classList.add('hidden');
+                return;
+            } else {
+                document.getElementById('emptyState').classList.add('hidden');
+                tbody.parentElement.parentElement.classList.remove('hidden');
+            }
+
+            sorted.forEach(r => {
+                // Desktop row
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition border-b border-slate-50 last:border-0";
+
+                const d = r.fullData || {};
+                const g = d.general || {};
+
+                tr.innerHTML = `
+                    <td class="p-4 text-slate-500">${htmlEscape(formatRecordDate(r.timestamp))}</td>
+                    <td class="p-4">
+                        <div class="font-bold text-slate-800">${htmlEscape(r.station)}</div>
+                        ${r.dm || r.cluster || r.ammMtn ? `<div class="text-xs text-slate-400 mt-0.5 flex flex-wrap gap-x-2">${r.dm ? '<span><span class="font-medium text-slate-500">DM:</span> ' + htmlEscape(r.dm) + '</span>' : ''}${r.cluster ? '<span><span class="font-medium text-slate-500">CM:</span> ' + htmlEscape(r.cluster) + '</span>' : ''}${r.ammMtn ? '<span><span class="font-medium text-slate-500">AM:</span> ' + htmlEscape(r.ammMtn) + '</span>' : ''}</div>` : ''}
+                    </td>
+                    <td class="p-4 text-slate-700">${htmlEscape(r.recorderName)}</td>
+                     <td class="p-4">
+                        <span class="status-badge status-${htmlEscape(r.status || 'Pending')}">
+                            ${htmlEscape(r.status || 'Pending')}
+                        </span>
+                    </td>
+                    <td class="p-4 text-right">
+                         <button onclick="openModalById('${htmlEscape(r.id)}')" class="text-blue-600 hover:text-blue-800 font-medium text-sm hover:bg-blue-50 px-3 py-1.5 rounded-lg transition border border-transparent hover:border-blue-100 shadow-sm">
+                            View Details
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+
+                // Mobile card
+                const mc = document.createElement('div');
+                mc.className = "bg-white p-4 rounded-xl shadow-sm border border-slate-200 transition-all hover:shadow-md";
+                mc.innerHTML = `
+                     <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-lg leading-tight mb-1">${htmlEscape(r.station)}</h3>
+                        </div>
+                        <span class="status-badge status-${htmlEscape(r.status || 'Pending')} text-[10px]">
+                            ${htmlEscape(r.status || 'Pending')}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-slate-500 pt-3 border-t border-slate-100 mt-2">
+                        <span>Reporter: ${htmlEscape(r.recorderName)}</span>
+                        <button onclick="openModalById('${htmlEscape(r.id)}')" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm border border-transparent">
+                            Details
+                        </button>
+                    </div>
+                `;
+                mobile.appendChild(mc);
+            });
+            updateAcCharts();
+        }
+
+        let acStatusChart = null;
+        let acTrendChart = null;
+        let acReporterChart = null;
+        let combinedChart = null;
+
+        function renderCombinedChart(data) {
+            const loader = document.getElementById('combinedChartLoader');
+            const wrap   = document.getElementById('combinedChartWrap');
+            if (loader) loader.classList.add('hidden');
+            if (wrap)   wrap.classList.remove('hidden');
+            if (combinedChart) { combinedChart.destroy(); combinedChart = null; }
+            Chart.defaults.font.family = 'Prompt, sans-serif';
+            // Thin out x-axis labels when many days
+            const labels = data.labels || [];
+            const skip = labels.length > 60 ? Math.ceil(labels.length / 30) : 1;
+            combinedChart = new Chart(document.getElementById('combinedSurveyChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Aircon',
+                            data: data.aircon || [],
+                            borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)',
+                            borderWidth: 2, tension: 0.35, fill: true,
+                            pointRadius: labels.length > 60 ? 0 : 3, pointHoverRadius: 5,
+                            pointBackgroundColor: '#6366f1'
+                        },
+                        {
+                            label: 'Refrigerator',
+                            data: data.ref || [],
+                            borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.08)',
+                            borderWidth: 2, tension: 0.35, fill: true,
+                            pointRadius: labels.length > 60 ? 0 : 3, pointHoverRadius: 5,
+                            pointBackgroundColor: '#38bdf8'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 10 }, maxRotation: 45,
+                                     callback: function(val, i) { return i % skip === 0 ? this.getLabelForValue(val) : ''; } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initAcCharts() {
+            Chart.defaults.font.family = 'Prompt, sans-serif';
+
+            acStatusChart = new Chart(document.getElementById('acStatusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'Acknowledged', 'Corrected', 'Closed'],
+                    datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#fbbf24', '#10b981', '#3b82f6', '#94a3b8'], borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '62%',
+                    plugins: { legend: { position: 'bottom', labels: { padding: 10, font: { size: 11 } } } }
+                }
+            });
+
+            acTrendChart = new Chart(document.getElementById('acTrendChart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{ label: 'รายงาน', data: [], borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', tension: 0.4, fill: true, pointBackgroundColor: '#6366f1', pointRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } }
+                    }
+                }
+            });
+
+            acReporterChart = new Chart(document.getElementById('acReporterChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: '#f43f5e', borderRadius: 5, borderSkipped: false }] },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#f1f5f9' } },
+                        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+
+            updateAcCharts();
+        }
+
+        function updateAcCharts() {
+            if (!acStatusChart) return;
+            const pending    = allReports.filter(r => r.status === 'Pending').length;
+            const ack        = allReports.filter(r => r.status === 'Acknowledged').length;
+            const corrected  = allReports.filter(r => r.status === 'Corrected').length;
+            const closed     = allReports.filter(r => r.status === 'Closed').length;
+
+            acStatusChart.data.datasets[0].data = [pending, ack, corrected, closed];
+            acStatusChart.update();
+
+            // Daily/Monthly trend (daily when data spans ≤60 days)
+            const dayMap = {};
+            const monthMap = {};
+            let minTs = Infinity, maxTs = -Infinity;
+            allReports.forEach(r => {
+                if (!r.timestamp) return;
+                const dt = new Date(r.timestamp);
+                if (isNaN(dt)) return;
+                const ms = dt.getTime();
+                if (ms < minTs) minTs = ms;
+                if (ms > maxTs) maxTs = ms;
+                const dayKey = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+                const monKey = dt.getFullYear() + '/' + String(dt.getMonth() + 1).padStart(2, '0');
+                dayMap[dayKey] = (dayMap[dayKey] || 0) + 1;
+                monthMap[monKey] = (monthMap[monKey] || 0) + 1;
+            });
+            const spanDays = maxTs > minTs ? (maxTs - minTs) / 86400000 : 0;
+            let trendLabels, trendValues;
+            if (spanDays <= 60) {
+                const sorted = Object.keys(dayMap).sort();
+                if (sorted.length > 0) {
+                    const start = new Date(sorted[0]);
+                    const end   = new Date(sorted[sorted.length - 1]);
+                    trendLabels = []; trendValues = [];
+                    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                        const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                        trendLabels.push(String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'));
+                        trendValues.push(dayMap[k] || 0);
+                    }
+                } else { trendLabels = []; trendValues = []; }
+            } else {
+                const sortedMonths = Object.keys(monthMap).sort();
+                trendLabels = sortedMonths;
+                trendValues = sortedMonths.map(k => monthMap[k]);
+            }
+            acTrendChart.data.labels = trendLabels;
+            acTrendChart.data.datasets[0].data = trendValues;
+            acTrendChart.update();
+
+            // Top 5 reporters
+            const reporterMap = {};
+            allReports.forEach(r => {
+                const name = r.recorderName || 'Unknown';
+                reporterMap[name] = (reporterMap[name] || 0) + 1;
+            });
+            const topReporters = Object.entries(reporterMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5);
+            acReporterChart.data.labels = topReporters.map(([name]) => name);
+            acReporterChart.data.datasets[0].data = topReporters.map(([, count]) => count);
+            acReporterChart.update();
+        }
+
+        function openModalById(id) {
+            try {
+            const report = allReportsMap[id];
+            if (!report) return alert("ไม่พบข้อมูล (ID: " + id + ")");
+
+            currentReportId = id;
+            document.getElementById('modalTitle').innerText = report.station;
+            document.getElementById('modalSubtitle').innerText = `${formatRecordDate(report.timestamp)} • ${report.recorderName}`;
+
+            const d = report.fullData || {};
+            const g = d.general || {};
+            const units = d.units || [];
+            const att = d.attachments || {};
+            const branchCode = report.station ? report.station.split(' - ')[0].trim() : '';
+            const acTypeCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+
+            document.getElementById('mBranch').innerText = report.station;
+            document.getElementById('mDate').innerText = formatRecordDate(report.timestamp);
+            document.getElementById('mReporter').innerText = report.recorderName;
+            document.getElementById('mDM').innerText = report.dm || g.dm || '-';
+            document.getElementById('mCM').innerText = report.cluster || g.cluster || '-';
+            document.getElementById('mAMM').innerText = report.ammMtn || g.ammMtn || '-';
+            document.getElementById('mACQuantity').innerText = g.acQuantity || 'N/A';
+            document.getElementById('mACBrand').innerText = g.acBrand || 'N/A';
+            document.getElementById('mACBroken').innerText = g.brokenUnits || 'None identified';
+            document.getElementById('mComments').innerText = g.comments || '-';
+
+            document.getElementById('statusSelect').value = report.status || 'Pending';
+
+            // Reset buttons — visibility is controlled by admin-only-link class set at page load (applyAdminUI)
+            // Pre-fill edit panel
+            document.getElementById('acEditStatus').value = report.status || 'Pending';
+            document.getElementById('acEditBrokenUnits').value = (report.fullData && report.fullData.general) ? (report.fullData.general.brokenUnits || '') : '';
+            document.getElementById('acEditComments').value = (report.fullData && report.fullData.general) ? (report.fullData.general.comments || '') : '';
+            document.getElementById('acEditPanel').classList.add('hidden');
+
+            const saveBtn = document.getElementById('saveStatusBtn');
+            saveBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Save Status`;
+            saveBtn.disabled = false;
+
+            // --- Per-Unit Section ---
+            const checkLabels = {
+                filter:    'ความสะอาดแผงคอยล์/ฟิลเตอร์',
+                cooling:   'ความเย็น/การกระจายลม',
+                drainage:  'การระบายน้ำ/น้ำหยด',
+                noise:     'เสียงการทำงาน',
+                condition: 'สภาพอุปกรณ์/หน้ากากแอร์'
+            };
+            const typeNameMap = { 'Wall Type': 'แอร์ติดผนัง', 'Cassette Type': 'แอร์แขวน/ฝังฝ้า', 'Floor Standing': 'แอร์ตั้งพื้น', 'Package Type': 'แอร์ตู้ตั้งพื้น' };
+            const statusColor = {
+                'OK':       'text-green-700 bg-green-50 border-green-200',
+                'NG':       'text-red-700 bg-red-50 border-red-200',
+                'Fair':     'text-amber-700 bg-amber-50 border-amber-200',
+                'ปกติ':     'text-green-700 bg-green-50 border-green-200',
+                'ผิดปกติ':  'text-red-700 bg-red-50 border-red-200',
+                'ไม่มี':    'text-slate-500 bg-slate-50 border-slate-200'
+            };
+
+            function statusBadge(val) {
+                // Empty value = not reported as broken → default to ปกติ
+                const display = val || 'ปกติ';
+                const cls = statusColor[display] || 'text-slate-700 bg-slate-50 border-slate-200';
+                return `<span class="inline-block px-2 py-0.5 rounded border text-xs font-bold ${cls}">${htmlEscape(display)}</span>`;
+            }
+
+            let unitHtml = '';
+            if (units.length > 0) {
+                unitHtml += `<h4 class="font-bold text-slate-700 mb-3 text-sm uppercase tracking-wider flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>รายละเอียดแต่ละตัว (${units.length} เครื่อง)</h4>`;
+                units.forEach(function(u) {
+                    const typeName = typeNameMap[u.type] || u.type || '-';
+                    const photoKey = 'รูปแอร์เบอร์ ' + u.num;
+                    const photos = [].concat(att['ac_inv_' + u.num] || [], att['ac_unit_' + u.num] || att[photoKey] || []);
+
+                    let photoBlock = '';
+                    if (photos.length > 0) {
+                        let thumbs = photos.map(url => {
+                            let _url = htmlEscape(url);
+                            return `<a href="${_url}" target="_blank" class="group block aspect-video rounded-lg overflow-hidden ring-2 ring-slate-200 hover:ring-blue-500 transition shadow-sm hover:shadow-md">
+                                <img src="${_url}" class="w-full h-full object-cover bg-slate-100 group-hover:scale-105 transition duration-300">
+                            </a>`;
+                        }).join('');
+                        photoBlock = `<div class="mt-3 pt-3 border-t border-slate-100">
+                            <p class="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                รูปแอร์เบอร์ ${u.num} (${photos.length} รูป)
+                            </p>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">${thumbs}</div>
+                        </div>`;
+                    }
+
+                    const acTypeCode = acTypeCodes[u.type] || 'AC';
+                    const equipmentId = branchCode ? `${branchCode}-${acTypeCode}${String(u.num).padStart(2,'0')}` : `${acTypeCode}${String(u.num).padStart(2,'0')}`;
+                    const brokenList = String(g.brokenUnits || '').split(',').map(s => s.trim());
+                    const isBroken = brokenList.includes(String(u.num));
+                    const headerCls = isBroken ? 'bg-red-600' : 'bg-blue-600';
+
+                    unitHtml += `
+                    <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm mb-4">
+                        <div class="${headerCls} text-white px-3 py-2 flex items-center justify-between">
+                            <div class="flex items-center gap-2 font-bold text-sm">
+                                <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                แอร์เบอร์ ${u.num}${isBroken ? ' ⚠ ชำรุด' : ''}
+                            </div>
+                            <span class="text-xs font-mono bg-white/20 rounded px-2 py-0.5 font-bold">${equipmentId}</span>
+                        </div>
+                        <div class="p-3 bg-white space-y-2">
+                            <div class="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-lg p-2 mb-2">
+                                <div class="flex-shrink-0 flex flex-col items-center gap-1">
+                                    <div id="qr-ac-${u.num}" data-qr="${equipmentId}"></div>
+                                </div>
+                                <div class="text-xs min-w-0">
+                                    <p class="font-mono font-bold text-blue-800 text-sm">${equipmentId}</p>
+                                    <p class="text-slate-500">รหัสอุปกรณ์ (สแกน QR)</p>
+                                    ${u.assetNo ? `<p class="text-slate-500 mt-0.5">Asset No: <span class="font-semibold text-slate-700">${htmlEscape(u.assetNo)}</span></p>` : ''}
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div class="bg-slate-50 rounded p-2"><span class="text-slate-500">ยี่ห้อ: </span><span class="font-semibold">${htmlEscape(u.brand || '-')}</span></div>
+                                <div class="bg-slate-50 rounded p-2"><span class="text-slate-500">ประเภท: </span><span class="font-semibold">${htmlEscape(typeName)}</span></div>
+                                <div class="bg-slate-50 rounded p-2 col-span-2 flex items-center gap-2">
+                                    <span class="text-slate-500">สถานะการใช้งาน: </span>
+                                    ${(u.unitStatus || 'ใช้งาน') === 'ใช้งาน'
+                                        ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-300">✓ ใช้งาน</span>`
+                                        : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-300">✗ ไม่ใช้งาน</span>`}
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs mt-2">
+                                ${Object.entries(checkLabels).map(([k, label]) => `
+                                <div class="flex justify-between items-center py-1 border-b border-slate-50">
+                                    <span class="text-slate-500">${label}</span>
+                                    ${statusBadge(u[k])}
+                                </div>`).join('')}
+                            </div>
+                            ${u.note ? `<div class="mt-2 bg-amber-50 border border-amber-100 rounded p-2 text-xs text-amber-800"><span class="font-semibold">หมายเหตุ:</span> ${htmlEscape(u.note)}</div>` : ''}
+                            ${photoBlock}
+                        </div>
+                    </div>`;
+                });
+            } else {
+                unitHtml = `<div class="text-slate-400 text-sm text-center py-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">ไม่มีข้อมูลรายละเอียดเครื่องแอร์แต่ละตัว</div>`;
+            }
+            document.getElementById('unitSection').innerHTML = unitHtml;
+            // Generate QR codes for each unit
+            if (typeof QRCode !== 'undefined') {
+                document.querySelectorAll('#unitSection [data-qr]').forEach(function(el) {
+                    const qrVal = el.getAttribute('data-qr');
+                    if (qrVal) {
+                        try {
+                            new QRCode(el, { text: qrVal, width: 64, height: 64, correctLevel: QRCode.CorrectLevel.L });
+                            var dlBtn = document.createElement('button');
+                            dlBtn.className = 'mt-1 w-full text-[10px] flex items-center justify-center gap-0.5 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded px-1 py-0.5 transition leading-none';
+                            dlBtn.title = 'ดาวน์โหลด QR';
+                            dlBtn.innerHTML = '<svg class="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>ดาวน์โหลด';
+                            dlBtn.onclick = (function(id, name) { return function() { downloadQR(id, name); }; })(el.id, qrVal);
+                            // Append inside the flex-col QR column wrapper (parent of QR div), not as flex sibling
+                            el.parentElement.appendChild(dlBtn);
+                        } catch(e) { el.textContent = qrVal; }
+                    }
+                });
+            }
+
+            // Show Modal
+            const m = document.getElementById('detailModal');
+            const c = document.getElementById('modalContent');
+            m.classList.remove('hidden');
+            setTimeout(() => {
+                m.classList.remove('opacity-0');
+                c.classList.remove('opacity-0', 'scale-95');
+                c.classList.add('opacity-100', 'scale-100');
+            }, 10);
+            } catch (err) {
+                console.error("openModalById error:", err);
+                alert("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + err.message);
+            }
+        }
+
+        function printAcModal() {
+            const title  = document.getElementById('modalTitle').textContent;
+            const sub    = document.getElementById('modalSubtitle').textContent;
+            const genHtml = document.getElementById('generalInfoSection').innerHTML;
+            const unitHtml = document.getElementById('unitSection').innerHTML;
+            const area = document.getElementById('printArea');
+            area.innerHTML =
+                '<div style="font-family:sans-serif;color:#1e293b;">' +
+                '<div style="background:#1d4ed8;color:white;padding:14px 18px;margin-bottom:16px;border-radius:6px;">' +
+                '<h2 style="margin:0 0 4px 0;font-size:16pt;">🌬️ ' + title + '</h2>' +
+                '<p style="margin:0;font-size:10pt;opacity:0.85;">' + sub + '</p>' +
+                '</div>' +
+                '<div style="margin-bottom:16px;">' + genHtml + '</div>' +
+                unitHtml +
+                '</div>';
+            window.print();
+            setTimeout(function() { area.innerHTML = ''; }, 1500);
+        }
+
+        function closeModal() {
+            const m = document.getElementById('detailModal');
+            const c = document.getElementById('modalContent');
+            m.classList.add('opacity-0');
+            c.classList.remove('opacity-100', 'scale-100');
+            c.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        }
+
+        function toggleAcEditPanel() {
+            document.getElementById('acEditPanel').classList.toggle('hidden');
+        }
+
+        // Mirrors updateUserUI() in index.html — show/hide .admin-only-link elements
+        function applyAdminUI() {
+            document.querySelectorAll('.admin-only-link').forEach(function(el) {
+                if (isAdmin) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+        }
+
+        function saveAcEdit() {
+            if (!currentReportId) return;
+            const btn = document.getElementById('acSaveEditBtn');
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> กำลังบันทึก...';
+            btn.disabled = true;
+            const form = {
+                id: currentReportId,
+                status: document.getElementById('acEditStatus').value,
+                comments: document.getElementById('acEditComments').value,
+                brokenUnits: document.getElementById('acEditBrokenUnits').value
+            };
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                    if (res.success) {
+                        // Update local data
+                        const report = allReportsMap[currentReportId];
+                        if (report) {
+                            report.status = form.status;
+                            if (report.fullData && report.fullData.general) {
+                                report.fullData.general.comments = form.comments;
+                                report.fullData.general.brokenUnits = form.brokenUnits;
+                            }
+                        }
+                        document.getElementById('acEditPanel').classList.add('hidden');
+                        applyFilters();
+                    } else {
+                        alert('บันทึกไม่สำเร็จ: ' + res.error);
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                    alert('Error: ' + err.message);
+                })
+                .updateAcSurveyRecord(form);
+        }
+
+        // --- BIND EVENTS ---
+        document.getElementById('detailModal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+
+        // Save Status (Similar to Survey App)
+        document.getElementById('saveStatusBtn').addEventListener('click', function () {
+            if (!isAdmin && !isSMF) return alert("You must be an Administrator or SMF team member to update the status.");
+            const newStatus = document.getElementById('statusSelect').value;
+            const btn = this;
+            var _lsUserAc = null;
+            try { _lsUserAc = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmailAc = (_lsUserAc && _lsUserAc.email) ? _lsUserAc.email : '';
+
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+
+            google.script.run
+                .withSuccessHandler(res => {
+                    if (res.success) {
+                        alert("Status updated successfully.");
+                        closeModal();
+                        loadData();
+                    } else {
+                        alert("Failed: " + res.error);
+                        btn.disabled = false;
+                        btn.innerHTML = `Save Status`;
+                    }
+                })
+                .withFailureHandler(e => {
+                    alert("Error: " + e.message);
+                    btn.disabled = false;
+                    btn.innerHTML = `Save Status`;
+                })
+                .updateSurvey({ id: currentReportId, status: newStatus, databaseType: "Aircon", clientEmail: clientEmailAc });
+        });
+
+        // Delete Report (same pattern as Refig)
+        function deleteAcRecord() {
+            if (!currentReportId) return;
+            if (!confirm('ลบรายงานนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+            const btn = document.getElementById('deleteBtn');
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            btn.disabled = true;
+            // Pass clientEmail from localStorage — Session.getActiveUser() returns empty in web app context
+            var _lsUser = null;
+            try { _lsUser = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsUser && _lsUser.email) ? _lsUser.email : '';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res.success) {
+                        allReports = allReports.filter(r => r.id !== currentReportId);
+                        delete allReportsMap[currentReportId];
+                        closeModal();
+                        renderTable();
+                        updateAcCharts();
+                    } else {
+                        alert('ลบไม่สำเร็จ: ' + res.error);
+                        btn.innerHTML = origHTML; btn.disabled = false;
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    alert('Error: ' + err.message);
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                })
+                .deleteReport({ id: currentReportId, databaseType: 'Aircon', clientEmail: clientEmail });
+        }
+
+        function downloadQR(divId, filename) {
+            var div = document.getElementById(divId);
+            if (!div) return;
+            var canvas = div.querySelector('canvas');
+            var img = div.querySelector('img');
+            var dataUrl;
+            if (canvas) {
+                dataUrl = canvas.toDataURL('image/png');
+            } else if (img) {
+                var c = document.createElement('canvas');
+                c.width = img.naturalWidth || 64; c.height = img.naturalHeight || 64;
+                c.getContext('2d').drawImage(img, 0, 0);
+                dataUrl = c.toDataURL('image/png');
+            } else return;
+            var a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = (filename || 'qrcode') + '.png';
+            a.click();
+        }
+
+    </script>
+</body>
+
+</html>

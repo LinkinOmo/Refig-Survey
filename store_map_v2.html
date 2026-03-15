@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <title>Store Distribution Map</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: #f3f4f6;
+        }
+
+        #map {
+            height: calc(100vh - 120px);
+            width: 100%;
+            border-radius: 12px;
+            z-index: 1;
+        }
+
+        /* Custom Pin Label */
+        .pin-label {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #3b82f6;
+            color: #1e3a8a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: auto !important;
+            height: auto !important;
+            margin-top: -35px !important;
+            margin-left: -10px !important;
+        }
+    </style>
+</head>
+
+<body class="p-4 h-screen flex flex-col">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-4 bg-white p-4 rounded-xl shadow-sm">
+        <div>
+            <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                    </path>
+                </svg>
+                Store Distribution Map
+            </h1>
+            <p class="text-xs text-gray-500">Visualizing store locations by BU</p>
+        </div>
+        <div>
+            <a href="<?= ScriptApp.getService().getUrl() ?>"
+                class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Home</a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="mb-4 bg-white p-3 rounded-xl shadow-sm flex flex-wrap gap-4 items-center sm:justify-between">
+        <div id="controls"
+            class="absolute top-4 left-4 z-[1000] bg-white p-2 rounded shadow-lg flex flex-col gap-2 w-[450px]">
+            <!-- Top Row: Store Filters -->
+            <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1">
+                    <label class="text-xs font-bold text-gray-600">Store:</label>
+                    <input type="text" id="searchStore" placeholder="Name/ID" class="text-xs border p-1 rounded w-24"
+                        oninput="filterMap()">
+                </div>
+                <div class="flex items-center gap-1">
+                    <label class="text-xs font-bold text-gray-600">BU:</label>
+                    <select id="filterBU" class="text-xs border p-1 rounded w-20" onchange="filterMap()">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-1">
+                    <label class="text-xs font-bold text-gray-600">Type:</label>
+                    <select id="filterBUType" class="text-xs border p-1 rounded w-20" onchange="filterMap()">
+                        <option value="">All</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr class="border-gray-200">
+
+            <!-- Bottom Row: Trip Filters -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- Quick Buttons -->
+                <div class="flex gap-1">
+                    <button onclick="setWeekRange(-1)"
+                        class="bg-gray-100 border text-xs px-2 py-1 rounded hover:bg-gray-200 text-gray-700">Last
+                        Wk</button>
+                    <button onclick="setWeekRange(0)"
+                        class="bg-blue-50 border border-blue-200 text-xs px-2 py-1 rounded hover:bg-blue-100 text-blue-700 font-bold">This
+                        Wk</button>
+                </div>
+
+                <!-- Date Range -->
+                <div class="flex items-center gap-1 bg-gray-50 p-1 rounded border">
+                    <input type="date" id="tripStart" class="text-[10px] border p-0.5 rounded w-20">
+                    <span class="text-xs text-gray-400">-</span>
+                    <input type="date" id="tripEnd" class="text-[10px] border p-0.5 rounded w-20">
+                </div>
+
+                <!-- Dept -->
+                <select id="tripDept" class="text-xs border p-1 rounded w-16" onchange="renderTrips()">
+                    <option value="All">All Dept</option>
+                    <option value="SMF">SMF</option>
+                    <option value="MMS">MMS</option>
+                    <option value="Other">Other</option>
+                </select>
+
+                <!-- Load Button -->
+                <button onclick="loadTripData()"
+                    class="bg-indigo-600 text-white text-xs px-3 py-1 rounded hover:bg-indigo-700 font-bold ml-auto">
+                    Load
+                </button>
+            </div>
+        </div>
+        <div class="text-xs font-bold text-gray-600" id="mapStatus">Loading Data...</div>
+    </div>
+
+    <!-- Map -->
+    <div id="map" class="shadow-md border border-gray-200"></div>
+
+    <script>
+        let map;
+        let markers = [];
+        let tripMarkers = [];
+        let allStores = [];
+        let tripDataList = [];
+
+        // Color palette for Different BUs
+        const buColors = {
+            'Default': '#3b82f6',
+            'Mini Big C': '#16a34a', // Green
+            'Hypermarket': '#dc2626', // Red
+            'Supermarket': '#ca8a04', // Yellowish
+            'Pure': '#9333ea' // Purple
+        };
+
+        // Department Colors
+        const deptColors = {
+            'SMF': '#14b8a6', // Teal
+            'MMS': '#db2777', // Pink
+            'Other': '#6366f1' // Indigo
+        };
+
+        window.onload = function () {
+            // Set Default Dates (This Week)
+            setWeekRange(0);
+
+            initMap();
+            loadData();
+            // loadTripData(); // Optional: Auto-load or wait for click? Let's wait for click or load default.
+        };
+
+        function setWeekRange(offsetWeeks) {
+            const today = new Date();
+            const day = today.getDay() || 7;
+            if (day !== 1) today.setHours(-24 * (day - 1)); // Back to Monday
+
+            if (offsetWeeks) {
+                today.setDate(today.getDate() + (offsetWeeks * 7));
+            }
+
+            const start = new Date(today);
+            const end = new Date(today);
+            end.setDate(end.getDate() + 6); // End of week
+
+            document.getElementById('tripStart').valueAsDate = start;
+            document.getElementById('tripEnd').valueAsDate = end;
+
+            // Optional: Auto-load on quick click?
+            // loadTripData();
+        }
+
+        function initMap() {
+            // Center on Thailand roughly
+            map = L.map('map').setView([13.7563, 100.5018], 6);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        function loadData() {
+            google.script.run
+                .withSuccessHandler(function (jsonStr) {
+                    try {
+                        let res = JSON.parse(jsonStr);
+                        if (res.error) { document.getElementById('mapStatus').textContent = "Error: " + res.error; return; }
+
+                        allStores = res.stores || [];
+
+                        document.getElementById('mapStatus').textContent = `Loaded ${allStores.length} stores`;
+
+                        populateFilters();
+                        filterMap();
+
+                    } catch (e) {
+                        console.error(e);
+                        document.getElementById('mapStatus').textContent = "Client Data Error: " + e.message;
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    document.getElementById('mapStatus').textContent = "Connection Failed";
+                })
+                .getStoreMapData();
+        }
+
+        function loadTripData() {
+            const s = document.getElementById('tripStart').value;
+            const e = document.getElementById('tripEnd').value;
+
+            document.getElementById('mapStatus').textContent = "Loading Trips...";
+
+            google.script.run
+                .withSuccessHandler(function (jsonStr) {
+                    try {
+                        let res = JSON.parse(jsonStr);
+                        if (res.error) {
+                            document.getElementById('mapStatus').textContent = "Trip Error: " + res.error;
+                            return;
+                        }
+
+                        tripDataList = res.trips || [];
+                        document.getElementById('mapStatus').textContent = `Loaded ${tripDataList.length} trips`;
+                        renderTrips();
+
+                    } catch (e) {
+                        console.error("Trip Data Parse Error", e);
+                    }
+                })
+                .getTripMapData(s, e);
+        }
+
+        function populateFilters() {
+            // BU Filter
+            const bus = [...new Set(allStores.map(s => s.bu).filter(Boolean))].sort();
+            const buSel = document.getElementById('filterBU');
+            bus.forEach(b => {
+                let opt = document.createElement('option');
+                opt.value = b;
+                opt.textContent = b;
+                buSel.appendChild(opt);
+            });
+
+            // BU Type Filter
+            const types = [...new Set(allStores.map(s => s.buType).filter(Boolean))].sort();
+            const typeSel = document.getElementById('filterBUType');
+            types.forEach(t => {
+                let opt = document.createElement('option');
+                opt.value = t;
+                opt.textContent = t;
+                typeSel.appendChild(opt);
+            });
+        }
+
+        function filterMap() {
+            // Clear existing markers (Stores)
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            const buInput = document.getElementById('filterBU').value;
+            const typeInput = document.getElementById('filterBUType').value;
+            const searchInput = document.getElementById('searchStore').value.toLowerCase();
+
+            let count = 0;
+            let bounds = L.latLngBounds();
+
+            allStores.forEach(store => {
+                // 1. BU Filter
+                if (buInput && store.bu !== buInput) return;
+
+                // 2. BU Type Filter
+                if (typeInput && store.buType !== typeInput) return;
+
+                // 3. Search Filter
+                if (searchInput) {
+                    const searchStr = (store.id + " " + store.name).toLowerCase();
+                    if (!searchStr.includes(searchInput)) return;
+                }
+
+                const lat = parseFloat(store.lat);
+                const lng = parseFloat(store.lng);
+
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                // Determine Color
+                let color = buColors['Default'];
+                if (store.bu) {
+                    if (store.bu.includes('Mini')) color = buColors['Mini Big C'];
+                    else if (store.bu.includes('Hyper')) color = buColors['Hypermarket'];
+                    else if (store.bu.includes('Super')) color = buColors['Supermarket'];
+                    else if (store.bu.includes('Pure')) color = buColors['Pure'];
+                }
+
+                // Popup Content
+                const popupContent = `
+                    <div class="font-sans text-left">
+                        <div class="font-bold text-sm text-gray-800 mb-1">${store.id} - ${store.name}</div>
+                        <div class="text-xs mb-1"><strong>BU:</strong> <span style="color: ${color}; font-weight: bold;">${store.bu || '-'}</span></div>
+                        <div class="text-xs mb-1"><strong>Type:</strong> ${store.buType || '-'}</div>
+                        <div class="text-xs mb-1"><strong>Province:</strong> ${store.province || '-'}</div>
+                        <div class="text-xs mt-2">
+                             <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" class="text-blue-600 underline">Open in Google Maps</a>
+                        </div>
+                    </div>
+                `;
+
+                // Custom Marker
+                const customIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.3); opacity: 0.6;"></div>`,
+                    iconSize: [14, 14],
+                    iconAnchor: [7, 7],
+                    popupAnchor: [0, -7]
+                });
+
+                const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(popupContent);
+                marker.addTo(map);
+                markers.push(marker);
+                bounds.extend([lat, lng]);
+                count++;
+            });
+
+            document.getElementById('mapStatus').textContent = `Showing ${count} stores`;
+
+            if (count > 0) {
+                // map.fitBounds(bounds, { padding: [50, 50] }); // Optional: Don't auto-zoom on filter change every time?
+            } else if (count === 0 && (buInput || typeInput || searchInput)) {
+                // Keep map position if no results but filters active
+            } else {
+                map.setView([13.7563, 100.5018], 6); // Reset to default
+            }
+
+            // Re-render trips in case they need to be on top
+            renderTrips();
+        }
+
+        let employeeColors = {};
+        const colorPalette = [
+            '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6',
+            '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+            '#06b6d4', '#a855f7', '#eab308', '#22c55e', '#f43f5e'
+        ];
+
+        function assignEmployeeColors() {
+            // Sort employees alphabetically for stability
+            const employees = [...new Set(tripDataList.map(t => t.empName).filter(Boolean))].sort();
+
+            employees.forEach((emp, idx) => {
+                employeeColors[emp] = colorPalette[idx % colorPalette.length];
+            });
+        }
+
+        function renderTrips() {
+            // Clear existing trip markers
+            tripMarkers.forEach(m => map.removeLayer(m));
+            tripMarkers = [];
+
+            const selectedDept = document.getElementById('tripDept').value;
+
+            // Ensure colors are assigned based on current data
+            assignEmployeeColors();
+
+            tripDataList.forEach(trip => {
+                // 1. Check Department
+                if (selectedDept !== "All" && trip.department !== selectedDept) return;
+                // (Also handle "Other" logic? If trip.dept isn't SMF/MMS, treat as Other?)
+                if (selectedDept === "Other" && (trip.department === "SMF" || trip.department === "MMS")) return;
+
+                const lat = parseFloat(trip.lat);
+                const lng = parseFloat(trip.lng);
+
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                // Determine Color based on Employee
+                let color = employeeColors[trip.empName] || '#6b7280'; // Default gray if not found
+
+                const popupContent = `
+                    <div class="font-sans text-left">
+                        <div class="font-bold text-sm text-gray-800 mb-1">${trip.storeName}</div>
+                        <div class="text-xs mb-1 font-bold" style="color:${color}">${trip.empName}</div>
+                        <hr class="my-1">
+                         <div class="text-xs mb-1"><strong>Dept:</strong> ${trip.department}</div>
+                        <div class="text-xs mb-1"><strong>Date:</strong> ${trip.date}</div>
+                        <div class="text-xs mb-1"><strong>Status:</strong> ${trip.status}</div>
+                    </div>
+                `;
+
+                // Big Pin for Trips
+                const customIcon = L.divIcon({
+                    className: 'trip-marker',
+                    html: `<div style="background-color: ${color}; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4); z-index: 1000;">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                           </div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15],
+                    popupAnchor: [0, -15]
+                });
+
+                const marker = L.marker([lat, lng], { icon: customIcon, zIndexOffset: 1000 }).bindPopup(popupContent);
+                marker.addTo(map);
+                tripMarkers.push(marker);
+            });
+        }
+    </script>
+</body>
+
+</html>
