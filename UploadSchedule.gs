@@ -109,27 +109,32 @@ function _cellDateStr(v) {
 
 // ─── Load all stores from external sheet ────────────────────
 
-function _loadAllStores() {
+function _loadAllStores(includeInactive) {
     try {
         var ss = SpreadsheetApp.openByUrl(STORE_DB_URL);
         var sheet = ss.getSheets()[0];
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
 
-        var idIdx = -1, nameIdx = -1, buIdx = -1;
+        var idIdx = -1, nameIdx = -1, buIdx = -1, statusIdx = -1;
         for (var i = 0; i < headers.length; i++) {
             var h = String(headers[i]).trim().toLowerCase();
             if (h.includes("store id") || h.includes("site id") || h === "code") idIdx = i;
             if (h.includes("store name") || h.includes("site name")) nameIdx = i;
             if (h === "bu" || h.includes("business unit") || h === "format") buIdx = i;
+            if (h === "status") statusIdx = i;
         }
 
         var stores = [];
         for (var r = 1; r < data.length; r++) {
             var row = data[r];
-            var code = idIdx >= 0 ? String(row[idIdx]).trim() : "";
-            var name = nameIdx >= 0 ? String(row[nameIdx]).trim() : "";
-            var bu   = buIdx   >= 0 ? String(row[buIdx]).trim()   : "";
+            var code       = idIdx     >= 0 ? String(row[idIdx]).trim()     : "";
+            var name       = nameIdx   >= 0 ? String(row[nameIdx]).trim()   : "";
+            var bu         = buIdx     >= 0 ? String(row[buIdx]).trim()     : "";
+            var storeStatus = statusIdx >= 0 ? String(row[statusIdx]).trim() : "A";
+
+            // If includeInactive is falsy, only include active stores (Status = "A")
+            if (!includeInactive && storeStatus !== "A") continue;
 
             // Fallback: extract code from name if missing (e.g. "StoreName-12345")
             if ((!code || code === "" || code === "undefined") && name.includes("-")) {
@@ -142,7 +147,7 @@ function _loadAllStores() {
             }
 
             if (name && name !== "" && name !== "undefined") {
-                stores.push({ code: code || name, name: name, bu: bu });
+                stores.push({ code: code || name, name: name, bu: bu, storeStatus: storeStatus });
             }
         }
         return stores;
@@ -435,25 +440,74 @@ function getScheduleForBranch(searchTerm) {
         var data   = sheet.getDataRange().getValues();
         var term   = searchTerm.trim().toLowerCase();
         var result = [];
+        var codeSet = {};
 
         for (var i = 1; i < data.length; i++) {
             var row = data[i];
             if (!row[0]) continue;
-            var code = String(row[0]).toLowerCase();
-            var name = String(row[1]).toLowerCase();
-            if (code.includes(term) || name.includes(term)) {
+            var code = String(row[0]);
+            if (code.toLowerCase().includes(term) || String(row[1]).toLowerCase().includes(term)) {
                 result.push({
-                    code:      String(row[0]),
-                    name:      String(row[1]),
-                    bu:        String(row[2]),
-                    critical:  String(row[3]),
-                    date:      _cellDateStr(row[4]),
-                    time:      String(row[5]),
-                    status:    String(row[6]),
-                    skipCount: parseInt(row[8]) || 0
+                    code:         code,
+                    name:         String(row[1]),
+                    bu:           String(row[2]),
+                    critical:     String(row[3]),
+                    date:         _cellDateStr(row[4]),
+                    time:         String(row[5]),
+                    status:       String(row[6]),
+                    skipCount:    parseInt(row[8]) || 0,
+                    hasAircon: false, airconStatus: '', airconTs: '',
+                    hasRef:    false, refStatus:    '', refTs:    ''
                 });
+                codeSet[code] = true;
             }
         }
+        if (result.length === 0) return { success: true, data: result };
+
+        // Enrich with latest non-Draft survey status per branch
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var sheetDefs = [
+            { name: 'Aircon_Survey_Database', isAircon: true },
+            { name: 'Ref_Survey_Database',    isAircon: false }
+        ];
+        var byCode = { Aircon: {}, Ref: {} };
+        sheetDefs.forEach(function(def) {
+            var sht = ss.getSheetByName(def.name);
+            if (!sht || sht.getLastRow() < 2) return;
+            var sData = sht.getDataRange().getValues();
+            var hdrs = sData[0];
+            var tsIdx = -1, codeIdx = -1, statusIdx = -1;
+            for (var h = 0; h < hdrs.length; h++) {
+                var hdr = String(hdrs[h]).toLowerCase().trim();
+                if (hdr === 'timestamp')   tsIdx     = h;
+                if (hdr === 'branch code') codeIdx   = h;
+                if (hdr === 'status')      statusIdx = h;
+            }
+            if (codeIdx < 0) return;
+            var typeKey = def.isAircon ? 'Aircon' : 'Ref';
+            for (var i = 1; i < sData.length; i++) {
+                var sRow  = sData[i];
+                var sCode = String(sRow[codeIdx] || '').trim();
+                if (!sCode || !codeSet[sCode]) continue;
+                var status = statusIdx >= 0 ? String(sRow[statusIdx] || '').trim() : '';
+                if (!status || status === 'Draft') continue;
+                var tsRaw  = tsIdx >= 0 ? sRow[tsIdx] : '';
+                var tsDate = tsRaw instanceof Date ? tsRaw : new Date(String(tsRaw));
+                var tsMs   = isNaN(tsDate) ? 0 : tsDate.getTime();
+                var tsStr  = tsMs > 0 ? Utilities.formatDate(tsDate, Session.getScriptTimeZone(), 'dd/MM/yy HH:mm') : '-';
+                var existing = byCode[typeKey][sCode];
+                if (!existing || tsMs > existing.tsMs) {
+                    byCode[typeKey][sCode] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                }
+            }
+        });
+        result.forEach(function(r) {
+            var ac = byCode.Aircon[r.code];
+            if (ac) { r.hasAircon = true; r.airconStatus = ac.status; r.airconTs = ac.tsStr; }
+            var rf = byCode.Ref[r.code];
+            if (rf) { r.hasRef = true; r.refStatus = rf.status; r.refTs = rf.tsStr; }
+        });
+
         return { success: true, data: result };
 
     } catch (e) {
@@ -549,6 +603,100 @@ function rescheduleOverdue() {
     }
 }
 
+// ─── Get Schedule by Date Range (enriched with survey data) ──
+
+function getDailyScheduleWithSurvey(fromDate, toDate) {
+    try {
+        var sheet = _getScheduleSheet(false);
+        if (!sheet || sheet.getLastRow() < 2) return { success: true, data: [] };
+
+        var data = sheet.getDataRange().getValues();
+        var rows = [];
+        var codeSet = {};
+
+        for (var i = 1; i < data.length; i++) {
+            var row = data[i];
+            if (!row[0]) continue;
+            var d = _cellDateStr(row[4]);
+            if (d < fromDate || d > toDate) continue;
+            var code = String(row[0]).trim();
+            codeSet[code] = true;
+            rows.push({
+                code:         code,
+                name:         String(row[1] || '').trim(),
+                bu:           String(row[2] || '').trim(),
+                critical:     String(row[3] || ''),
+                date:         d,
+                time:         String(row[5] || '').trim(),
+                status:       String(row[6] || '').trim(),
+                skipCount:    parseInt(row[8]) || 0,
+                rowIdx:       i + 1,
+                hasAircon:    false, airconStatus: '', airconTs: '',
+                hasRef:       false, refStatus:    '', refTs:    ''
+            });
+        }
+
+        if (rows.length === 0) return { success: true, data: [] };
+
+        // Enrich from survey sheets (latest non-Draft per code)
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var sheetDefs = [
+            { name: 'Aircon_Survey_Database', isAircon: true },
+            { name: 'Ref_Survey_Database',    isAircon: false }
+        ];
+        var byCode = { Aircon: {}, Ref: {} };
+
+        sheetDefs.forEach(function(def) {
+            var sht = ss.getSheetByName(def.name);
+            if (!sht || sht.getLastRow() < 2) return;
+            var sData   = sht.getDataRange().getValues();
+            var hdrs    = sData[0];
+            var tsIdx = -1, codeIdx = -1, statusIdx = -1;
+            for (var h = 0; h < hdrs.length; h++) {
+                var hdr = String(hdrs[h]).toLowerCase().trim();
+                if (hdr === 'timestamp')   tsIdx     = h;
+                if (hdr === 'branch code') codeIdx   = h;
+                if (hdr === 'status')      statusIdx = h;
+            }
+            if (codeIdx < 0) return;
+            var typeKey = def.isAircon ? 'Aircon' : 'Ref';
+            for (var i = 1; i < sData.length; i++) {
+                var row    = sData[i];
+                var code   = String(row[codeIdx] || '').trim();
+                if (!code || !codeSet[code]) continue;
+                var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
+                if (!status || status === 'Draft') continue;
+                var tsRaw  = tsIdx >= 0 ? row[tsIdx] : '';
+                var tsDate = tsRaw instanceof Date ? tsRaw : new Date(String(tsRaw));
+                var tsMs   = isNaN(tsDate) ? 0 : tsDate.getTime();
+                var tsStr  = tsMs > 0 ? Utilities.formatDate(tsDate, Session.getScriptTimeZone(), 'dd/MM/yy HH:mm') : '-';
+                var existing = byCode[typeKey][code];
+                if (!existing || tsMs > existing.tsMs) {
+                    byCode[typeKey][code] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                }
+            }
+        });
+
+        rows.forEach(function(r) {
+            var ac = byCode.Aircon[r.code];
+            if (ac) { r.hasAircon = true; r.airconStatus = ac.status; r.airconTs = ac.tsStr; }
+            var rf = byCode.Ref[r.code];
+            if (rf) { r.hasRef = true; r.refStatus = rf.status; r.refTs = rf.tsStr; }
+        });
+
+        rows.sort(function(a, b) {
+            var da = (a.date || '') + (a.time || '');
+            var db = (b.date || '') + (b.time || '');
+            return da < db ? -1 : da > db ? 1 : 0;
+        });
+
+        return { success: true, data: rows };
+    } catch(e) {
+        Logger.log('getDailyScheduleWithSurvey Error: ' + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
 // ─── Sync Schedule Status from Survey Databases ──────────────
 // A branch is marked "Uploaded" only when ALL submitted survey types
 // (Aircon AND/OR Ref, whichever were submitted) are in a done status.
@@ -561,10 +709,6 @@ function syncScheduleWithSurveyDb() {
         }
 
         var ss          = SpreadsheetApp.getActiveSpreadsheet();
-        var meta        = _readMeta();
-        var schedCreated = meta['createdAt'] ? new Date(meta['createdAt']) : new Date(0);
-
-        var DONE_STATUSES = ['Acknowledged', 'Corrected', 'Closed', 'Rejected'];
 
         // byCompound: "code|type" -> { tsDate, status }
         var byCompound = {};
@@ -597,8 +741,8 @@ function syncScheduleWithSurveyDb() {
                 var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
                 var ts     = row[tsIdx];
                 var tsDate = ts instanceof Date ? ts : new Date(ts);
-                if (!code || isNaN(tsDate) || status === 'Draft') continue;
-                if (tsDate < schedCreated) continue;
+                // Any non-Draft submission counts as uploaded for schedule purposes
+                if (!code || isNaN(tsDate) || !status || status === 'Draft') continue;
 
                 var key      = code + '|' + def.type;
                 var existing = byCompound[key];
@@ -608,8 +752,8 @@ function syncScheduleWithSurveyDb() {
             }
         });
 
-        // Group by branch code; require ALL submitted types to be done
-        var branchReady = {};  // code -> latest tsDate (only if ALL done)
+        // Group by branch code; any non-Draft submission qualifies
+        var branchReady = {};  // code -> latest tsDate
         var branchTypes = {};  // code -> { Aircon: entry, Ref: entry }
         Object.keys(byCompound).forEach(function(key) {
             var parts = key.split('|');
@@ -620,8 +764,6 @@ function syncScheduleWithSurveyDb() {
         Object.keys(branchTypes).forEach(function(code) {
             var types   = branchTypes[code];
             var entries = Object.keys(types).map(function(t) { return types[t]; });
-            var allDone = entries.every(function(e) { return DONE_STATUSES.indexOf(e.status) >= 0; });
-            if (!allDone) return;
             var latest = entries.reduce(function(mx, e) { return e.tsDate > mx ? e.tsDate : mx; }, new Date(0));
             branchReady[code] = latest;
         });
@@ -948,9 +1090,16 @@ function getSurveySubmissionStatus() {
                 if (e.tsMs > latestTs) { latestTs = e.tsMs; latestTsStr = e.tsStr; }
             });
 
-            // Sorted list of submitted types for display
-            var types = entries.map(function(e) { return e.type; }).sort();
-            var row = { code: code, name: branch.name, types: types, timestamp: latestTsStr, _ts: latestTs };
+            var row = {
+                code: code, name: branch.name,
+                hasAircon:    !!branch.types['Aircon'],
+                airconStatus: branch.types['Aircon'] ? branch.types['Aircon'].status : '',
+                airconTs:     branch.types['Aircon'] ? branch.types['Aircon'].tsStr  : '',
+                hasRef:       !!branch.types['Ref'],
+                refStatus:    branch.types['Ref'] ? branch.types['Ref'].status : '',
+                refTs:        branch.types['Ref'] ? branch.types['Ref'].tsStr  : '',
+                _ts: latestTs
+            };
 
             if (allDone) acknowledged.push(row);
             else         pendingReview.push(row);
@@ -1260,6 +1409,182 @@ function getAcknowledgedPerformanceDashboard() {
 
     } catch (e) {
         Logger.log('getAcknowledgedPerformanceDashboard Error: ' + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getScheduleUploadProgressReport
+// Lists ALL branches from Store Master, enriches with Upload_Schedule data
+// and Aircon & Ref survey submissions for the "📋 รายงาน" tab.
+// ─────────────────────────────────────────────────────────────────────────────
+function getScheduleUploadProgressReport() {
+    try {
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+        // 1. Load ALL branches from Store Master as the primary source (including inactive)
+        var allStores = _loadAllStores(true);
+        if (allStores.length === 0) {
+            return { success: false, error: 'ไม่สามารถโหลดข้อมูล Store Master ได้' };
+        }
+
+        var branches = {};  // code -> branch obj
+        allStores.forEach(function(s) {
+            var code = String(s.code || '').trim();
+            if (!code) return;
+            branches[code] = {
+                code:         code,
+                name:         String(s.name || '').trim(),
+                bu:           String(s.bu  || '').trim(),
+                storeStatus:  String(s.storeStatus || 'A').trim(),
+                critical:     false,
+                inSchedule:   false,
+                date:         '',
+                time:         '',
+                schedStatus:  '',
+                hasAircon:    false,
+                airconStatus: '',
+                airconTs:     '',
+                airconTsMs:   0,
+                hasRef:       false,
+                refStatus:    '',
+                refTs:        '',
+                refTsMs:      0
+            };
+        });
+
+        // 2. Enrich from Upload_Schedule (mark inSchedule + scheduled date/time)
+        var schedSheet = _getScheduleSheet(false);
+        if (schedSheet && schedSheet.getLastRow() >= 2) {
+            var schedData = schedSheet.getDataRange().getValues();
+            for (var i = 1; i < schedData.length; i++) {
+                var sRow = schedData[i];
+                if (!sRow[0]) continue;
+                var code = String(sRow[0]).trim();
+                if (!code) continue;
+                if (!branches[code]) {
+                    // In schedule but not in Store Master — add it
+                    branches[code] = {
+                        code:         code,
+                        name:         String(sRow[1] || '').trim(),
+                        bu:           String(sRow[2] || '').trim(),
+                        storeStatus:  'A',
+                        critical:     String(sRow[3] || '') === 'Yes',
+                        inSchedule:   true,
+                        date:         _cellDateStr(sRow[4]),
+                        time:         String(sRow[5] || '').trim(),
+                        schedStatus:  String(sRow[6] || 'Pending').trim(),
+                        hasAircon:    false,
+                        airconStatus: '',
+                        airconTs:     '',
+                        airconTsMs:   0,
+                        hasRef:       false,
+                        refStatus:    '',
+                        refTs:        '',
+                        refTsMs:      0
+                    };
+                } else if (!branches[code].inSchedule) {
+                    // First occurrence — enrich Store Master entry with schedule data
+                    branches[code].critical    = String(sRow[3] || '') === 'Yes';
+                    branches[code].inSchedule  = true;
+                    branches[code].date        = _cellDateStr(sRow[4]);
+                    branches[code].time        = String(sRow[5] || '').trim();
+                    branches[code].schedStatus = String(sRow[6] || 'Pending').trim();
+                }
+            }
+        }
+
+        // 3. Enrich from survey sheets (latest submission per branch code)
+        function enrichFromSheet(sheetName, isAircon) {
+            var sht = ss.getSheetByName(sheetName);
+            if (!sht || sht.getLastRow() < 2) return;
+            var data    = sht.getDataRange().getValues();
+            var headers = data[0];
+            var tsIdx = -1, codeIdx = -1, statusIdx = -1;
+            for (var h = 0; h < headers.length; h++) {
+                var hdr = String(headers[h]).toLowerCase().trim();
+                if (hdr === 'timestamp')   tsIdx     = h;
+                if (hdr === 'branch code') codeIdx   = h;
+                if (hdr === 'status')      statusIdx = h;
+            }
+            if (codeIdx < 0) return;
+
+            var byCode = {};
+            for (var i = 1; i < data.length; i++) {
+                var row    = data[i];
+                var code   = String(row[codeIdx] || '').trim();
+                var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
+                if (!code || status === 'Draft') continue;
+                var tsRaw  = tsIdx >= 0 ? row[tsIdx] : '';
+                var tsDate = tsRaw instanceof Date ? tsRaw : new Date(String(tsRaw));
+                var tsMs   = isNaN(tsDate) ? 0 : tsDate.getTime();
+                var tsStr  = tsMs > 0 ? Utilities.formatDate(tsDate, Session.getScriptTimeZone(), 'dd/MM/yy HH:mm') : '-';
+                if (!byCode[code] || tsMs > byCode[code].tsMs) {
+                    byCode[code] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                }
+            }
+
+            Object.keys(byCode).forEach(function(code) {
+                if (!branches[code]) return;
+                var info = byCode[code];
+                if (isAircon) {
+                    branches[code].hasAircon    = true;
+                    branches[code].airconStatus = info.status;
+                    branches[code].airconTs     = info.tsStr;
+                    branches[code].airconTsMs   = info.tsMs;
+                } else {
+                    branches[code].hasRef    = true;
+                    branches[code].refStatus = info.status;
+                    branches[code].refTs     = info.tsStr;
+                    branches[code].refTsMs   = info.tsMs;
+                }
+            });
+        }
+
+        enrichFromSheet('Aircon_Survey_Database', true);
+        enrichFromSheet('Ref_Survey_Database',    false);
+
+        // 4. Sort: in-schedule branches first (not-uploaded → uploaded by date),
+        //    then not-in-schedule (has survey → none)
+        var result = Object.keys(branches).map(function(c) { return branches[c]; });
+        result.sort(function(a, b) {
+            var aInSched = a.inSchedule ? 0 : 1;
+            var bInSched = b.inSchedule ? 0 : 1;
+            if (aInSched !== bInSched) return aInSched - bInSched;
+            var aUp = a.hasAircon || a.hasRef;
+            var bUp = b.hasAircon || b.hasRef;
+            if (!aUp && bUp)  return -1;
+            if (aUp  && !bUp) return  1;
+            if (a.date < b.date) return -1;
+            if (a.date > b.date) return  1;
+            return a.time < b.time ? -1 : 1;
+        });
+
+        // Strip internal tsMs fields before returning
+        result.forEach(function(r) { delete r.airconTsMs; delete r.refTsMs; });
+
+        // Summary counts
+        var inScheduleCount = result.filter(function(r) { return r.inSchedule; }).length;
+        var withBoth        = result.filter(function(r) { return r.hasAircon && r.hasRef; }).length;
+        var withAirconOnly  = result.filter(function(r) { return r.hasAircon && !r.hasRef; }).length;
+        var withRefOnly     = result.filter(function(r) { return !r.hasAircon && r.hasRef; }).length;
+        var withNone        = result.filter(function(r) { return !r.hasAircon && !r.hasRef; }).length;
+
+        return {
+            success: true,
+            data: result,
+            summary: {
+                total:          result.length,
+                inSchedule:     inScheduleCount,
+                withBoth:       withBoth,
+                withAirconOnly: withAirconOnly,
+                withRefOnly:    withRefOnly,
+                withNone:       withNone
+            }
+        };
+
+    } catch (e) {
+        Logger.log('getScheduleUploadProgressReport Error: ' + e.toString());
         return { success: false, error: e.toString() };
     }
 }

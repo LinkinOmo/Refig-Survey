@@ -860,7 +860,21 @@ function processAirConSurveyForm(form) {
             "Operational Noise 20":      form.Aircon_Noise_20 || "",
             "Equipment Condition 20":    form.Aircon_Condition_20 || "",
             "Unit 20 Note":              form.AcUnit20_Note || "",
+        };
 
+        // Dynamically capture measuring-tool fields (ControllerTemp, SupplyTemp, ReturnTemp, Amps)
+        // These are only submitted by SMF/MMS team members
+        for (var mi = 1; mi <= 20; mi++) {
+            ['ControllerTemp', 'SupplyTemp', 'ReturnTemp', 'Amps'].forEach(function(field) {
+                var formKey = 'AcUnit' + mi + '_' + field;
+                if (form[formKey] !== undefined && form[formKey] !== '') {
+                    var sheetKey = 'Unit ' + mi + ' ' + field.replace(/([A-Z])/g, ' $1').trim();
+                    dataToSave[sheetKey] = form[formKey];
+                }
+            });
+        }
+
+        var _dummy = {
             "DM Area": form.dmArea || "",
             "CM Area": form.cmArea || "",
             "AMM MTN": form.ammMtn || "",
@@ -868,6 +882,8 @@ function processAirConSurveyForm(form) {
             "Status": form.isDraft ? "Draft" : "Pending",
             "Attachments_JSON": JSON.stringify(attachmentLinks)
         };
+        Object.assign(dataToSave, _dummy);
+        delete _dummy;
 
         // 2. Handle Sheet & Headers
         if (!sheet) {
@@ -1464,7 +1480,11 @@ function getAirConSurveysReport() {
                     drainage:  getVal("Drainage Leakage " + u),
                     noise:     getVal("Operational Noise " + u),
                     condition: getVal("Equipment Condition " + u),
-                    note:      getVal("Unit " + u + " Note")
+                    note:      getVal("Unit " + u + " Note"),
+                    controllerTemp: getVal("Unit " + u + " Controller Temp"),
+                    supplyTemp:     getVal("Unit " + u + " Supply Temp"),
+                    returnTemp:     getVal("Unit " + u + " Return Temp"),
+                    amps:           getVal("Unit " + u + " Amps")
                 });
             }
 
@@ -2698,7 +2718,24 @@ function processRefSurveyForm(form) {
             htmlBody += '<div style="background:#0369a1;color:white;padding:20px;text-align:center;">';
             htmlBody += '<h2 style="margin:0 0 8px 0;">Refrigerator Survey Report</h2>';
             htmlBody += '<p style="margin:0;font-size:14px;">Branch: ' + form.branchCode + ' - ' + form.branchName + '</p>';
-            htmlBody += '</div><div style="padding:20px;">';
+            htmlBody += '</div>';
+
+            // Overall / Shop photo hero (same as Aircon card)
+            var _overallPhotos = attachmentLinks.Overall || attachmentLinks.overall || attachmentLinks.Shop || attachmentLinks.shop || [];
+            if (_overallPhotos.length > 0) {
+                htmlBody += '<div style="padding:20px;background:#f0f9ff;border-bottom:2px solid #bae6fd;">';
+                htmlBody += '<h3 style="color:#0369a1;margin:0 0 15px 0;">📸 Overall Photo</h3>';
+                htmlBody += '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">';
+                for (var _p = 0; _p < _overallPhotos.length; _p++) {
+                    htmlBody += '<div style="flex:0 0 auto;max-width:100%;">';
+                    htmlBody += '<a href="' + _overallPhotos[_p] + '" target="_blank" style="display:block;border:2px solid #7dd3fc;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,0.1);">';
+                    htmlBody += '<img src="' + _overallPhotos[_p] + '" style="max-width:100%;height:auto;display:block;">';
+                    htmlBody += '</a></div>';
+                }
+                htmlBody += '</div></div>';
+            }
+
+            htmlBody += '<div style="padding:20px;">';
             htmlBody += '<p><b>Reporter:</b> ' + (form.reporterName || toEmail) + '</p>';
             htmlBody += '<hr/>';
             htmlBody += '<h3>สรุปจำนวนตู้แช่รวม</h3>';
@@ -2710,11 +2747,27 @@ function processRefSurveyForm(form) {
             
             htmlBody += '<hr/><h3>รายละเอียดแต่ละตู้ (Brand, Asset No & Product)</h3>';
 
-            // Helper: print unit rows for a given namePrefix and qty, starting at startIdx
-            function unitRows(sectionLabel, prefixKey, qty, startIdx) {
-                if (!qty || qty <= 0) return;
+            // Helper: photo strip for a given attachment category
+            function sectionPhotos(attachKey) {
+                var links = attachmentLinks[attachKey] || [];
+                if (!links.length) return '';
+                var ph = '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e2e8f0;">';
+                ph += '<p style="font-size:12px;font-weight:600;color:#64748b;margin:0 0 8px 0;">📷 รูปภาพ (' + links.length + ' รูป)</p>';
+                ph += '<table style="border-collapse:collapse;width:100%;"><tr>';
+                for (var pi = 0; pi < links.length; pi++) {
+                    if (pi > 0 && pi % 2 === 0) ph += '</tr><tr>';
+                    ph += '<td style="padding:3px;width:50%;vertical-align:top;"><a href="' + links[pi] + '" target="_blank">';
+                    ph += '<img src="' + links[pi] + '" style="width:100%;height:auto;border-radius:6px;border:1px solid #cbd5e1;display:block;">';
+                    ph += '</a></td>';
+                }
+                ph += '</tr></table></div>';
+                return ph;
+            }
+
+            // Helper: render unit rows for a section, returns HTML for injection into a card body
+            function unitRowsHtml(prefixKey, qty, startIdx) {
                 var start = startIdx || 1;
-                htmlBody += '<p style="margin:4px 0 2px 0;"><b>→ ' + sectionLabel + ' (' + qty + ' ตู้)</b></p>';
+                var s = '';
                 for (var u = start; u < start + qty; u++) {
                     var supplier = dataToSave[prefixKey + 'Supplier_' + u] || '';
                     var supplierOther = dataToSave[prefixKey + 'Supplier Other_' + u] || '';
@@ -2724,28 +2777,93 @@ function processRefSurveyForm(form) {
                     var product = dataToSave[prefixKey + 'Product_' + u]  || '-';
                     var uStatus = dataToSave[prefixKey + 'Status_' + u]   || 'ใช้งาน';
                     var statusTag = uStatus === 'ใช้งาน'
-                        ? '<span style="display:inline-block;padding:0 7px;border-radius:10px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:700;font-size:11px;">✓ ใช้งาน</span>'
-                        : '<span style="display:inline-block;padding:0 7px;border-radius:10px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;font-size:11px;">✗ ไม่ใช้งาน</span>';
-                    var line = 'ตู้ที่ ' + (u - start + 1) + ': ';
-                    if (supplierDisplay) line += 'แบรนด์ไอศกรีม=' + supplierDisplay + ' | ';
-                    line += (supplierDisplay ? 'ยี่ห้อตู้=' : 'ยี่ห้อ=') + brand + ' | Asset=' + asset + ' | สินค้า=' + product + ' | สถานะ=' + statusTag;
-                    htmlBody += '<p style="margin:0 0 0 12px;font-size:13px;">' + line + '</p>';
+                        ? '<span style="display:inline-block;padding:0 6px;border-radius:10px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:700;font-size:11px;">✓ ใช้งาน</span>'
+                        : '<span style="display:inline-block;padding:0 6px;border-radius:10px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;font-weight:700;font-size:11px;">✗ ไม่ใช้งาน</span>';
+                    s += '<div style="' + (u > start ? 'border-top:1px solid #f1f5f9;margin-top:8px;padding-top:8px;' : '') + '">';
+                    s += '<p style="margin:0 0 4px 0;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">ตู้ที่ ' + (u - start + 1) + '</p>';
+                    s += '<table style="border-collapse:collapse;font-size:13px;">';
+                    if (supplierDisplay) s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">แบรนด์ไอศกรีม</td><td style="padding:2px 0;font-weight:600;">' + supplierDisplay + '</td></tr>';
+                    s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">' + (supplierDisplay ? 'ยี่ห้อตู้' : 'ยี่ห้อ') + '</td><td style="padding:2px 0;font-weight:600;">' + brand + '</td></tr>';
+                    if (asset !== '-') s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">Asset No.</td><td style="padding:2px 0;">' + asset + '</td></tr>';
+                    if (product !== '-') s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">สินค้า</td><td style="padding:2px 0;">' + product + '</td></tr>';
+                    s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">สถานะ</td><td style="padding:2px 0;">' + statusTag + '</td></tr>';
+                    s += '</table></div>';
                 }
+                return s;
+            }
+
+            // Helper: full section card with header, unit rows, and photos
+            function sectionCard(label, bgColor, bodyHtml, attachKey) {
+                if (!bodyHtml) return '';
+                var card = '<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:12px;">';
+                card += '<div style="background:' + bgColor + ';color:white;padding:8px 14px;">';
+                card += '<b style="font-size:13px;">→ ' + label + '</b>';
+                card += '</div>';
+                card += '<div style="padding:12px 14px;">';
+                card += bodyHtml;
+                if (attachKey) card += sectionPhotos(attachKey);
+                card += '</div></div>';
+                return card;
             }
 
             var _f1 = parseInt(form.refFrozen1DoorQty) || 0;
             var _f2 = parseInt(form.refFrozen2DoorQty) || 0;
             var _f3 = parseInt(form.refFrozen3DoorQty) || 0;
-            unitRows('2.1 OPEN', 'Ref Open ', parseInt(form.refOpenQty) || 0, 1);
-            unitRows('2.2 Plugin', 'Ref Bev Plugin ', parseInt(form.refBevPluginQty) || 0, 1);
-            unitRows('2.2 Walk-in', 'Ref Bev Walk In ', parseInt(form.refBevWalkInQty) || 0, 1);
-            unitRows('2.2 Remote', 'Ref Bev Remote ', parseInt(form.refBevRemoteQty) || 0, 1);
-            unitRows('2.3 ตู้แช่แข็ง 1 ประตู', 'Ref Frozen ', _f1, 1);
-            unitRows('2.3 ตู้แช่แข็ง 2 ประตู', 'Ref Frozen ', _f2, _f1 + 1);
-            unitRows('2.3 ตู้แช่แข็ง 3 ประตู', 'Ref Frozen ', _f3, _f1 + _f2 + 1);
-            unitRows('2.4 ไอศกรีม', 'Ref Ice Cream ', parseInt(form.refIceCreamQty) || 0, 1);
-            unitRows('2.5 น้ำแข็ง', 'Ref Ice ', parseInt(form.refIceQty) || 0, 1);
-            unitRows('2.6 ตู้ 4 ประตู Stainless', 'Ref Ss4Door ', parseInt(form.refSs4DoorQty) || 0, 1);
+            var _openQty   = parseInt(form.refOpenQty)      || 0;
+            var _pluginQty = parseInt(form.refBevPluginQty) || 0;
+            var _walkinQty = parseInt(form.refBevWalkInQty) || 0;
+            var _remoteQty = parseInt(form.refBevRemoteQty) || 0;
+            var _icecreamQty = parseInt(form.refIceCreamQty)|| 0;
+            var _iceQty      = parseInt(form.refIceQty)     || 0;
+            var _ss4DoorQty  = parseInt(form.refSs4DoorQty) || 0;
+
+            // 2.1 OPEN
+            if (_openQty > 0)
+                htmlBody += sectionCard('2.1 ตู้แช่ OPEN (' + _openQty + ' ตู้)', '#0369a1',
+                    unitRowsHtml('Ref Open ', _openQty, 1), 'ref_open');
+
+            // 2.2 ตู้ทำความเย็นเครื่องดื่ม — all sub-types share ref_bev photos → shown at end
+            var _bevBodyHtml = '';
+            if (_pluginQty > 0) _bevBodyHtml += '<p style="margin:0 0 6px 0;font-size:12px;font-weight:700;color:#0f766e;">Plugin (' + _pluginQty + ' ตู้)</p>' + unitRowsHtml('Ref Bev Plugin ', _pluginQty, 1);
+            if (_walkinQty > 0) _bevBodyHtml += '<p style="margin:' + (_pluginQty > 0 ? '10px' : '0') + ' 0 6px 0;font-size:12px;font-weight:700;color:#0f766e;">Walk-in (' + _walkinQty + ' ตู้)</p>' + unitRowsHtml('Ref Bev Walk In ', _walkinQty, 1);
+            if (_remoteQty > 0) _bevBodyHtml += '<p style="margin:' + (_pluginQty + _walkinQty > 0 ? '10px' : '0') + ' 0 6px 0;font-size:12px;font-weight:700;color:#0f766e;">Remote (' + _remoteQty + ' ตู้)</p>' + unitRowsHtml('Ref Bev Remote ', _remoteQty, 1);
+            if (_bevBodyHtml)
+                htmlBody += sectionCard('2.2 ตู้ทำความเย็นเครื่องดื่ม (' + (_pluginQty+_walkinQty+_remoteQty) + ' ตู้)', '#0d9488',
+                    _bevBodyHtml, 'ref_bev');
+
+            // 2.3 ตู้แช่แข็ง — all door types share ref_frozen photos
+            var _frozenBodyHtml = '';
+            if (_f1 > 0) _frozenBodyHtml += '<p style="margin:0 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">1 ประตู (' + _f1 + ' ตู้)</p>' + unitRowsHtml('Ref Frozen ', _f1, 1);
+            if (_f2 > 0) _frozenBodyHtml += '<p style="margin:' + (_f1 > 0 ? '10px' : '0') + ' 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">2 ประตู (' + _f2 + ' ตู้)</p>' + unitRowsHtml('Ref Frozen ', _f2, _f1 + 1);
+            if (_f3 > 0) _frozenBodyHtml += '<p style="margin:' + (_f1 + _f2 > 0 ? '10px' : '0') + ' 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">3 ประตู (' + _f3 + ' ตู้)</p>' + unitRowsHtml('Ref Frozen ', _f3, _f1 + _f2 + 1);
+            if (_frozenBodyHtml)
+                htmlBody += sectionCard('2.3 ตู้แช่อาหารแช่แข็ง (' + (_f1+_f2+_f3) + ' ตู้)', '#4f46e5',
+                    _frozenBodyHtml, 'ref_frozen');
+
+            // 2.4 ไอศกรีม
+            if (_icecreamQty > 0)
+                htmlBody += sectionCard('2.4 ตู้แช่ไอศกรีม (' + _icecreamQty + ' ตู้)', '#7c3aed',
+                    unitRowsHtml('Ref Ice Cream ', _icecreamQty, 1), 'ref_icecream');
+
+            // 2.5 น้ำแข็ง
+            if (_iceQty > 0)
+                htmlBody += sectionCard('2.5 ตู้แช่น้ำแข็ง (' + _iceQty + ' ตู้)', '#0891b2',
+                    unitRowsHtml('Ref Ice ', _iceQty, 1), 'ref_ice');
+
+            // 2.6 Stainless 4 Door
+            if (_ss4DoorQty > 0)
+                htmlBody += sectionCard('2.6 ตู้ 4 ประตู Stainless (' + _ss4DoorQty + ' ตู้)', '#475569',
+                    unitRowsHtml('Ref Ss4Door ', _ss4DoorQty, 1), null);
+
+            // Other problem photos (ref_problem)
+            var _problemPhotos = attachmentLinks['ref_problem'] || [];
+            if (_problemPhotos.length > 0) {
+                htmlBody += '<div style="border:1px solid #fca5a5;border-radius:8px;overflow:hidden;margin-bottom:12px;">';
+                htmlBody += '<div style="background:#dc2626;color:white;padding:8px 14px;"><b style="font-size:13px;">📷 รูปภาพปัญหาอื่นๆ</b></div>';
+                htmlBody += '<div style="padding:12px 14px;">' + sectionPhotos('ref_problem') + '</div>';
+                htmlBody += '</div>';
+            }
+
             if (form.hasBrokenRef === 'Yes') {
                 htmlBody += '<hr/><h3 style="color:red;">ตู้แช่ชำรุด</h3>';
                 htmlBody += '<p><b>ตู้ที่ชำรุด:</b> ' + (brokenUnitNumbers || '-') + '</p>';
@@ -3206,6 +3324,42 @@ function updateAcSurveyRecord(form) {
             if (colMap["Closed Date"]) sheet.getRange(rowIndex, colMap["Closed Date"]).setValue(new Date());
         }
         _invalidateRefSlimCache();
+        _invalidateAcSlimCache();
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Save Controller Temperature for a single AC unit (available to all users)
+// form: { id, unitNum, temp, clientEmail }
+// ─────────────────────────────────────────────────────────────────────────────
+function saveAcUnitControllerTemp(form) {
+    try {
+        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
+        if (!sheet) return { success: false, error: "Sheet not found" };
+
+        var data = sheet.getDataRange().getValues();
+        var headers = data[0];
+        var colMap = {};
+        headers.forEach(function(h, idx) { colMap[String(h).trim()] = idx + 1; });
+
+        var idColIdx = (colMap["ID"] || 1) - 1;
+        var rowIndex = -1;
+        for (var i = 1; i < data.length; i++) {
+            if (String(data[i][idColIdx]) === String(form.id)) { rowIndex = i + 1; break; }
+        }
+        if (rowIndex === -1) return { success: false, error: "Record not found" };
+
+        var colName = "Unit " + form.unitNum + " Controller Temp";
+        var colIdx = colMap[colName];
+        if (!colIdx) {
+            colIdx = sheet.getLastColumn() + 1;
+            sheet.getRange(1, colIdx).setValue(colName);
+        }
+        var saveVal = (form.temp === '' || form.temp === null || form.temp === undefined) ? '' : Number(form.temp);
+        sheet.getRange(rowIndex, colIdx).setValue(saveVal);
         _invalidateAcSlimCache();
         return { success: true };
     } catch (e) {

@@ -9,6 +9,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -54,6 +56,12 @@
             background-color: #f1f5f9;
             color: #475569;
             border: 1px solid #cbd5e1;
+        }
+
+        .status-Rejected {
+            background-color: #ffe4e6;
+            color: #e11d48;
+            border: 1px solid #fecdd3;
         }
 
         .loader {
@@ -204,7 +212,7 @@
         <div id="content" class="hidden space-y-6">
 
             <!-- Global Stats Summary Overview -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div class="glass-panel p-5 rounded-xl border-l-4 border-blue-500 cursor-pointer hover:shadow-md transition-all group"
                     id="statTotalCard">
                     <div class="flex justify-between items-start">
@@ -276,6 +284,30 @@
                         </div>
                     </div>
                 </div>
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-rose-500 cursor-pointer hover:shadow-md transition-all group"
+                    id="statRejectedCard">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Rejected</p>
+                            <h3 class="text-3xl font-bold text-slate-800" id="statRejected">0</h3>
+                        </div>
+                        <div class="bg-rose-50 p-2 rounded-lg text-rose-600 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500 cursor-pointer hover:shadow-md transition-all group"
+                    id="statBrokenCard">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">มีแอร์ชำรุด</p>
+                            <h3 class="text-3xl font-bold text-slate-800" id="statBroken">0</h3>
+                        </div>
+                        <div class="bg-red-50 p-2 rounded-lg text-red-600 group-hover:scale-110 transition-transform">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Interactive Charts Dashboard -->
@@ -302,15 +334,25 @@
 
             <!-- Combined Aircon + Ref Monthly Aggregation Chart -->
             <div class="glass-panel p-5 rounded-xl">
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex flex-wrap items-start justify-between gap-y-2 mb-3">
                     <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-violet-500 inline-block"></span>ภาพรวม Aircon &amp; Refrigerator รายเดือน
                     </h3>
-                    <div class="flex items-center gap-4 text-xs text-slate-500">
-                        <span class="flex items-center gap-1.5"><span class="w-3 h-2.5 rounded-sm inline-block" style="background:#6366f1"></span>Aircon</span>
-                        <span class="flex items-center gap-1.5"><span class="w-3 h-2.5 rounded-sm inline-block" style="background:#38bdf8"></span>Refrigerator</span>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="flex items-center gap-3 text-xs text-slate-500">
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-2.5 rounded-sm inline-block" style="background:#6366f1"></span>Aircon</span>
+                            <span class="flex items-center gap-1.5"><span class="w-3 h-2.5 rounded-sm inline-block" style="background:#38bdf8"></span>Refrigerator</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <input type="date" id="combinedDateFrom" class="border border-slate-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-violet-400 outline-none" onchange="applyCombinedDateFilter()">
+                            <span class="text-xs text-slate-400">–</span>
+                            <input type="date" id="combinedDateTo" class="border border-slate-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-violet-400 outline-none" onchange="applyCombinedDateFilter()">
+                            <button onclick="resetCombinedDateFilter()" id="combinedResetBtn" class="hidden text-xs text-slate-400 hover:text-red-500 border border-slate-200 hover:border-red-200 px-2 py-1 rounded-lg transition-colors" title="ล้าง filter">✕</button>
+                        </div>
                     </div>
                 </div>
+                <!-- Summary bar (shown when date filter active) -->
+                <div id="combinedSummaryBar" class="hidden mb-3 flex flex-wrap gap-4 text-xs bg-violet-50 border border-violet-200 rounded-lg px-3 py-2 text-slate-700"></div>
                 <div id="combinedChartLoader" class="flex items-center justify-center text-sm text-slate-400" style="height:200px">⏳ กำลังโหลดข้อมูล...</div>
                 <div class="relative hidden" id="combinedChartWrap" style="height:200px"><canvas id="combinedSurveyChart"></canvas></div>
             </div>
@@ -327,8 +369,8 @@
                         </svg>
                     </div>
                     <input type="text" id="searchInput" placeholder="Search by Station, RM, Reporter..."
-                        oninput="filters.search=this.value; renderTable();"
-                        onkeydown="if(event.key==='Enter'){filters.search=this.value; renderTable();}"
+                        oninput="filters.search=this.value; _acDebounce();"
+                        onkeydown="if(event.key==='Enter'){filters.search=this.value; clearTimeout(_acDebounceTimer); renderTable();}"
                         class="w-full pl-10 pr-24 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow text-sm">
                     <button onclick="filters.search=document.getElementById('searchInput').value; renderTable();" title="Search"
                         class="absolute inset-y-0 right-0 px-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-r-lg flex items-center gap-1 transition-colors">
@@ -350,6 +392,7 @@
                             <option value="Acknowledged">Acknowledged</option>
                             <option value="Corrected">Corrected</option>
                             <option value="Closed">Closed</option>
+                            <option value="Rejected">Rejected</option>
                         </select>
                     </div>
 
@@ -443,6 +486,7 @@
                                     data-sort="status">
                                     Status <span class="sort-indicator"></span>
                                 </th>
+                                <th class="p-4">ชำรุด</th>
                                 <th class="p-4 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -530,7 +574,7 @@
                 </div>
 
                 <!-- Modal Body -->
-                <div class="p-6">
+                <div class="p-6" id="acModalBody">
                     <!-- General Details Block -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" id="generalInfoSection">
                         <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
@@ -585,7 +629,7 @@
                     <div id="unitSection" class="mb-6"></div>
 
                     <!-- Status Update Section -->
-                    <div class="mt-8 border-t border-slate-200 pt-6">
+                    <div id="statusMgmtSection" class="hidden mt-8 border-t border-slate-200 pt-6">
                         <h4 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
                             <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -604,6 +648,7 @@
                                     <option value="Acknowledged">Acknowledged</option>
                                     <option value="Corrected">Corrected</option>
                                     <option value="Closed">Closed</option>
+                                    <option value="Rejected">⛔ Rejected</option>
                                 </select>
                             </div>
                             <div class="w-full md:w-1/3">
@@ -622,34 +667,62 @@
                 </div> <!-- End Modal Body -->
 
                 <!-- AC Edit Panel (admin only, hidden by default) -->
-                <div id="acEditPanel" class="hidden border-t border-amber-200 bg-amber-50 p-5">
-                    <h4 class="text-sm font-bold text-amber-800 mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        แก้ไขข้อมูล (Admin)
-                    </h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">สถานะ</label>
-                            <select id="acEditStatus" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white">
-                                <option value="Pending">Pending</option>
-                                <option value="Acknowledged">Acknowledged</option>
-                                <option value="Corrected">Corrected</option>
-                                <option value="Closed">Closed</option>
-                                <option value="Draft">Draft</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">แอร์ชำรุด (เบอร์ คั่นด้วย ,)</label>
-                            <input id="acEditBrokenUnits" type="text" placeholder="เช่น 1, 3" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white">
-                        </div>
-                        <div class="sm:col-span-2">
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">หมายเหตุ</label>
-                            <textarea id="acEditComments" rows="2" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white resize-none"></textarea>
+                <div id="acEditPanel" class="hidden flex flex-col border-t border-amber-200" style="min-height:420px">
+                    <!-- Tab Bar -->
+                    <div class="flex border-b border-amber-200 bg-amber-50 px-4 pt-3 gap-1" id="acEditTabBar">
+                        <button onclick="_acEditTab('general')" id="acTab_general"
+                            class="px-3 py-1.5 text-xs font-semibold rounded-t-lg transition">🗒️ ทั่วไป</button>
+                        <button onclick="_acEditTab('qty')" id="acTab_qty"
+                            class="px-3 py-1.5 text-xs font-semibold rounded-t-lg transition text-slate-500 hover:text-slate-700">📦 จำนวนแอร์</button>
+                        <button onclick="_acEditTab('units')" id="acTab_units"
+                            class="px-3 py-1.5 text-xs font-semibold rounded-t-lg transition text-slate-500 hover:text-slate-700">🔧 ข้อมูลแอร์</button>
+                    </div>
+                    <!-- Tab: ทั่วไป -->
+                    <div id="acTabContent_general" class="p-5 bg-amber-50 flex-1 overflow-y-auto">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">สถานะ</label>
+                                <select id="acEditStatus" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white">
+                                    <option value="Pending">Pending</option>
+                                    <option value="Acknowledged">Acknowledged</option>
+                                    <option value="Corrected">Corrected</option>
+                                    <option value="Closed">Closed</option>
+                                    <option value="Rejected">⛔ Rejected</option>
+                                    <option value="Draft">Draft</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">แอร์ชำรุด (เบอร์ คั่นด้วย ,)</label>
+                                <input id="acEditBrokenUnits" type="text" placeholder="เช่น 1, 3"
+                                    class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">หมายเหตุ</label>
+                                <textarea id="acEditComments" rows="3"
+                                    class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white resize-none"></textarea>
+                            </div>
                         </div>
                     </div>
-                    <div class="flex gap-2 justify-end">
-                        <button onclick="document.getElementById('acEditPanel').classList.add('hidden')" class="px-4 py-1.5 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition">ยกเลิก</button>
-                        <button id="acSaveEditBtn" onclick="saveAcEdit()" class="px-4 py-1.5 text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition flex items-center gap-1">
+                    <!-- Tab: จำนวนแอร์ -->
+                    <div id="acTabContent_qty" class="p-5 bg-amber-50 flex-1 overflow-y-auto hidden">
+                        <div class="max-w-xs">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">จำนวนแอร์ทั้งหมด</label>
+                            <input id="acEditQty" type="number" min="0" max="50"
+                                class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-amber-400 outline-none bg-white">
+                        </div>
+                        <p class="text-xs text-slate-500 mt-3">* เมื่อเปลี่ยนจำนวน ให้ไปที่แท็บ "ข้อมูลแอร์" เพื่ออัปเดตรายละเอียดแต่ละตัว</p>
+                    </div>
+                    <!-- Tab: ข้อมูลแอร์ -->
+                    <div id="acTabContent_units" class="p-5 bg-amber-50 flex-1 overflow-y-auto hidden">
+                        <p class="text-xs text-slate-500 mb-3">กรอกข้อมูลแอร์แต่ละตัว (ตามจำนวนในแท็บ "จำนวนแอร์")</p>
+                        <div id="_acEditUnitsBody" class="space-y-4"></div>
+                    </div>
+                    <!-- Footer -->
+                    <div class="flex gap-2 justify-end px-5 py-3 border-t border-amber-200 bg-amber-50">
+                        <button onclick="_acCancelEdit()"
+                            class="px-4 py-1.5 text-sm text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition">ยกเลิก</button>
+                        <button id="acSaveEditBtn" onclick="saveAcEdit()"
+                            class="px-4 py-1.5 text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition flex items-center gap-1">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             บันทึก
                         </button>
@@ -659,13 +732,14 @@
         </div>
     </div>
 
-    <!-- Hidden print area -->
-    <div id="printArea"></div> (injected by doGet for guest access) -->
+    <!-- Hidden file input for per-unit photo upload -->
+    <input type="file" id="acPhotoUploadInput" multiple accept="image/*" style="display:none">
     <script>var _PRELOADED_AC = <?!= preloadedData ?>;</script>
     <!-- Include Apps Script APIs or JS Bundle -->
     <script>
         let allReports = [];
         let allReportsMap = {};
+        let _acFullCache = {};
         let currentReportId = null;
         let isAdmin = false;
         let isSMF = false;
@@ -704,24 +778,21 @@
 
         // --- DASHBOARD MOUNTING ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Step 1: Read auth from localStorage — identical to RefSurveyReport pattern
+            // Read display name from localStorage only — admin status is verified server-side below.
+            // Do NOT set isAdmin from localStorage: stale data could grant incorrect admin access.
             try {
                 var _lsUser = JSON.parse(localStorage.getItem('app_user_data') || 'null');
                 if (_lsUser && localStorage.getItem('app_auth_token')) {
-                    isAdmin = !!_lsUser.isAdmin;
-                    isSMF = !!_lsUser.isSMF;
                     var navName = document.getElementById('nav-user-name');
                     if (navName) navName.textContent = _lsUser.name || _lsUser.email || '';
                 }
             } catch(e) {}
 
-            // Step 2: Update access display and apply admin UI — done ONCE, based on localStorage
+            // Apply admin UI with default false — server will correct below
             var accessDisplay = document.getElementById('access-level-display');
             if (accessDisplay) {
-                accessDisplay.textContent = isAdmin ? 'Administrator Access' : 'User Access';
-                accessDisplay.className = isAdmin
-                    ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
-                    : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
+                accessDisplay.textContent = 'User Access';
+                accessDisplay.className = 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
             }
             applyAdminUI();
 
@@ -745,13 +816,20 @@
                     google.script.run
                         .withSuccessHandler(function(flags) {
                             if (!flags) return;
-                            if (flags.isAdmin && !isAdmin) {
-                                isAdmin = true;
+                            // Use server as ground truth — prevents stale localStorage from granting admin
+                            var serverAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
+                            if (serverAdmin !== isAdmin) {
+                                isAdmin = serverAdmin;
                                 const ad = document.getElementById('access-level-display');
-                                if (ad) ad.textContent = 'Administrator Access';
+                                if (ad) {
+                                    ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
+                                    ad.className = isAdmin
+                                        ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
+                                        : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
+                                }
                                 applyAdminUI();
                             }
-                            if (flags.isSMF && !isSMF) { isSMF = true; }
+                            isSMF = !!flags.isSMF;
                         })
                         .getUserFlags(_acUserEmail);
                 }
@@ -768,45 +846,56 @@
         });
 
         function loadData() {
+            var _loadTimer = setTimeout(function() {
+                var loadEl = document.getElementById('loading');
+                if (loadEl && !loadEl.classList.contains('hidden')) {
+                    loadEl.innerHTML = '<div class="text-amber-600 text-sm text-center">\u26a0\ufe0f \u0e42\u0e2b\u0e25\u0e14\u0e19\u0e32\u0e19\u0e40\u0e01\u0e34\u0e19\u0e44\u0e1b \u0e01\u0e23\u0e38\u0e13\u0e32 Deploy \u0e40\u0e27\u0e2d\u0e23\u0e4c\u0e0a\u0e31\u0e19\u0e43\u0e2b\u0e21\u0e48\u0e41\u0e25\u0e49\u0e27\u0e23\u0e35\u0e40\u0e1f\u0e23\u0e0a</div>';
+                }
+            }, 25000);
             google.script.run
-                .withSuccessHandler(init)
-                .withFailureHandler((err) => {
-                    console.error(err);
-                    alert("Failed to load air conditioner survey reports. Please check console.");
+                .withSuccessHandler(function(res) {
+                    clearTimeout(_loadTimer);
+                    if (!res) {
+                        document.getElementById('loading').innerHTML = '<div class="text-amber-600 text-sm text-center">\u26a0\ufe0f \u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e23\u0e31\u0e1a\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 \u2014 \u0e01\u0e23\u0e38\u0e13\u0e32 Deploy \u0e40\u0e27\u0e2d\u0e23\u0e4c\u0e0a\u0e31\u0e19\u0e43\u0e2b\u0e21\u0e48\u0e41\u0e25\u0e49\u0e27\u0e23\u0e35\u0e40\u0e1f\u0e23\u0e0a</div>';
+                        return;
+                    }
+                    init(res);
                 })
-                .getAirConSurveysReport();
+                .withFailureHandler(function(err) {
+                    clearTimeout(_loadTimer);
+                    console.error(err);
+                    document.getElementById('loading').innerHTML = '<div class="text-red-500 text-sm text-center">\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: ' + (err.message || err) + '</div>';
+                })
+                .getAirconSurveyListSlim();
         }
 
-        function init(jsonString) {
-            let data;
-            try {
-                if (typeof jsonString === 'string') data = JSON.parse(jsonString);
-                else data = jsonString;
-            } catch (e) {
-                alert("Failed to parse data from backend"); return;
+        function init(res) {
+            // Support both slim object (getAirconSurveyListSlim) and legacy preloaded JSON string
+            if (typeof res === 'string') {
+                var data;
+                try { data = JSON.parse(res); } catch(e) { alert('Failed to parse data from backend'); return; }
+                allReports = (data.orders || []).map(function(r) {
+                    return {
+                        id: String(r.id || ''), timestamp: r.timestamp,
+                        station: r.station, dm: r.dm || '', cluster: r.cluster || '', ammMtn: r.ammMtn || '',
+                        recorderName: r.recorderName || r.reporterName || '',
+                        status: r.status || 'Pending',
+                        brokenUnits: (r.fullData && r.fullData.general && r.fullData.general.brokenUnits) || ''
+                    };
+                });
+            } else {
+                if (!res || !res.success) {
+                    document.getElementById('loading').innerHTML = '<div class="text-red-500 text-sm text-center">\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: ' + (res ? res.error : 'Unknown') + '</div>';
+                    return;
+                }
+                allReports = res.data || [];
             }
+
+            allReportsMap = {};
+            allReports.forEach(function(r) { if (r.id) allReportsMap[r.id] = r; });
 
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('content').classList.remove('hidden');
-
-            if (data.error) {
-                alert("Error loading data: " + data.error);
-                return;
-            }
-
-            allReports = data.orders || [];
-            allReportsMap = {};
-            allReports.forEach(r => { if (r.id) allReportsMap[r.id] = r; });
-
-            if (data.isAdmin === true && !isAdmin) {
-                isAdmin = true;
-                const ad = document.getElementById('access-level-display');
-                if (ad) ad.textContent = 'Administrator Access';
-                applyAdminUI();
-            }
-            if (data.isSMF === true && !isSMF) {
-                isSMF = true;
-            }
 
             setupFilters();
             renderTable();
@@ -852,9 +941,9 @@
                 document.getElementById('dateFrom').value = ''; document.getElementById('dateTo').value = '';
                 dmFilter.value = 'all'; clusterFilter.value = 'all'; ammMtnFilter.value = 'all';
                 document.getElementById('statTotalCard').classList.add('border-blue-500', 'bg-blue-50/20');
-                ['statPendingCard', 'statAckCard', 'statCorrectedCard', 'statClosedCard'].forEach(id => {
+                ['statPendingCard', 'statAckCard', 'statCorrectedCard', 'statClosedCard', 'statRejectedCard', 'statBrokenCard'].forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) el.classList.remove('border-amber-500', 'border-emerald-500', 'border-blue-500', 'border-slate-400', 'bg-amber-50/20', 'bg-emerald-50/20', 'bg-blue-50/20', 'bg-slate-50/20');
+                    if (el) el.classList.remove('border-amber-500', 'border-emerald-500', 'border-blue-500', 'border-slate-400', 'border-rose-500', 'border-red-500', 'bg-amber-50/20', 'bg-emerald-50/20', 'bg-blue-50/20', 'bg-slate-50/20', 'bg-rose-50/20', 'bg-red-50/20');
                 });
                 renderTable();
             });
@@ -874,7 +963,9 @@
                 { id: 'statPendingCard',   stat: 'pending',     cls: ['border-amber-500',   'bg-amber-50/20'] },
                 { id: 'statAckCard',       stat: 'acknowledged',cls: ['border-emerald-500', 'bg-emerald-50/20'] },
                 { id: 'statCorrectedCard', stat: 'corrected',   cls: ['border-blue-500',    'bg-blue-50/20'] },
-                { id: 'statClosedCard',    stat: 'closed',      cls: ['border-slate-400',   'bg-slate-50/20'] }
+                { id: 'statClosedCard',    stat: 'closed',      cls: ['border-slate-400',   'bg-slate-50/20'] },
+                { id: 'statRejectedCard',  stat: 'rejected',    cls: ['border-rose-500',    'bg-rose-50/20'] },
+                { id: 'statBrokenCard',    stat: 'broken',      cls: ['border-red-500',     'bg-red-50/20'] }
             ];
             _allStatCards.forEach(cfg => {
                 const el = document.getElementById(cfg.id);
@@ -909,6 +1000,11 @@
                 if (filters.stat === 'acknowledged'  && r.status !== 'Acknowledged') return false;
                 if (filters.stat === 'corrected'     && r.status !== 'Corrected')    return false;
                 if (filters.stat === 'closed'        && r.status !== 'Closed')       return false;
+                if (filters.stat === 'rejected'      && r.status !== 'Rejected')     return false;
+                if (filters.stat === 'broken') {
+                    const _gu = String(r.brokenUnits || '').trim();
+                    if (!_gu) return false;
+                }
 
                 if (fromD && r.timestamp) {
                     const d = new Date(r.timestamp); d.setHours(0, 0, 0, 0);
@@ -956,12 +1052,25 @@
             const filtered = applyFilters();
             const sorted = sortReports(filtered);
 
-            // Update stats
+            // Update stats — single-pass instead of 7 separate .filter() calls
+            let _sPending = 0, _sAck = 0, _sCorrected = 0, _sClosed = 0, _sRejected = 0, _sBroken = 0;
+            for (let _i = 0; _i < sorted.length; _i++) {
+                const _r = sorted[_i];
+                const _st = _r.status || 'Pending';
+                if      (_st === 'Pending')      _sPending++;
+                else if (_st === 'Acknowledged') _sAck++;
+                else if (_st === 'Corrected')    _sCorrected++;
+                else if (_st === 'Closed')       _sClosed++;
+                else if (_st === 'Rejected')     _sRejected++;
+                if (String(_r.brokenUnits || '').trim()) _sBroken++;
+            }
             document.getElementById('statTotal').innerText = sorted.length;
-            document.getElementById('statPending').innerText = sorted.filter(r => r.status === 'Pending').length;
-            document.getElementById('statAck').innerText = sorted.filter(r => r.status === 'Acknowledged').length;
-            document.getElementById('statCorrected').innerText = sorted.filter(r => r.status === 'Corrected').length;
-            document.getElementById('statClosed').innerText = sorted.filter(r => r.status === 'Closed').length;
+            document.getElementById('statPending').innerText = _sPending;
+            document.getElementById('statAck').innerText = _sAck;
+            document.getElementById('statCorrected').innerText = _sCorrected;
+            document.getElementById('statClosed').innerText = _sClosed;
+            document.getElementById('statRejected').innerText = _sRejected;
+            document.getElementById('statBroken').innerText = _sBroken;
             document.getElementById('filterSummary').innerText = `Showing ${sorted.length} of ${allReports.length} reports`;
 
             document.querySelectorAll('.sort-indicator').forEach(i => {
@@ -980,6 +1089,10 @@
                 tbody.parentElement.parentElement.classList.remove('hidden');
             }
 
+            // Use DocumentFragments to batch all DOM insertions in one go (avoids per-row reflow)
+            const tableFragment  = document.createDocumentFragment();
+            const mobileFragment = document.createDocumentFragment();
+
             sorted.forEach(r => {
                 // Desktop row
                 const tr = document.createElement('tr');
@@ -988,6 +1101,7 @@
                 const d = r.fullData || {};
                 const g = d.general || {};
 
+                const _rBroken = String(r.brokenUnits || '').trim();
                 tr.innerHTML = `
                     <td class="p-4 text-slate-500">${htmlEscape(formatRecordDate(r.timestamp))}</td>
                     <td class="p-4">
@@ -1000,13 +1114,14 @@
                             ${htmlEscape(r.status || 'Pending')}
                         </span>
                     </td>
+                    <td class="p-4">${_rBroken ? '<span class="inline-block bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full border border-red-200">มีแอร์ชำรุด</span>' : '<span class="text-slate-300 text-xs">—</span>'}</td>
                     <td class="p-4 text-right">
                          <button onclick="openModalById('${htmlEscape(r.id)}')" class="text-blue-600 hover:text-blue-800 font-medium text-sm hover:bg-blue-50 px-3 py-1.5 rounded-lg transition border border-transparent hover:border-blue-100 shadow-sm">
                             View Details
                         </button>
                     </td>
                 `;
-                tbody.appendChild(tr);
+                tableFragment.appendChild(tr);
 
                 // Mobile card
                 const mc = document.createElement('div');
@@ -1015,6 +1130,7 @@
                      <div class="flex justify-between items-start mb-3">
                         <div>
                             <h3 class="font-bold text-slate-800 text-lg leading-tight mb-1">${htmlEscape(r.station)}</h3>
+                            ${_rBroken ? '<span class="inline-block mt-1 bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200">มีแอร์ชำรุด</span>' : ''}
                         </div>
                         <span class="status-badge status-${htmlEscape(r.status || 'Pending')} text-[10px]">
                             ${htmlEscape(r.status || 'Pending')}
@@ -1027,25 +1143,83 @@
                         </button>
                     </div>
                 `;
-                mobile.appendChild(mc);
+                mobileFragment.appendChild(mc);
             });
+
+            // Single DOM write per container
+            tbody.appendChild(tableFragment);
+            mobile.appendChild(mobileFragment);
             updateAcCharts();
         }
+
+        // Debounce helper for search input
+        let _acDebounceTimer = null;
+        function _acDebounce() { clearTimeout(_acDebounceTimer); _acDebounceTimer = setTimeout(renderTable, 220); }
 
         let acStatusChart = null;
         let acTrendChart = null;
         let acReporterChart = null;
         let combinedChart = null;
+        let _combinedRawData = null;
 
-        function renderCombinedChart(data) {
+        function renderCombinedChart(data, filterFrom, filterTo) {
+            if (data) _combinedRawData = data;
+            const src = _combinedRawData;
+            if (!src) return;
             const loader = document.getElementById('combinedChartLoader');
             const wrap   = document.getElementById('combinedChartWrap');
             if (loader) loader.classList.add('hidden');
             if (wrap)   wrap.classList.remove('hidden');
             if (combinedChart) { combinedChart.destroy(); combinedChart = null; }
             Chart.defaults.font.family = 'Prompt, sans-serif';
+
+            // --- Date range filtering ---
+            const fullDates  = src.fullDates  || [];
+            const allLabels  = src.labels     || [];
+            const airconD    = src.airconDaily || [];
+            const refD       = src.refDaily   || [];
+            let fromTs = filterFrom ? new Date(filterFrom).getTime() : -Infinity;
+            let toTs   = filterTo   ? new Date(filterTo  ).getTime() :  Infinity;
+
+            let labels = [], airconVals = [], refVals = [];
+            let sumAircon = 0, sumRef = 0, cumA = 0, cumR = 0;
+            let hasFilter = filterFrom || filterTo;
+
+            for (let i = 0; i < allLabels.length; i++) {
+                const dts = fullDates[i] ? new Date(fullDates[i]).getTime() : NaN;
+                const inRange = isNaN(dts) || (dts >= fromTs && dts <= toTs);
+                if (inRange) {
+                    cumA += airconD[i] || 0;
+                    cumR += refD[i]   || 0;
+                    sumAircon += airconD[i] || 0;
+                    sumRef    += refD[i]   || 0;
+                    labels.push(allLabels[i]);
+                    airconVals.push(cumA);
+                    refVals.push(cumR);
+                }
+            }
+
+            // Summary bar
+            const summaryBar = document.getElementById('combinedSummaryBar');
+            const resetBtn   = document.getElementById('combinedResetBtn');
+            if (hasFilter && summaryBar) {
+                const fmtDate = v => v ? v.split('-').reverse().join('/') : '';
+                const rangeTxt = (filterFrom || filterTo)
+                    ? ((filterFrom ? fmtDate(filterFrom) : '...') + ' – ' + (filterTo ? fmtDate(filterTo) : '...'))
+                    : '';
+                summaryBar.innerHTML =
+                    '<span class="font-semibold text-violet-700">📅 ' + rangeTxt + '</span>' +
+                    '<span class="flex items-center gap-1"><span class="w-2.5 h-2 rounded-sm inline-block" style="background:#6366f1"></span>Aircon เพิ่มขึ้น <b class="ml-1 text-indigo-700">+' + sumAircon.toLocaleString() + '</b> รายการ</span>' +
+                    '<span class="flex items-center gap-1"><span class="w-2.5 h-2 rounded-sm inline-block" style="background:#38bdf8"></span>Ref เพิ่มขึ้น <b class="ml-1 text-sky-700">+' + sumRef.toLocaleString() + '</b> รายการ</span>' +
+                    '<span class="text-slate-500">รวม <b>' + (sumAircon + sumRef).toLocaleString() + '</b> รายการ</span>';
+                summaryBar.classList.remove('hidden');
+                if (resetBtn) resetBtn.classList.remove('hidden');
+            } else {
+                if (summaryBar) summaryBar.classList.add('hidden');
+                if (resetBtn)   resetBtn.classList.add('hidden');
+            }
+
             // Thin out x-axis labels when many days
-            const labels = data.labels || [];
             const skip = labels.length > 60 ? Math.ceil(labels.length / 30) : 1;
             combinedChart = new Chart(document.getElementById('combinedSurveyChart'), {
                 type: 'line',
@@ -1054,7 +1228,7 @@
                     datasets: [
                         {
                             label: 'Aircon',
-                            data: data.aircon || [],
+                            data: airconVals,
                             borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)',
                             borderWidth: 2, tension: 0.35, fill: true,
                             pointRadius: labels.length > 60 ? 0 : 3, pointHoverRadius: 5,
@@ -1062,7 +1236,7 @@
                         },
                         {
                             label: 'Refrigerator',
-                            data: data.ref || [],
+                            data: refVals,
                             borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.08)',
                             borderWidth: 2, tension: 0.35, fill: true,
                             pointRadius: labels.length > 60 ? 0 : 3, pointHoverRadius: 5,
@@ -1088,14 +1262,26 @@
             });
         }
 
+        function applyCombinedDateFilter() {
+            const from = document.getElementById('combinedDateFrom').value;
+            const to   = document.getElementById('combinedDateTo').value;
+            renderCombinedChart(null, from || null, to || null);
+        }
+
+        function resetCombinedDateFilter() {
+            document.getElementById('combinedDateFrom').value = '';
+            document.getElementById('combinedDateTo').value   = '';
+            renderCombinedChart(null, null, null);
+        }
+
         function initAcCharts() {
             Chart.defaults.font.family = 'Prompt, sans-serif';
 
             acStatusChart = new Chart(document.getElementById('acStatusChart'), {
                 type: 'doughnut',
                 data: {
-                    labels: ['Pending', 'Acknowledged', 'Corrected', 'Closed'],
-                    datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['#fbbf24', '#10b981', '#3b82f6', '#94a3b8'], borderWidth: 2, borderColor: '#fff' }]
+                    labels: ['Pending', 'Acknowledged', 'Corrected', 'Closed', 'Rejected'],
+                    datasets: [{ data: [0, 0, 0, 0, 0], backgroundColor: ['#fbbf24', '#10b981', '#3b82f6', '#94a3b8', '#f43f5e'], borderWidth: 2, borderColor: '#fff' }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false, cutout: '62%',
@@ -1142,8 +1328,9 @@
             const ack        = allReports.filter(r => r.status === 'Acknowledged').length;
             const corrected  = allReports.filter(r => r.status === 'Corrected').length;
             const closed     = allReports.filter(r => r.status === 'Closed').length;
+            const rejected   = allReports.filter(r => r.status === 'Rejected').length;
 
-            acStatusChart.data.datasets[0].data = [pending, ack, corrected, closed];
+            acStatusChart.data.datasets[0].data = [pending, ack, corrected, closed, rejected];
             acStatusChart.update();
 
             // Daily/Monthly trend (daily when data spans ≤60 days)
@@ -1201,43 +1388,85 @@
 
         function openModalById(id) {
             try {
-            const report = allReportsMap[id];
-            if (!report) return alert("ไม่พบข้อมูล (ID: " + id + ")");
+            const r = allReportsMap[id];
+            if (!r) return alert("ไม่พบข้อมูล (ID: " + id + ")");
 
             currentReportId = id;
-            document.getElementById('modalTitle').innerText = report.station;
-            document.getElementById('modalSubtitle').innerText = `${formatRecordDate(report.timestamp)} • ${report.recorderName}`;
+            document.getElementById('modalTitle').innerText = r.station;
+            document.getElementById('modalSubtitle').innerText = `${formatRecordDate(r.timestamp)} • ${r.recorderName}`;
 
-            const d = report.fullData || {};
-            const g = d.general || {};
-            const units = d.units || [];
-            const att = d.attachments || {};
-            const branchCode = report.station ? report.station.split(' - ')[0].trim() : '';
-            const acTypeCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+            document.getElementById('mBranch').innerText = r.station;
+            document.getElementById('mDate').innerText = formatRecordDate(r.timestamp);
+            document.getElementById('mReporter').innerText = r.recorderName;
+            document.getElementById('mDM').innerText = r.dm || '-';
+            document.getElementById('mCM').innerText = r.cluster || '-';
+            document.getElementById('mAMM').innerText = r.ammMtn || '-';
+            document.getElementById('mACBroken').innerText = r.brokenUnits || 'None identified';
+            document.getElementById('mACQuantity').innerText = '...';
+            document.getElementById('mACBrand').innerText = '...';
+            document.getElementById('mComments').innerText = '...';
 
-            document.getElementById('mBranch').innerText = report.station;
-            document.getElementById('mDate').innerText = formatRecordDate(report.timestamp);
-            document.getElementById('mReporter').innerText = report.recorderName;
-            document.getElementById('mDM').innerText = report.dm || g.dm || '-';
-            document.getElementById('mCM').innerText = report.cluster || g.cluster || '-';
-            document.getElementById('mAMM').innerText = report.ammMtn || g.ammMtn || '-';
-            document.getElementById('mACQuantity').innerText = g.acQuantity || 'N/A';
-            document.getElementById('mACBrand').innerText = g.acBrand || 'N/A';
-            document.getElementById('mACBroken').innerText = g.brokenUnits || 'None identified';
-            document.getElementById('mComments').innerText = g.comments || '-';
-
-            document.getElementById('statusSelect').value = report.status || 'Pending';
+            document.getElementById('statusSelect').value = r.status || 'Pending';
 
             // Reset buttons — visibility is controlled by admin-only-link class set at page load (applyAdminUI)
-            // Pre-fill edit panel
-            document.getElementById('acEditStatus').value = report.status || 'Pending';
-            document.getElementById('acEditBrokenUnits').value = (report.fullData && report.fullData.general) ? (report.fullData.general.brokenUnits || '') : '';
-            document.getElementById('acEditComments').value = (report.fullData && report.fullData.general) ? (report.fullData.general.comments || '') : '';
+            // Hide edit panel on open
             document.getElementById('acEditPanel').classList.add('hidden');
+            document.getElementById('acModalBody').classList.remove('hidden');
 
             const saveBtn = document.getElementById('saveStatusBtn');
             saveBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Save Status`;
             saveBtn.disabled = false;
+
+            // Spinner in unit section while full record loads
+            document.getElementById('unitSection').innerHTML = '<div class="flex justify-center items-center py-10"><svg class="w-8 h-8 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="ml-2 text-slate-500 text-sm">กำลังโหลดข้อมูล...</span></div>';
+
+            // Show Modal
+            const m = document.getElementById('detailModal');
+            const c = document.getElementById('modalContent');
+            m.classList.remove('hidden');
+            setTimeout(() => {
+                m.classList.remove('opacity-0');
+                c.classList.remove('opacity-0', 'scale-95');
+                c.classList.add('opacity-100', 'scale-100');
+            }, 10);
+
+            // Serve from cache, or lazy-load full record from server
+            if (_acFullCache[id]) {
+                _renderAcModalContent(_acFullCache[id]);
+                return;
+            }
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res || !res.success) {
+                        document.getElementById('unitSection').innerHTML = '<div class="text-red-500 text-sm text-center py-4">โหลดข้อมูลไม่สำเร็จ: ' + (res ? res.error : 'ไม่ได้รับข้อมูล') + '</div>';
+                        return;
+                    }
+                    _acFullCache[id] = res.data;
+                    _renderAcModalContent(res.data);
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('unitSection').innerHTML = '<div class="text-red-500 text-sm text-center py-4">Error: ' + (err.message || err) + '</div>';
+                })
+                .getAirconSurveyRecordById(id);
+            } catch (err) {
+                console.error("openModalById error:", err);
+                alert("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + err.message);
+            }
+        }
+
+        function _renderAcModalContent(fullRecord) {
+            try {
+            const d = fullRecord.fullData || {};
+            const g = d.general || {};
+            const units = d.units || [];
+            const att = d.attachments || {};
+            const branchCode = fullRecord.station ? fullRecord.station.split(' - ')[0].trim() : '';
+            const acTypeCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+
+            document.getElementById('mACQuantity').innerText = g.acQuantity || 'N/A';
+            document.getElementById('mACBrand').innerText = g.acBrand || 'N/A';
+            document.getElementById('mACBroken').innerText = g.brokenUnits || fullRecord.brokenUnits || 'None identified';
+            document.getElementById('mComments').innerText = g.comments || '-';
 
             // --- Per-Unit Section ---
             const checkLabels = {
@@ -1273,13 +1502,17 @@
                     const photoKey = 'รูปแอร์เบอร์ ' + u.num;
                     const photos = [].concat(att['ac_inv_' + u.num] || [], att['ac_unit_' + u.num] || att[photoKey] || []);
 
+                    const acPhotoBlockId = 'ac-photo-' + u.num;
+                    const acUnitKey = 'ac_inv_' + u.num;
                     let photoBlock = '';
                     if (photos.length > 0) {
                         let thumbs = photos.map(url => {
                             let _url = htmlEscape(url);
-                            return `<a href="${_url}" target="_blank" class="group block aspect-video rounded-lg overflow-hidden ring-2 ring-slate-200 hover:ring-blue-500 transition shadow-sm hover:shadow-md">
-                                <img src="${_url}" class="w-full h-full object-cover bg-slate-100 group-hover:scale-105 transition duration-300">
-                            </a>`;
+                            return `<div class="relative group aspect-video rounded-lg overflow-hidden ring-2 ring-slate-200 hover:ring-blue-500 transition shadow-sm hover:shadow-md">` +
+                                `<a href="${_url}" target="_blank" class="block w-full h-full">` +
+                                `<img src="${_url}" class="w-full h-full object-cover bg-slate-100 group-hover:scale-105 transition duration-300"></a>` +
+                                `<button onclick="deleteAcPhoto(this,'${acUnitKey}','${acPhotoBlockId}')" data-url="${_url}" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button>` +
+                                `</div>`;
                         }).join('');
                         photoBlock = `<div class="mt-3 pt-3 border-t border-slate-100">
                             <p class="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1">
@@ -1319,12 +1552,12 @@
                             <div class="grid grid-cols-2 gap-2 text-xs">
                                 <div class="bg-slate-50 rounded p-2"><span class="text-slate-500">ยี่ห้อ: </span><span class="font-semibold">${htmlEscape(u.brand || '-')}</span></div>
                                 <div class="bg-slate-50 rounded p-2"><span class="text-slate-500">ประเภท: </span><span class="font-semibold">${htmlEscape(typeName)}</span></div>
-                                <div class="bg-slate-50 rounded p-2 col-span-2 flex items-center gap-2">
-                                    <span class="text-slate-500">สถานะการใช้งาน: </span>
-                                    ${(u.unitStatus || 'ใช้งาน') === 'ใช้งาน'
-                                        ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-300">✓ ใช้งาน</span>`
-                                        : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-300">✗ ไม่ใช้งาน</span>`}
-                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs mt-1">
+                                <span class="text-slate-500">สถานะ:</span>
+                                ${(u.unitStatus || 'ใช้งาน') === 'ใช้งาน'
+                                    ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-green-100 text-green-700 border border-green-300">✓ ใช้งาน</span>`
+                                    : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-red-100 text-red-700 border border-red-300">✗ ไม่ใช้งาน</span>`}
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs mt-2">
                                 ${Object.entries(checkLabels).map(([k, label]) => `
@@ -1334,7 +1567,38 @@
                                 </div>`).join('')}
                             </div>
                             ${u.note ? `<div class="mt-2 bg-amber-50 border border-amber-100 rounded p-2 text-xs text-amber-800"><span class="font-semibold">หมายเหตุ:</span> ${htmlEscape(u.note)}</div>` : ''}
-                            ${photoBlock}
+                            <div class="mt-2 bg-blue-50 border border-blue-100 rounded-lg p-2 text-xs">
+                                <p class="font-semibold text-blue-700 mb-1.5">🌡️ อุณหภูมิที่ Controller</p>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" step="0.1" id="ctrlTemp_${u.num}" value="${(u.controllerTemp !== '' && u.controllerTemp !== undefined && u.controllerTemp !== null) ? htmlEscape(String(u.controllerTemp)) : ''}" placeholder="--" class="w-20 border border-blue-200 rounded px-2 py-1 text-sm bg-white font-bold text-blue-900 focus:ring-2 focus:ring-blue-300 focus:outline-none">
+                                    <span class="text-blue-600 font-semibold">°C</span>
+                                    <button onclick="saveControllerTemp('${htmlEscape(String(fullRecord.id))}', ${u.num}, 'ctrlTemp_${u.num}', this)" class="ml-auto bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded transition font-medium text-xs flex items-center gap-1"><svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>บันทึก</button>
+                                </div>
+                            </div>
+                            ${((u.supplyTemp !== '' && u.supplyTemp !== undefined && u.supplyTemp !== null) || (u.returnTemp !== '' && u.returnTemp !== undefined && u.returnTemp !== null) || (u.amps !== '' && u.amps !== undefined && u.amps !== null)) ? `
+                            <div class="mt-1 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs">
+                                <p class="font-semibold text-amber-700 mb-1.5">🔧 ข้อมูลเครื่องมือวัด</p>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div class="bg-white border border-amber-100 rounded p-1.5 text-center">
+                                        <p class="text-slate-500 mb-0.5">Supply</p>
+                                        <p class="font-bold text-slate-800">${(u.supplyTemp !== '' && u.supplyTemp !== undefined && u.supplyTemp !== null) ? htmlEscape(String(u.supplyTemp)) + ' °C' : '-'}</p>
+                                    </div>
+                                    <div class="bg-white border border-amber-100 rounded p-1.5 text-center">
+                                        <p class="text-slate-500 mb-0.5">Return</p>
+                                        <p class="font-bold text-slate-800">${(u.returnTemp !== '' && u.returnTemp !== undefined && u.returnTemp !== null) ? htmlEscape(String(u.returnTemp)) + ' °C' : '-'}</p>
+                                    </div>
+                                    <div class="bg-white border border-amber-100 rounded p-1.5 text-center">
+                                        <p class="text-slate-500 mb-0.5">กระแส</p>
+                                        <p class="font-bold text-slate-800">${(u.amps !== '' && u.amps !== undefined && u.amps !== null) ? htmlEscape(String(u.amps)) + ' A' : '-'}</p>
+                                    </div>
+                                </div>
+                            </div>` : ''}
+                            <div id="${acPhotoBlockId}">${photoBlock}</div>
+                            <div class="mt-2 flex justify-end">
+                                <button onclick="pickAcUnitPhoto('${acUnitKey}','${acPhotoBlockId}')" class="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 hover:bg-blue-50 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>เพิ่มรูปภาพ
+                                </button>
+                            </div>
                         </div>
                     </div>`;
                 });
@@ -1342,6 +1606,7 @@
                 unitHtml = `<div class="text-slate-400 text-sm text-center py-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">ไม่มีข้อมูลรายละเอียดเครื่องแอร์แต่ละตัว</div>`;
             }
             document.getElementById('unitSection').innerHTML = unitHtml;
+            applyAdminUI(); // re-apply to show upload buttons injected dynamically
             // Generate QR codes for each unit
             if (typeof QRCode !== 'undefined') {
                 document.querySelectorAll('#unitSection [data-qr]').forEach(function(el) {
@@ -1361,18 +1626,9 @@
                 });
             }
 
-            // Show Modal
-            const m = document.getElementById('detailModal');
-            const c = document.getElementById('modalContent');
-            m.classList.remove('hidden');
-            setTimeout(() => {
-                m.classList.remove('opacity-0');
-                c.classList.remove('opacity-0', 'scale-95');
-                c.classList.add('opacity-100', 'scale-100');
-            }, 10);
             } catch (err) {
-                console.error("openModalById error:", err);
-                alert("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + err.message);
+                console.error("_renderAcModalContent error:", err);
+                document.getElementById('unitSection').innerHTML = '<div class="text-red-500 text-sm text-center py-4">เกิดข้อผิดพลาด: ' + err.message + '</div>';
             }
         }
 
@@ -1405,7 +1661,177 @@
         }
 
         function toggleAcEditPanel() {
-            document.getElementById('acEditPanel').classList.toggle('hidden');
+            const panel = document.getElementById('acEditPanel');
+            const body  = document.getElementById('acModalBody');
+            if (panel.classList.contains('hidden')) {
+                const report = allReportsMap[currentReportId];
+                if (!report) return;
+                // Prefer _acFullCache (authoritative full record) over slim allReportsMap
+                const fullR  = _acFullCache[currentReportId];
+                const fd     = (fullR ? fullR.fullData : report.fullData) || {};
+                const g      = fd.general || {};
+                const existU = fd.units   || [];
+                const maxNum = existU.length > 0 ? Math.max.apply(null, existU.map(function(u){ return u.num; })) : 0;
+                const derivedQty = Math.max(parseInt(g.acQuantity) || 0, maxNum);
+                document.getElementById('acEditStatus').value      = report.status || 'Pending';
+                document.getElementById('acEditBrokenUnits').value = g.brokenUnits || '';
+                document.getElementById('acEditComments').value    = g.comments || '';
+                document.getElementById('acEditQty').value         = derivedQty;
+                body.classList.add('hidden');
+                panel.classList.remove('hidden');
+                _acEditTab('general');
+            } else {
+                _acCancelEdit();
+            }
+        }
+
+        function _acCancelEdit() {
+            document.getElementById('acEditPanel').classList.add('hidden');
+            document.getElementById('acModalBody').classList.remove('hidden');
+        }
+
+        function _acEditTab(tab) {
+            ['general', 'qty', 'units'].forEach(function(t) {
+                const btn     = document.getElementById('acTab_' + t);
+                const content = document.getElementById('acTabContent_' + t);
+                if (t === tab) {
+                    btn.classList.add('bg-white', 'border', 'border-b-white', 'border-amber-200', 'text-amber-700');
+                    btn.classList.remove('text-slate-500', 'hover:text-slate-700');
+                    content.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('bg-white', 'border', 'border-b-white', 'border-amber-200', 'text-amber-700');
+                    btn.classList.add('text-slate-500', 'hover:text-slate-700');
+                    content.classList.add('hidden');
+                }
+            });
+            if (tab === 'units') _buildAcEditUnitsFields();
+        }
+
+        function saveControllerTemp(reportId, unitNum, inputId, btn) {
+            var inp = document.getElementById(inputId);
+            if (!inp || !btn) return;
+            var val = inp.value.trim();
+            var origHTML = btn.innerHTML;
+            var origClass = btn.className;
+            btn.innerHTML = '<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            btn.disabled = true;
+            var _lsUser = null;
+            try { _lsUser = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsUser && _lsUser.email) ? _lsUser.email : '';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                    if (res && res.success) {
+                        var cache = _acFullCache[reportId];
+                        if (cache && cache.fullData && cache.fullData.units) {
+                            cache.fullData.units.forEach(function(u) {
+                                if (u.num == unitNum) u.controllerTemp = val;
+                            });
+                        }
+                        btn.innerHTML = '✓ บันทึกแล้ว';
+                        btn.className = origClass.replace('bg-blue-600', 'bg-green-600').replace('hover:bg-blue-700', 'hover:bg-green-700');
+                        setTimeout(function() { btn.innerHTML = origHTML; btn.className = origClass; }, 2000);
+                    } else {
+                        alert('บันทึกไม่สำเร็จ: ' + (res ? res.error : 'Unknown error'));
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    btn.innerHTML = origHTML; btn.disabled = false;
+                    alert('Error: ' + err.message);
+                })
+                .saveAcUnitControllerTemp({ id: reportId, unitNum: unitNum, temp: val, clientEmail: clientEmail });
+        }
+
+        function _buildAcEditUnitsFields() {
+            const report = allReportsMap[currentReportId];
+            const fullR  = _acFullCache[currentReportId];
+            const existingUnits = (((fullR ? fullR.fullData : (report || {}).fullData) || {}).units) || [];
+            const unitMap = {};
+            existingUnits.forEach(function(u) { unitMap[u.num] = u; });
+            const maxNum = existingUnits.length > 0 ? Math.max.apply(null, existingUnits.map(function(u){ return u.num; })) : 0;
+            const qty = Math.max(parseInt(document.getElementById('acEditQty').value) || 0, maxNum);
+            const container = document.getElementById('_acEditUnitsBody');
+            if (!container) return;
+            if (qty === 0) {
+                container.innerHTML = '<p class="text-sm text-slate-400 italic">ระบุจำนวนแอร์ในแท็บ "จำนวนแอร์" ก่อน</p>';
+                return;
+            }
+            const acTypeCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+            const stationStr = (report || {}).station || '';
+            const branchCode = stationStr ? stationStr.split(' - ')[0].trim() : '';
+            function makeEqId(typeVal, num) {
+                const code = acTypeCodes[typeVal] || 'AC';
+                return branchCode ? (branchCode + '-' + code + String(num).padStart(2, '0')) : (code + String(num).padStart(2, '0'));
+            }
+            let html = '';
+            for (let n = 1; n <= qty; n++) {
+                const u = unitMap[n] || {};
+                const equipmentId = makeEqId(u.type, n);
+                const typeOpts = ['Wall Type', 'Cassette Type', 'Floor Standing', 'Package Type'].map(function(opt) {
+                    return `<option value="${opt}" ${(u.type || '') === opt ? 'selected' : ''}>${opt}</option>`;
+                }).join('');
+                const AC_BRANDS = ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train'];
+                const currentBrand = u.brand || '';
+                const isOtherBrand = !!currentBrand && !AC_BRANDS.includes(currentBrand);
+                const brandOpts = [''].concat(AC_BRANDS).map(function(b) {
+                    if (!b) return '<option value="">-- เลือกยี่ห้อ --</option>';
+                    return `<option value="${b}" ${currentBrand === b ? 'selected' : ''}>${b}</option>`;
+                }).join('') + `<option value="Other" ${isOtherBrand ? 'selected' : ''}>อื่นๆ โปรดระบุ</option>`;
+                const statusOpts = ['ใช้งาน', 'ชำรุด', 'ซ่อมแล้ว'].map(function(opt) {
+                    return `<option value="${opt}" ${(u.unitStatus || 'ใช้งาน') === opt ? 'selected' : ''}>${opt}</option>`;
+                }).join('');
+                html += `<div class="bg-white border border-slate-200 rounded-xl p-4">
+                    <h5 class="text-xs font-bold text-amber-700 mb-3 uppercase tracking-wide flex items-center gap-2">
+                        <span>แอร์ตัวที่ ${n}</span>
+                        <span id="acEditEqId_${n}" class="font-mono normal-case bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded tracking-normal">${htmlEscape(equipmentId)}</span>
+                    </h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">ประเภท</label>
+                            <select data-ac-edit-field="Unit ${n} Type" onchange="(function(sel){var codes={'Wall Type':'WT','Cassette Type':'CT','Floor Standing':'FS','Package Type':'PT'};var code=codes[sel.value]||'AC';var bc='${htmlEscape(branchCode)}';var eid=bc?bc+'-'+code+String(${n}).padStart(2,'0'):code+String(${n}).padStart(2,'0');var lbl=document.getElementById('acEditEqId_${n}');if(lbl)lbl.textContent=eid;})(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">${typeOpts}</select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">ยี่ห้อ</label>
+                            <select data-ac-edit-field="Unit ${n} Brand" onchange="(function(el){var inp=document.getElementById('acBrandOther_${n}');if(inp)inp.style.display=el.value==='Other'?'':'none';})(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">${brandOpts}</select>
+                            <input type="text" id="acBrandOther_${n}" placeholder="ระบุยี่ห้อ..." value="${isOtherBrand ? htmlEscape(currentBrand) : ''}" style="display:${isOtherBrand ? '' : 'none'}" class="mt-1 w-full border border-orange-300 rounded p-1.5 text-sm bg-orange-50">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">Asset No</label>
+                            <input data-ac-edit-field="Unit ${n} Asset No" type="text" value="${htmlEscape(u.assetNo || '')}" class="w-full border border-slate-300 rounded p-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-500 mb-1">สถานะ</label>
+                            <select data-ac-edit-field="Unit ${n} Status" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">${statusOpts}</select>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs text-slate-500 mb-1">หมายเหตุ</label>
+                            <input data-ac-edit-field="Unit ${n} Note" type="text" value="${htmlEscape(u.note || '')}" class="w-full border border-slate-300 rounded p-1.5 text-sm">
+                        </div>
+                        <div class="sm:col-span-2 border-t border-blue-100 pt-2 mt-1">
+                            <p class="text-xs font-semibold text-blue-600 mb-2">🌡️ อุณหภูมิและเครื่องมือวัด</p>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-0.5">Controller (°C)</label>
+                                    <input data-ac-edit-field="Unit ${n} Controller Temp" type="number" step="0.1" value="${htmlEscape(String(u.controllerTemp ?? ''))}" class="w-full border border-slate-300 rounded p-1.5 text-sm" placeholder="-">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-0.5">Supply (°C)</label>
+                                    <input data-ac-edit-field="Unit ${n} Supply Temp" type="number" step="0.1" value="${htmlEscape(String(u.supplyTemp ?? ''))}" class="w-full border border-slate-300 rounded p-1.5 text-sm" placeholder="-">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-0.5">Return (°C)</label>
+                                    <input data-ac-edit-field="Unit ${n} Return Temp" type="number" step="0.1" value="${htmlEscape(String(u.returnTemp ?? ''))}" class="w-full border border-slate-300 rounded p-1.5 text-sm" placeholder="-">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-0.5">กระแสไฟ (A)</label>
+                                    <input data-ac-edit-field="Unit ${n} Amps" type="number" step="0.01" value="${htmlEscape(String(u.amps ?? ''))}" class="w-full border border-slate-300 rounded p-1.5 text-sm" placeholder="-">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            container.innerHTML = html;
         }
 
         // Mirrors updateUserUI() in index.html — show/hide .admin-only-link elements
@@ -1414,6 +1840,130 @@
                 if (isAdmin) el.classList.remove('hidden');
                 else el.classList.add('hidden');
             });
+            // Status Management section — visible only to Admin or SMF
+            var statusSection = document.getElementById('statusMgmtSection');
+            if (statusSection) {
+                if (isAdmin || isSMF) statusSection.classList.remove('hidden');
+                else statusSection.classList.add('hidden');
+            }
+        }
+
+        // ─── Per-unit Photo Upload (admin only) ────────────────────────────────────
+        var _acPhotoTarget = null; // { unitKey, photoBlockId }
+
+        function pickAcUnitPhoto(unitKey, photoBlockId) {
+            _acPhotoTarget = { unitKey: unitKey, photoBlockId: photoBlockId };
+            var inp = document.getElementById('acPhotoUploadInput');
+            inp.value = '';
+            inp.click();
+        }
+
+        document.getElementById('acPhotoUploadInput').addEventListener('change', function() {
+            if (!_acPhotoTarget || !currentReportId) return;
+            const files = Array.from(this.files);
+            if (!files.length) return;
+            const { unitKey, photoBlockId } = _acPhotoTarget;
+            _acPhotoTarget = null;
+
+            const photoBlockEl = document.getElementById(photoBlockId);
+
+            // Show inline loading indicator
+            const loadingId = 'ac-ul-' + Date.now();
+            const loadingHtml = `<div id="${loadingId}" class="mt-2 flex items-center gap-2 text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">` +
+                `<svg class="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>` +
+                `กำลังอัปโหลด ${files.length} รูป...</div>`;
+            if (photoBlockEl) photoBlockEl.insertAdjacentHTML('afterend', loadingHtml);
+
+            Promise.all(files.map(function(file) {
+                return new Promise(function(resolve, reject) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        resolve({ name: file.name, mimeType: file.type || 'image/jpeg', data: e.target.result.split(',')[1] });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            })).then(function(fileData) {
+                google.script.run
+                    .withSuccessHandler(function(res) {
+                        const loadingEl = document.getElementById(loadingId);
+                        if (loadingEl) loadingEl.remove();
+                        if (!res.success) { alert('อัปโหลดรูปไม่สำเร็จ: ' + res.error); return; }
+
+                        // Update in-memory attachments
+                        const _cachedRec = _acFullCache[currentReportId];
+                        if (_cachedRec) {
+                            if (!_cachedRec.fullData) _cachedRec.fullData = {};
+                            if (!_cachedRec.fullData.attachments) _cachedRec.fullData.attachments = {};
+                            const att = _cachedRec.fullData.attachments;
+                            att[unitKey] = (att[unitKey] || []).concat(res.newUrls);
+                        }
+
+                        // Inject new thumbnails
+                        if (photoBlockEl) {
+                            const thumbHtml = res.newUrls.map(function(url) {
+                                let _u = htmlEscape(url);
+                                return `<div class="relative group aspect-video rounded-lg overflow-hidden ring-2 ring-slate-200 hover:ring-blue-500 transition shadow-sm hover:shadow-md">` +
+                                    `<a href="${_u}" target="_blank" class="block w-full h-full">` +
+                                    `<img src="${_u}" class="w-full h-full object-cover bg-slate-100 group-hover:scale-105 transition duration-300"></a>` +
+                                    `<button onclick="deleteAcPhoto(this,'${unitKey}','${photoBlockId}')" data-url="${_u}" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button>` +
+                                    `</div>`;
+                            }).join('');
+                            const existingGrid = photoBlockEl.querySelector('.grid');
+                            if (existingGrid) {
+                                existingGrid.insertAdjacentHTML('beforeend', thumbHtml);
+                                const countEl = photoBlockEl.querySelector('p');
+                                if (countEl) {
+                                    const total = photoBlockEl.querySelectorAll('img').length;
+                                    countEl.innerHTML = countEl.innerHTML.replace(/\d+ รูป/, total + ' รูป');
+                                }
+                            } else {
+                                const unitNum = unitKey.replace('ac_inv_', '');
+                                photoBlockEl.innerHTML =
+                                    `<div class="mt-3 pt-3 border-t border-slate-100">` +
+                                    `<p class="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1">` +
+                                    `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>` +
+                                    `รูปแอร์เบอร์ ${unitNum} (${res.newUrls.length} รูป)</p>` +
+                                    `<div class="grid grid-cols-2 md:grid-cols-3 gap-2">${thumbHtml}</div>` +
+                                    `</div>`;
+                            }
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        const loadingEl = document.getElementById(loadingId);
+                        if (loadingEl) loadingEl.remove();
+                        alert('Error: ' + err.message);
+                    })
+                    .addAcSurveyPhotos(currentReportId, unitKey, fileData);
+            });
+        });
+        // ─────────────────────────────────────────────────────────────────────────
+
+        function deleteAcPhoto(btn, unitKey, photoBlockId) {
+            if (!currentReportId) return;
+            if (!confirm('ลบรูปภาพนี้?')) return;
+            const url = btn.dataset.url;
+            const wrapper = btn.parentElement;
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '…';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) { alert('ลบรูปไม่สำเร็จ: ' + res.error); btn.disabled = false; btn.textContent = origText; return; }
+                    wrapper.remove();
+                    const photoBlockEl = document.getElementById(photoBlockId);
+                    if (photoBlockEl) {
+                        const remaining = photoBlockEl.querySelectorAll('img').length;
+                        const countEl = photoBlockEl.querySelector('p');
+                        if (countEl) countEl.innerHTML = countEl.innerHTML.replace(/\d+ รูป/, remaining + ' รูป');
+                    }
+                    const _cachedRec2 = _acFullCache[currentReportId];
+                    if (_cachedRec2 && _cachedRec2.fullData && _cachedRec2.fullData.attachments && _cachedRec2.fullData.attachments[unitKey]) {
+                        _cachedRec2.fullData.attachments[unitKey] = _cachedRec2.fullData.attachments[unitKey].filter(function(u) { return u !== url; });
+                    }
+                })
+                .withFailureHandler(function(err) { alert('Error: ' + err.message); btn.disabled = false; btn.textContent = origText; })
+                .deleteAcSurveyPhoto(currentReportId, unitKey, url);
         }
 
         function saveAcEdit() {
@@ -1422,29 +1972,51 @@
             const origHTML = btn.innerHTML;
             btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> กำลังบันทึก...';
             btn.disabled = true;
+
+            const acQuantity = document.getElementById('acEditQty').value;
+            const unitFields = {};
+            document.querySelectorAll('#_acEditUnitsBody [data-ac-edit-field]').forEach(function(el) {
+                unitFields[el.dataset.acEditField] = el.value;
+            });
+            // Replace "Other" brand values with the typed custom text
+            Object.keys(unitFields).forEach(function(key) {
+                if (unitFields[key] === 'Other' && /^Unit \d+ Brand$/.test(key)) {
+                    var n = key.match(/^Unit (\d+) Brand$/)[1];
+                    var otherEl = document.getElementById('acBrandOther_' + n);
+                    if (otherEl && otherEl.value.trim()) unitFields[key] = otherEl.value.trim();
+                }
+            });
+
+            var _lsUserAcEdit = null;
+            try { _lsUserAcEdit = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var _acEditClientEmail = (_lsUserAcEdit && _lsUserAcEdit.email) ? _lsUserAcEdit.email : '';
+
             const form = {
                 id: currentReportId,
                 status: document.getElementById('acEditStatus').value,
                 comments: document.getElementById('acEditComments').value,
-                brokenUnits: document.getElementById('acEditBrokenUnits').value
+                brokenUnits: document.getElementById('acEditBrokenUnits').value,
+                acQuantity: acQuantity,
+                unitFields: unitFields,
+                clientEmail: _acEditClientEmail
             };
             google.script.run
                 .withSuccessHandler(function(res) {
                     btn.innerHTML = origHTML; btn.disabled = false;
-                    if (res.success) {
-                        // Update local data
-                        const report = allReportsMap[currentReportId];
-                        if (report) {
-                            report.status = form.status;
-                            if (report.fullData && report.fullData.general) {
-                                report.fullData.general.comments = form.comments;
-                                report.fullData.general.brokenUnits = form.brokenUnits;
-                            }
+                    if (res && res.success) {
+                        // Update slim record
+                        const slimR = allReportsMap[currentReportId];
+                        if (slimR) {
+                            slimR.status = form.status;
+                            slimR.brokenUnits = form.brokenUnits;
                         }
-                        document.getElementById('acEditPanel').classList.add('hidden');
-                        applyFilters();
+                        // Invalidate full-record cache so next modal open re-fetches from server
+                        delete _acFullCache[currentReportId];
+                        _acCancelEdit();
+                        openModalById(currentReportId);
+                        renderTable(); // re-render table so status/data in list also updates
                     } else {
-                        alert('บันทึกไม่สำเร็จ: ' + res.error);
+                        alert('บันทึกไม่สำเร็จ: ' + (res ? res.error : 'Unknown error'));
                     }
                 })
                 .withFailureHandler(function(err) {
@@ -1474,9 +2046,13 @@
             google.script.run
                 .withSuccessHandler(res => {
                     if (res.success) {
+                        const _sr = allReportsMap[currentReportId];
+                        if (_sr) _sr.status = newStatus;
+                        delete _acFullCache[currentReportId];
                         alert("Status updated successfully.");
                         closeModal();
-                        loadData();
+                        renderTable();
+                        updateAcCharts();
                     } else {
                         alert("Failed: " + res.error);
                         btn.disabled = false;
@@ -1508,6 +2084,7 @@
                     if (res.success) {
                         allReports = allReports.filter(r => r.id !== currentReportId);
                         delete allReportsMap[currentReportId];
+                        delete _acFullCache[currentReportId];
                         closeModal();
                         renderTable();
                         updateAcCharts();

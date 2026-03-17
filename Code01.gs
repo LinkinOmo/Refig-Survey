@@ -699,6 +699,7 @@ function checkAdminStatus(clientEmail) {
     
     var isAdmin = false;
     var isSMF = false;
+    var isMMS = false;
     var isScheduleAdmin = false;
     var logs = [];
     
@@ -768,6 +769,19 @@ function checkAdminStatus(clientEmail) {
                     var role = String(data[i][userTypeIdx]).trim().toLowerCase();
                     logs.push(`Role in DB: '${role}'`);
                     
+                    // Check SMF/MMS team via Note column FIRST (before any break)
+                    if (noteIdx > -1) {
+                        var teamNote = String(data[i][noteIdx]).trim().toUpperCase();
+                        if (!isSMF && teamNote === 'SMF') {
+                            isSMF = true;
+                            logs.push("SMF team member identified.");
+                        }
+                        if (!isMMS && teamNote === 'MMS') {
+                            isMMS = true;
+                            logs.push("MMS team member identified.");
+                        }
+                    }
+
                     if (role === 'admin') {
                         isAdmin = true;
                         logs.push("SUCCESS: Admin privs granted.");
@@ -780,13 +794,11 @@ function checkAdminStatus(clientEmail) {
                     }
                 } else {
                     logs.push("WARN: User found but no Role/User Type column in DB.");
-                }
-                // Check SMF team via Note column
-                if (noteIdx > -1 && !isSMF) {
-                    var teamNote = String(data[i][noteIdx]).trim().toUpperCase();
-                    if (teamNote === 'SMF') {
-                        isSMF = true;
-                        logs.push("SMF team member identified.");
+                    // Still check Note column even if no role column exists
+                    if (noteIdx > -1) {
+                        var teamNote = String(data[i][noteIdx]).trim().toUpperCase();
+                        if (!isSMF && teamNote === 'SMF') { isSMF = true; }
+                        if (!isMMS && teamNote === 'MMS') { isMMS = true; }
                     }
                 }
                 // Do NOT break here; continue searching in case there's another entry for this email with Admin role.
@@ -800,8 +812,8 @@ function checkAdminStatus(clientEmail) {
         console.error("Admin Check Error", e);
     }
 
-    console.log("Admin Check Result:", { isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, email: effectiveEmail, logs: logs });
-    return { isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, email: effectiveEmail, logs: logs };
+    console.log("Admin Check Result:", { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isScheduleAdmin: isScheduleAdmin, email: effectiveEmail, logs: logs });
+    return { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isScheduleAdmin: isScheduleAdmin, email: effectiveEmail, logs: logs };
 }
 
 // Deprecated: checkAdminStatusById - Use checkAdminStatus(email) instead

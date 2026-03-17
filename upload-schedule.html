@@ -54,6 +54,7 @@
     <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('daily')">📆 รายวัน</button>
     <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('lookup')">🔍 ค้นหาสาขา</button>
     <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('submitted')">📥 ส่งแล้ว</button>
+    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('progress')">📋 รายงาน</button>
     <button class="tab-btn admin-only-tab hidden px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('performance')">📊 Dashboard</button>
   </div>
 </div>
@@ -334,7 +335,7 @@
   </div>
 
   <!-- Schedule table -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
     <div id="daily-loading" class="flex items-center justify-center py-10 text-gray-400 text-sm">
       <svg class="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity=".3"/><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
       กำลังโหลด...
@@ -343,11 +344,10 @@
       <p class="text-4xl mb-2">📭</p>
       <p class="text-sm">ไม่มีสาขาที่ต้อง Upload ในวันนี้</p>
     </div>
-    <table id="daily-table" class="hidden w-full text-sm">
+    <table id="daily-table" class="hidden w-full min-w-[800px] text-sm">
       <thead>
         <tr class="bg-sky-50 text-xs font-bold text-sky-800 uppercase">
-          <th class="px-3 py-2 text-left">วันที่ / เวลา</th>
-          <th class="px-3 py-2 text-left">รหัสสาขา</th>
+          <th class="px-3 py-2 text-left">สาขา / วัน-เวลา</th>
           <th class="px-3 py-2 text-left">ชื่อสาขา</th>
           <th class="px-3 py-2 text-left hidden sm:table-cell">BU</th>
           <th class="px-3 py-2 text-left hidden md:table-cell">DM</th>
@@ -355,7 +355,9 @@
           <th class="px-3 py-2 text-left hidden lg:table-cell">AM</th>
           <th class="px-3 py-2 text-center hidden sm:table-cell">เลื่อน</th>
           <th id="th-daily-critical" class="px-3 py-2 text-center hidden">🔴</th>
-          <th class="px-3 py-2 text-center">สถานะ</th>
+          <th class="px-3 py-2 text-center hidden md:table-cell">Aircon</th>
+          <th class="px-3 py-2 text-center hidden md:table-cell">Ref</th>
+          <th class="px-3 py-2 text-center">สรุป</th>
         </tr>
       </thead>
       <tbody id="daily-table-body"></tbody>
@@ -433,12 +435,13 @@
       </div>
       <div id="ack-body">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="w-full min-w-[560px] text-sm">
             <thead><tr class="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
               <th class="px-3 py-2 text-left">รหัสสาขา</th>
               <th class="px-3 py-2 text-left">ชื่อสาขา</th>
-              <th class="px-3 py-2 text-center">ประเภทที่ส่ง</th>
-              <th class="px-3 py-2 text-left">เวลาล่าสุด</th>
+              <th class="px-3 py-2 text-center">🌀 Aircon</th>
+              <th class="px-3 py-2 text-center">❄️ Ref</th>
+              <th class="px-3 py-2 text-center">สรุป</th>
             </tr></thead>
             <tbody id="ack-table-body"></tbody>
           </table>
@@ -457,12 +460,13 @@
       </div>
       <div id="pend-body">
         <div class="overflow-x-auto">
-          <table class="w-full text-sm">
+          <table class="w-full min-w-[560px] text-sm">
             <thead><tr class="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
               <th class="px-3 py-2 text-left">รหัสสาขา</th>
               <th class="px-3 py-2 text-left">ชื่อสาขา</th>
-              <th class="px-3 py-2 text-center">ประเภทที่ส่ง</th>
-              <th class="px-3 py-2 text-left">เวลาล่าสุด</th>
+              <th class="px-3 py-2 text-center">🌀 Aircon</th>
+              <th class="px-3 py-2 text-center">❄️ Ref</th>
+              <th class="px-3 py-2 text-center">สรุป</th>
             </tr></thead>
             <tbody id="pend-table-body"></tbody>
           </table>
@@ -470,6 +474,89 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- ══ TAB: PROGRESS REPORT ══════════════════════════════ -->
+<div id="tab-progress" class="hidden max-w-5xl mx-auto mt-4 px-3 pb-10">
+
+  <!-- Header + controls -->
+  <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+    <div>
+      <h2 class="text-sm font-bold text-gray-700">📋 รายงานความคืบหน้าการ Upload ตามแผน</h2>
+      <p class="text-xs text-gray-400 mt-0.5">แสดงทุกสาขาในแผน + สถานะการส่งข้อมูล Aircon &amp; Ref Survey</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <button onclick="_downloadProgressExcel(this)" id="btn-progress-excel" class="text-xs text-emerald-600 hover:text-emerald-800 border border-emerald-200 hover:border-emerald-400 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">📥 Excel</button>
+      <button onclick="_reloadProgress()" class="text-xs text-gray-400 hover:text-sky-600 border border-gray-200 hover:border-sky-300 px-3 py-1.5 rounded-lg transition-colors">🔄 รีเฟรช</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="progress-loading" class="py-16 text-center text-gray-400 text-sm">⏳ กำลังโหลด...</div>
+
+  <!-- Content -->
+  <div id="progress-content" class="hidden space-y-3">
+
+    <!-- Summary pills -->
+    <div id="progress-summary" class="flex gap-2 flex-wrap"></div>
+
+    <!-- Filter bar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-3 flex flex-wrap gap-2 items-center">
+      <input type="text" id="progress-search"
+             placeholder="ค้นหารหัส / ชื่อสาขา..."
+             oninput="_filterProgress()"
+             class="flex-1 min-w-[180px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-400 outline-none">
+      <select id="progress-filter-status" onchange="_filterProgress()"
+              class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-sky-400">
+        <option value="">ทุกสถานะ Upload</option>
+        <option value="none">❌ ยังไม่ Upload เลย</option>
+        <option value="aircon_only">🌀 Aircon เท่านั้น</option>
+        <option value="ref_only">❄️ Ref เท่านั้น</option>
+        <option value="both">✅ ครบทั้ง 2</option>
+        <option value="in_schedule">📅 อยู่ในแผน</option>
+        <option value="not_in_schedule">📭 ไม่อยู่ในแผน</option>
+      </select>
+      <select id="progress-filter-bu" onchange="_filterProgress()"
+              class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-sky-400 min-w-[110px]">
+        <option value="">ทุก BU</option>
+      </select>
+      <select id="progress-filter-store-status" onchange="_filterProgress()"
+              class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-sky-400">
+        <option value="">ทุก Status</option>
+        <option value="A">🟢 A — Active</option>
+        <option value="I">🔴 I — Inactive</option>
+      </select>
+      <select id="progress-filter-sched" onchange="_filterProgress()"
+              class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-sky-400">
+        <option value="">ทุกสถานะแผน</option>
+        <option value="Pending">⏳ Pending</option>
+        <option value="Uploaded">✅ Uploaded</option>
+      </select>
+      <button onclick="_clearProgressFilters()" class="text-xs text-gray-400 hover:text-red-500 border border-gray-200 px-3 py-2 rounded-lg transition-colors">✕ ล้าง</button>
+      <span class="ml-auto text-xs text-sky-600 font-semibold" id="progress-count-label"></span>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[720px] text-xs" id="progress-table">
+          <thead>
+            <tr class="bg-sky-50 text-xs font-bold text-sky-800 uppercase">
+              <th class="px-3 py-2.5 text-left">รหัสสาขา</th>
+              <th class="px-3 py-2.5 text-left">ชื่อสาขา</th>
+              <th class="px-3 py-2.5 text-left">BU</th>
+              <th class="px-3 py-2.5 text-center">วันในแผน</th>
+              <th class="px-3 py-2.5 text-center">🌀 Aircon</th>
+              <th class="px-3 py-2.5 text-center">❄️ Ref</th>
+              <th class="px-3 py-2.5 text-center">สรุป</th>
+            </tr>
+          </thead>
+          <tbody id="progress-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ══ TAB: PERFORMANCE ════════════════════════════════════ -->
@@ -568,7 +655,7 @@ function showTab(name) {
     // Block non-admins from the Performance tab
     if (name === 'performance' && !IS_ADMIN) { name = 'daily'; }
     CURRENT_TAB = name;
-    ['setup','daily','lookup','submitted','performance'].forEach(function(t) {
+    ['setup','daily','lookup','submitted','progress','performance'].forEach(function(t) {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
     });
     document.querySelectorAll('.tab-btn').forEach(function(btn) {
@@ -577,11 +664,13 @@ function showTab(name) {
                      (name === 'daily'       && txt.includes('📆')) ||
                      (name === 'lookup'      && txt.includes('🔍')) ||
                      (name === 'submitted'   && txt.includes('📥')) ||
+                     (name === 'progress'    && txt.includes('📋')) ||
                      (name === 'performance' && txt.includes('📊'));
         btn.classList.toggle('active', active);
     });
     if (name === 'daily')       initDailyView();
     if (name === 'submitted')   loadSubmittedView();
+    if (name === 'progress')    loadProgressReport();
     if (name === 'performance') loadPerformanceDashboard();
 }
 
@@ -1227,8 +1316,14 @@ function downloadFilteredExcel(btn) {
         var suffix = [bu, dm, cm, am].filter(Boolean).join('_');
         var filename = 'schedule_' + dateLabel + (suffix ? '_' + suffix : '') + '.xlsx';
 
-        var header = ['วันที่', 'เวลา', 'รหัสสาขา', 'ชื่อสาขา', 'BU', 'DM', 'CM', 'AM', 'เลื่อน (ครั้ง)', 'Critical', 'สถานะ'];
+        var header = ['วันที่', 'เวลา', 'รหัสสาขา', 'ชื่อสาขา', 'BU', 'DM', 'CM', 'AM', 'เลื่อน (ครั้ง)', 'Critical', 'Aircon Status', 'Aircon เวลาส่ง', 'Ref Status', 'Ref เวลาส่ง', 'สรุป'];
+        var DONE_EXP = ['Acknowledged', 'Corrected', 'Closed', 'Rejected'];
         var aoa = [header].concat(_filteredRows.map(function(r) {
+            var overall = (!r.hasAircon && !r.hasRef)
+                ? (r.status === 'Uploaded' ? 'Upload แล้ว' : 'ยังไม่ Upload')
+                : (r.hasAircon && r.hasRef && DONE_EXP.indexOf(r.airconStatus) >= 0 && DONE_EXP.indexOf(r.refStatus) >= 0)
+                    ? ((r.airconStatus === 'Rejected' || r.refStatus === 'Rejected') ? 'ส่งครบแต่ยังไม่ผ่าน' : 'ครบแล้ว')
+                : (r.hasAircon && r.hasRef) ? 'รอ Approve' : 'บางส่วน';
             return [
                 r.date || '',
                 r.time,
@@ -1240,7 +1335,11 @@ function downloadFilteredExcel(btn) {
                 r.amName || '',
                 r.skipCount || 0,
                 r.critical === 'Yes' ? 'Critical' : '',
-                r.status === 'Uploaded' ? '✅ แล้ว' : '⏳ รอ'
+                r.hasAircon ? r.airconStatus : '',
+                r.hasAircon ? r.airconTs     : '',
+                r.hasRef    ? r.refStatus    : '',
+                r.hasRef    ? r.refTs        : '',
+                overall
             ];
         }));
 
@@ -1256,7 +1355,11 @@ function downloadFilteredExcel(btn) {
             {wch: 24}, // AM
             {wch: 12}, // เลื่อน
             {wch: 10}, // Critical
-            {wch: 12}  // สถานะ
+            {wch: 18}, // Aircon Status
+            {wch: 16}, // Aircon เวลาส่ง
+            {wch: 18}, // Ref Status
+            {wch: 16}, // Ref เวลาส่ง
+            {wch: 20}  // สรุป
         ];
         ws['!freeze'] = { xSplit: 0, ySplit: 1 };
 
@@ -1533,50 +1636,26 @@ function loadDailyView() {
     if (!toDate || toDate < fromDate) toDate = fromDate;
     updateDailyDateLabel();
 
-    // Build list of dates in range (max 14 days)
-    var dates = [];
-    var d = new Date(fromDate + 'T12:00:00');
-    var end = new Date(toDate + 'T12:00:00');
-    while (d <= end && dates.length < 14) {
-        dates.push(_dateStr(d));
-        d.setDate(d.getDate() + 1);
-    }
-
     document.getElementById('daily-loading').classList.remove('hidden');
     document.getElementById('daily-table').classList.add('hidden');
     document.getElementById('daily-empty').classList.add('hidden');
 
-    var allRows = [];
-    var remaining = dates.length;
-
-    function onResult(res) {
-        if (res && res.success && res.data && res.data.length) {
-            allRows = allRows.concat(res.data);
-        }
-        remaining--;
-        if (remaining > 0) return;
-        document.getElementById('daily-loading').classList.add('hidden');
-        if (allRows.length === 0) {
+    google.script.run
+        .withSuccessHandler(function(res) {
+            document.getElementById('daily-loading').classList.add('hidden');
+            if (!res || !res.success || !res.data || res.data.length === 0) {
+                document.getElementById('daily-empty').classList.remove('hidden');
+                document.getElementById('daily-summary-pills').innerHTML = '';
+                return;
+            }
+            renderDailyTable(res.data);
+        })
+        .withFailureHandler(function(e) {
+            document.getElementById('daily-loading').classList.add('hidden');
             document.getElementById('daily-empty').classList.remove('hidden');
-            document.getElementById('daily-summary-pills').innerHTML = '';
-            return;
-        }
-        // Sort by date then time
-        allRows.sort(function(a, b) {
-            var da = (a.date || '') + (a.time || '');
-            var db = (b.date || '') + (b.time || '');
-            return da < db ? -1 : da > db ? 1 : 0;
-        });
-        renderDailyTable(allRows);
-    }
-    function onFail() { onResult(null); }
-
-    dates.forEach(function(dateStr) {
-        google.script.run
-            .withSuccessHandler(onResult)
-            .withFailureHandler(onFail)
-            .getScheduleByDate(dateStr);
-    });
+            showToast('Error: ' + (e && e.message ? e.message : 'โหลดข้อมูลไม่ได้'), 'error');
+        })
+        .getDailyScheduleWithSurvey(fromDate, toDate);
 }
 
 var _dailyRows = [];    // raw rows for current date
@@ -1673,6 +1752,22 @@ function renderDailyTable(rows) {
 }
 
 function renderDailyRows(rows) {
+    // Sort: Critical+ยังไม่ Upload → Critical+บางส่วน/รอ → rest (preserve original order within groups)
+    var DONE_S = ['Acknowledged', 'Corrected', 'Closed', 'Rejected'];
+    function _priority(r) {
+        if (r.critical !== 'Yes') return 2;
+        // Critical & no survey done at all
+        var acDone  = r.hasAircon && DONE_S.indexOf(r.airconStatus) >= 0;
+        var refDone = r.hasRef    && DONE_S.indexOf(r.refStatus)    >= 0;
+        var anyDone = acDone || refDone;
+        if (!anyDone && r.status !== 'Uploaded') return 0;
+        // Critical & partial (not fully done)
+        var fullyDone = (r.hasAircon ? acDone : true) && (r.hasRef ? refDone : true) && r.status === 'Uploaded';
+        if (!fullyDone) return 1;
+        return 2;
+    }
+    rows = rows.slice().sort(function(a, b) { return _priority(a) - _priority(b); });
+
     _filteredRows = rows; // track for CSV export
     var pending  = rows.filter(function(r){return r.status==='Pending';}).length;
     var uploaded = rows.filter(function(r){return r.status==='Uploaded';}).length;
@@ -1684,22 +1779,61 @@ function renderDailyRows(rows) {
         pill('✅ ' + uploaded + ' Upload แล้ว', '#d1fae5', '#065f46') +
         pill('⏳ ' + pending + ' รอ Upload', '#fef3c7', '#92400e');
 
+    var DONE = ['Acknowledged', 'Corrected', 'Closed', 'Rejected'];
+    var colCount = IS_ADMIN ? 11 : 10;
+
+    function dSB(has, status, ts) {  // daily Status Badge
+        if (!has) return '<span class="inline-flex px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-xs">-</span>';
+        var isRej = status === 'Rejected';
+        var isDone = DONE.indexOf(status) >= 0;
+        var color = isRej ? '#991b1b' : (isDone ? '#065f46' : '#92400e');
+        var bg    = isRej ? '#fee2e2'  : (isDone ? '#d1fae5' : '#fef3c7');
+        var icon  = isRej ? '❌' : (isDone ? '✅' : '⏳');
+        return '<div class="inline-block text-left">' +
+               '<span style="background:' + bg + ';color:' + color + ';" class="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap">' + icon + ' ' + (status || 'Pending') + '</span>' +
+               '<div class="text-gray-400 font-mono" style="font-size:10px;">' + (ts || '-') + '</div>' +
+               '</div>';
+    }
+
+    function dOB(r) {  // daily Overall Badge
+        if (!r.hasAircon && !r.hasRef)
+            return r.status === 'Uploaded'
+                ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✅ Upload แล้ว</span>'
+                : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ยังไม่ Upload</span>';
+        if (r.hasAircon && r.hasRef) {
+            var acDone  = DONE.indexOf(r.airconStatus) >= 0;
+            var refDone = DONE.indexOf(r.refStatus) >= 0;
+            if (acDone && refDone) {
+                return (r.airconStatus === 'Rejected' || r.refStatus === 'Rejected')
+                    ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ส่งครบแต่ยังไม่ผ่าน</span>'
+                    : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✅ ครบแล้ว</span>';
+            }
+            return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">⏳ รอ Approve</span>';
+        }
+        var s1 = r.hasAircon ? r.airconStatus : r.refStatus;
+        return s1 === 'Rejected'
+            ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ส่งแต่ยังไม่ผ่าน</span>'
+            : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">⚠️ บางส่วน</span>';
+    }
+
     var tbody = document.getElementById('daily-table-body');
     if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="px-3 py-8 text-center text-gray-400 text-sm">ไม่มีสาขาที่ตรงกับตัวกรอง</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="' + colCount + '" class="px-3 py-8 text-center text-gray-400 text-sm">ไม่มีสาขาที่ตรงกับตัวกรอง</td></tr>';
         return;
     }
     tbody.innerHTML = rows.map(function(r) {
         var isCritical = r.critical === 'Yes';
-        var statusCls  = r.status === 'Uploaded' ? 'status-uploaded' : 'status-pending';
+        var anyRej = r.airconStatus === 'Rejected' || r.refStatus === 'Rejected';
+        var rowBg = isCritical ? ' bg-red-50' : (anyRej ? ' bg-red-50' : '');
         var dp = (r.date || '').split('-'); var shortDate = dp.length===3 ? dp[2]+'/'+dp[1] : '';
-        return '<tr class="border-b border-gray-100 hover:bg-sky-50 transition-colors' + (isCritical ? ' bg-red-50' : '') + '">' +
-               '<td class="px-3 py-2.5">' +
-               '<span class="block text-gray-400 text-xs leading-tight">' + shortDate + '</span>' +
-               '<span class="font-mono text-xs font-bold text-sky-800">' + r.time + '</span></td>' +
+        return '<tr class="border-b border-gray-100 hover:bg-sky-50 transition-colors' + rowBg + '">' +
                '<td class="px-3 py-2.5">' +
                (isCritical ? '<span class="critical-badge text-xs px-1.5 py-0.5 rounded font-bold mr-1">🔴</span>' : '') +
-               '<span class="font-semibold text-gray-800">' + r.code + '</span></td>' +
+               '<span class="font-semibold text-gray-800">' + r.code + '</span>' +
+               '<div class="flex gap-1.5 items-center mt-0.5">' +
+               '<span class="text-gray-400 text-xs font-mono">' + shortDate + '</span>' +
+               '<span class="font-mono text-xs font-bold text-sky-700">' + r.time + '</span>' +
+               '</div></td>' +
                '<td class="px-3 py-2.5 text-gray-700 text-xs">' + r.name + '</td>' +
                '<td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell">' + r.bu + '</td>' +
                '<td class="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell">' + (r.dmName || '—') + '</td>' +
@@ -1709,7 +1843,9 @@ function renderDailyRows(rows) {
                (r.skipCount > 0 ? '<span title="เลื่อนนัดแล้ว ' + r.skipCount + ' ครั้ง" class="inline-flex items-center gap-0.5 text-xs bg-orange-100 text-orange-600 border border-orange-300 rounded px-1.5 py-0.5 font-bold">🔄 ' + r.skipCount + '</span>' : '<span class="text-gray-300 text-xs">—</span>') +
                '</td>' +
                (IS_ADMIN ? '<td class="px-3 py-2.5 text-center">' + (r.status !== 'Uploaded' ? '<button onclick="toggleRowCritical(\'' + escQ(r.code) + '\',\'' + r.critical + '\',this)" class="text-xs px-2 py-1 rounded border ' + (r.critical === 'Yes' ? 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100') + '">' + (r.critical === 'Yes' ? '🔴 Critical' : '⬜ ตั้ง') + '</button>' : '<span class="text-gray-300 text-xs">—</span>') + '</td>' : '') +
-               '<td class="px-3 py-2.5 text-center"><span class="text-xs px-2 py-1 rounded-full font-semibold ' + statusCls + '">' + (r.status === 'Uploaded' ? '✅ แล้ว' : '⏳ รอ') + '</span></td>' +
+               '<td class="px-3 py-2.5 text-center hidden md:table-cell">' + dSB(r.hasAircon, r.airconStatus, r.airconTs) + '</td>' +
+               '<td class="px-3 py-2.5 text-center hidden md:table-cell">' + dSB(r.hasRef, r.refStatus, r.refTs) + '</td>' +
+               '<td class="px-3 py-2.5 text-center">' + dOB(r) + '</td>' +
                '</tr>';
     }).join('');
     document.getElementById('daily-table').classList.remove('hidden');
@@ -1730,38 +1866,74 @@ function doLookup() {
                 res.innerHTML = '<div class="py-10 text-center text-gray-400 text-sm">ไม่พบสาขาที่ค้นหา</div>';
                 return;
             }
+            var DONE = ['Acknowledged', 'Corrected', 'Closed', 'Rejected'];
+            function lSB(has, status, ts) {
+                if (!has) return '<span class="inline-flex px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-xs">-</span>';
+                var isRej  = status === 'Rejected';
+                var isDone = DONE.indexOf(status) >= 0;
+                var color  = isRej ? '#991b1b' : (isDone ? '#065f46' : '#92400e');
+                var bg     = isRej ? '#fee2e2'  : (isDone ? '#d1fae5' : '#fef3c7');
+                var icon   = isRej ? '❌' : (isDone ? '✅' : '⏳');
+                return '<div class="inline-block text-left">' +
+                       '<span style="background:' + bg + ';color:' + color + ';" class="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap">' + icon + ' ' + (status || 'Pending') + '</span>' +
+                       '<div class="text-gray-400 font-mono" style="font-size:10px;">' + (ts || '-') + '</div>' +
+                       '</div>';
+            }
+            function lOB(s) {
+                if (!s.hasAircon && !s.hasRef)
+                    return s.status === 'Uploaded'
+                        ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✅ Upload แล้ว</span>'
+                        : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ยังไม่ Upload</span>';
+                if (s.hasAircon && s.hasRef) {
+                    var acDone  = DONE.indexOf(s.airconStatus) >= 0;
+                    var refDone = DONE.indexOf(s.refStatus) >= 0;
+                    if (acDone && refDone) {
+                        return (s.airconStatus === 'Rejected' || s.refStatus === 'Rejected')
+                            ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ส่งครบแต่ยังไม่ผ่าน</span>'
+                            : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✅ ครบแล้ว</span>';
+                    }
+                    return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">⏳ รอ Approve</span>';
+                }
+                var s1 = s.hasAircon ? s.airconStatus : s.refStatus;
+                return s1 === 'Rejected'
+                    ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ส่งแต่ยังไม่ผ่าน</span>'
+                    : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">⚠️ บางส่วน</span>';
+            }
             var rows = r.data;
-            var html = '<table class="w-full text-sm">' +
+            var html = '<div class="overflow-x-auto"><table class="w-full min-w-[720px] text-sm">' +
                 '<thead><tr class="bg-sky-50 text-xs font-bold text-sky-800 uppercase">' +
-                '<th class="px-3 py-2 text-left">Branch Code</th>' +
+                '<th class="px-3 py-2 text-left">สาขา / วันนัด</th>' +
                 '<th class="px-3 py-2 text-left">ชื่อสาขา</th>' +
                 '<th class="px-3 py-2 text-left hidden sm:table-cell">BU</th>' +
-                '<th class="px-3 py-2 text-center">วันที่ Upload</th>' +
-                '<th class="px-3 py-2 text-center">เวลา</th>' +
                 '<th class="px-3 py-2 text-center hidden sm:table-cell">เลื่อน</th>' +
                 (IS_ADMIN ? '<th class="px-3 py-2 text-center">🔴</th>' : '') +
-                '<th class="px-3 py-2 text-center">สถานะ</th>' +
+                '<th class="px-3 py-2 text-center">🌀 Aircon</th>' +
+                '<th class="px-3 py-2 text-center">❄️ Ref</th>' +
+                '<th class="px-3 py-2 text-center">สรุป</th>' +
                 '</tr></thead><tbody>';
             rows.forEach(function(s) {
                 var isCrit = s.critical === 'Yes';
-                var sColor = s.status === 'Uploaded' ? 'status-uploaded' : 'status-pending';
+                var dp = (s.date || '').split('-'); var shortDate = dp.length===3 ? dp[2]+'/'+dp[1] : fmtDate(s.date);
                 html += '<tr class="border-b border-gray-100 hover:bg-sky-50' + (isCrit?' bg-red-50':'') + '">' +
-                        '<td class="px-3 py-2.5 font-semibold text-gray-800">' +
+                        '<td class="px-3 py-2.5">' +
                         (isCrit?'<span class="critical-badge text-xs px-1.5 py-0.5 rounded font-bold mr-1">🔴</span>':'') +
-                        s.code + '</td>' +
+                        '<span class="font-semibold text-gray-800">' + s.code + '</span>' +
+                        '<div class="flex gap-1.5 items-center mt-0.5">' +
+                        '<span class="text-gray-400 text-xs font-mono">' + shortDate + '</span>' +
+                        '<span class="font-mono text-xs font-bold text-sky-700">' + s.time + '</span>' +
+                        '</div></td>' +
                         '<td class="px-3 py-2.5 text-gray-700 text-xs">' + s.name + '</td>' +
                         '<td class="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell">' + s.bu + '</td>' +
-                        '<td class="px-3 py-2.5 text-center font-semibold text-sky-800 text-xs">' + fmtDate(s.date) + '</td>' +
-                        '<td class="px-3 py-2.5 text-center font-mono text-xs text-sky-700">' + s.time + '</td>' +
                         '<td class="px-3 py-2.5 text-center hidden sm:table-cell">' +
                         (s.skipCount > 0 ? '<span title="เลื่อนนัดแล้ว ' + s.skipCount + ' ครั้ง" class="inline-flex items-center gap-0.5 text-xs bg-orange-100 text-orange-600 border border-orange-300 rounded px-1.5 py-0.5 font-bold">🔄 ' + s.skipCount + '</span>' : '<span class="text-gray-300 text-xs">—</span>') +
                         '</td>' +
                         (IS_ADMIN ? '<td class="px-3 py-2.5 text-center">' + (s.status !== 'Uploaded' ? '<button onclick="toggleRowCritical(\'' + escQ(s.code) + '\',\'' + s.critical + '\',this)" class="text-xs px-2 py-1 rounded border ' + (s.critical === 'Yes' ? 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100') + '">' + (s.critical === 'Yes' ? '🔴 Critical' : '⬜ ตั้ง') + '</button>' : '<span class="text-gray-300 text-xs">—</span>') + '</td>' : '') +
-                        '<td class="px-3 py-2.5 text-center"><span class="text-xs px-2 py-1 rounded-full font-semibold ' + sColor + '">' +
-                        (s.status === 'Uploaded' ? '✅ แล้ว' : '⏳ รอ') + '</span></td>' +
+                        '<td class="px-3 py-2.5 text-center">' + lSB(s.hasAircon, s.airconStatus, s.airconTs) + '</td>' +
+                        '<td class="px-3 py-2.5 text-center">' + lSB(s.hasRef, s.refStatus, s.refTs) + '</td>' +
+                        '<td class="px-3 py-2.5 text-center">' + lOB(s) + '</td>' +
                         '</tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             res.innerHTML = html;
         })
         .getScheduleForBranch(term);
@@ -1862,23 +2034,46 @@ function _renderSubmitted(data, q) {
         pill('✅ Acknowledge แล้ว ' + (data.acknowledged||[]).length, '#d1fae5', '#065f46') +
         pill('⏳ รอ Acknowledge ' + (data.pendingReview||[]).length, '#fef3c7', '#92400e');
 
-    function typeTag(types) {
-        // types is an array e.g. ['Aircon'], ['Ref'], or ['Aircon','Ref']
-        var tags = [];
-        if (types && types.indexOf('Aircon') >= 0)
-            tags.push('<span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 whitespace-nowrap">🌀 Aircon</span>');
-        if (types && types.indexOf('Ref') >= 0)
-            tags.push('<span class="text-xs px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 whitespace-nowrap">❄️ Ref</span>');
-        return tags.join('<br>');
+    var DONE = ['Acknowledged', 'Corrected', 'Closed', 'Rejected'];
+    function sBadge(has, status, ts) {
+        if (!has) return '<span class="inline-flex px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-xs">-</span>';
+        var isRej  = status === 'Rejected';
+        var isDone = DONE.indexOf(status) >= 0;
+        var color  = isRej ? '#991b1b' : (isDone ? '#065f46' : '#92400e');
+        var bg     = isRej ? '#fee2e2'  : (isDone ? '#d1fae5' : '#fef3c7');
+        var icon   = isRej ? '❌' : (isDone ? '✅' : '⏳');
+        return '<div class="inline-block text-left">' +
+               '<span style="background:' + bg + ';color:' + color + ';" class="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap">' + icon + ' ' + (status || 'Pending') + '</span>' +
+               '<div class="text-gray-400 font-mono" style="font-size:10px;">' + (ts || '-') + '</div>' +
+               '</div>';
+    }
+    function oBadge(r) {
+        if (!r.hasAircon && !r.hasRef)
+            return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-400">—</span>';
+        if (r.hasAircon && r.hasRef) {
+            var acDone  = DONE.indexOf(r.airconStatus) >= 0;
+            var refDone = DONE.indexOf(r.refStatus) >= 0;
+            if (acDone && refDone) {
+                return (r.airconStatus === 'Rejected' || r.refStatus === 'Rejected')
+                    ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ส่งครบแต่ยังไม่ผ่าน</span>'
+                    : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✅ ครบแล้ว</span>';
+            }
+            return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">⏳ รอ Approve</span>';
+        }
+        var s1 = r.hasAircon ? r.airconStatus : r.refStatus;
+        return s1 === 'Rejected'
+            ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ส่งแต่ยังไม่ผ่าน</span>'
+            : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">⚠️ บางส่วน</span>';
     }
     function makeRows(arr, hoverCls) {
-        if (arr.length === 0) return '<tr><td colspan="4" class="px-3 py-6 text-center text-gray-300 text-sm">ไม่มีข้อมูล</td></tr>';
+        if (arr.length === 0) return '<tr><td colspan="5" class="px-3 py-6 text-center text-gray-300 text-sm">ไม่มีข้อมูล</td></tr>';
         return arr.map(function(r) {
             return '<tr class="border-b border-gray-50 hover:' + hoverCls + '">' +
                 '<td class="px-3 py-2.5 font-semibold text-gray-800 text-xs">' + r.code + '</td>' +
                 '<td class="px-3 py-2.5 text-gray-600 text-xs">' + r.name + '</td>' +
-                '<td class="px-3 py-2.5 text-center">' + typeTag(r.types) + '</td>' +
-                '<td class="px-3 py-2.5 text-gray-400 text-xs font-mono">' + r.timestamp + '</td>' +
+                '<td class="px-3 py-2.5 text-center">' + sBadge(r.hasAircon, r.airconStatus, r.airconTs) + '</td>' +
+                '<td class="px-3 py-2.5 text-center">' + sBadge(r.hasRef, r.refStatus, r.refTs) + '</td>' +
+                '<td class="px-3 py-2.5 text-center">' + oBadge(r) + '</td>' +
                 '</tr>';
         }).join('');
     }
@@ -2071,10 +2266,10 @@ function renderDashboard(d) {
         '<div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">' +
         '<p class="text-xs font-bold text-gray-700">🕒 Upload ล่าสุด</p>' +
         '</div>' +
-        '<table class="w-full text-sm"><thead><tr class="bg-gray-50 text-xs text-gray-500 uppercase">' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-gray-50 text-xs text-gray-500 uppercase">' +
         '<th class="px-3 py-2 text-left">รหัส</th><th class="px-3 py-2 text-left">ชื่อสาขา</th>' +
         '<th class="px-3 py-2 text-left hidden sm:table-cell">BU</th><th class="px-3 py-2 text-left">วันที่</th>' +
-        '</tr></thead><tbody>' + recentHtml + '</tbody></table></div>';
+        '</tr></thead><tbody>' + recentHtml + '</tbody></table></div></div>';
 }
 
 function kpiCard(label, value, bg, color) {
@@ -2242,7 +2437,7 @@ function _renderPerfContent(data) {
         '<div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">' +
         '<div class="px-4 py-3 border-b border-gray-100">' +
         '<p class="text-xs font-bold text-gray-700">📋 รายละเอียดสาขา (' + stores.length + ' สาขา)</p></div>' +
-        '<div class="overflow-x-auto"><table class="w-full text-sm">' +
+        '<div class="overflow-x-auto"><table class="w-full min-w-[700px] text-sm">' +
         '<thead><tr class="bg-gray-50 text-xs text-gray-500">' +
         '<th class="px-3 py-2 text-left">รหัส</th>' +
         '<th class="px-3 py-2 text-left">ชื่อสาขา</th>' +
@@ -2336,6 +2531,215 @@ function showToast(msg, type) {
                   (type==='error' ? 'bg-red-600' : type==='warning' ? 'bg-orange-500' : type==='success' ? 'bg-emerald-600' : 'bg-gray-800');
     t.style.opacity = '1';
     setTimeout(function(){ t.style.opacity = '0'; }, 4000);
+}
+
+// ══════════════════════════════════════════════
+// PROGRESS REPORT TAB
+// ══════════════════════════════════════════════
+var _progressData    = null;
+var _progressLoading = false;
+
+function loadProgressReport() {
+    if (_progressData) { _renderProgress(_progressData); return; }
+    if (_progressLoading) return;
+    _progressLoading = true;
+    document.getElementById('progress-loading').classList.remove('hidden');
+    document.getElementById('progress-loading').textContent = '⏳ กำลังโหลดข้อมูล...';
+    document.getElementById('progress-content').classList.add('hidden');
+    google.script.run
+        .withSuccessHandler(function(res) {
+            _progressLoading = false;
+            document.getElementById('progress-loading').classList.add('hidden');
+            if (!res || !res.success) {
+                var errMsg = (res && res.error) ? res.error : 'โหลดไม่สำเร็จ';
+                document.getElementById('progress-loading').textContent = '❌ ' + errMsg;
+                document.getElementById('progress-loading').classList.remove('hidden');
+                return;
+            }
+            _progressData = res;
+            _populateProgressBUFilter(res.data);
+            document.getElementById('progress-content').classList.remove('hidden');
+            _renderProgress(res);
+        })
+        .withFailureHandler(function(e) {
+            _progressLoading = false;
+            document.getElementById('progress-loading').textContent = '❌ Error: ' + e.message;
+            document.getElementById('progress-loading').classList.remove('hidden');
+        })
+        .getScheduleUploadProgressReport();
+}
+
+function _reloadProgress() {
+    _progressData    = null;
+    _progressLoading = false;
+    document.getElementById('progress-search').value         = '';
+    document.getElementById('progress-filter-status').value  = '';
+    document.getElementById('progress-filter-bu').value      = '';
+    document.getElementById('progress-content').classList.add('hidden');
+    document.getElementById('progress-loading').classList.remove('hidden');
+    document.getElementById('progress-loading').textContent  = '⏳ กำลังโหลดข้อมูล...';
+    loadProgressReport();
+}
+
+function _populateProgressBUFilter(data) {
+    var buSet = {};
+    (data || []).forEach(function(r) { if (r.bu) buSet[r.bu] = true; });
+    var sel = document.getElementById('progress-filter-bu');
+    var prev = sel.value;
+    sel.innerHTML = '<option value="">ทุก BU</option>' +
+        Object.keys(buSet).sort().map(function(bu) {
+            return '<option value="' + bu + '">' + bu + '</option>';
+        }).join('');
+    sel.value = prev;
+}
+
+function _filterProgress() {
+    if (_progressData) _renderProgress(_progressData);
+}
+
+function _clearProgressFilters() {
+    document.getElementById('progress-search').value              = '';
+    document.getElementById('progress-filter-status').value       = '';
+    document.getElementById('progress-filter-bu').value           = '';
+    document.getElementById('progress-filter-store-status').value = '';
+    document.getElementById('progress-filter-sched').value        = '';
+    if (_progressData) _renderProgress(_progressData);
+}
+
+function _renderProgress(res) {
+    var q                = (document.getElementById('progress-search').value || '').trim().toLowerCase();
+    var filterSt         = document.getElementById('progress-filter-status').value;
+    var filterBU         = document.getElementById('progress-filter-bu').value;
+    var filterStoreStatus = document.getElementById('progress-filter-store-status').value;
+    var filterSched      = document.getElementById('progress-filter-sched').value;
+    var summary          = res.summary || {};
+
+    // Summary pills
+    document.getElementById('progress-summary').innerHTML =
+        pill('📦 ทั้งหมด ' + summary.total,             '#f1f5f9','#334155') +
+        pill('📅 ในแผน '  + summary.inSchedule,          '#e0f2fe','#0369a1') +
+        pill('✅ ครบทั้ง 2 '  + summary.withBoth,         '#d1fae5','#065f46') +
+        pill('🌀 Aircon เท่านั้น ' + summary.withAirconOnly, '#dbeafe','#1e40af') +
+        pill('❄️ Ref เท่านั้น ' + summary.withRefOnly,       '#f5f3ff','#4c1d95') +
+        pill('❌ ยังไม่ Upload ' + summary.withNone,      '#fee2e2','#991b1b');
+
+    // Filter data
+    var rows = (res.data || []).filter(function(r) {
+        if (q && r.code.toLowerCase().indexOf(q) < 0 && r.name.toLowerCase().indexOf(q) < 0) return false;
+        if (filterBU && r.bu !== filterBU) return false;
+        if (filterStoreStatus && r.storeStatus !== filterStoreStatus) return false;
+        if (filterSched && r.schedStatus !== filterSched) return false;
+        if (filterSt === 'none'       && (r.hasAircon || r.hasRef))   return false;
+        if (filterSt === 'aircon_only' && !(r.hasAircon && !r.hasRef)) return false;
+        if (filterSt === 'ref_only'   && !(!r.hasAircon && r.hasRef)) return false;
+        if (filterSt === 'both'           && !(r.hasAircon && r.hasRef))  return false;
+        if (filterSt === 'in_schedule'     && !r.inSchedule)              return false;
+        if (filterSt === 'not_in_schedule' &&  r.inSchedule)              return false;
+        return true;
+    });
+
+    document.getElementById('progress-count-label').textContent = 'แสดง ' + rows.length + ' สาขา';
+
+    var DONE = ['Acknowledged', 'Corrected', 'Closed', 'Rejected'];
+
+    function statusBadge(has, status, ts, accentColor) {
+        if (!has) return '<span class="inline-flex px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-xs">-</span>';
+        var isRejected = status === 'Rejected';
+        var isDone = DONE.indexOf(status) >= 0;
+        var color  = isRejected ? '#991b1b' : (isDone ? '#065f46' : '#92400e');
+        var bg     = isRejected ? '#fee2e2'  : (isDone ? '#d1fae5' : '#fef3c7');
+        var icon   = isRejected ? '❌' : (isDone ? '✅' : '⏳');
+        return '<div class="inline-block text-left">' +
+               '<span style="background:' + bg + ';color:' + color + ';" class="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap">' + icon + ' ' + (status || 'Pending') + '</span>' +
+               '<div class="text-gray-400 font-mono" style="font-size:10px;">' + (ts || '-') + '</div>' +
+               '</div>';
+    }
+
+    function overallBadge(r) {
+        if (!r.hasAircon && !r.hasRef)
+            return r.inSchedule
+                ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ยังไม่ Upload</span>'
+                : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-gray-200 text-gray-500">📭 ไม่อยู่ในแผน</span>';
+        if (r.hasAircon && r.hasRef) {
+            var acDone  = DONE.indexOf(r.airconStatus) >= 0;
+            var refDone = DONE.indexOf(r.refStatus) >= 0;
+            if (acDone && refDone) {
+                var anyRejected = r.airconStatus === 'Rejected' || r.refStatus === 'Rejected';
+                return anyRejected
+                    ? '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ส่งครบแต่ยังไม่ผ่าน</span>'
+                    : '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✅ ครบแล้ว</span>';
+            }
+            return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">⏳ รอ Approve</span>';
+        }
+        // Only one type submitted
+        var singleStatus = r.hasAircon ? r.airconStatus : r.refStatus;
+        if (singleStatus === 'Rejected')
+            return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">❌ ส่งแต่ยังไม่ผ่าน</span>';
+        return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">⚠️ บางส่วน</span>';
+    }
+
+    var html = '';
+    if (rows.length === 0) {
+        html = '<tr><td colspan="7" class="px-3 py-8 text-center text-gray-400">ไม่พบข้อมูลตามเงื่อนไข</td></tr>';
+    } else {
+        rows.forEach(function(r) {
+            var rowBg = r.inSchedule
+                ? ( (!r.hasAircon && !r.hasRef) ? 'bg-red-50' : (r.hasAircon && r.hasRef) ? '' : 'bg-amber-50' )
+                : ( (r.hasAircon || r.hasRef)   ? 'bg-sky-50' : 'bg-gray-50' );
+            var critTag  = r.critical ? '<span class="ml-1 text-xs font-bold text-red-500">🔴</span>' : '';
+            var schedTag = r.inSchedule
+                ? (r.date || '-')
+                : '<span class="text-xs text-gray-400 italic">ไม่ในแผน</span>';
+            html += '<tr class="border-b border-gray-50 hover:bg-sky-50 ' + rowBg + '">' +
+                    '<td class="px-3 py-2 font-mono font-bold text-gray-800">' + r.code + critTag + '</td>' +
+                    '<td class="px-3 py-2 text-gray-700 max-w-[180px] truncate" title="' + r.name + '">' + r.name + '</td>' +
+                    '<td class="px-3 py-2 text-gray-400">' + (r.bu || '-') + '</td>' +
+                    '<td class="px-3 py-2 text-center text-gray-500 whitespace-nowrap">' + schedTag + '</td>' +
+                    '<td class="px-3 py-2 text-center">' + statusBadge(r.hasAircon, r.airconStatus, r.airconTs) + '</td>' +
+                    '<td class="px-3 py-2 text-center">' + statusBadge(r.hasRef, r.refStatus, r.refTs) + '</td>' +
+                    '<td class="px-3 py-2 text-center">' + overallBadge(r) + '</td>' +
+                    '</tr>';
+        });
+    }
+    document.getElementById('progress-table-body').innerHTML = html;
+}
+
+function _downloadProgressExcel(btn) {
+    if (!_progressData || !_progressData.data) { showToast('ยังไม่มีข้อมูล', 'warning'); return; }
+    if (typeof XLSX === 'undefined') { showToast('ไม่พบ XLSX library', 'error'); return; }
+    var origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ...'; }
+    try {
+        var DONE = ['Acknowledged','Corrected','Closed','Rejected'];
+        var header = ['รหัสสาขา','ชื่อสาขา','BU','Store Status','Critical','อยู่ในแผน','วันในแผน','เวลา',
+                      'Aircon Status','Aircon เวลาส่ง','Ref Status','Ref เวลาส่ง','สรุป'];
+        var aoa = [header].concat(_progressData.data.map(function(r) {
+            var overall = (!r.hasAircon && !r.hasRef)
+                ? (r.inSchedule ? 'ยังไม่ Upload' : 'ไม่อยู่ในแผน')
+                : (r.hasAircon && r.hasRef && DONE.indexOf(r.airconStatus) >= 0 && DONE.indexOf(r.refStatus) >= 0)
+                    ? ((r.airconStatus === 'Rejected' || r.refStatus === 'Rejected') ? 'ส่งครบแต่ยังไม่ผ่าน' : 'ครบแล้ว')
+                : (r.hasAircon && r.hasRef) ? 'รอ Approve'
+                : (((r.hasAircon ? r.airconStatus : r.refStatus) === 'Rejected') ? 'ส่งแต่ยังไม่ผ่าน' : 'บางส่วน');
+            return [
+                r.code, r.name, r.bu || '', r.storeStatus || 'A', r.critical ? 'Yes' : 'No',
+                r.inSchedule ? 'Yes' : 'No', r.date || '', r.time || '',
+                r.hasAircon ? r.airconStatus : '', r.hasAircon ? r.airconTs : '',
+                r.hasRef    ? r.refStatus    : '', r.hasRef    ? r.refTs    : '',
+                overall
+            ];
+        }));
+        var ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [{wch:12},{wch:36},{wch:8},{wch:8},{wch:8},{wch:8},{wch:12},{wch:8},
+                       {wch:18},{wch:16},{wch:18},{wch:16},{wch:14}];
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Upload Progress');
+        XLSX.writeFile(wb, 'upload_progress_' + new Date().toISOString().slice(0,10) + '.xlsx');
+        showToast('ดาวน์โหลด ' + _progressData.data.length + ' สาขา', 'success');
+    } catch(e) {
+        showToast('Excel error: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+    }
 }
 </script>
 </body>
