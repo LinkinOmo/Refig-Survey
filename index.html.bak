@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .input-field {
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .custom-file-upload {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
+
+        .custom-file-upload:hover {
+            border-color: #16a34a;
+            background-color: #f0fdf4;
+        }
+
+        /* Tab Styles */
+        .tab-btn.active {
+            color: #16a34a;
+            border-bottom-color: #16a34a;
+            background-color: #f0fdf4;
+        }
+    </style>
+</head>
+
+<body class="py-10 px-4 sm:px-6 lg:px-8">
+
+    <div id="auth-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
+                <p class="text-gray-500">Please sign in to continue</p>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input type="email" id="loginEmail"
+                        class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        required placeholder="your.name@example.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="loginPassword"
+                        class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        required placeholder="••••••••">
+                </div>
+
+                <div id="loginError" class="hidden text-red-500 text-sm text-center bg-red-50 p-2 rounded">
+                    Invalid credentials
+                </div>
+
+                <button type="submit" id="loginBtn"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <span>Sign In</span>
+                    <svg id="loginSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="change-pwd-modal"
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Change Password</h3>
+            <form onsubmit="handleChangePwd(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 uppercase">Old Password</label>
+                    <input type="password" id="oldPwd"
+                        class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        required>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 uppercase">New Password</label>
+                    <input type="password" id="newPwd"
+                        class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        required>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 uppercase">Confirm New</label>
+                    <input type="password" id="confirmPwd"
+                        class="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                        required>
+                </div>
+
+                <div id="changePwdError" class="hidden text-red-500 text-sm"></div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="toggleChangePwd(false)"
+                        class="text-gray-500 hover:text-gray-700 px-4 py-2 text-sm">Cancel</button>
+                    <button type="submit" id="changePwdBtn"
+                        class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium">Update
+                        Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Controls -->
+    <div id="user-controls"
+        class="hidden fixed top-4 right-4 z-[90] flex items-center gap-3 bg-white/90 backdrop-blur-sm p-2 px-4 rounded-full shadow-lg border border-gray-100 transition-all hover:shadow-xl">
+        <div class="flex flex-col items-end">
+            <span id="user-email-display" class="text-xs font-bold text-gray-700"></span>
+            <span class="text-[10px] text-gray-500">Logged in</span>
+        </div>
+        <div class="h-6 w-px bg-gray-200 mx-1"></div>
+        <button onclick="toggleChangePwd(true)" class="text-gray-600 hover:text-blue-600 p-1" title="Change Password">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11.536 11 13 12.464l-4 4L7.5 15l-4 4m6-1a2 2 0 002-2" />
+            </svg>
+        </button>
+        <button onclick="logout()" class="text-gray-600 hover:text-red-600 p-1" title="Logout">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+        </button>
+    </div>
+
+
+    <script>
+        // Auth Logic
+        const AUTH_KEY = 'app_auth_token';
+        const AUTH_USER = 'app_user_data';
+        let CURRENT_USER = null;
+
+        // Check Login on Load
+        (function checkAuth() {
+            const user = localStorage.getItem(AUTH_USER);
+            if (user) {
+                try {
+                    CURRENT_USER = JSON.parse(user);
+                    updateUserUI(CURRENT_USER);
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    document.getElementById('user-controls').classList.remove('hidden');
+                } catch (e) {
+                    console.error("Auth Error", e);
+                    logout();
+                }
+            } else {
+                // Show login
+                document.getElementById('auth-overlay').classList.remove('hidden');
+                document.getElementById('user-controls').classList.add('hidden');
+            }
+        })();
+
+        function updateUserUI(user) {
+            const display = document.getElementById('user-email-display');
+            if (display) display.textContent = user.name || user.email;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('loginBtn');
+            const spinner = document.getElementById('loginSpinner');
+            const errorMsg = document.getElementById('loginError');
+            const email = document.getElementById('loginEmail').value;
+            const pwd = document.getElementById('loginPassword').value;
+
+            // UI Loading
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            errorMsg.classList.add('hidden');
+
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    spinner.classList.add('hidden');
+
+                    if (res.success) {
+                        // Save Session
+                        localStorage.setItem(AUTH_USER, JSON.stringify(res.user));
+                        localStorage.setItem(AUTH_KEY, 'valid');
+
+                        CURRENT_USER = res.user;
+                        updateUserUI(CURRENT_USER);
+
+                        // Hide Overlay, Show Controls
+                        document.getElementById('auth-overlay').classList.add('hidden');
+                        document.getElementById('user-controls').classList.remove('hidden');
+
+                        // Check Admin Status immediately
+                        google.script.run.withSuccessHandler(handleAdminStatus).checkAdminStatus(CURRENT_USER.email);
+                    } else {
+                        errorMsg.textContent = res.error;
+                        errorMsg.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    btn.disabled = false;
+                    spinner.classList.add('hidden');
+                    errorMsg.textContent = "System Error: " + err;
+                    errorMsg.classList.remove('hidden');
+                })
+                .loginUser(email, pwd);
+        }
+
+        function logout() {
+            localStorage.removeItem(AUTH_USER);
+            localStorage.removeItem(AUTH_KEY);
+            location.reload();
+        }
+
+        // Allow Global Access (if needed by other scripts)
+        window.logout = logout;
+        window.checkAuth = checkAuth; // in case we need to re-verify
+
+        // Change Password Logic
+        function toggleChangePwd(show) {
+            const modal = document.getElementById('change-pwd-modal');
+            if (show) {
+                modal.classList.remove('hidden');
+                document.getElementById('changePwdError').classList.add('hidden');
+                document.getElementById('oldPwd').value = '';
+                document.getElementById('newPwd').value = '';
+                document.getElementById('confirmPwd').value = '';
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function handleChangePwd(e) {
+            e.preventDefault();
+
+            const oldPwd = document.getElementById('oldPwd').value;
+            const newPwd = document.getElementById('newPwd').value;
+            const confirmPwd = document.getElementById('confirmPwd').value;
+            const errorMsg = document.getElementById('changePwdError');
+            const btn = document.getElementById('changePwdBtn');
+
+            if (newPwd !== confirmPwd) {
+                errorMsg.textContent = "New passwords do not match.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            if (!CURRENT_USER || !CURRENT_USER.email) {
+                errorMsg.textContent = "Session invalid. Please logout and login again.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = "Updating...";
+
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    btn.textContent = "Update Password";
+
+                    if (res.success) {
+                        alert("Password changed successfully. Please login again.");
+                        logout();
+                    } else {
+                        errorMsg.textContent = res.error;
+                        errorMsg.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    btn.disabled = false;
+                    btn.textContent = "Update Password";
+                    errorMsg.textContent = "Error: " + err;
+                    errorMsg.classList.remove('hidden');
+                })
+                .changePassword(CURRENT_USER.email, oldPwd, newPwd);
+        }
+    </script>
+
+    <div class="max-w-4xl mx-auto glass-panel p-6">
+        <div class="text-center mb-6 relative">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Mini Big C Maintenance</h1>
+            <p class="text-gray-600">Employee Management Portal</p>
+            <a href="<?= ScriptApp.getService().getUrl() ?>?page=report" target="_top"
+                class="absolute top-0 right-0 mt-[-10px] bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium hover:bg-green-200 transition-colors">
+                View Org Chart
+            </a>
+        </div>
+
+        <!-- HIDDEN INPUT FOR EVIDENCE UPLOAD -->
+        <input type="file" id="evidenceInput" class="hidden" accept="image/*,.pdf"
+            onchange="handleEvidenceUpload(this)">
+
+        <!-- TABS -->
+        <div class="flex border-b border-gray-200 mb-6 overflow-x-auto">
+            <button onclick="openTab('work-orders')" id="tab-work-orders"
+                class="tab-btn active flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                Work Orders
+            </button>
+            <button onclick="openTab('assignment')" id="tab-assignment"
+                class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                Assignments
+            </button>
+            <button onclick="openTab('performance')" id="tab-performance"
+                class="tab-btn hidden flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                Performance
+            </button>
+            <button onclick="openTab('talent')" id="tab-talent"
+                class="tab-btn hidden flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                Talent Data
+            </button>
+            <button onclick="openTab('register')" id="tab-register"
+                class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                Register Profile
+            </button>
+        </div>
+
+        <!-- CONTENT: PERFORMANCE -->
+        <div id="content-performance" class="tab-content hidden">
+            <form onsubmit="handlePerformanceSubmit(event)" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Select Employee</label>
+                    <select name="empId" class="emp-select w-full border p-2 rounded bg-white" required>
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                        <input type="number" name="year" value="2025" class="input-field w-full border p-2 rounded"
+                            required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Period (e.g. Q1)</label>
+                        <input type="text" name="period" class="input-field w-full border p-2 rounded" required>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Grade (A-F)</label>
+                        <select name="grade" class="input-field w-full border p-2 rounded">
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                            <option value="F">F</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Score</label>
+                        <input type="text" name="score" class="input-field w-full border p-2 rounded">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Reviewer Name</label>
+                    <input type="text" name="reviewer" class="input-field w-full border p-2 rounded" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Comments</label>
+                    <textarea name="comments" rows="3" class="input-field w-full border p-2 rounded"></textarea>
+                </div>
+                <button type="submit"
+                    class="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-700">Save
+                    Performance</button>
+            </form>
+        </div>
+
+        <!-- CONTENT: TALENT -->
+        <div id="content-talent" class="tab-content hidden">
+            <form onsubmit="handleTalentSubmit(event)" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Select Employee</label>
+                    <select name="empId" class="emp-select w-full border p-2 rounded bg-white" required>
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Performance (Low/Med/High)</label>
+                        <select name="perfRating" class="input-field w-full border p-2 rounded">
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Potential (Low/Med/High)</label>
+                        <select name="potRating" class="input-field w-full border p-2 rounded">
+                            <option value="High">High</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Readiness</label>
+                    <select name="readiness" class="input-field w-full border p-2 rounded">
+                        <option value="Now">Now</option>
+                        <option value="1-2 Years">1-2 Years</option>
+                        <option value="3-5 Years">3-5 Years</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Key Strengths</label>
+                    <textarea name="strengths" rows="3" class="input-field w-full border p-2 rounded"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Development Needs</label>
+                    <textarea name="needs" rows="3" class="input-field w-full border p-2 rounded"></textarea>
+                </div>
+                <button type="submit"
+                    class="w-full bg-purple-600 text-white font-bold py-3 rounded hover:bg-purple-700">Save Talent
+                    Data</button>
+            </form>
+        </div>
+
+        <!-- CONTENT: ASSIGNMENT -->
+        <div id="content-assignment" class="tab-content hidden">
+            <form onsubmit="handleAssignmentSubmit(event)" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Select Employee</label>
+                    <select name="empId" class="emp-select w-full border p-2 rounded bg-white" required>
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                    <input type="text" name="department" class="input-field w-full border p-2 rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+                    <input type="text" name="project" class="input-field w-full border p-2 rounded" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <input type="text" name="role" class="input-field w-full border p-2 rounded"
+                            placeholder="Lead, Member...">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select name="status" class="input-field w-full border p-2 rounded">
+                            <option value="Active">Active</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Planned">Planned</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                        <input type="date" name="start" class="input-field w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                        <input type="date" name="end" class="input-field w-full border p-2 rounded">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Achievements / Notes</label>
+                    <textarea name="achievements" rows="3" class="input-field w-full border p-2 rounded"></textarea>
+                </div>
+                <button type="submit"
+                    class="w-full bg-orange-500 text-white font-bold py-3 rounded hover:bg-orange-600">Save
+                    Assignment</button>
+            </form>
+        </div>
+
+        <!-- CONTENT: REGISTER -->
+        <div id="content-register" class="tab-content hidden">
+            <form id="profileForm" onsubmit="handleFormSubmit(event)" class="space-y-6">
+
+                <!-- Section: Personal Details -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">รหัสพนักงาน (Employee ID)</label>
+                        <input type="text" name="empId" required
+                            class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อ-นามสกุล (Full Name)</label>
+                        <input type="text" name="name" required
+                            class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อเล่น (Nickname)</label>
+                        <input type="text" name="nickname" required
+                            class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อหัวหน้างานโดยตรง (Direct Manager
+                            Full Name)</label>
+                        <input type="text" name="manager" required placeholder="Full Name of Manager"
+                            class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                        <p class="text-xs text-gray-500 mt-1">If AVP, Enter "VP". If AM, Enter AVP Name.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">หน่วยงาน (Department)</label>
+                        <input type="text" name="department" required placeholder="e.g. SMF Nationwide"
+                            class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ตำแหน่ง (Position)</label>
+                        <input type="text" name="position" required
+                            class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">อีเมล (Email)</label>
+                        <input type="email" name="email" required
+                            class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">เบอร์โทรศัพท์ (Phone Number)</label>
+                        <input type="tel" name="phone" required
+                            class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">เขตที่ดูแล (Zone/Area)</label>
+                    <input type="text" name="zone" required placeholder="e.g. BKK North, Zone 1"
+                        class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                </div>
+
+                <!-- Section: Detailed Info -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ข้อมูลส่วนตัวเพิ่มเติม (Personal
+                        Information)</label>
+                    <textarea name="personalInfo" rows="3" placeholder="Address, Date of Birth, etc."
+                        class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ประวัติการศึกษา (Education
+                        History)</label>
+                    <textarea name="education" rows="3"
+                        class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">ข้อความแนะนำตัวเอง (Self
+                        Introduction)</label>
+                    <textarea name="intro" rows="4" placeholder="Tell us about yourself..."
+                        class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"></textarea>
+                </div>
+
+                <!-- Section: Photo Upload -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">รูปภาพโปรไฟล์ (Profile Photo)</label>
+                    <div
+                        class="custom-file-upload relative rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer group">
+                        <input type="file" id="fileInput" accept="image/*"
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            onchange="previewImage(this)">
+                        <div id="uploadPlaceholder" class="text-center">
+                            <svg class="mx-auto h-12 w-12 text-gray-400 group-hover:text-green-500 transition-colors"
+                                stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                <path
+                                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <p class="mt-1 text-sm text-gray-600">Click to upload or drag and drop</p>
+                            <p class="text-xs text-gray-500">PNG, JPG up to 5MB</p>
+                        </div>
+                        <div id="imagePreviewContainer" class="hidden mt-2">
+                            <img id="imagePreview"
+                                class="h-32 w-32 object-cover rounded-full border-4 border-white shadow-lg mx-auto"
+                                src="#" alt="Preview" />
+                            <p id="fileName" class="mt-2 text-sm text-gray-500 text-center"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4">
+                    <button type="submit" id="submitBtn"
+                        class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-3 px-4 rounded-lg hover:from-green-600 hover:to-emerald-700 transform hover:-translate-y-0.5 transition-all shadow-lg flex justify-center items-center">
+                        <span>บันทึกข้อมูล (Register)</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- CONTENT: WORK ORDERS -->
+        <div id="content-work-orders" class="tab-content">
+            <!-- Part 1: Create Form -->
+            <form onsubmit="handleWorkOrderSubmit(event)" class="space-y-6 mb-8 border-b pb-8">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Create New Work Order</h2>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
+                    <select name="empId" class="emp-select w-full border p-2 rounded bg-white" required>
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Task / Project</label>
+                    <input type="text" name="project" class="input-field w-full border p-2 rounded" required
+                        placeholder="e.g. Server Maintenance">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                        <select name="priority" class="input-field w-full border p-2 rounded">
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Low">Low</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                        <input type="date" name="startDate" class="input-field w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Finish Date</label>
+                        <input type="date" name="deadline" class="input-field w-full border p-2 rounded" required>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Details</label>
+                    <textarea name="details" rows="3" class="input-field w-full border p-2 rounded"
+                        placeholder="Describe the task..."></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Attachment (Optional -
+                        Photo/File)</label>
+                    <input type="file" id="workOrderAttachment" class="w-full border p-2 rounded" accept="image/*,.pdf"
+                        multiple>
+                    <p class="text-xs text-gray-500 mt-1">Upload a photo or document related to this work order.</p>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-500 text-white font-bold py-3 rounded hover:bg-blue-600">
+                    Submit Work Order
+                </button>
+            </form>
+
+            <!-- Part 2: Approval List -->
+            <div>
+                <div class="flex justify-end items-center mb-4">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=work_order_report" target="_blank"
+                        class="text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
+                        </svg>
+                        View Full Report
+                    </a>
+                </div>
+                <!-- Pending List Removed as requested -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal"
+        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div class="relative p-5 border w-96 shadow-lg rounded-md bg-white text-center">
+            <div class="mt-3 text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                    <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mt-2">Saved Successfully!</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500">
+                        ข้อมูลของคุณถูกบันทึกเรียบร้อยแล้ว
+                    </p>
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="okBtn"
+                        class="px-4 py-2 bg-green-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="globalLoading" class="hidden fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+        <div class="bg-white p-4 rounded-lg flex items-center">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mr-3"></div>
+            <span>Processing...</span>
+        </div>
+    </div>
+
+    <script>
+        // Init
+        window.onload = function () {
+            // Fetch employees for dropdowns
+            google.script.run.withSuccessHandler(populateSelects).getEmployeeList();
+
+            // Check Admin Status (Pass current user email if logged in)
+            const user = localStorage.getItem(AUTH_USER);
+            const email = user ? JSON.parse(user).email : "";
+            google.script.run.withSuccessHandler(handleAdminStatus).checkAdminStatus(email);
+        };
+
+        function handleAdminStatus(res) {
+            if (res && res.isAdmin) {
+                document.getElementById('tab-performance').classList.remove('hidden');
+                document.getElementById('tab-talent').classList.remove('hidden');
+            }
+        }
+
+        function populateSelects(list) {
+            const dropdowns = document.querySelectorAll('.emp-select');
+            let html = '<option value="">-- Select Employee --</option>';
+            list.forEach(emp => {
+                html += `<option value="${emp.id}">${emp.name}</option>`;
+            });
+            dropdowns.forEach(d => d.innerHTML = html);
+        }
+
+        // Tab Switching
+        function openTab(tabName) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(c => c.classList.add('hidden'));
+
+            // Deactivate all buttons
+            const btns = document.querySelectorAll('.tab-btn');
+            btns.forEach(b => b.classList.remove('active'));
+
+            // Activate selected
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            if (tabName === 'work-orders') {
+                loadPendingWorkOrders();
+            }
+        }
+
+        let fileData = {
+            data: null, // Base64 string
+            mimeType: null,
+            name: null
+        };
+
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+
+                reader.onload = function (e) {
+                    // Show preview
+                    document.getElementById('imagePreview').src = e.target.result;
+                    document.getElementById('imagePreviewContainer').classList.remove('hidden');
+                    document.getElementById('uploadPlaceholder').classList.add('hidden');
+                    document.getElementById('fileName').textContent = input.files[0].name;
+
+                    // Prepare data for upload
+                    fileData.data = e.target.result.split(',')[1];
+                    fileData.mimeType = input.files[0].type;
+                    fileData.name = input.files[0].name
+                }
+
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Generic Loader
+        function showLoading() { document.getElementById('globalLoading').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('globalLoading').classList.add('hidden'); }
+        function showSuccess() { document.getElementById('successModal').classList.remove('hidden'); }
+
+        // --- HANDLERS ---
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = "Saving...";
+
+            const form = e.target;
+            const formData = {
+                empId: form.empId.value,
+                name: form.name.value,
+                nickname: form.nickname.value,
+                manager: form.manager.value,
+                department: form.department.value,
+                position: form.position.value,
+                email: form.email.value,
+                phone: form.phone.value,
+                zone: form.zone.value,
+                personalInfo: form.personalInfo.value,
+                education: form.education.value,
+                intro: form.intro.value,
+                photoData: fileData.data,
+                photoMimeType: fileData.mimeType,
+                photoName: fileData.name
+            };
+
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    btn.textContent = "บันทึกข้อมูล (Register)";
+                    if (res.success) {
+                        showSuccess();
+                        form.reset();
+                        // Reset File
+                        document.getElementById('imagePreviewContainer').classList.add('hidden');
+                        document.getElementById('uploadPlaceholder').classList.remove('hidden');
+                        fileData = {};
+                    } else { alert("Error: " + res.error); }
+                })
+                .withFailureHandler(function (e) {
+                    btn.disabled = false;
+                    btn.textContent = "บันทึกข้อมูล (Register)";
+                    alert("Error: " + e);
+                })
+                .processForm(formData);
+        }
+
+        function handlePerformanceSubmit(e) {
+            e.preventDefault();
+            showLoading();
+            const form = e.target;
+            const data = {
+                empId: form.empId.value,
+                year: form.year.value,
+                period: form.period.value,
+                grade: form.grade.value,
+                score: form.score.value,
+                reviewer: form.reviewer.value,
+                comments: form.comments.value
+            };
+            google.script.run.withSuccessHandler((res) => {
+                hideLoading();
+                if (res.success) { showSuccess(); form.reset(); }
+                else { alert(res.error); }
+            }).processPerformanceForm(data);
+        }
+
+        function handleTalentSubmit(e) {
+            e.preventDefault();
+            showLoading();
+            const form = e.target;
+            const data = {
+                empId: form.empId.value,
+                perfRating: form.perfRating.value,
+                potRating: form.potRating.value,
+                readiness: form.readiness.value,
+                strengths: form.strengths.value,
+                needs: form.needs.value
+            };
+            google.script.run.withSuccessHandler((res) => {
+                hideLoading();
+                if (res.success) { showSuccess(); form.reset(); }
+                else { alert(res.error); }
+            }).processTalentForm(data);
+        }
+
+        function handleAssignmentSubmit(e) {
+            e.preventDefault();
+            showLoading();
+            const form = e.target;
+            // Parse Dates
+            const data = {
+                empId: form.empId.value,
+                project: form.project.value,
+                role: form.role.value,
+                status: form.status.value,
+                start: form.start.value,
+                end: form.end.value,
+                achievements: form.achievements.value,
+                department: form.department.value // Capture Department
+            };
+            google.script.run.withSuccessHandler((res) => {
+                hideLoading();
+                if (res.success) { showSuccess(); form.reset(); }
+                else { alert(res.error); }
+            }).processAssignmentForm(data);
+        }
+
+        function handleWorkOrderSubmit(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('workOrderAttachment');
+            const form = e.target;
+
+            // Helper to submit via backend
+            const submitData = (attachmentData = null) => {
+                const data = {
+                    empId: form.empId.value,
+                    project: form.project.value,
+                    priority: form.priority.value,
+                    deadline: form.deadline.value,
+                    details: form.details.value,
+                    ...attachmentData // Merge attachment data if exists
+                };
+
+                google.script.run.withSuccessHandler((res) => {
+                    hideLoading();
+                    if (res.success) {
+                        showSuccess();
+                        form.reset();
+                        fileInput.value = ''; // Reset file input
+                        loadPendingWorkOrders();
+                    }
+                    else { alert(res.error); }
+                }).processWorkOrderForm(data);
+            };
+
+            showLoading();
+
+            if (fileInput.files.length > 0) {
+                const files = Array.from(fileInput.files);
+                const attachmentList = [];
+                let filesProcessed = 0;
+
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        attachmentList.push({
+                            data: e.target.result.split(',')[1],
+                            mimeType: file.type,
+                            name: file.name
+                        });
+                        filesProcessed++;
+                        if (filesProcessed === files.length) {
+                            submitData({ attachmentList: attachmentList });
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                submitData();
+            }
+        }
+
+        function loadPendingWorkOrders() {
+            const listContainer = document.getElementById('pending-orders-list');
+            listContainer.innerHTML = '<p class="text-gray-500 text-center italic py-4">Loading pending orders...</p>';
+
+            google.script.run.withSuccessHandler((response) => {
+                // Response is { orders: [], isAdmin: bool, user: string }
+                // Handle legacy or null response
+                const orders = response.orders || [];
+                const isAdmin = response.isAdmin || false;
+                const user = response.user || "Anonymous";
+
+                if (orders.length === 0) {
+                    listContainer.innerHTML = `<p class="text-gray-500 text-center italic py-4">No pending orders found.<br><span class="text-xs">Logged in as: ${user}</span></p>`;
+                    return;
+                }
+
+                let html = `<div class="mb-2 text-right text-xs text-gray-400">User: ${user} ${isAdmin ? '(Admin)' : ''}</div>`;
+
+                orders.forEach(order => {
+                    let actionHtml = '';
+                    let statusBadge = '';
+
+                    if (order.status === 'Pending') {
+                        statusBadge = '<span class="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-700">Pending</span>';
+                        actionHtml = `
+                            <button onclick="triggerUpload('${order.id}')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm font-medium flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                Upload & Done
+                            </button>
+                         `;
+                    } else if (order.status === 'Waiting Approval') {
+                        statusBadge = '<span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">Waiting Approval</span>';
+                        let evidenceHtml = order.evidence ? `<a href="${order.evidence}" target="_blank" class="text-blue-500 text-xs underline block mt-1">View Evidence</a>` : '';
+
+                        // Use per-order permission check (Manager or Admin)
+                        if (order.canApprove) {
+                            actionHtml = `
+                                <div class="flex flex-col items-end gap-2">
+                                    ${evidenceHtml}
+                                    <button onclick="approveOrder('${order.id}')" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm font-medium">
+                                        Assess & Approve
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            actionHtml = `
+                                <div class="flex flex-col items-end gap-2">
+                                    ${evidenceHtml}
+                                    <span class="text-xs text-gray-400 italic">Waiting for Manager Approval</span>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    html += `
+                    <div class="bg-white p-4 rounded border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-bold text-gray-800">${order.project}</span>
+                                <span class="px-2 py-0.5 text-xs rounded-full ${getPriorityClass(order.priority)}">${order.priority}</span>
+                                ${statusBadge}
+                            </div>
+                            <p class="text-sm text-gray-600"><strong>To:</strong> ${order.empName}</p>
+                            <p class="text-sm text-gray-600"><strong>Due:</strong> ${order.deadline}</p>
+                            <p class="text-sm text-gray-500 mt-1">${order.details}</p>
+                            ${order.attachment ? `<a href="${order.attachment}" target="_blank" class="flex items-center gap-1 text-xs text-blue-600 mt-2 hover:underline"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>View Attachment</a>` : ''}
+                        </div>
+                        <div>${actionHtml}</div>
+                    </div>
+                    `;
+                });
+                listContainer.innerHTML = html;
+            })
+                .withFailureHandler((err) => {
+                    listContainer.innerHTML = `<p class="text-red-500 text-center py-4">Error loading list: ${err}</p>`;
+                })
+                .getPendingWorkOrders(CURRENT_USER ? CURRENT_USER.email : "");
+        }
+
+        function getPriorityClass(p) {
+            if (p === 'High') return 'bg-red-100 text-red-700';
+            if (p === 'Medium') return 'bg-orange-100 text-orange-700';
+            return 'bg-blue-100 text-blue-700';
+        }
+
+        // --- Approval Logic ---
+        function approveOrder(id) {
+            const approver = prompt("Enter AVP Name to Approve:");
+            if (!approver) return;
+
+            const rating = prompt("Enter Rating (1-5):", "5");
+            if (!rating) return;
+
+            showLoading();
+            google.script.run.withSuccessHandler((res) => {
+                hideLoading();
+                if (res.success) {
+                    loadPendingWorkOrders();
+                } else {
+                    alert("Error: " + res.error);
+                }
+            }).approveWorkOrder(id, approver, rating);
+        }
+
+        // --- Upload Logic ---
+        let tempUploadId = null;
+        function triggerUpload(id) {
+            tempUploadId = id;
+            document.getElementById('evidenceInput').click();
+        }
+
+        function handleEvidenceUpload(input) {
+            if (input.files && input.files[0] && tempUploadId) {
+                const file = input.files[0];
+                const reader = new FileReader();
+
+                showLoading();
+
+                reader.onload = function (e) {
+                    const data = {
+                        data: e.target.result.split(',')[1],
+                        mimeType: file.type,
+                        name: file.name
+                    };
+
+                    google.script.run.withSuccessHandler((res) => {
+                        hideLoading();
+                        if (res.success) {
+                            alert("Evidence uploaded! Sent for approval.");
+                            loadPendingWorkOrders();
+                        } else {
+                            alert("Upload failed: " + res.error);
+                        }
+                        tempUploadId = null;
+                        input.value = ''; // Reset
+                    }).uploadWorkOrderEvidence(tempUploadId, data);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Modal close handler
+        document.getElementById('okBtn').addEventListener('click', function () {
+            document.getElementById('successModal').classList.add('hidden');
+        });
+    </script>
+</body>
+
+</html>

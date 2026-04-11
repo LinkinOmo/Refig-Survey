@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+    </style>
+</head>
+
+<body class="p-6">
+
+    <!-- Auth Overlay (Same as work-order-report.html) -->
+    <div id="auth-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
+                <p class="text-gray-500">Please sign in to continue</p>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input type="email" id="loginEmail"
+                        class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        required placeholder="your.name@example.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="loginPassword"
+                        class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        required placeholder="••••••••">
+                </div>
+
+                <div id="loginError" class="hidden text-red-500 text-sm text-center bg-red-50 p-2 rounded">
+                    Invalid credentials
+                </div>
+
+                <button type="submit" id="loginBtn"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <span>Sign In</span>
+                    <svg id="loginSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Controls -->
+    <div id="user-controls"
+        class="hidden fixed top-4 right-4 z-[90] flex items-center gap-3 bg-white/90 backdrop-blur-sm p-2 px-4 rounded-full shadow-lg border border-gray-100 transition-all hover:shadow-xl">
+        <div class="flex flex-col items-end">
+            <span id="user-email-display" class="text-xs font-bold text-gray-700"></span>
+            <span class="text-[10px] text-gray-500">Logged in</span>
+        </div>
+        <div class="h-6 w-px bg-gray-200 mx-1"></div>
+        <button onclick="logout()" class="text-gray-600 hover:text-red-600 p-1" title="Logout">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+        </button>
+    </div>
+
+    <script>
+        // Auth Logic (Same as work-order-report.html)
+        const AUTH_KEY = 'app_auth_token';
+        const AUTH_USER = 'app_user_data';
+        let CURRENT_USER = null;
+
+        (function checkAuth() {
+            const user = localStorage.getItem(AUTH_USER);
+            if (user) {
+                try {
+                    CURRENT_USER = JSON.parse(user);
+                    updateUserUI(CURRENT_USER);
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    document.getElementById('user-controls').classList.remove('hidden');
+                } catch (e) {
+                    console.error("Auth Error", e);
+                    logout();
+                }
+            } else {
+                document.getElementById('auth-overlay').classList.remove('hidden');
+                document.getElementById('user-controls').classList.add('hidden');
+            }
+        })();
+
+        function updateUserUI(user) {
+            const display = document.getElementById('user-email-display');
+            if (display) display.textContent = user.name || user.email;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('loginBtn');
+            const spinner = document.getElementById('loginSpinner');
+            const errorMsg = document.getElementById('loginError');
+            const email = document.getElementById('loginEmail').value;
+            const pwd = document.getElementById('loginPassword').value;
+
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            errorMsg.classList.add('hidden');
+
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    spinner.classList.add('hidden');
+
+                    if (res.success) {
+                        localStorage.setItem(AUTH_USER, JSON.stringify(res.user));
+                        localStorage.setItem(AUTH_KEY, 'valid');
+
+                        CURRENT_USER = res.user;
+                        updateUserUI(CURRENT_USER);
+
+                        document.getElementById('auth-overlay').classList.add('hidden');
+                        document.getElementById('user-controls').classList.remove('hidden');
+                    } else {
+                        errorMsg.textContent = res.error;
+                        errorMsg.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    btn.disabled = false;
+                    spinner.classList.add('hidden');
+                    errorMsg.textContent = "System Error: " + err;
+                    errorMsg.classList.remove('hidden');
+                })
+                .loginUser(email, pwd);
+        }
+
+        function logout() {
+            localStorage.removeItem(AUTH_USER);
+            localStorage.removeItem(AUTH_KEY);
+            location.reload();
+        }
+
+        window.logout = logout;
+    </script>
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="glass-card shadow-2xl rounded-2xl overflow-hidden mb-6">
+            <div class="p-6 flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 flex items-center gap-3">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        Work Order Dashboard
+                    </h1>
+                    <p class="text-gray-500 text-sm mt-1">Real-time monitoring and analytics</p>
+                </div>
+                <div class="flex gap-2">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=report" target="_top"
+                        class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Report
+                    </a>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>" target="_top"
+                        class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        Main App
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div class="stat-card glass-card shadow-lg rounded-2xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium uppercase">Total Orders</p>
+                        <p id="kpi-total" class="text-3xl font-bold text-gray-800 mt-2">0</p>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card glass-card shadow-lg rounded-2xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium uppercase">Pending</p>
+                        <p id="kpi-pending" class="text-3xl font-bold text-yellow-600 mt-2">0</p>
+                    </div>
+                    <div class="bg-yellow-100 p-3 rounded-full">
+                        <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card glass-card shadow-lg rounded-2xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium uppercase">In Progress</p>
+                        <p id="kpi-progress" class="text-3xl font-bold text-blue-600 mt-2">0</p>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card glass-card shadow-lg rounded-2xl p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm font-medium uppercase">Completed</p>
+                        <p id="kpi-completed" class="text-3xl font-bold text-green-600 mt-2">0</p>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Status Distribution -->
+            <div class="glass-card shadow-lg rounded-2xl p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                    </svg>
+                    Status Distribution
+                </h3>
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Priority Distribution -->
+            <div class="glass-card shadow-lg rounded-2xl p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Priority Breakdown
+                </h3>
+                <div class="chart-container">
+                    <canvas id="priorityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <!-- Department Distribution -->
+            <div class="glass-card shadow-lg rounded-2xl p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                    By Department
+                </h3>
+                <div class="chart-container">
+                    <canvas id="departmentChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Zone Distribution -->
+            <div class="glass-card shadow-lg rounded-2xl p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    By Zone
+                </h3>
+                <div class="chart-container">
+                    <canvas id="zoneChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline Chart -->
+        <div class="glass-card shadow-lg rounded-2xl p-6 mb-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                </svg>
+                Work Orders Timeline (Last 30 Days)
+            </h3>
+            <div style="height: 300px;">
+                <canvas id="timelineChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="text-center py-10">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-white mx-auto"></div>
+            <p class="mt-4 text-white font-medium">Loading dashboard data...</p>
+        </div>
+    </div>
+
+    <script>
+        let allOrders = [];
+        let charts = {};
+
+        window.onload = function () {
+            google.script.run.withSuccessHandler(initDashboard).getAllWorkOrdersReport();
+        };
+
+        function initDashboard(data) {
+            document.getElementById('loading').classList.add('hidden');
+            allOrders = data.orders || [];
+
+            updateKPIs();
+            createCharts();
+        }
+
+        function updateKPIs() {
+            const total = allOrders.length;
+            const pending = allOrders.filter(o => o.status === 'Pending').length;
+            const inProgress = allOrders.filter(o => o.status === 'In Progress').length;
+            const completed = allOrders.filter(o => o.status === 'Closed' || o.status === 'Approved').length;
+
+            document.getElementById('kpi-total').textContent = total;
+            document.getElementById('kpi-pending').textContent = pending;
+            document.getElementById('kpi-progress').textContent = inProgress;
+            document.getElementById('kpi-completed').textContent = completed;
+        }
+
+        function createCharts() {
+            createStatusChart();
+            createPriorityChart();
+            createDepartmentChart();
+            createZoneChart();
+            createTimelineChart();
+        }
+
+        function createStatusChart() {
+            const statusCounts = {};
+            allOrders.forEach(o => {
+                statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
+            });
+
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            charts.status = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(statusCounts),
+                    datasets: [{
+                        data: Object.values(statusCounts),
+                        backgroundColor: [
+                            '#fbbf24', // Pending - Yellow
+                            '#3b82f6', // In Progress - Blue
+                            '#10b981', // Approved - Green
+                            '#6b7280', // Closed - Gray
+                            '#ef4444'  // Rejected - Red
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createPriorityChart() {
+            const priorityCounts = {};
+            allOrders.forEach(o => {
+                priorityCounts[o.priority] = (priorityCounts[o.priority] || 0) + 1;
+            });
+
+            const ctx = document.getElementById('priorityChart').getContext('2d');
+            charts.priority = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(priorityCounts),
+                    datasets: [{
+                        data: Object.values(priorityCounts),
+                        backgroundColor: [
+                            '#ef4444', // High - Red
+                            '#f59e0b', // Medium - Orange
+                            '#3b82f6'  // Low - Blue
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createDepartmentChart() {
+            const deptCounts = {};
+            allOrders.forEach(o => {
+                if (o.department) {
+                    deptCounts[o.department] = (deptCounts[o.department] || 0) + 1;
+                }
+            });
+
+            const ctx = document.getElementById('departmentChart').getContext('2d');
+            charts.department = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(deptCounts),
+                    datasets: [{
+                        label: 'Work Orders',
+                        data: Object.values(deptCounts),
+                        backgroundColor: '#8b5cf6',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createZoneChart() {
+            const zoneCounts = {};
+            allOrders.forEach(o => {
+                if (o.zone) {
+                    zoneCounts[o.zone] = (zoneCounts[o.zone] || 0) + 1;
+                }
+            });
+
+            const ctx = document.getElementById('zoneChart').getContext('2d');
+            charts.zone = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(zoneCounts),
+                    datasets: [{
+                        label: 'Work Orders',
+                        data: Object.values(zoneCounts),
+                        backgroundColor: '#14b8a6',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTimelineChart() {
+            // Group by date (last 30 days)
+            const today = new Date();
+            const last30Days = [];
+            const dateLabels = [];
+
+            for (let i = 29; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                const dateStr = date.toISOString().split('T')[0];
+                dateLabels.push(dateStr);
+                last30Days.push({ date: dateStr, count: 0 });
+            }
+
+            allOrders.forEach(o => {
+                const orderDate = o.timestamp ? o.timestamp.split(' ')[0] : null;
+                const dayData = last30Days.find(d => d.date === orderDate);
+                if (dayData) {
+                    dayData.count++;
+                }
+            });
+
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            charts.timeline = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dateLabels,
+                    datasets: [{
+                        label: 'New Work Orders',
+                        data: last30Days.map(d => d.count),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

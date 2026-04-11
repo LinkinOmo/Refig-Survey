@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body class="p-4 max-w-lg mx-auto">
+    <div class="mb-3">
+        <div class="flex items-center justify-between mb-1">
+            <h1 class="text-lg font-bold text-gray-800">My Check-Ins</h1>
+            <a href="index.html"
+                class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition-all text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                    </path>
+                </svg>
+                <span>Home</span>
+            </a>
+        </div>
+        <div class="flex items-center justify-between">
+            <div class="text-xs text-gray-500" id="currentDate"></div>
+            <div class="text-xs text-gray-600 font-medium" id="employeeName"></div>
+        </div>
+    </div>
+
+    <div id="tripList" class="space-y-2">
+        <div class="text-center text-gray-400 py-4 text-sm">Loading trips...</div>
+    </div>
+
+    <!-- Abort Work Modal -->
+    <div id="abortModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">ยกเลิกงาน / Abort Work</h3>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-2">Trip: <span id="abortTripInfo" class="font-semibold"></span></p>
+                <p class="text-xs text-red-600 mb-3">⚠️ กรุณาระบุเหตุผลในการยกเลิกงาน</p>
+                <label class="block text-sm font-medium text-gray-700 mb-2">เหตุผล / Reason:</label>
+                <textarea id="abortComment" rows="4"
+                    class="w-full border border-gray-300 p-3 rounded focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                    placeholder="ระบุเหตุผลในการยกเลิกงาน..."></textarea>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeAbortModal()"
+                    class="flex-1 bg-gray-200 text-gray-800 py-2 rounded font-medium hover:bg-gray-300">ยกเลิก /
+                    Cancel</button>
+                <button onclick="confirmAbort()"
+                    class="flex-1 bg-red-600 text-white py-2 rounded font-bold hover:bg-red-700">ยืนยันยกเลิกงาน</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="statusMsg"
+        class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded shadow-lg hidden text-sm">
+    </div>
+
+    <script>
+        window.onload = function () {
+            var d = new Date();
+            document.getElementById('currentDate').textContent = d.toLocaleDateString();
+
+            // Display employee name
+            var user = JSON.parse(localStorage.getItem('app_user_data') || '{}');
+            if (user.name) {
+                document.getElementById('employeeName').textContent = user.name;
+            } else if (user.empId) {
+                document.getElementById('employeeName').textContent = 'ID: ' + user.empId;
+            }
+
+            loadTrips();
+        };
+
+        function loadTrips() {
+            var user = JSON.parse(localStorage.getItem('app_user_data') || '{}');
+            var empId = user.empId || '';
+
+            if (!empId) {
+                showStatus("Error: No Employee ID found. Please login again.");
+                return;
+            }
+
+            google.script.run
+                .withSuccessHandler(function (resStr) {
+                    try {
+                        var res = JSON.parse(resStr);
+                        if (res.error) {
+                            showStatus("Error: " + res.error);
+                            return;
+                        }
+                        renderTrips(res.trips || []);
+                    } catch (e) { console.error(e); }
+                })
+                .getMyTodayTrips(empId);
+        }
+
+        function renderTrips(trips) {
+            var container = document.getElementById('tripList');
+            container.innerHTML = "";
+
+            if (trips.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-6 bg-white rounded shadow text-sm">No active trips for today</div>';
+                return;
+            }
+
+            trips.forEach(function (trip) {
+                var card = document.createElement('div');
+                card.className = "bg-white p-3 rounded shadow-sm border border-gray-100";
+
+                var statusBadge = "";
+                if (trip.checkInStatus === 'Verified') {
+                    statusBadge = `<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded font-semibold">Verified</span>`;
+                } else if (trip.checkInStatus === 'Aborted') {
+                    statusBadge = `<span class="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded font-semibold">Aborted</span>`;
+                } else if (trip.checkInStatus && trip.checkInStatus.includes('Off-site')) {
+                    statusBadge = `<span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded font-semibold">${trip.checkInStatus}</span>`;
+                }
+
+                var btnHtml = "";
+                if (trip.checkInStatus === 'Verified') {
+                    btnHtml = `<div class="text-xs text-gray-500 mt-2">✓ Checked in at ${formatTime(trip.checkInTime)}</div>`;
+                } else if (trip.checkInStatus === 'Aborted') {
+                    btnHtml = `<div class="text-xs text-red-600 mt-2">✗ Aborted at ${formatTime(trip.abortTime)}</div>
+                               ${trip.abortComment ? `<div class="text-xs text-gray-500 mt-1 italic">"${trip.abortComment}"</div>` : ''}`;
+                } else {
+                    // Compact action buttons in one row
+                    var navBtn = "";
+                    if (trip.storeGps) {
+                        navBtn = `
+                            <button onclick="navigateToStore('${trip.storeGps}', '${trip.storeName}')" 
+                                class="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs py-1.5 rounded flex items-center justify-center gap-0.5 transition" title="Navigate to Store">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                <span>Nav</span>
+                            </button>
+                        `;
+                    }
+
+                    btnHtml = `<div class="flex gap-1.5 mt-2">
+                        ${navBtn}
+                        <button onclick="checkIn('${trip.tripId}', this)" 
+                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1.5 rounded flex items-center justify-center gap-0.5 transition" title="Check In Here">
+                            <span>Check In</span>
+                        </button>
+                        <button onclick="showAbortModal('${trip.tripId}', '${trip.storeName}')" 
+                            class="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 rounded flex items-center justify-center gap-0.5 transition" title="Abort Work">
+                            <span>❌ Abort</span>
+                        </button>
+                    </div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-1">
+                        <div>
+                            <h3 class="font-semibold text-gray-800 text-sm">${trip.storeName}</h3>
+                            <div class="text-xs text-gray-400">ID: ${trip.tripId}</div>
+                        </div>
+                        ${statusBadge}
+                    </div>
+                    ${btnHtml}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function checkIn(tripId, btn) {
+            if (!navigator.geolocation) {
+                showStatus("Geolocation is not supported by your browser");
+                return;
+            }
+
+            var originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = `<div class="spinner border-white"></div> Checking...`;
+
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                var lat = pos.coords.latitude;
+                var lng = pos.coords.longitude;
+
+                google.script.run
+                    .withSuccessHandler(function (resStr) {
+                        try {
+                            var res = JSON.parse(resStr);
+                            if (res.success) {
+                                if (res.status === 'Verified') {
+                                    showStatus("✅ Check-in Successful: " + res.distance);
+                                } else {
+                                    showStatus("check-in ไม่สำเร็จ โปรด check in ที่สาขาที่กำหนด", true);
+                                }
+                                loadTrips(); // Reload to update UI
+                            } else {
+                                showStatus("❌ Failed: " + res.error, true);
+                                btn.innerHTML = originalText;
+                                btn.disabled = false;
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            btn.innerHTML = originalText;
+                            btn.disabled = false;
+                        }
+                    })
+                    .saveCheckIn(tripId, lat, lng);
+
+            }, function (err) {
+                console.error(err);
+                showStatus("⚠️ Location access denied or failed", true);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        }
+
+        function showStatus(msg, isError) {
+            var el = document.getElementById('statusMsg');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            if (isError) {
+                el.classList.remove('bg-gray-800');
+                el.classList.add('bg-red-600', 'font-bold');
+            } else {
+                el.classList.add('bg-gray-800');
+                el.classList.remove('bg-red-600', 'font-bold');
+            }
+            setTimeout(function () { el.classList.add('hidden'); }, 5000);
+        }
+
+        function navigateToStore(gpsCoords, storeName) {
+            if (!gpsCoords) {
+                showStatus("⚠️ GPS coordinates not available for this store", true);
+                return;
+            }
+
+            // GPS format is expected to be "latitude,longitude"
+            var coords = gpsCoords.trim();
+
+            // Open Google Maps in a new tab with the coordinates
+            // Format: https://www.google.com/maps/search/?api=1&query=lat,lng
+            var mapsUrl = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(coords);
+
+            window.open(mapsUrl, '_blank');
+            showStatus("🗺️ Opening navigation to " + storeName);
+        }
+
+        // Abort Work Functions
+        var currentAbortTripId = null;
+
+        function showAbortModal(tripId, storeName) {
+            currentAbortTripId = tripId;
+            document.getElementById('abortTripInfo').textContent = storeName + ' (ID: ' + tripId + ')';
+            document.getElementById('abortComment').value = '';
+            document.getElementById('abortModal').classList.remove('hidden');
+        }
+
+        function closeAbortModal() {
+            currentAbortTripId = null;
+            document.getElementById('abortModal').classList.add('hidden');
+            document.getElementById('abortComment').value = '';
+        }
+
+        function confirmAbort() {
+            var comment = document.getElementById('abortComment').value.trim();
+
+            if (!comment || comment.length < 10) {
+                alert('กรุณาระบุเหตุผลในการยกเลิกงาน (อย่างน้อย 10 ตัวอักษร)\nPlease provide a reason for aborting (at least 10 characters)');
+                return;
+            }
+
+            if (!currentAbortTripId) {
+                alert('Error: Trip ID not found');
+                return;
+            }
+
+            var user = JSON.parse(localStorage.getItem('app_user_data') || '{}');
+            var empId = user.empId || '';
+
+            if (!empId) {
+                alert('Error: Employee ID not found');
+                return;
+            }
+
+            // Show loading state
+            var confirmBtn = event.target;
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'กำลังยกเลิก...';
+
+            google.script.run
+                .withSuccessHandler(function (result) {
+                    try {
+                        var res = JSON.parse(result);
+                        if (res.success) {
+                            closeAbortModal();
+                            showStatus('✅ ยกเลิกงานสำเร็จ / Work aborted successfully');
+                            loadTrips(); // Reload trip list
+                        } else {
+                            alert('Error: ' + (res.error || 'Failed to abort work'));
+                            confirmBtn.disabled = false;
+                            confirmBtn.textContent = 'ยืนยันยกเลิกงาน';
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        alert('System error occurred');
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = 'ยืนยันยกเลิกงาน';
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    alert('System error: ' + err.message);
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'ยืนยันยกเลิกงาน';
+                })
+                .abortTripPlan(currentAbortTripId, empId, comment);
+        }
+
+        function formatTime(dateStr) {
+            if (!dateStr) return "";
+            var d = new Date(dateStr);
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+    </script>
+</body>
+
+</html>

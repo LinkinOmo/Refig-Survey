@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <title>Refig & Aircon Survey Map</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        body { font-family: 'Prompt', sans-serif; background: #f3f4f6; }
+        #map { height: calc(100vh - 140px); width: 100%; border-radius: 12px; z-index: 1; }
+        .legend-dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.25); vertical-align: middle; margin-right: 4px; }
+    </style>
+</head>
+
+<body class="p-4 h-screen flex flex-col">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-3 bg-white p-4 rounded-xl shadow-sm flex-shrink-0">
+        <div>
+            <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                Refig &amp; Aircon Survey Map
+            </h1>
+            <p class="text-xs text-gray-500 mt-0.5">สถานะการสำรวจตู้แช่และแอร์แต่ละสาขา</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <!-- Legend -->
+            <div class="hidden sm:flex items-center gap-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <span><span class="legend-dot" style="background:#1e3a8a;"></span>✔ Acknowledged</span>
+                <span><span class="legend-dot" style="background:#16a34a;"></span>มีทั้ง Refig &amp; Aircon</span>
+                <span><span class="legend-dot" style="background:#ca8a04;"></span>มีอย่างใดอย่างหนึ่ง</span>
+                <span><span class="legend-dot" style="background:#94a3b8;opacity:0.7;"></span>ยังไม่มี</span>
+            </div>
+            <a href="<?= ScriptApp.getService().getUrl() ?>"
+                class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">Home</a>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="mb-3 bg-white p-3 rounded-xl shadow-sm flex flex-wrap gap-3 items-center flex-shrink-0">
+        <div class="flex items-center gap-1.5">
+            <label class="text-xs font-bold text-gray-600">ค้นหา:</label>
+            <input type="text" id="searchStore" placeholder="รหัส / ชื่อสาขา"
+                class="text-xs border border-gray-300 p-1.5 rounded-lg w-40 focus:ring-1 focus:ring-blue-400 outline-none"
+                oninput="filterMap()">
+        </div>
+        <div class="flex items-center gap-1.5">
+            <label class="text-xs font-bold text-gray-600">BU:</label>
+            <select id="filterBU" class="text-xs border border-gray-300 p-1.5 rounded-lg w-28 focus:ring-1 focus:ring-blue-400 outline-none" onchange="updatePersonFilters(); filterMap()">
+                <option value="">ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <label class="text-xs font-bold text-gray-600">DM:</label>
+            <select id="filterDM" class="text-xs border border-gray-300 p-1.5 rounded-lg w-36 focus:ring-1 focus:ring-blue-400 outline-none" onchange="filterMap()">
+                <option value="">ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <label class="text-xs font-bold text-gray-600">CM:</label>
+            <select id="filterCM" class="text-xs border border-gray-300 p-1.5 rounded-lg w-36 focus:ring-1 focus:ring-blue-400 outline-none" onchange="filterMap()">
+                <option value="">ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <label class="text-xs font-bold text-gray-600">AM:</label>
+            <select id="filterAM" class="text-xs border border-gray-300 p-1.5 rounded-lg w-36 focus:ring-1 focus:ring-blue-400 outline-none" onchange="filterMap()">
+                <option value="">ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <label class="text-xs font-bold text-gray-600">สถานะ:</label>
+            <select id="filterStatus" class="text-xs border border-gray-300 p-1.5 rounded-lg w-40 focus:ring-1 focus:ring-blue-400 outline-none" onchange="filterMap()">
+                <option value="">ทั้งหมด</option>
+                <option value="acknowledged">✔ Acknowledged</option>
+                <option value="both">🟢 มีทั้งคู่</option>
+                <option value="refig">🟡 มีแค่ Refig</option>
+                <option value="aircon">🟡 มีแค่ Aircon</option>
+                <option value="none">⚪ ยังไม่มีเลย</option>
+            </select>
+        </div>
+        <!-- Mobile Legend -->
+        <div class="flex sm:hidden items-center gap-2 text-xs text-gray-600 ml-auto">
+            <span><span class="legend-dot" style="background:#1e3a8a;"></span>✔ Ack</span>
+            <span><span class="legend-dot" style="background:#16a34a;"></span>ทั้งคู่</span>
+            <span><span class="legend-dot" style="background:#ca8a04;"></span>อย่างหนึ่ง</span>
+            <span><span class="legend-dot" style="background:#94a3b8;opacity:0.7;"></span>ไม่มี</span>
+        </div>
+        <div class="flex items-center gap-2 ml-auto">
+            <span id="mapStatus" class="text-xs text-gray-500 font-medium">กำลังโหลด...</span>
+            <!-- Summary chips -->
+            <span id="chipBoth"  class="hidden text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold border border-emerald-200"></span>
+            <span id="chipOne"   class="hidden text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-semibold border border-yellow-200"></span>
+            <span id="chipAck"   class="hidden text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-semibold border border-blue-300"></span>
+            <span id="chipNone"  class="hidden text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold border border-slate-200"></span>
+        </div>
+    </div>
+
+    <!-- Map -->
+    <div id="map" class="shadow-md border border-gray-200 flex-1 min-h-0"></div>
+
+    <script>
+        let map;
+        let markers = [];
+        let allStores = [];   // [{id, name, lat, lng, bu, buType, province, surveyStatus}]
+        let acknowledgedSet = new Set();
+
+        const STATUS_COLORS = {
+            both:   '#16a34a',  // green-600
+            refig:  '#ca8a04',  // yellow-600
+            aircon: '#ca8a04',  // yellow-600
+            none:   '#94a3b8'   // slate-400
+        };
+        const STATUS_OPACITY = { both: 0.9, refig: 0.85, aircon: 0.85, none: 0.35 };
+        const STATUS_SIZE    = { both: 16, refig: 14, aircon: 14, none: 11 };
+        const STATUS_LABEL   = {
+            both:   '✅ มีทั้ง Refig & Aircon',
+            refig:  '🟡 มีแค่ Refig',
+            aircon: '🟡 มีแค่ Aircon',
+            none:   '⚪ ยังไม่มี'
+        };
+
+        window.onload = function () {
+            initMap();
+            loadData();
+            loadAcknowledgedStatus();
+        };        
+
+        function loadAcknowledgedStatus() {
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    acknowledgedSet = new Set();
+                    if (res && res.success && res.acknowledged) {
+                        res.acknowledged.forEach(function(entry) {
+                            acknowledgedSet.add(String(entry.code).trim());
+                        });
+                    }
+                    filterMap();
+                })
+                .withFailureHandler(function(err) {
+                    console.warn('loadAcknowledgedStatus failed:', err);
+                })
+                .getSurveySubmissionStatus();
+        }
+
+        function initMap() {
+            map = L.map('map').setView([13.7563, 100.5018], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        function loadData() {
+            document.getElementById('mapStatus').textContent = 'กำลังโหลดข้อมูล...';
+            google.script.run
+                .withSuccessHandler(function (jsonStr) {
+                    try {
+                        const res = JSON.parse(jsonStr);
+                        if (res.error) { document.getElementById('mapStatus').textContent = 'Error: ' + res.error; return; }
+                        allStores = res.stores || [];
+                        populateBUFilter();
+                        filterMap();
+                    } catch (e) {
+                        console.error(e);
+                        document.getElementById('mapStatus').textContent = 'Client Error: ' + e.message;
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    document.getElementById('mapStatus').textContent = 'Connection Failed';
+                })
+                .getRefAcMapData();
+        }
+
+        function populateBUFilter() {
+            const bus = [...new Set(allStores.map(s => s.bu).filter(Boolean))].sort();
+            const sel = document.getElementById('filterBU');
+            bus.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b; opt.textContent = b;
+                sel.appendChild(opt);
+            });
+            // Default to BCM, then populate DM/CM/AM scoped to BCM
+            sel.value = 'BCM';
+            updatePersonFilters();
+        }
+
+        function updatePersonFilters() {
+            const buInput = document.getElementById('filterBU').value;
+            const buList  = buInput ? buInput.split('|') : [];
+            // Scope stores to selected BU (empty = all)
+            const scoped  = buList.length > 0
+                ? allStores.filter(s => buList.includes(s.bu))
+                : allStores;
+
+            const prevDM = document.getElementById('filterDM').value;
+            const prevCM = document.getElementById('filterCM').value;
+            const prevAM = document.getElementById('filterAM').value;
+
+            function fillMapSel(id, values, prevVal) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                while (el.options.length > 1) el.remove(1);
+                values.forEach(function(v) {
+                    const opt = document.createElement('option');
+                    opt.value = v; opt.textContent = v;
+                    el.appendChild(opt);
+                });
+                // Restore previous selection only if still valid in the new list
+                el.value = values.includes(prevVal) ? prevVal : '';
+            }
+            fillMapSel('filterDM', [...new Set(scoped.map(s => s.dm).filter(Boolean))].sort(), prevDM);
+            fillMapSel('filterCM', [...new Set(scoped.map(s => s.cm).filter(Boolean))].sort(), prevCM);
+            fillMapSel('filterAM', [...new Set(scoped.map(s => s.am).filter(Boolean))].sort(), prevAM);
+        }
+
+        function filterMap() {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            const buInput     = document.getElementById('filterBU').value;
+            const dmInput     = document.getElementById('filterDM').value;
+            const cmInput     = document.getElementById('filterCM').value;
+            const amInput     = document.getElementById('filterAM').value;
+            const statusInput = document.getElementById('filterStatus').value;
+            const search      = document.getElementById('searchStore').value.toLowerCase().trim();
+            const buList      = buInput ? buInput.split('|') : [];  // support pipe-separated multi-BU
+
+            let countBoth = 0, countOne = 0, countNone = 0, countAck = 0, total = 0;
+
+            allStores.forEach(store => {
+                if (buList.length > 0 && !buList.includes(store.bu)) return;
+                if (dmInput && store.dm !== dmInput) return;
+                if (cmInput && store.cm !== cmInput) return;
+                if (amInput && store.am !== amInput) return;
+                // Status filter: skip general check when filtering by acknowledged
+                if (statusInput && statusInput !== 'acknowledged' && store.surveyStatus !== statusInput) return;
+                if (search) {
+                    const hay = (store.id + ' ' + store.name).toLowerCase();
+                    if (!hay.includes(search)) return;
+                }
+
+                const lat = parseFloat(store.lat);
+                const lng = parseFloat(store.lng);
+                if (isNaN(lat) || isNaN(lng)) return;
+
+                const st = store.surveyStatus || 'none';
+                const isAck = acknowledgedSet.has(String(store.id).trim());
+
+                if (statusInput === 'acknowledged' && !isAck) return;
+
+                const color   = isAck ? '#1e3a8a' : STATUS_COLORS[st];
+                const opacity = isAck ? 1 : STATUS_OPACITY[st];
+                const size    = isAck ? 18 : STATUS_SIZE[st];
+
+                if (isAck) countAck++;
+                if (st === 'both')   countBoth++;
+                else if (st === 'none') countNone++;
+                else countOne++;
+                total++;
+
+                const popupContent = `
+                    <div style="font-family:'Prompt',sans-serif;min-width:200px;">
+                        <div style="font-weight:700;font-size:13px;color:#1e293b;margin-bottom:4px;">${store.id} — ${store.name}</div>
+                        ${isAck ? '<div style="font-size:11px;margin-bottom:4px;padding:3px 8px;background:#dbeafe;border-radius:4px;font-weight:700;color:#1e3a8a;">✔ Acknowledged</div>' : ''}
+                        <div style="font-size:11px;margin-bottom:6px;padding:4px 8px;background:${color}22;border-radius:4px;font-weight:600;color:${color === '#94a3b8' ? '#64748b' : color};">
+                            ${STATUS_LABEL[st]}
+                        </div>
+                        <div style="font-size:11px;color:#64748b;line-height:1.7;">
+                            <div><span style="font-weight:600;color:#374151;display:inline-block;width:64px;">BU:</span>${store.bu || '—'}</div>
+                            <div><span style="font-weight:600;color:#374151;display:inline-block;width:64px;">Province:</span>${store.province || '—'}</div>
+                        </div>
+                        <div style="margin:6px 0;border-top:1px solid #e5e7eb;padding-top:6px;font-size:11px;line-height:1.8;">
+                            <div><span style="font-weight:600;color:#0369a1;display:inline-block;width:36px;">DM:</span><span style="color:#1e293b;">${store.dm || '—'}</span></div>
+                            <div><span style="font-weight:600;color:#0369a1;display:inline-block;width:36px;">CM:</span><span style="color:#1e293b;">${store.cm || '—'}</span></div>
+                            <div><span style="font-weight:600;color:#0369a1;display:inline-block;width:36px;">AM:</span><span style="color:#1e293b;">${store.am || '—'}</span></div>
+                        </div>
+                        ${(store.lastRefig || store.lastAircon) ? `<div style="border-top:1px solid #e5e7eb;padding-top:5px;font-size:11px;color:#64748b;line-height:1.7;">
+                            ${store.lastRefig  ? '<div><span style="font-weight:600;color:#2563eb;">Refig:</span>  ' + store.lastRefig  + '</div>' : ''}
+                            ${store.lastAircon ? '<div><span style="font-weight:600;color:#2563eb;">Aircon:</span> ' + store.lastAircon + '</div>' : ''}
+                        </div>` : ''}
+                        <div style="margin-top:6px;">
+                            <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank"
+                               style="color:#2563eb;font-size:11px;text-decoration:underline;">📍 Google Maps</a>
+                        </div>
+                    </div>`;
+
+                const customIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: isAck
+                        ? `<div style="width:${size}px;height:${size}px;background:#1e3a8a;border-radius:50%;border:2.5px solid white;box-shadow:0 3px 8px rgba(30,58,138,0.5);display:flex;align-items:center;justify-content:center;">
+                               <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg>
+                           </div>`
+                        : `<div style="width:${size}px;height:${size}px;background:${color};border-radius:50%;border:2.5px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.28);opacity:${opacity};"></div>`,
+                    iconSize: [size, size],
+                    iconAnchor: [size/2, size/2],
+                    popupAnchor: [0, -(size/2)]
+                });
+
+                const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(popupContent);
+                marker.addTo(map);
+                markers.push(marker);
+            });
+
+            // Update header status
+            document.getElementById('mapStatus').textContent = `แสดง ${total} สาขา`;
+            const chipBoth  = document.getElementById('chipBoth');
+            const chipOne   = document.getElementById('chipOne');
+            const chipNone  = document.getElementById('chipNone');
+            const chipAck   = document.getElementById('chipAck');
+            chipAck.textContent   = '✔ ' + countAck  + ' Acknowledged';
+            chipBoth.textContent  = '🟢 ' + countBoth + ' สาขา';
+            chipOne.textContent   = '🟡 ' + countOne  + ' สาขา';
+            chipNone.textContent  = '⚪ ' + countNone  + ' สาขา';
+            chipAck.classList.toggle('hidden', countAck === 0);
+            chipBoth.classList.toggle('hidden', countBoth === 0);
+            chipOne.classList.toggle('hidden', countOne === 0);
+            chipNone.classList.toggle('hidden', countNone === 0);
+        }
+    </script>
+</body>
+
+</html>

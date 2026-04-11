@@ -1,0 +1,10 @@
+# Ignore Google Service Account keys
+Service Account/
+*.json
+
+# Ignore Python environment/cache
+__pycache__/
+*.pyc
+
+# Ignore backup files
+*.bak

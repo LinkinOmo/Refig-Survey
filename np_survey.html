@@ -1,0 +1,658 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>แบบสำรวจ New Product</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: "Prompt", sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f1f5f9; }
+        .input-field { transition: border-color .15s, box-shadow .15s; }
+        .input-field:focus { outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,.15); border-color: #3b82f6; }
+        .unit-card { animation: slideIn .2s ease; }
+        @keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+        .status-pill { transition: all .15s; cursor: pointer; user-select: none; }
+        .status-pill.active-use  { background:#dcfce7; border-color:#4ade80; color:#16a34a; font-weight:700; }
+        .status-pill.active-nouse{ background:#fee2e2; border-color:#f87171; color:#b91c1c; font-weight:700; }
+        .section-card { background:#fff; border-radius:.75rem; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,.06); overflow:hidden; }
+        .draft-toast { animation: fadeUp .3s ease; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:none;} }
+        select, input, textarea { font-family: "Prompt", sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800">
+
+<header class="bg-emerald-700 text-white px-4 py-3 sticky top-0 z-40 shadow-lg">
+    <div class="max-w-2xl mx-auto flex items-center gap-3">
+        <div class="bg-white/20 rounded-xl p-2 shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+        </div>
+        <div class="min-w-0">
+            <h1 class="text-base font-bold leading-tight">แบบสำรวจ New Product</h1>
+            <p class="text-emerald-200 text-xs leading-tight truncate">Ice Cream &bull; Jet Spray &bull; Slushy &bull; Ice Maker &bull; เครื่องกรองน้ำ</p>
+        </div>
+    </div>
+</header>
+
+<div class="max-w-2xl mx-auto px-4 pt-4 pb-36 space-y-4">
+
+    <div class="section-card">
+        <div class="bg-gray-700 text-white px-4 py-3 flex items-center gap-2">
+            <span class="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0">1</span>
+            <span class="font-bold text-sm">ข้อมูลผู้สำรวจและสาขา</span>
+        </div>
+        <div class="p-4 space-y-3">
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อผู้สำรวจ (Reporter) <span class="text-red-500">*</span></label>
+                <input id="fld_reporterName" type="text" autocomplete="name"
+                    placeholder="ชื่อ-นามสกุล (พิมพ์แก้ไขได้)"
+                    class="input-field w-full border border-gray-300 p-2 rounded-lg text-sm bg-white">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) <span class="text-red-500">*</span></label>
+                <div class="relative">
+                    <input id="np-station-search" type="text" autocomplete="off"
+                        class="input-field w-full border border-gray-300 p-2 rounded-lg text-sm bg-blue-50"
+                        placeholder="พิมพ์รหัส 5 หลัก หรือชื่อสาขา..."
+                        oninput="handleNpStationInput(this)">
+                    <div id="np-station-dropdown"
+                        class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">รหัสสาขา *</label>
+                    <input id="fld_branchCode" type="text" readonly
+                        class="input-field w-full border border-gray-300 p-2 rounded-lg text-sm bg-gray-100"
+                        placeholder="Auto-fill">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อสาขา *</label>
+                    <input id="fld_branchName" type="text" readonly
+                        class="input-field w-full border border-gray-300 p-2 rounded-lg text-sm bg-gray-100"
+                        placeholder="Auto-fill">
+                </div>
+            </div>
+            <input type="hidden" id="fld_email">
+            <input type="hidden" id="fld_ammMtn">
+            <input type="hidden" id="fld_dmArea">
+            <input type="hidden" id="fld_cmArea">
+            <div id="storeLoadingMsg" class="text-xs text-blue-500 italic">&#9203; กำลังโหลดข้อมูลสาขา...</div>
+        </div>
+    </div>
+
+    <div id="np-rest-form" class="hidden space-y-4">
+
+        <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+            <span class="text-base leading-tight shrink-0">&#128268;</span>
+            <p>กรุณาถ่ายรูป <strong>เครื่องจักร</strong>, <strong>ปลั๊กไฟ</strong> และ <strong>บริเวณที่ติดตั้ง</strong> สำหรับแต่ละเครื่อง</p>
+        </div>
+
+        <div id="productsSection" class="space-y-4"></div>
+
+        <div class="section-card">
+            <div class="bg-red-600 text-white px-4 py-3 flex items-center gap-2">
+                <span class="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0">7</span>
+                <span class="font-bold text-sm">อุปกรณ์ชำรุด</span>
+            </div>
+            <div class="p-4 space-y-3">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">มีอุปกรณ์ชำรุดหรือไม่?</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="hasBrokenNP" value="Yes" class="text-blue-600" onchange="toggleBrokenSection(true)">
+                            <span class="text-sm">มี (Yes)</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="hasBrokenNP" value="No" class="text-blue-600" onchange="toggleBrokenSection(false)" checked>
+                            <span class="text-sm">ไม่มี (No)</span>
+                        </label>
+                    </div>
+                </div>
+                <div id="brokenDetailsSection" class="hidden space-y-3 bg-red-50 border border-red-200 rounded-xl p-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">เบอร์อุปกรณ์ที่ชำรุด</label>
+                        <input id="fld_brokenUnits" type="text" placeholder="เช่น 1, 3, 5"
+                            class="input-field w-full border border-gray-300 rounded-lg p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">รายละเอียดอาการชำรุด</label>
+                        <textarea id="fld_brokenDetail" rows="3" placeholder="อธิบายอาการ..."
+                            class="input-field w-full border border-gray-300 rounded-lg p-2 text-sm resize-none"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <div class="bg-amber-600 text-white px-4 py-3 flex items-center gap-2">
+                <span class="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0">8</span>
+                <span class="font-bold text-sm">สรุปปัญหาเพิ่มเติม</span>
+            </div>
+            <div class="p-4">
+                <textarea id="fld_comments" rows="3" placeholder="ระบุปัญหาเพิ่มเติมที่พบ... (Optional)"
+                    class="input-field w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-gray-50 resize-none"></textarea>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center gap-2 pt-1 pb-2">
+            <button type="button" onclick="clearForm()"
+                class="text-red-600 text-sm font-medium hover:underline transition">
+                Clear form
+            </button>
+            <div class="flex gap-2">
+                <button type="button" onclick="saveDraft(this)"
+                    class="bg-slate-500 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg shadow text-sm transition">
+                    &#128190; Save Draft
+                </button>
+                <button id="submitBtn" type="button" onclick="submitForm()"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-lg shadow text-sm transition flex items-center gap-1.5">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    ส่งข้อมูล
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<div id="draftToast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none draft-toast">
+    <div class="bg-green-700 text-white text-sm font-semibold px-5 py-3 rounded-full shadow-xl flex items-center gap-2">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        บันทึก Draft แล้ว
+    </div>
+</div>
+
+<div id="successModal" class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
+        <div class="text-5xl mb-3">&#9989;</div>
+        <h2 class="text-xl font-bold text-gray-800 mb-1">ส่งข้อมูลสำเร็จ!</h2>
+        <p class="text-gray-500 text-sm mb-3">ข้อมูลถูกบันทึกเรียบร้อยแล้ว</p>
+        <p id="successId" class="font-mono text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg mb-4"></p>
+        <div id="uploadProgress" class="hidden mb-4 text-left">
+            <p class="text-xs font-semibold text-gray-600 mb-1.5">กำลังอัปโหลดรูปภาพ...</p>
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-1">
+                <div id="uploadProgressFill" class="bg-emerald-500 h-2 rounded-full transition-all duration-300" style="width:0%"></div>
+            </div>
+            <p id="uploadProgressText" class="text-xs text-gray-400"></p>
+        </div>
+        <div id="uploadDone" class="hidden mb-4 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs text-emerald-700 font-semibold">&#9989; อัปโหลดรูปครบทุกกลุ่มแล้ว</div>
+        <button id="newSurveyBtn" onclick="resetAll()" disabled
+            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl transition disabled:opacity-50 disabled:cursor-wait">
+            &#128203; สำรวจสาขาใหม่
+        </button>
+    </div>
+</div>
+
+<div id="loadingOverlay" class="fixed inset-0 bg-white/80 z-50 hidden items-center justify-center flex-col gap-3">
+    <svg class="w-10 h-10 text-emerald-600 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+    </svg>
+    <p class="text-emerald-700 font-semibold text-sm">กำลังส่งข้อมูล...</p>
+</div>
+
+<script>
+const NP_PRODUCTS_FORM = [
+    { code:'SC', prefix:'NP SS ', label:'Ice Cream Soft Serve', icon:'&#127846;', sectionNum:2, headerBg:'bg-pink-600', accentBorder:'border-pink-300', accentBg:'bg-pink-50', accentText:'text-pink-700', attachBase:'np_ss', brands:['JM Softserve','Taylor','Carpigiani','Soft Ice','Electro Freeze','Nissei','อื่นๆ'] },
+    { code:'JT', prefix:'NP JS ', label:'Jet Spray',            icon:'&#128167;', sectionNum:3, headerBg:'bg-sky-600',   accentBorder:'border-sky-300',   accentBg:'bg-sky-50',   accentText:'text-sky-700',  attachBase:'np_js', brands:['FBD','CRATHCO','Manitowoc','CELLI','อื่นๆ'] },
+    { code:'SH', prefix:'NP SL ', label:'Slushy',               icon:'&#129482;', sectionNum:4, headerBg:'bg-blue-600',  accentBorder:'border-blue-300',  accentBg:'bg-blue-50',  accentText:'text-blue-700', attachBase:'np_sl', brands:['FBD','GRANITA','Stoelting','Carpigiani','อื่นๆ'] },
+    { code:'MK', prefix:'NP IM ', label:'Ice Maker',            icon:'&#10052;&#65039;', sectionNum:5, headerBg:'bg-cyan-700',   accentBorder:'border-cyan-300',  accentBg:'bg-cyan-50',  accentText:'text-cyan-700', attachBase:'np_im', brands:['Hoshizaki','Manitowoc','Scotsman','Ice-O-Matic','อื่นๆ'] },
+    { code:'WF', prefix:'NP WF ', label:'เครื่องกรองน้ำ',       icon:'&#128688;', sectionNum:6, headerBg:'bg-teal-700',  accentBorder:'border-teal-300',  accentBg:'bg-teal-50',  accentText:'text-teal-700', attachBase:'np_wf', brands:['Coway','3M','Amway','Amico','Mitsubishi','อื่นๆ'] },
+];
+const MAX_UNITS = 15;
+const DRAFT_KEY = 'np_survey_draft';
+const _photoFiles = {};
+const _photoPreviews = {};
+let globalNpStoreData = [];
+
+google.script.run
+    .withSuccessHandler(function(data) {
+        globalNpStoreData = data || [];
+        document.getElementById('storeLoadingMsg').classList.add('hidden');
+        restoreDraft();
+    })
+    .withFailureHandler(function(e) {
+        document.getElementById('storeLoadingMsg').textContent = 'ไม่สามารถโหลดข้อมูลสาขาได้';
+        console.error(e);
+    })
+    .getStoreDBDataForFrontend();
+
+(function preloadUser() {
+    try {
+        const u = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+        if (u) {
+            if (u.email) document.getElementById('fld_email').value = u.email;
+            if (u.name)  document.getElementById('fld_reporterName').value = u.name;
+        }
+    } catch(e) {}
+})();
+
+buildProductForm();
+
+function handleNpStationInput(input) {
+    const val = input.value.toLowerCase().trim();
+    const dropdown = document.getElementById('np-station-dropdown');
+    if (val.length < 1) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; return; }
+    const matches = globalNpStoreData.filter(s => s.station.toLowerCase().includes(val)).slice(0, 30);
+    if (!matches.length) { dropdown.classList.add('hidden'); return; }
+    dropdown.innerHTML = matches.map(s => {
+        const safe = s.station.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        return '<div class="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-0" onmousedown="event.preventDefault();applyNpBranch(\'' + safe + '\')">' + s.station + '</div>';
+    }).join('');
+    dropdown.classList.remove('hidden');
+}
+
+document.addEventListener('click', function(e) {
+    const d = document.getElementById('np-station-dropdown');
+    const inp = document.getElementById('np-station-search');
+    if (d && !d.contains(e.target) && e.target !== inp) d.classList.add('hidden');
+});
+
+function applyNpBranch(stationName) {
+    let match = globalNpStoreData.find(s => s.station === stationName)
+             || globalNpStoreData.find(s => s.station.toLowerCase() === stationName.toLowerCase());
+    if (!match) return;
+    document.getElementById('np-station-search').value = stationName;
+    document.getElementById('np-station-dropdown').classList.add('hidden');
+    document.getElementById('fld_branchCode').value = match.id || '';
+    let cleanName = match.station;
+    if (match.id && cleanName.startsWith(match.id)) cleanName = cleanName.substring(match.id.length).trim();
+    document.getElementById('fld_branchName').value = cleanName;
+    document.getElementById('fld_ammMtn').value = match.ammMtn || '';
+    document.getElementById('fld_dmArea').value  = match.dmName  || '';
+    document.getElementById('fld_cmArea').value  = match.cmName  || '';
+    document.getElementById('np-rest-form').classList.remove('hidden');
+    setTimeout(function(){ document.getElementById('np-rest-form').scrollIntoView({ behavior:'smooth', block:'start' }); }, 100);
+}
+
+function buildProductForm() {
+    const container = document.getElementById('productsSection');
+    container.innerHTML = NP_PRODUCTS_FORM.map(prod => buildProductSection(prod)).join('');
+    NP_PRODUCTS_FORM.forEach(p => renderUnits(p.code, 0));
+}
+
+function buildProductSection(prod) {
+    return '<div class="section-card" id="prod-' + prod.code + '">' +
+        '<div class="' + prod.headerBg + ' text-white px-4 py-3 flex items-center gap-2">' +
+            '<span class="bg-white/20 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0">' + prod.sectionNum + '</span>' +
+            '<span class="font-bold text-sm">' + prod.icon + ' ' + prod.label + '</span>' +
+        '</div>' +
+        '<div class="p-4">' +
+            '<div class="' + prod.accentBg + ' ' + prod.accentBorder + ' border rounded-lg px-3 py-2 mb-4">' +
+                '<div class="flex items-center gap-3">' +
+                    '<span class="text-sm font-semibold ' + prod.accentText + ' shrink-0">จำนวนเครื่อง:</span>' +
+                    '<button type="button" onclick="changeQty(\'' + prod.code + '\',-1)" class="w-8 h-8 rounded-full bg-white border border-gray-300 hover:bg-gray-50 font-bold text-lg flex items-center justify-center select-none shadow-sm">&#8722;</button>' +
+                    '<input id="qty_' + prod.code + '" type="number" value="0" min="0" max="' + MAX_UNITS + '" onchange="renderUnits(\'' + prod.code + '\',Math.max(0,Math.min(' + MAX_UNITS + ',parseInt(this.value)||0)))" class="w-14 text-center border border-gray-300 rounded-lg py-1.5 text-sm font-bold focus:ring-2 focus:ring-blue-400">' +
+                    '<button type="button" onclick="changeQty(\'' + prod.code + '\',1)" class="w-8 h-8 rounded-full bg-white border border-gray-300 hover:bg-gray-50 font-bold text-lg flex items-center justify-center select-none shadow-sm">+</button>' +
+                    '<span class="text-xs text-gray-400 italic">ใส่ 0 หากไม่มี</span>' +
+                '</div>' +
+            '</div>' +
+            '<div id="units_' + prod.code + '" class="space-y-4"></div>' +
+        '</div>' +
+    '</div>';
+}
+
+function changeQty(code, delta) {
+    var inp = document.getElementById('qty_' + code);
+    var val = Math.max(0, Math.min(MAX_UNITS, (parseInt(inp.value) || 0) + delta));
+    inp.value = val;
+    renderUnits(code, val);
+}
+
+function renderUnits(code, qty) {
+    var prod = NP_PRODUCTS_FORM.find(function(p){ return p.code === code; });
+    if (!prod) return;
+    var container = document.getElementById('units_' + code);
+    if (!container) return;
+    for (var u = qty + 1; u <= MAX_UNITS; u++) {
+        ['machine','plug','area'].forEach(function(t) {
+            var k = code + '_' + t + '_' + u;
+            delete _photoFiles[k]; delete _photoPreviews[k];
+        });
+    }
+    if (qty === 0) { container.innerHTML = ''; return; }
+    var html = '';
+    for (var i = 1; i <= qty; i++) html += buildUnitCard(prod, i);
+    container.innerHTML = html;
+    for (var j = 1; j <= qty; j++) {
+        ['machine','plug','area'].forEach(function(t) {
+            var k = code + '_' + t + '_' + j;
+            if (_photoPreviews[k] && _photoPreviews[k].length) _renderPreviews(k, _photoPreviews[k]);
+        });
+    }
+}
+
+function buildUnitCard(prod, u) {
+    var brandOpts = '<option value="">&#8212; เลือกยี่ห้อ &#8212;</option>' +
+        prod.brands.map(function(b){ return '<option value="' + b + '">' + b + '</option>'; }).join('');
+    return '<div class="border ' + prod.accentBorder + ' rounded-xl overflow-hidden unit-card shadow-sm">' +
+        '<div class="' + prod.headerBg + ' text-white px-3 py-2 flex items-center justify-between">' +
+            '<div class="flex items-center gap-2">' +
+                '<svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>' +
+                '<span class="font-bold text-sm">' + prod.label + ' เครื่องที่ ' + u + '</span>' +
+            '</div>' +
+            '<span class="text-xs font-mono bg-white/20 px-2 py-0.5 rounded-full">Unit ' + u + '</span>' +
+        '</div>' +
+        '<div class="p-3 bg-white space-y-3">' +
+            '<div class="grid grid-cols-2 gap-2">' +
+                '<div class="col-span-2">' +
+                    '<label class="block text-xs font-semibold text-gray-500 mb-1">ยี่ห้อ (Brand)</label>' +
+                    '<select id="u_' + prod.code + '_' + u + '_brand" class="input-field w-full border border-gray-300 rounded text-sm p-2 bg-gray-50" onchange="toggleNpOtherBrand(\'other_brand_' + prod.code + '_' + u + '\',this.value)">' + brandOpts + '</select>' +
+                    '<input type="text" id="other_brand_' + prod.code + '_' + u + '" placeholder="ระบุยี่ห้อ..." class="hidden mt-1 w-full border border-gray-300 rounded text-sm p-2 input-field">' +
+                '</div>' +
+                '<div>' +
+                    '<label class="block text-xs font-semibold text-gray-500 mb-1">Asset No.</label>' +
+                    '<input type="text" id="u_' + prod.code + '_' + u + '_asset" placeholder="Asset No." autocomplete="off" class="input-field w-full border border-gray-300 rounded text-sm p-2 bg-gray-50">' +
+                '</div>' +
+                '<div>' +
+                    '<label class="block text-xs font-semibold text-gray-500 mb-1">Serial No.</label>' +
+                    '<input type="text" id="u_' + prod.code + '_' + u + '_serial" placeholder="Serial No." autocomplete="off" class="input-field w-full border border-gray-300 rounded text-sm p-2 bg-gray-50">' +
+                '</div>' +
+            '</div>' +
+            '<div>' +
+                '<label class="block text-xs font-semibold text-gray-500 mb-1.5">สถานะการใช้งาน</label>' +
+                '<div class="flex gap-2">' +
+                    '<label id="npSt_use_' + prod.code + '_' + u + '" onclick="_npSetStatus(\'' + prod.code + '\',' + u + ',true)" class="status-pill active-use flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-green-300 text-xs">' +
+                        '<input type="radio" name="' + prod.code + '_' + u + '_status" value="ใช้งาน" checked class="hidden">&#10003; ใช้งาน' +
+                    '</label>' +
+                    '<label id="npSt_no_' + prod.code + '_' + u + '" onclick="_npSetStatus(\'' + prod.code + '\',' + u + ',false)" class="status-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-300 text-gray-500 text-xs bg-white">' +
+                        '<input type="radio" name="' + prod.code + '_' + u + '_status" value="ไม่ใช้งาน" class="hidden">&#10007; ไม่ใช้งาน' +
+                    '</label>' +
+                '</div>' +
+            '</div>' +
+            '<div>' +
+                '<label class="block text-xs font-semibold text-gray-500 mb-1">&#128268; ปลั๊กไฟรองรับ <span class="text-red-500">*</span></label>' +
+                '<select id="u_' + prod.code + '_' + u + '_plug" class="input-field w-full border border-gray-300 rounded text-sm p-2 bg-gray-50">' +
+                    '<option value="">&#8212; กรุณาเลือก &#8212;</option>' +
+                    '<option value="Yes">&#9989; มีปลั๊กไฟในตำแหน่งที่ถูกต้อง</option>' +
+                    '<option value="No">&#9888;&#65039; ไม่มีปลั๊กไฟ / ตำแหน่งไม่ถูกต้อง</option>' +
+                    '<option value="ไม่แน่ใจ">&#10068; ไม่แน่ใจ ต้องตรวจสอบเพิ่มเติม</option>' +
+                '</select>' +
+            '</div>' +
+            '<div>' +
+                '<label class="block text-xs font-semibold text-gray-500 mb-1">หมายเหตุ</label>' +
+                '<input type="text" id="u_' + prod.code + '_' + u + '_note" placeholder="หมายเหตุ (ถ้ามี)" class="input-field w-full border border-gray-300 rounded text-sm p-2 bg-gray-50">' +
+            '</div>' +
+            '<div class="border-t border-gray-100 pt-3 space-y-4">' +
+                buildPhotoSection(prod.code, u, 'machine', '&#128247; รูปเครื่อง', 'บันทึกทะเบียนเครื่องจักร') +
+                buildPhotoSection(prod.code, u, 'plug',    '&#128268; รูปปลั๊กไฟ', 'แสดงปลั๊กและตำแหน่งต่อใช้งาน') +
+                buildPhotoSection(prod.code, u, 'area',    '&#128205; รูปบริเวณที่ติดตั้ง', 'แสดงพื้นที่โดยรอบจุดติดตั้ง') +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+function toggleNpOtherBrand(inputId, val) {
+    var el = document.getElementById(inputId);
+    if (!el) return;
+    if (val === 'อื่นๆ') { el.classList.remove('hidden'); el.required = true; }
+    else                  { el.classList.add('hidden');    el.required = false; el.value = ''; }
+}
+
+function _npSetStatus(code, u, isWorking) {
+    var useEl = document.getElementById('npSt_use_' + code + '_' + u);
+    var noEl  = document.getElementById('npSt_no_'  + code + '_' + u);
+    if (!useEl || !noEl) return;
+    var BASE = 'status-pill flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs';
+    if (isWorking) {
+        useEl.className = BASE + ' active-use border-green-300'; useEl.querySelector('input').checked = true;
+        noEl.className  = BASE + ' border-gray-300 text-gray-500 bg-white'; noEl.querySelector('input').checked = false;
+    } else {
+        noEl.className  = BASE + ' active-nouse border-red-300'; noEl.querySelector('input').checked = true;
+        useEl.className = BASE + ' border-gray-300 text-gray-500 bg-white'; useEl.querySelector('input').checked = false;
+    }
+}
+
+function buildPhotoSection(code, u, type, label, hint) {
+    var k = code + '_' + type + '_' + u;
+    return '<div>' +
+        '<div class="mb-1.5">' +
+            '<p class="text-xs font-bold text-gray-600">' + label + '</p>' +
+            '<p class="text-xs text-gray-400">' + hint + '</p>' +
+        '</div>' +
+        '<div class="flex gap-2 flex-wrap mb-2">' +
+            '<button type="button" onclick="document.getElementById(\'cam_' + k + '\').click()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-green-400 bg-green-50 text-green-700 text-xs font-semibold hover:bg-green-100 transition">&#128247; ถ่ายรูป</button>' +
+            '<input type="file" id="cam_' + k + '" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoSelect(this,\'' + k + '\')">' +
+            '<button type="button" onclick="document.getElementById(\'gallery_' + k + '\').click()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-400 bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition">&#128444;&#65039; เลือกจาก Gallery</button>' +
+            '<input type="file" id="gallery_' + k + '" accept="image/*" multiple class="hidden" onchange="handlePhotoSelect(this,\'' + k + '\')">' +
+        '</div>' +
+        '<div id="prev_' + k + '" class="flex flex-wrap gap-1.5"></div>' +
+        '<div id="empty_' + k + '" class="border-2 border-dashed border-gray-200 rounded-lg py-3 text-center text-xs text-gray-400">ยังไม่มีรูป</div>' +
+    '</div>';
+}
+
+function handlePhotoSelect(input, key) {
+    var files = Array.from(input.files); if (!files.length) return;
+    if (!_photoFiles[key]) _photoFiles[key] = [];
+    if (!_photoPreviews[key]) _photoPreviews[key] = [];
+    var loaded = 0;
+    files.forEach(function(f) {
+        _photoFiles[key].push(f);
+        var r = new FileReader();
+        r.onload = function(e) {
+            _photoPreviews[key].push(e.target.result);
+            loaded++;
+            if (loaded === files.length) _renderPreviews(key, _photoPreviews[key]);
+        };
+        r.readAsDataURL(f);
+    });
+    input.value = '';
+}
+
+function _renderPreviews(key, previews) {
+    var grid  = document.getElementById('prev_'  + key);
+    var empty = document.getElementById('empty_' + key);
+    if (!grid) return;
+    if (!previews || !previews.length) { grid.innerHTML = ''; if (empty) empty.classList.remove('hidden'); return; }
+    if (empty) empty.classList.add('hidden');
+    grid.innerHTML = previews.map(function(src, i) {
+        return '<div class="relative group rounded-lg overflow-hidden border border-gray-200 bg-gray-50" style="width:72px;height:72px">' +
+            '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover">' +
+            '<button type="button" onclick="removePreview(\'' + key + '\',' + i + ')" class="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition shadow">&#10005;</button>' +
+        '</div>';
+    }).join('');
+}
+
+function removePreview(key, idx) {
+    if (_photoFiles[key])    _photoFiles[key].splice(idx, 1);
+    if (_photoPreviews[key]) _photoPreviews[key].splice(idx, 1);
+    _renderPreviews(key, _photoPreviews[key] || []);
+}
+
+function toggleBrokenSection(show) {
+    document.getElementById('brokenDetailsSection').classList.toggle('hidden', !show);
+}
+
+function collectFormData() {
+    var form = {
+        branchCode:       document.getElementById('fld_branchCode').value.trim(),
+        branchName:       document.getElementById('fld_branchName').value.trim(),
+        reporterName:     document.getElementById('fld_reporterName').value.trim(),
+        reporterEmail:    document.getElementById('fld_email').value.trim(),
+        ammMtn:           document.getElementById('fld_ammMtn').value.trim(),
+        dmArea:           document.getElementById('fld_dmArea').value.trim(),
+        cmArea:           document.getElementById('fld_cmArea').value.trim(),
+        hasBrokenNP:      (document.querySelector('input[name="hasBrokenNP"]:checked') || {}).value || 'No',
+        brokenUnits:      document.getElementById('fld_brokenUnits').value.trim(),
+        brokenUnitDetail: document.getElementById('fld_brokenDetail').value.trim(),
+        comments:         document.getElementById('fld_comments').value.trim(),
+    };
+    NP_PRODUCTS_FORM.forEach(function(prod) {
+        var qty = parseInt(document.getElementById('qty_' + prod.code).value) || 0;
+        form[prod.code + '_qty'] = qty;
+        for (var u = 1; u <= qty; u++) {
+            var brandEl = document.getElementById('u_' + prod.code + '_' + u + '_brand');
+            var brandVal = brandEl ? brandEl.value : '';
+            if (brandVal === 'อื่นๆ') {
+                var otherEl = document.getElementById('other_brand_' + prod.code + '_' + u);
+                brandVal = otherEl ? otherEl.value.trim() : '';
+            }
+            var pre = prod.code + '_' + u + '_';
+            form[pre + 'brand']  = brandVal;
+            form[pre + 'asset']  = (document.getElementById('u_' + prod.code + '_' + u + '_asset') || {}).value || '';
+            form[pre + 'serial'] = (document.getElementById('u_' + prod.code + '_' + u + '_serial') || {}).value || '';
+            form[pre + 'status'] = (document.querySelector('input[name="' + prod.code + '_' + u + '_status"]:checked') || {}).value || 'ใช้งาน';
+            form[pre + 'plug']   = (document.getElementById('u_' + prod.code + '_' + u + '_plug') || {}).value || '';
+            form[pre + 'note']   = (document.getElementById('u_' + prod.code + '_' + u + '_note') || {}).value || '';
+        }
+    });
+    return form;
+}
+
+function saveDraft(btn) {
+    try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(collectFormData()));
+        var t = document.getElementById('draftToast');
+        t.classList.remove('hidden'); setTimeout(function(){ t.classList.add('hidden'); }, 2500);
+        if (btn) { var orig = btn.innerHTML; btn.innerHTML = '&#9989; Saved!'; setTimeout(function(){ btn.innerHTML = orig; }, 1500); }
+    } catch(e) { alert('ไม่สามารถบันทึก Draft: ' + e.message); }
+}
+
+function restoreDraft() {
+    try {
+        var raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) return;
+        var d = JSON.parse(raw);
+        if (!d || !d.branchCode) return;
+        if (d.reporterName) document.getElementById('fld_reporterName').value = d.reporterName;
+        if (d.reporterEmail) document.getElementById('fld_email').value = d.reporterEmail;
+        if (d.branchCode) {
+            var match = globalNpStoreData.find(function(s){ return (s.id||'') === d.branchCode; })
+                     || globalNpStoreData.find(function(s){ return s.station.includes(d.branchCode); });
+            if (match) { applyNpBranch(match.station); } else {
+                document.getElementById('fld_branchCode').value = d.branchCode;
+                document.getElementById('fld_branchName').value = d.branchName || '';
+                document.getElementById('np-rest-form').classList.remove('hidden');
+            }
+        }
+        NP_PRODUCTS_FORM.forEach(function(prod) {
+            var qty = parseInt(d[prod.code + '_qty']) || 0;
+            if (!qty) return;
+            document.getElementById('qty_' + prod.code).value = qty;
+            renderUnits(prod.code, qty);
+            for (var u = 1; u <= qty; u++) {
+                var pre = prod.code + '_' + u + '_';
+                var savedBrand = d[pre + 'brand'] || '';
+                var brandEl = document.getElementById('u_' + prod.code + '_' + u + '_brand');
+                if (brandEl && savedBrand) {
+                    var exact = prod.brands.find(function(b){ return b === savedBrand && b !== 'อื่นๆ'; });
+                    if (exact) { brandEl.value = exact; }
+                    else { brandEl.value = 'อื่นๆ'; var oe = document.getElementById('other_brand_' + prod.code + '_' + u); if (oe){ oe.value = savedBrand; oe.classList.remove('hidden'); } }
+                }
+                ['asset','serial','note'].forEach(function(f) {
+                    var el = document.getElementById('u_' + prod.code + '_' + u + '_' + f);
+                    if (el && d[pre + f]) el.value = d[pre + f];
+                });
+                var plugEl = document.getElementById('u_' + prod.code + '_' + u + '_plug');
+                if (plugEl && d[pre + 'plug']) plugEl.value = d[pre + 'plug'];
+                if (d[pre + 'status']) _npSetStatus(prod.code, u, d[pre + 'status'] === 'ใช้งาน');
+            }
+        });
+        if (d.hasBrokenNP === 'Yes') {
+            var r = document.querySelector('input[name="hasBrokenNP"][value="Yes"]');
+            if (r) { r.checked = true; toggleBrokenSection(true); }
+            if (d.brokenUnits)      document.getElementById('fld_brokenUnits').value = d.brokenUnits;
+            if (d.brokenUnitDetail) document.getElementById('fld_brokenDetail').value = d.brokenUnitDetail;
+        }
+        if (d.comments) document.getElementById('fld_comments').value = d.comments;
+    } catch(e) { console.error('restoreDraft', e); }
+}
+
+function clearForm() {
+    if (!confirm('ล้างข้อมูลทั้งหมดใช่ไหม?')) return;
+    ['fld_reporterName','fld_branchCode','fld_branchName','fld_brokenUnits','fld_brokenDetail','fld_comments'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('np-station-search').value = '';
+    document.getElementById('np-rest-form').classList.add('hidden');
+    var noR = document.querySelector('input[name="hasBrokenNP"][value="No"]');
+    if (noR) { noR.checked = true; toggleBrokenSection(false); }
+    Object.keys(_photoFiles).forEach(function(k){ delete _photoFiles[k]; delete _photoPreviews[k]; });
+    NP_PRODUCTS_FORM.forEach(function(p){ var qEl=document.getElementById('qty_'+p.code); if(qEl) qEl.value=0; renderUnits(p.code,0); });
+    localStorage.removeItem(DRAFT_KEY);
+    try { var u=JSON.parse(localStorage.getItem('app_user_data')||'null'); if(u&&u.name) document.getElementById('fld_reporterName').value=u.name; } catch(e){}
+    window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+async function submitForm() {
+    var branchCode   = document.getElementById('fld_branchCode').value.trim();
+    var reporterName = document.getElementById('fld_reporterName').value.trim();
+    if (!branchCode)   { alert('กรุณาค้นหาและเลือกสาขา'); document.getElementById('np-station-search').focus(); return; }
+    if (!reporterName) { alert('กรุณาระบุชื่อผู้สำรวจ'); document.getElementById('fld_reporterName').focus(); return; }
+    var missingPlug = false;
+    NP_PRODUCTS_FORM.forEach(function(prod) {
+        var qty = parseInt(document.getElementById('qty_'+prod.code).value)||0;
+        for (var u=1; u<=qty && !missingPlug; u++) {
+            var el = document.getElementById('u_'+prod.code+'_'+u+'_plug');
+            if (el && !el.value) missingPlug = true;
+        }
+    });
+    if (missingPlug) { alert('กรุณาระบุสถานะปลั๊กไฟสำหรับทุกเครื่องก่อนส่ง'); return; }
+
+    var form = collectFormData();
+    var btn  = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> กำลังส่ง...';
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    document.getElementById('loadingOverlay').classList.add('flex');
+
+    try {
+        var result = await new Promise(function(res,rej){ google.script.run.withSuccessHandler(res).withFailureHandler(rej).submitNpSurvey(form); });
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        document.getElementById('loadingOverlay').classList.remove('flex');
+        if (!result.success) {
+            alert('เกิดข้อผิดพลาด: ' + (result.error||'Unknown'));
+            btn.disabled=false; btn.innerHTML='<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> ส่งข้อมูล'; return;
+        }
+        localStorage.removeItem(DRAFT_KEY);
+        document.getElementById('successId').textContent = 'รหัสบันทึก: ' + result.id;
+        document.getElementById('successModal').classList.remove('hidden');
+        document.getElementById('successModal').classList.add('flex');
+
+        var photoKeys = Object.keys(_photoFiles).filter(function(k){ return _photoFiles[k]&&_photoFiles[k].length>0; });
+        if (photoKeys.length > 0) {
+            document.getElementById('uploadProgress').classList.remove('hidden');
+            var fillEl = document.getElementById('uploadProgressFill');
+            var textEl = document.getElementById('uploadProgressText');
+            var done = 0;
+            for (var ki = 0; ki < photoKeys.length; ki++) {
+                var key = photoKeys[ki];
+                var parts = key.split('_'); var prodCode=parts[0], photoType=parts[1], unitNum=parts[2];
+                var prodDef = NP_PRODUCTS_FORM.find(function(p){ return p.code===prodCode; });
+                var attachKey = prodDef.attachBase+'_'+photoType+'_'+unitNum;
+                var typeLabel = {machine:'รูปเครื่อง',plug:'รูปปลั๊กไฟ',area:'รูปบริเวณติดตั้ง'}[photoType]||photoType;
+                textEl.textContent = (prodDef?prodDef.label:prodCode)+' เครื่องที่ '+unitNum+' — '+typeLabel;
+                var fileData = await Promise.all(_photoFiles[key].map(function(f){ return new Promise(function(res_,rej_){ var r=new FileReader(); r.onload=function(e){ res_({name:f.name,mimeType:f.type||'image/jpeg',data:e.target.result.split(',')[1]}); }; r.onerror=rej_; r.readAsDataURL(f); }); }));
+                await new Promise(function(res_,rej_){ google.script.run.withSuccessHandler(res_).withFailureHandler(rej_).addNpSurveyPhotos(result.id, attachKey, fileData); });
+                done++;
+                fillEl.style.width = Math.round(done/photoKeys.length*100)+'%';
+            }
+            document.getElementById('uploadProgress').classList.add('hidden');
+            document.getElementById('uploadDone').classList.remove('hidden');
+        }
+        document.getElementById('newSurveyBtn').disabled = false;
+    } catch(err) {
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        document.getElementById('loadingOverlay').classList.remove('flex');
+        alert('เกิดข้อผิดพลาด: '+(err.message||String(err)));
+        btn.disabled=false; btn.innerHTML='<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> ส่งข้อมูล';
+    }
+}
+
+function resetAll() {
+    document.getElementById('successModal').classList.add('hidden'); document.getElementById('successModal').classList.remove('flex');
+    document.getElementById('uploadProgress').classList.add('hidden'); document.getElementById('uploadDone').classList.add('hidden');
+    document.getElementById('uploadProgressFill').style.width='0%';
+    document.getElementById('newSurveyBtn').disabled=true;
+    var btn=document.getElementById('submitBtn'); btn.disabled=false;
+    btn.innerHTML='<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> ส่งข้อมูล';
+    clearForm();
+}
+</script>
+</body>
+</html>

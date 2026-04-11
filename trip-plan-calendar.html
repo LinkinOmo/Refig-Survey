@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: #f3f4f6;
+        }
+
+        .calendar-cell {
+            min-height: 100px;
+            transition: all 0.2s;
+        }
+
+        .calendar-cell:hover {
+            background: #f0f9ff;
+            transform: translateY(-1px);
+        }
+
+        .trip-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            margin: 1px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .trip-badge:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .today {
+            background: #eff6ff;
+            border: 2px solid #3b82f6;
+        }
+    </style>
+</head>
+
+<body class="p-6">
+
+    <!-- Auth Overlay -->
+    <div id="auth-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Welcome Back</h2>
+                <p class="text-gray-500">Please sign in to continue</p>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input type="email" id="loginEmail"
+                        class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        required placeholder="your.name@example.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="loginPassword"
+                        class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        required placeholder="••••••••">
+                </div>
+
+                <div id="loginError" class="hidden text-red-500 text-sm text-center bg-red-50 p-2 rounded">
+                    Invalid credentials
+                </div>
+
+                <button type="submit" id="loginBtn"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <span>Sign In</span>
+                    <svg id="loginSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- User Controls -->
+    <div id="user-controls"
+        class="hidden fixed top-4 right-4 z-[90] flex items-center gap-3 bg-white/90 backdrop-blur-sm p-2 px-4 rounded-full shadow-lg border border-gray-100">
+        <div class="flex flex-col items-end">
+            <span id="user-email-display" class="text-xs font-bold text-gray-700"></span>
+            <span class="text-[10px] text-gray-500">Logged in</span>
+        </div>
+        <div class="h-6 w-px bg-gray-200 mx-1"></div>
+        <button onclick="logout()" class="text-gray-600 hover:text-red-600 p-1" title="Logout">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+        </button>
+    </div>
+
+    <script>
+        // Auth Logic
+        const AUTH_KEY = 'app_auth_token';
+        const AUTH_USER = 'app_user_data';
+        let CURRENT_USER = null;
+
+        (function checkAuth() {
+            const user = localStorage.getItem(AUTH_USER);
+            if (user) {
+                try {
+                    CURRENT_USER = JSON.parse(user);
+                    updateUserUI(CURRENT_USER);
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    document.getElementById('user-controls').classList.remove('hidden');
+                } catch (e) {
+                    console.error("Auth Error", e);
+                    logout();
+                }
+            } else {
+                document.getElementById('auth-overlay').classList.remove('hidden');
+                document.getElementById('user-controls').classList.add('hidden');
+            }
+        })();
+
+        function updateUserUI(user) {
+            const display = document.getElementById('user-email-display');
+            if (display) display.textContent = user.name || user.email;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('loginBtn');
+            const spinner = document.getElementById('loginSpinner');
+            const errorMsg = document.getElementById('loginError');
+            const email = document.getElementById('loginEmail').value;
+            const pwd = document.getElementById('loginPassword').value;
+
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            errorMsg.classList.add('hidden');
+
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    spinner.classList.add('hidden');
+
+                    if (res.success) {
+                        localStorage.setItem(AUTH_USER, JSON.stringify(res.user));
+                        localStorage.setItem(AUTH_KEY, 'valid');
+
+                        CURRENT_USER = res.user;
+                        updateUserUI(CURRENT_USER);
+
+                        document.getElementById('auth-overlay').classList.add('hidden');
+                        document.getElementById('user-controls').classList.remove('hidden');
+
+                        loadCalendar();
+                    } else {
+                        errorMsg.textContent = res.error;
+                        errorMsg.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    btn.disabled = false;
+                    spinner.classList.add('hidden');
+                    errorMsg.textContent = "System Error: " + err;
+                    errorMsg.classList.remove('hidden');
+                })
+                .loginUser(email, pwd);
+        }
+
+        function logout() {
+            localStorage.removeItem(AUTH_USER);
+            localStorage.removeItem(AUTH_KEY);
+            location.reload();
+        }
+    </script>
+
+    <div class="max-w-7xl mx-auto bg-white shadow-lg rounded-xl overflow-hidden">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-1">Trip Plan Calendar</h1>
+                    <p class="text-gray-600 text-sm">View all scheduled trips at a glance</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="openAddTripModal()"
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
+                            </path>
+                        </svg>
+                        Create Trip Plan
+                    </button>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>" target="_top"
+                        class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        Back to App
+                    </a>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=trip-plan-report" target="_blank"
+                        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
+                        </svg>
+                        List View
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filters & Month Navigation -->
+            <div class="space-y-4">
+                <!-- Filters -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white/50 p-4 rounded-lg border border-gray-200">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                        <select id="filterStatus"
+                            class="w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            onchange="renderCalendar()">
+                            <option value="All">All Statuses</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Waiting Approval">Waiting Approval</option>
+                            <option value="Closed">Closed / Approved</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Employee Name</label>
+                        <select id="filterName"
+                            class="w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            onchange="renderCalendar()">
+                            <option value="">All Employees</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Department</label>
+                        <select id="filterDept"
+                            class="w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            onchange="renderCalendar()">
+                            <option value="">All Departments</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="flex items-center justify-between">
+                    <button onclick="changeWeek(-1)" class="p-2 hover:bg-white rounded-lg transition-colors">
+                        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7">
+                            </path>
+                        </svg>
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <h2 id="monthYear" class="text-xl font-bold text-gray-800"></h2>
+                        <span
+                            class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-medium">Weekly</span>
+                    </div>
+                    <button onclick="changeWeek(1)" class="p-2 hover:bg-white rounded-lg transition-colors">
+                        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend (Thai Work Types) -->
+        <div class="p-4 bg-gray-50 border-b flex flex-wrap gap-4 text-xs justify-center md:justify-start">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-purple-100 border border-purple-200 rounded"></div>
+                <span>ตรวจสอบสถานที่ (Site Inspection)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-blue-100 border border-blue-200 rounded"></div>
+                <span>บำรุงรักษาและซ่อมแซม (Maintenance)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-orange-100 border border-orange-200 rounded"></div>
+                <span>กำกับการก่อสร้าง (Construction)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-pink-100 border border-pink-200 rounded"></div>
+                <span>ประชุมผู้ขาย (Vendor Meeting)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-teal-100 border border-teal-200 rounded"></div>
+                <span>ตรวจสอบทรัพย์สิน (Asset Check)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-gray-100 border border-gray-200 rounded"></div>
+                <span>อื่นๆ (Other)</span>
+            </div>
+            <div class="ml-auto flex items-center gap-2 border-l pl-4">
+                <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                <span class="text-gray-500">High Priority</span>
+            </div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="p-4">
+            <div class="grid grid-cols-7 gap-2 mb-2">
+                <div class="text-center font-bold text-gray-700 py-2 uppercase text-sm">Sun</div>
+                <div class="text-center font-bold text-gray-700 py-2 uppercase text-sm">Mon</div>
+                <div class="text-center font-bold text-gray-700 py-2 uppercase text-sm">Tue</div>
+                <div class="text-center font-bold text-gray-700 py-2 uppercase text-sm">Wed</div>
+                <div class="text-center font-bold text-gray-700 py-2 uppercase text-sm">Thu</div>
+                <div class="text-center font-bold text-gray-700 py-2 uppercase text-sm">Fri</div>
+                <div class="text-center font-bold text-gray-700 py-2 uppercase text-sm">Sat</div>
+            </div>
+            <div id="calendarGrid" class="grid grid-cols-7 gap-2">
+                <!-- Calendar cells will be generated here -->
+            </div>
+        </div>
+
+        <div id="loading" class="text-center py-10">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+            <p class="mt-2 text-gray-500">Loading trip plans...</p>
+        </div>
+    </div>
+
+    <!-- Trip Details Modal -->
+    <div id="tripModal"
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                <h3 class="text-xl font-bold text-gray-800">Trip Plan Details</h3>
+                <button onclick="closeTripModal()" class="text-gray-500 hover:text-gray-700">&times;</button>
+            </div>
+            <div id="tripModalContent" class="p-6">
+                <!-- Content will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal (Expanded) -->
+    <div id="editModal"
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div
+                class="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg sticky top-0 bg-white z-10">
+                <h3 class="text-lg font-bold text-gray-800">Edit Trip Plan</h3>
+                <button onclick="closeEditModal()" class="text-gray-500 hover:text-gray-700">&times;</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="editOrderId">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Work Type (ประเภทงาน)</label>
+                        <select id="editWorkType" class="w-full border p-2 rounded outline-none text-sm bg-white">
+                            <option value="">-- Select Work Type --</option>
+                            <option value="Site Inspection">ตรวจสอบสถานที่ (Site Inspection)</option>
+                            <option value="Maintenance & Repair">บำรุงรักษาและซ่อมแซม (Maintenance)</option>
+                            <option value="Construction Supervision">กำกับการก่อสร้าง (Construction)</option>
+                            <option value="Vendor Meeting">ประชุมผู้ขาย (Vendor Meeting)</option>
+                            <option value="Asset Audit">ตรวจสอบทรัพย์สิน (Asset Audit)</option>
+                            <option value="Other">อื่นๆ (Other)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Category (หมวดงาน)</label>
+                        <!-- Reuse dropdown options from index.html -->
+                        <select id="editDetails" class="w-full border p-2 rounded outline-none text-sm bg-white">
+                            <option value="">-- Select Category --</option>
+                            <option value="ACT - Air Condition">ACT - Air Condition</option>
+                            <option value="ADR - Auto Door">ADR - Auto Door</option>
+                            <option value="BLD - Building">BLD - Building</option>
+                            <option value="CTS - CCTV & Sound">CTS - CCTV & Sound</option>
+                            <option value="ELC - Electrical">ELC - Electrical</option>
+                            <option value="FFE - Furniture & Fixture">FFE - Furniture & Fixture</option>
+                            <option value="FHW - Fresh Food Hot Water">FHW - Fresh Food Hot Water</option>
+                            <option value="FNT - Furniture">FNT - Furniture</option>
+                            <option value="IMK - Ice Maker">IMK - Ice Maker</option>
+                            <option value="PCT - Pest Control">PCT - Pest Control</option>
+                            <option value="RFT - Refrigeration">RFT - Refrigeration</option>
+                            <option value="SAN - Sanitary">SAN - Sanitary</option>
+                            <option value="SEM - Small Equipment">SEM - Small Equipment</option>
+                            <option value="SFB - Safe Box">SFB - Safe Box</option>
+                            <option value="General Inspection">General Inspection</option>
+                            <option value="Preventive Maintenance">Preventive Maintenance</option>
+                            <option value="Emergency Repair">Emergency Repair</option>
+                            <option value="Renovation Check">Renovation Check</option>
+                            <option value="New Store Setup">New Store Setup</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Project/Task Description</label>
+                    <input type="text" id="editProject" class="w-full border p-2 rounded outline-none text-sm"
+                        placeholder="e.g. Visit Banner Branch">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Est. Distance (km)</label>
+                        <input type="number" id="editDistance" class="w-full border p-2 rounded outline-none text-sm"
+                            placeholder="0.00">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Station/Store</label>
+                        <input type="text" id="editStation" list="station-list-edit"
+                            class="w-full border p-2 rounded outline-none text-sm" placeholder="Type to search store..."
+                            oninput="handleStationInput(this)">
+                        <datalist id="station-list-edit"></datalist>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Contract</label>
+                        <input type="text" id="editContract" class="w-full border p-2 rounded outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
+                        <input type="text" id="editVendor" class="w-full border p-2 rounded outline-none text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                        <select id="editPriority" class="w-full border p-2 rounded outline-none text-sm bg-white">
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Critical">Critical</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                        <input type="datetime-local" id="editStart"
+                            class="w-full border p-2 rounded outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">End Date/Deadline</label>
+                        <input type="datetime-local" id="editEnd"
+                            class="w-full border p-2 rounded outline-none text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Work Doc Number</label>
+                        <input type="text" id="editWorkDoc" class="w-full border p-2 rounded outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Notify Email (Opt)</label>
+                        <input type="email" id="editNotifyEmail" class="w-full border p-2 rounded outline-none text-sm"
+                            placeholder="notify@example.com">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="editStatus" class="w-full border p-2 rounded outline-none text-sm bg-white">
+                        <option value="Pending">Pending</option>
+                        <option value="Waiting Approval">Waiting Approval</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                </div>
+
+                <!-- Rating (Only show if Closed/Approved) -->
+                <div id="editRatingWrapper" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Rating (1-5)</label>
+                    <input type="number" id="editRating" min="1" max="5"
+                        class="w-full border p-2 rounded outline-none text-sm">
+                </div>
+
+                <div class="pt-4 flex justify-end gap-3 border-t">
+                    <button onclick="closeEditModal()"
+                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm">Cancel</button>
+                    <button onclick="submitEdit()"
+                        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium">Save
+                        Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDate = new Date(); // Defaults to today
+        let allTrips = [];
+        let STORE_DB = []; // For search
+        let isAdmin = false;
+
+        window.onload = function () {
+            setTimeout(function () {
+                if (window.checkAuth) window.checkAuth();
+                // Load calendar if user is already known
+                const user = localStorage.getItem('app_user_data');
+                if (user) {
+                    CURRENT_USER = JSON.parse(user);
+                    loadCalendar();
+                }
+            }, 500);
+        };
+
+        function loadCalendar() {
+            const userEmail = CURRENT_USER ? CURRENT_USER.email : '';
+            console.log("Loading calendar for:", userEmail);
+
+            google.script.run
+                .withSuccessHandler(function (data) {
+                    document.getElementById('loading').classList.add('hidden');
+                    console.log("Data received", data);
+
+                    // Handle data structure (Report format: { orders: [], ... })
+                    if (data.orders) {
+                        allTrips = data.orders;
+                        isAdmin = data.isAdmin || false;
+                        STORE_DB = data.storeDb || []; // If passed from backend
+                    } else if (data.trips) {
+                        allTrips = data.trips;
+                        isAdmin = data.isAdmin || false;
+                    } else if (Array.isArray(data)) {
+                        allTrips = data;
+                    } else {
+                        allTrips = [];
+                    }
+
+                    // Preload store data if not passed in main object to enable search immediately
+                    if (!STORE_DB || STORE_DB.length === 0) {
+                        google.script.run.withSuccessHandler(db => {
+                            STORE_DB = db;
+                            console.log("Store DB loaded async:", db.length);
+                        }).getStoreDBDataForFrontend();
+                    }
+
+                    populateFilterOptions();
+                    renderCalendar();
+                })
+                .withFailureHandler(function (err) {
+                    document.getElementById('loading').classList.add('hidden');
+                    alert('Error loading trips: ' + err);
+                })
+                .getAllTripPlansForCalendar(userEmail);
+        }
+
+        function populateFilterOptions() {
+            const getUnique = (prop) => [...new Set(allTrips.map(o => o[prop]).filter(Boolean))].sort();
+            const fillSelect = (id, items) => {
+                const el = document.getElementById(id);
+                const first = el.firstElementChild;
+                el.innerHTML = '';
+                el.appendChild(first);
+                items.forEach(i => {
+                    const opt = document.createElement('option');
+                    opt.value = i; opt.textContent = i;
+                    el.appendChild(opt);
+                });
+            };
+            fillSelect('filterName', getUnique('empName'));
+            fillSelect('filterDept', getUnique('department'));
+        }
+
+        // Navigation: Jump by Week
+        function changeWeek(direction) {
+            currentDate.setDate(currentDate.getDate() + (direction * 7));
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            // 1. Calculate Start and End of Current Week (Sunday - Saturday)
+            const startOfWeek = new Date(currentDate);
+            startOfWeek.setDate(currentDate.getDate() - currentDate.getDay()); // Go to Sunday
+
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6); // Go to Saturday
+
+            // 2. Update Header
+            const options = { month: 'short', day: 'numeric' };
+            const yearStr = (startOfWeek.getFullYear() === endOfWeek.getFullYear()) ? startOfWeek.getFullYear() : `${startOfWeek.getFullYear()} - ${endOfWeek.getFullYear()}`;
+            document.getElementById('monthYear').textContent =
+                `${startOfWeek.toLocaleDateString('en-US', options)} - ${endOfWeek.toLocaleDateString('en-US', options)}, ${yearStr}`;
+
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+
+            // 3. Filter Trips
+            const statusFilter = document.getElementById('filterStatus').value;
+            const nameFilter = document.getElementById('filterName').value.toLowerCase();
+            const deptFilter = document.getElementById('filterDept').value.toLowerCase();
+
+            const filteredTrips = allTrips.filter(t => {
+                if (statusFilter !== 'All') {
+                    if (statusFilter === 'Pending' && t.status !== 'Pending') return false;
+                    if (statusFilter === 'Waiting Approval' && t.status !== 'Waiting Approval') return false;
+                    if (statusFilter === 'Closed' && (t.status !== 'Closed' && t.status !== 'Approved')) return false;
+                    if (statusFilter === 'Rejected' && t.status !== 'Rejected') return false;
+                }
+                if (nameFilter && String(t.empName).toLowerCase() !== nameFilter) return false;
+                if (deptFilter && String(t.department).toLowerCase() !== deptFilter) return false;
+                return true;
+            });
+
+            // 4. Render 7 Columns (Weekly Grid)
+            const today = new Date();
+            const loopDate = new Date(startOfWeek);
+
+            for (let i = 0; i < 7; i++) {
+                const cell = document.createElement('div');
+                // Check if Today
+                const isToday = today.getDate() === loopDate.getDate() &&
+                    today.getMonth() === loopDate.getMonth() &&
+                    today.getFullYear() === loopDate.getFullYear();
+
+                cell.className = `calendar-cell border border-gray-200 rounded-lg p-2 min-h-[150px] ${isToday ? 'bg-blue-50 border-blue-200' : 'bg-white'}`;
+
+                // Date Label
+                const dateStr = loopDate.toLocaleDateString('en-CA'); // YYYY-MM-DD
+                const dayNum = document.createElement('div');
+                dayNum.className = `font-bold text-gray-700 mb-2 text-right ${isToday ? 'text-blue-600' : ''}`;
+                dayNum.textContent = loopDate.getDate(); // Just the number
+                cell.appendChild(dayNum);
+
+                // Find trips for this specific day
+                const tripsForDay = filteredTrips.filter(trip => {
+                    // Robust Date Parsing (Handle 'T' or space separator)
+                    let sDate = trip.startDate ? trip.startDate.split(' ')[0].split('T')[0] : null;
+                    let eDate = trip.deadline ? trip.deadline.split(' ')[0].split('T')[0] : null;
+
+                    if (!sDate && !eDate) return false;
+                    // Match if date falls within trip range via start or deadline
+                    return sDate === dateStr || (!sDate && eDate === dateStr);
+                });
+
+                // Render Badges
+                tripsForDay.forEach(trip => {
+                    const badge = document.createElement('div');
+
+                    // --- Coloring Logic (Thai Work Types) ---
+                    let bgColor = 'bg-gray-100 border-gray-200 text-gray-800'; // Default
+                    const wt = (trip.workType || trip.type || '').toLowerCase();
+
+                    if (wt.includes('ตรวจสอบสถานที่')) bgColor = 'bg-purple-100 border-purple-200 text-purple-800';
+                    else if (wt.includes('บำรุงรักษาและซ่อมแซม') || wt.includes('mainten')) bgColor = 'bg-blue-100 border-blue-200 text-blue-800';
+                    else if (wt.includes('กำกับการก่อสร้าง') || wt.includes('construct')) bgColor = 'bg-orange-100 border-orange-200 text-orange-800';
+                    else if (wt.includes('ประชุมผู้ขาย') || wt.includes('meeting')) bgColor = 'bg-pink-100 border-pink-200 text-pink-800';
+                    else if (wt.includes('ตรวจสอบทรัพย์สิน') || wt.includes('asset')) bgColor = 'bg-teal-100 border-teal-200 text-teal-800';
+
+                    // --- Priority Dot ---
+                    let dotColor = 'bg-gray-400';
+                    if (trip.priority === 'High') dotColor = 'bg-red-500';
+                    else if (trip.priority === 'Medium') dotColor = 'bg-yellow-500';
+                    else if (trip.priority === 'Low') dotColor = 'bg-green-500';
+                    else if (trip.priority === 'Critical') dotColor = 'bg-red-700';
+
+                    // --- Abroad Check ---
+                    const isAbroad = (trip.checkInStatus || '').toLowerCase().includes('abroad');
+                    const abroadIcon = isAbroad ? '<span class="mr-1">✈️</span>' : '';
+
+                    // --- Label Construction: [Nickname] [Station] ---
+                    // Fallback to name if nickname missing
+                    const nick = trip.empNickname || (trip.empName ? trip.empName.split(' ')[0] : 'Unk');
+                    const station = trip.station || '-';
+                    const label = `${nick} ${station}`;
+
+                    badge.className = `mb-1 p-1.5 rounded border text-[10px] shadow-sm cursor-pointer hover:shadow-md transition flex items-center gap-1 ${bgColor}`;
+                    badge.innerHTML = `
+                        <div class="w-1.5 h-1.5 rounded-full ${dotColor} flex-shrink-0"></div>
+                        <div class="truncate font-medium leading-tight">${abroadIcon}${label}</div>
+                    `;
+
+                    badge.title = `${trip.project} | ${trip.empName} | ${trip.status}`;
+                    badge.onclick = (e) => {
+                        e.stopPropagation();
+                        showTripDetails(trip);
+                    };
+
+                    cell.appendChild(badge);
+                });
+
+                grid.appendChild(cell);
+
+                // Next day
+                loopDate.setDate(loopDate.getDate() + 1);
+            }
+        }
+
+        function showTripDetails(trip) {
+            const modal = document.getElementById('tripModal');
+            const content = document.getElementById('tripModalContent');
+
+            const priorityColors = {
+                'High': 'bg-red-100 text-red-800 border-red-200',
+                'Medium': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                'Low': 'bg-green-100 text-green-800 border-green-200',
+                'Critical': 'bg-red-200 text-red-900 border-red-300'
+            };
+
+            const statusColors = {
+                'Pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+                'Approved': 'bg-blue-100 text-blue-800 border-blue-200',
+                'Closed': 'bg-green-100 text-green-800 border-green-200',
+                'Waiting Approval': 'bg-purple-100 text-purple-800 border-purple-200',
+                'Rejected': 'bg-red-100 text-red-800 border-red-200'
+            };
+
+            // --- Action Buttons ---
+            let actionHtml = `<div class="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-100">`;
+
+            // 1. Edit/Delete (Admin)
+            if (isAdmin) {
+                actionHtml += `
+                     <button onclick='openEditModal(${JSON.stringify(trip).replace(/'/g, "&#39;")})' class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium transition">
+                         Edit
+                     </button>
+                     <button onclick="handleDelete('${trip.id}')" class="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-sm font-medium transition">
+                         Delete
+                     </button>
+                 `;
+            }
+
+            // 2. Approve/Reject (If allowed)
+            if ((trip.status === 'Waiting Approval' || trip.status === 'Pending') && trip.canApprove) {
+                actionHtml += `
+                    <button onclick="handleReject('${trip.id}')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-sm font-medium transition flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        Reject
+                    </button>
+                    <button onclick="handleApprove('${trip.id}')" class="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm font-medium transition flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Approve
+                    </button>
+                `;
+            }
+            actionHtml += `</div>`;
+
+            let attHtml = '';
+            if (trip.evidence) attHtml += `<a href="${trip.evidence}" target="_blank" class="text-xs text-blue-600 underline block mt-1">View Evidence</a>`;
+            if (trip.creationAttachment) attHtml += `<a href="${trip.creationAttachment}" target="_blank" class="text-xs text-blue-600 underline block mt-1">View Attachment</a>`;
+
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-start justify-between">
+                         <div>
+                            <div class="mb-2">
+                                <span class="px-2 py-1 rounded text-xs font-bold border ${trip.workType.includes('บำรุงรักษา') ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-gray-100 text-gray-800 border-gray-200'}">
+                                    ${trip.workType || trip.type || 'General'}
+                                </span>
+                            </div>
+                            <div class="text-[10px] text-gray-400 font-mono mb-1">ID: ${trip.id}</div>
+                            <h4 class="text-lg font-bold text-gray-800 mb-1 leading-tight">${trip.project || 'No Title'}</h4>
+                            <p class="text-sm text-gray-600 whitespace-pre-wrap">${trip.details || '-'}</p>
+                            ${attHtml}
+                        </div>
+                        <div class="flex flex-col gap-2 items-end min-w-[120px]">
+                            <span class="px-3 py-1 rounded-md text-xs font-bold border ${priorityColors[trip.priority] || 'bg-gray-100 text-gray-800 border-gray-200'}">
+                                ${trip.priority || 'Medium'} Priority
+                            </span>
+                            <span class="px-3 py-1 rounded-md text-xs font-bold border ${statusColors[trip.status] || 'bg-gray-100 text-gray-800 border-gray-200'}">
+                                ${trip.status}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-3 pt-3 border-t">
+                        <div>
+                            <span class="block text-xs font-bold text-gray-500 uppercase mb-0.5">Employee</span>
+                            <p class="text-sm text-gray-800 font-medium">${trip.empName || trip.empId || '-'}</p>
+                        </div>
+                        <div>
+                            <span class="block text-xs font-bold text-gray-500 uppercase mb-0.5">Department</span>
+                            <p class="text-sm text-gray-800">${trip.department || '-'}</p>
+                        </div>
+                        <div class="col-span-2">
+                             <span class="block text-xs font-bold text-gray-500 uppercase mb-0.5">Destination</span>
+                             <p class="text-sm text-gray-800 font-medium">${trip.station || '-'}</p>
+                             ${trip.address ? `<p class="text-xs text-gray-500 mt-0.5">${trip.address}</p>` : ''}
+                             ${trip.province ? `<span class="inline-block px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded mt-1">${trip.province}</span>` : ''}
+                              ${trip.gps ? `<a href="https://maps.google.com/?q=${trip.gps}" target="_blank" class="text-xs text-blue-500 hover:underline ml-2">📍 Map</a>` : ''}
+                        </div>
+                        <div>
+                            <span class="block text-xs font-bold text-gray-500 uppercase mb-0.5">Start Date</span>
+                            <p class="text-sm text-gray-800">${trip.startDate ? new Date(trip.startDate).toLocaleString() : '-'}</p>
+                        </div>
+                        <div>
+                            <span class="block text-xs font-bold text-gray-500 uppercase mb-0.5">Deadline/End</span>
+                            <p class="text-sm text-gray-800">${trip.deadline ? new Date(trip.deadline).toLocaleString() : '-'}</p>
+                        </div>
+                         
+                         ${trip.checkInStatus ? `
+                         <div class="col-span-2 bg-gray-50 p-2 rounded border border-gray-100">
+                             <span class="block text-xs font-bold text-gray-500 uppercase mb-1">Check-in Info</span>
+                             <div class="flex justify-between items-center">
+                                 <span class="font-bold ${trip.checkInStatus === 'Verified' ? 'text-green-600' : 'text-orange-600'} text-sm">${trip.checkInStatus}</span>
+                                 <div class="text-right">
+                                     <div class="text-xs text-gray-600">${trip.checkInTime || '-'}</div>
+                                     ${trip.checkInDistance ? `<div class="text-[10px] text-gray-400">Dist: ${trip.checkInDistance}</div>` : ''}
+                                 </div>
+                             </div>
+                         </div>
+                         ` : ''}
+
+                        ${trip.approvedBy ? `
+                        <div class="col-span-2 pt-2 border-t mt-1">
+                            <span class="block text-xs font-bold text-green-700 uppercase mb-0.5">Approved By</span>
+                            <p class="text-sm text-green-800">${trip.approvedBy}</p>
+                            ${trip.approvalDate ? `<p class="text-xs text-green-600">${new Date(trip.approvalDate).toLocaleString()}</p>` : ''}
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Site Visits Section -->
+                    <div id="siteVisitSection-${trip.id}" class="mt-4 pt-4 border-t border-gray-100">
+                        <div class="text-sm text-gray-500">Loading site visit data...</div>
+                    </div>
+                    
+                    <!-- Comments Section -->
+                    <div class="mt-6 pt-4 border-t border-gray-100">
+                        <h4 class="text-sm font-bold text-gray-800 uppercase mb-3">Comments & Attachments</h4>
+                        
+                        <!-- List -->
+                        <div id="commentsList-${trip.id}" class="space-y-3 mb-4 max-h-40 overflow-y-auto pr-1">
+                            <div class="text-center text-gray-400 text-xs py-2">Loading comments...</div>
+                        </div>
+
+                        <!-- Input (Restricted) -->
+                        ${(function () {
+                    // Permission Check: Admin OR Approver OR Owner
+                    const myEmail = (CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email.toLowerCase() : '';
+                    const ownerEmail = (trip.empEmail || '').toLowerCase();
+                    const isOwner = myEmail && ownerEmail && (myEmail === ownerEmail);
+                    const canComment = isAdmin || trip.canApprove || isOwner;
+
+                    if (canComment) {
+                        return `
+                                 <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                     <textarea id="commentText-${trip.id}" rows="2" class="w-full text-sm border-gray-300 rounded p-2 focus:ring-1 focus:ring-blue-500 outline-none resize-none" placeholder="Write a comment..."></textarea>
+                                     <div class="flex items-center justify-between mt-2">
+                                         <input type="file" id="commentFile-${trip.id}" multiple class="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                         <button id="postBtn-${trip.id}" onclick="handlePostComment('${trip.id}')" class="px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition">Post</button>
+                                     </div>
+                                 </div>`;
+                    } else {
+                        return `<div class="text-xs text-gray-500 italic text-center py-2">Comments are closed or restricted.</div>`;
+                    }
+                })()}
+                    </div>
+                    
+                    ${actionHtml}
+                </div>
+            `;
+
+            loadTripComments(trip.id);
+            
+            // Load site visits
+            const empId = trip.empId;
+            const station = trip.station;
+            const tripDate = trip.startDate;
+
+            console.log('Loading site visits for:', { empId, station, tripDate });
+
+            if (empId && station) {
+                // Add timeout for the request
+                const timeoutId = setTimeout(function() {
+                    const siteVisitSection = document.getElementById('siteVisitSection-' + trip.id);
+                    if (siteVisitSection && siteVisitSection.innerHTML.includes('Loading')) {
+                        siteVisitSection.innerHTML = `<div class="text-sm text-orange-600">Site visit lookup timed out. The server may be busy.</div>`;
+                    }
+                }, 15000); // 15 second timeout
+
+                google.script.run
+                    .withSuccessHandler(function(result) {
+                        clearTimeout(timeoutId);
+                        console.log('Site visits result:', result);
+                        const siteVisitSection = document.getElementById('siteVisitSection-' + trip.id);
+                        
+                        if (!siteVisitSection) {
+                            console.warn('Site visit section not found for trip:', trip.id);
+                            return; // Modal might be closed
+                        }
+                        
+                        // Check for errors
+                        if (result && result.error) {
+                            siteVisitSection.innerHTML = `<div class="text-sm text-red-600">Error: ${result.error}</div>`;
+                            return;
+                        }
+                        
+                        // Check if we have visits
+                        const visits = result && result.visits ? result.visits : [];
+                        const count = result && result.count ? result.count : visits.length;
+                        
+                        if (count === 0 || visits.length === 0) {
+                            siteVisitSection.innerHTML = `
+                                <div class="text-sm font-bold text-gray-700 uppercase mb-2">📋 Site Visits</div>
+                                <div class="text-sm text-gray-500 italic">No site visits found for this trip plan.</div>
+                            `;
+                            return;
+                        }
+                        
+                        // Build site visits display
+                        let visitsHtml = '<div class="text-sm font-bold text-gray-700 uppercase mb-3">📋 Site Visits (' + count + ')</div>';
+                        
+                        visits.forEach(function(visit) {
+                            const statusBadge = visit.status ? `<span class="px-2 py-1 text-xs rounded ${
+                                visit.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                visit.status === 'In Progress' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-700'
+                            }">${visit.status}</span>` : '';
+                            
+                            visitsHtml += `
+                                <div class="mb-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <span class="text-sm font-semibold text-green-700">Site Visit Completed</span>
+                                        ${statusBadge}
+                                    </div>
+                                    <div class="space-y-1 text-sm text-gray-700 pl-7">
+                                        <div><strong>ID:</strong> ${visit.id || 'N/A'}</div>
+                                        <div><strong>Date:</strong> ${visit.visitDateFormatted || visit.visitDate || 'N/A'}</div>
+                                        <div><strong>Objective:</strong> ${visit.objective || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        siteVisitSection.innerHTML = visitsHtml;
+                    })
+                    .withFailureHandler(function(error) {
+                        clearTimeout(timeoutId);
+                        console.error('Site visits error:', error);
+                        const siteVisitSection = document.getElementById('siteVisitSection-' + trip.id);
+                        if (siteVisitSection) {
+                            siteVisitSection.innerHTML = `<div class="text-sm text-red-600">Failed: ${error.message || error}</div>`;
+                        }
+                    })
+                    .getSiteVisitsForTripPlan(empId, station, tripDate);
+            } else {
+                console.log('Missing data for site visit lookup:', { empId, station });
+                const siteVisitSection = document.getElementById('siteVisitSection-' + trip.id);
+                if (siteVisitSection) {
+                    siteVisitSection.innerHTML = `<div class="text-sm text-gray-500 italic">Missing employee or station data for lookup.</div>`;
+                }
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeTripModal() {
+            document.getElementById('tripModal').classList.add('hidden');
+        }
+
+        // --- ACTION HANDLERS ---
+
+        function handleApprove(id) {
+            const rating = prompt("Rating (1-5):", "5");
+            if (!rating) return;
+            if (!confirm('Are you sure you want to approve this trip plan?')) return;
+
+            const btn = event.currentTarget;
+            btn.textContent = '...'; btn.disabled = true;
+
+            const approverName = CURRENT_USER?.name || CURRENT_USER?.email;
+            const userEmail = CURRENT_USER?.email;
+
+            google.script.run.withSuccessHandler(res => {
+                if (res.success) {
+                    alert('Approved!');
+                    closeTripModal();
+                    loadCalendar(); // Reload
+                } else {
+                    alert(res.error);
+                    btn.disabled = false; btn.textContent = 'Approve';
+                }
+            }).approveTripPlan(id, approverName, rating, userEmail);
+        }
+
+        function handleReject(id) {
+            const reason = prompt('Rejection Reason:');
+            if (reason === null) return;
+
+            const btn = event.currentTarget;
+            btn.textContent = '...'; btn.disabled = true;
+
+            const rejectorName = CURRENT_USER?.name || CURRENT_USER?.email;
+            const userEmail = CURRENT_USER?.email;
+
+            google.script.run.withSuccessHandler(res => {
+                if (res.success) {
+                    alert('Rejected!');
+                    closeTripModal();
+                    loadCalendar();
+                } else {
+                    alert(res.error);
+                    btn.disabled = false; btn.textContent = 'Reject';
+                }
+            }).rejectTripPlan(id, rejectorName, reason || '', userEmail);
+        }
+
+        function handleDelete(id) {
+            if (!confirm('Are you sure you want to DELETE this trip plan? This cannot be undone.')) return;
+            const userEmail = CURRENT_USER?.email;
+
+            google.script.run.withSuccessHandler(res => {
+                if (res.success) {
+                    alert('Deleted!');
+                    closeTripModal();
+                    loadCalendar();
+                } else {
+                    alert('Error: ' + res.error);
+                }
+            }).deleteTripPlan(id, userEmail);
+        }
+
+        // --- EDIT MODAL LOGIC ---
+        // --- EDIT MODAL LOGIC ---
+
+        function openEditModal(order) {
+            closeTripModal(); // Close details modal first
+
+            // Populate Fields
+            document.getElementById('editOrderId').value = order.id;
+            document.getElementById('editProject').value = order.project || '';
+            document.getElementById('editDetails').value = order.details || '';
+            document.getElementById('editStation').value = order.station || '';
+
+            document.getElementById('editWorkType').value = order.workType || order.type || '';
+            document.getElementById('editContract').value = order.contract || '';
+            document.getElementById('editVendor').value = order.vendor || '';
+            document.getElementById('editDistance').value = order.estimatedDistance || '';
+            document.getElementById('editWorkDoc').value = order.workDocNumber || '';
+            document.getElementById('editNotifyEmail').value = order.additionalEmail || '';
+
+            document.getElementById('editPriority').value = order.priority || 'Medium';
+            document.getElementById('editStatus').value = order.status || 'Pending';
+
+            if (order.rating) {
+                document.getElementById('editRatingWrapper').classList.remove('hidden');
+                document.getElementById('editRating').value = order.rating;
+            } else {
+                document.getElementById('editRatingWrapper').classList.add('hidden');
+            }
+
+            // Dates - Use datetime-local format (YYYY-MM-DDTHH:mm)
+            const formatForInput = (dStr) => {
+                if (!dStr) return '';
+                // Try to parse format: yyyy-MM-dd HH:mm
+                // If it's already ISO, just slice. If custom format, reformat.
+                let d = new Date(dStr);
+                if (isNaN(d.getTime())) return dStr.replace(' ', 'T'); // Fallback
+
+                // Adjust for timezone offset to keep local time
+                const offset = d.getTimezoneOffset() * 60000;
+                return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+            };
+
+            document.getElementById('editStart').value = formatForInput(order.startDate);
+            document.getElementById('editEnd').value = formatForInput(order.deadline);
+
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        function submitEdit() {
+            const id = document.getElementById('editOrderId').value;
+
+            // Gather Form Data
+            const form = {
+                id: id,
+                project: document.getElementById('editProject').value,
+                details: document.getElementById('editDetails').value, // Category
+                workType: document.getElementById('editWorkType').value,
+                station: document.getElementById('editStation').value,
+                contract: document.getElementById('editContract').value,
+                vendor: document.getElementById('editVendor').value,
+                estimatedDistance: document.getElementById('editDistance').value,
+                workDocNumber: document.getElementById('editWorkDoc').value,
+                additionalEmail: document.getElementById('editNotifyEmail').value,
+                priority: document.getElementById('editPriority').value,
+                status: document.getElementById('editStatus').value,
+                startDate: document.getElementById('editStart').value, // valueAsNumber would differ
+                deadline: document.getElementById('editEnd').value,
+                rating: document.getElementById('editRating').value
+            };
+
+            const btn = event.currentTarget;
+            btn.textContent = 'Saving...'; btn.disabled = true;
+
+            const userEmail = CURRENT_USER?.email;
+
+            google.script.run.withSuccessHandler(res => {
+                btn.disabled = false; btn.textContent = 'Save Changes';
+                if (res.success) {
+                    alert('Updated successfully!');
+                    closeEditModal();
+                    loadCalendar();
+                } else {
+                    alert(res.error);
+                }
+            }).updateTripPlan(form, userEmail);
+        }
+
+        // --- Store Search Logic ---
+        function handleStationInput(input) {
+            const val = input.value.toLowerCase();
+            const list = document.getElementById('station-list-edit');
+            list.innerHTML = '';
+
+            if (val.length < 2) return;
+
+            // Use global STORE_DB if available
+            if (!STORE_DB || STORE_DB.length === 0) return;
+
+            // Filter
+            const matches = STORE_DB.filter(s =>
+                (s.station && s.station.toLowerCase().includes(val)) ||
+                (s.id && String(s.id).includes(val))
+            ).slice(0, 10); // Limit to 10
+
+            matches.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.station; // Use the pre-formatted station string
+                list.appendChild(opt);
+            });
+        }
+
+        // --- Comment Functions ---
+
+        function loadTripComments(tripId) {
+            const list = document.getElementById(`commentsList-${tripId}`);
+            if (!list) return;
+
+            list.innerHTML = '<div class="text-xs text-gray-400 text-center py-2">Loading comments...</div>';
+
+            google.script.run
+                .withSuccessHandler(function (comments) {
+                    list.innerHTML = '';
+                    if (!comments || comments.length === 0) {
+                        list.innerHTML = '<div class="text-sm text-gray-500 text-center py-4 italic">No comments yet.</div>';
+
+                        // Debug tunnel removed as per request
+                        return;
+                    }
+
+                    // Sort again client-side just in case
+                    comments.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                    comments.forEach(c => {
+                        const isMe = (CURRENT_USER && c.user && CURRENT_USER.email && c.user.toLowerCase() === CURRENT_USER.email.toLowerCase());
+                        const alignClass = isMe ? 'items-end' : 'items-start';
+                        const bgClass = isMe ? 'bg-blue-50 border-blue-100' : 'bg-white border-gray-100';
+                        const userDisplay = isMe ? 'You' : (c.user.split('@')[0]);
+
+                        let dateStr = "";
+                        try {
+                            const d = new Date(c.timestamp);
+                            if (!isNaN(d.getTime())) {
+                                dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            } else {
+                                dateStr = "Just now";
+                            }
+                        } catch (e) { dateStr = ""; }
+
+                        let attachmentHtml = '';
+                        if (c.fileUrl) {
+                            // Handle multiple files (split by newline)
+                            const urls = c.fileUrl.split('\n');
+                            const names = (c.fileName || '').split('\n');
+
+                            urls.forEach((url, idx) => {
+                                url = url.trim();
+                                if (!url) return;
+                                const name = (names[idx] || 'Attachment').trim();
+                                const isImg = url.indexOf('drive.google.com/thumbnail') > -1;
+
+                                if (isImg) {
+                                    attachmentHtml += `<div class="mt-1"><a href="${url.replace('thumbnail', 'view')}" target="_blank"><img src="${url}" class="h-16 rounded border border-gray-200 hover:opacity-80 transition"></a></div>`;
+                                } else {
+                                    attachmentHtml += `<div class="mt-1"><a href="${url}" target="_blank" class="text-blue-600 hover:underline text-xs flex items-center gap-1">📎 ${name}</a></div>`;
+                                }
+                            });
+                        }
+
+                        const html = `
+                        <div class="flex flex-col ${alignClass} mb-2">
+                             <div class="${bgClass} border rounded p-2 max-w-[90%] text-sm shadow-sm">
+                                 <div class="flex justify-between items-baseline gap-2 mb-1">
+                                     <span class="font-bold text-xs text-gray-700">${userDisplay}</span>
+                                     <span class="text-[10px] text-gray-400">${dateStr}</span>
+                                 </div>
+                                 <div class="text-gray-800 whitespace-pre-wrap leading-snug">${c.text}</div>
+                                 ${attachmentHtml}
+                             </div>
+                        </div>`;
+                        list.insertAdjacentHTML('beforeend', html);
+                    });
+                })
+                .withFailureHandler(function (err) {
+                    list.innerHTML = `<div class="text-xs text-red-500 text-center py-2">Error loading comments: ${err}</div>`;
+                })
+                .getTripComments(tripId);
+        }
+
+        function handlePostComment(tripId) {
+            const textEl = document.getElementById(`commentText-${tripId}`);
+            const fileEl = document.getElementById(`commentFile-${tripId}`);
+            const btn = document.getElementById(`postBtn-${tripId}`);
+
+            const text = textEl.value.trim();
+            const files = fileEl.files;
+
+            if (!text && files.length === 0) {
+                alert("Please enter a comment or select a file.");
+                return;
+            }
+
+            // UI Loading State
+            const originalBtnText = btn.textContent;
+            btn.textContent = "Posting...";
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            // User Email & Name
+            const userEmail = CURRENT_USER ? CURRENT_USER.email : 'Unknown';
+            const userName = CURRENT_USER ? CURRENT_USER.name : userEmail.split('@')[0];
+
+            // Helper to actually send
+            const sendReq = (filesData) => {
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        btn.textContent = originalBtnText;
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50');
+
+                        if (res && res.success) {
+                            textEl.value = '';
+                            fileEl.value = '';
+                            loadTripComments(tripId); // Reload list
+                        } else {
+                            alert("Failed to post: " + (res.error || 'Unknown error'));
+                        }
+                    })
+                    .withFailureHandler(function (err) {
+                        btn.textContent = originalBtnText;
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50');
+                        alert("Error: " + err);
+                    })
+                    .addTripComment(tripId, text, filesData, userEmail, userName);
+            };
+
+            if (files.length > 0) {
+                // Sequential Upload Helper
+                const uploadSequentially = async () => {
+                    const uploaded = [];
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        btn.textContent = `Uploading ${i + 1}/${files.length}...`;
+
+                        try {
+                            // 1. Resize/Read
+                            let fileData = null;
+                            try {
+                                fileData = await resizeImage(file);
+                            } catch (resizeErr) {
+                                console.error("Resize error", resizeErr);
+                                alert("Error processing file " + file.name);
+                                throw resizeErr;
+                            }
+
+                            // Check size (approx 10MB limit for safe Apps Script calls)
+                            if (fileData.data.length > 15000000) { // ~11MB base64
+                                if (!confirm(`File "${file.name}" is very large and may fail to upload. Try anyway?`)) {
+                                    continue;
+                                }
+                            }
+
+                            // 2. Upload individual file
+                            const result = await new Promise((resolve, reject) => {
+                                google.script.run
+                                    .withSuccessHandler(resolve)
+                                    .withFailureHandler(reject)
+                                    .uploadTripAttachment(fileData);
+                            });
+
+                            if (result && result.success) {
+                                uploaded.push({ url: result.url, name: result.name });
+                            } else {
+                                console.error("Upload failed for " + file.name, result);
+                                if (!confirm(`Failed to upload "${file.name}". Continue with other files?`)) {
+                                    throw new Error("Upload cancelled by user.");
+                                }
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            // Alert is shown in inner catch or confirm
+                            throw e;
+                        }
+                    }
+                    return uploaded;
+                };
+
+                uploadSequentially()
+                    .then(uploadedFiles => {
+                        btn.textContent = "Finalizing...";
+                        sendReq(uploadedFiles);
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        btn.disabled = false;
+                        btn.textContent = originalBtnText;
+                        btn.classList.remove('opacity-50');
+                        alert("Upload Error: " + err);
+                    });
+            } else {
+                sendReq([]);
+            }
+        }
+
+        // --- Image Optimization Helper ---
+        function resizeImage(file, maxWidth = 1000, maxHeight = 1000, quality = 0.7) {
+            return new Promise((resolve, reject) => {
+                // If not an image, resolve with original file data (base64)
+                if (file.type.indexOf('image') === -1) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        resolve({
+                            name: file.name,
+                            mimeType: file.type,
+                            data: e.target.result.split(',')[1]
+                        });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                    return;
+                }
+
+                // If Image -> Resize
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = function (event) {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = function () {
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > maxWidth) {
+                                height *= maxWidth / width;
+                                width = maxWidth;
+                            }
+                        } else {
+                            if (height > maxHeight) {
+                                width *= maxHeight / height;
+                                height = maxHeight;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                        resolve({
+                            data: dataUrl.split(',')[1],
+                            mimeType: 'image/jpeg',
+                            name: file.name.replace(/\.[^/.]+$/, "") + ".jpg"
+                        });
+                    };
+                    img.onerror = reject;
+                };
+                reader.onerror = reject;
+            });
+        }
+    </script>
+
+
+    <!-- Add Trip Modal -->
+    <div id="addTripModal"
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h3 class="text-xl font-bold text-gray-800">Create New Trip Plan</h3>
+                <button onclick="closeAddTripModal()" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="p-6">
+                <form id="addTripForm" onsubmit="handleAddTripSubmit(event)" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">มอบหมายให้ (Assign To)</label>
+                        <select name="empId"
+                            class="emp-select w-full border p-2 rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            required>
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ประเภทงาน (Work Type)</label>
+                            <select name="workType"
+                                class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="">-- เลือกประเภท --</option>
+                                <option value="Site Inspection">ตรวจสอบสถานที่</option>
+                                <option value="Maintenance & Repair">บำรุงรักษาและซ่อมแซม</option>
+                                <option value="Construction Supervision">กำกับการก่อสร้าง</option>
+                                <option value="Vendor Meeting">ประชุมผู้ขาย</option>
+                                <option value="Asset Audit">ตรวจสอบทรัพย์สิน</option>
+                                <option value="Other">อื่นๆ</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">วัตถุประสงค์ (Purpose)</label>
+                            <select name="details"
+                                class="input-field w-full border p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                required>
+                                <option value="">-- Select Purpose --</option>
+                                <option value="ACT - Air Condition">ACT - Air Condition</option>
+                                <option value="ADR - Auto Door">ADR - Auto Door</option>
+                                <option value="BLD - Building">BLD - Building</option>
+                                <option value="CTS - CCTV & Sound">CTS - CCTV & Sound</option>
+                                <option value="ELC - Electrical">ELC - Electrical</option>
+                                <option value="FFE - Furniture & Fixture">FFE - Furniture & Fixture</option>
+                                <option value="FHW - Fresh Food Hot Water">FHW - Fresh Food Hot Water</option>
+                                <option value="FNT - Furniture">FNT - Furniture</option>
+                                <option value="IMK - Ice Maker">IMK - Ice Maker</option>
+                                <option value="PCT - Pest Control">PCT - Pest Control</option>
+                                <option value="RFT - Refrigeration">RFT - Refrigeration</option>
+                                <option value="SAN - Sanitary">SAN - Sanitary</option>
+                                <option value="SEM - Small Equipment">SEM - Small Equipment</option>
+                                <option value="SFB - Safe Box">SFB - Safe Box</option>
+                                <option value="General Inspection">General Inspection</option>
+                                <option value="Preventive Maintenance">Preventive Maintenance</option>
+                                <option value="Emergency Repair">Emergency Repair</option>
+                                <option value="Renovation Check">Renovation Check</option>
+                                <option value="New Store Setup">New Store Setup</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">รายละเอียดงาน (Project/Task)</label>
+                        <input type="text" name="project"
+                            class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            required placeholder="เช่น เยี่ยมสาขา">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ระยะทางโดยประมาณ (กม.)</label>
+                            <input type="number" name="estimatedDistance"
+                                class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="0.00">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">สาขา (Station)</label>
+                            <input type="text" name="station" list="add-trip-station-list"
+                                class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="ค้นหาสาขา..." oninput="handleStationInput(this)">
+                            <datalist id="add-trip-station-list"></datalist>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">สัญญา (Contract)</label>
+                            <input type="text" name="contract"
+                                class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="ระบุสัญญา">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ผู้ขาย (Vendor)</label>
+                            <input type="text" name="vendor"
+                                class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="ระบุผู้ขาย">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ความสำคัญ (Priority)</label>
+                            <select name="priority"
+                                class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="Medium">ปานกลาง</option>
+                                <option value="High">สูง</option>
+                                <option value="Low">ต่ำ</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">วันและเวลาเริ่มต้น</label>
+                            <input type="datetime-local" name="startDate"
+                                class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">วันและเวลาสิ้นสุด</label>
+                            <input type="datetime-local" name="deadline"
+                                class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">อีเมลแจ้งเตือนเพิ่มเติม
+                            (Optional)</label>
+                        <input type="email" name="additionalEmail"
+                            class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="notify@example.com">
+                    </div>
+
+                    <div class="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="addTripEmailToggle" class="sr-only peer">
+                            <div
+                                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500">
+                            </div>
+                        </label>
+                        <span class="text-sm font-medium text-gray-700">Send Email Notification for this Trip
+                            Plan</span>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">การลา (Leave Options)</label>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="isCompensatory"
+                                    class="form-checkbox text-blue-600 rounded">
+                                <span class="ml-2 text-sm text-gray-700">หยุดชดเชย (Compensatory)</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="isPersonalLeave"
+                                    class="form-checkbox text-blue-600 rounded">
+                                <span class="ml-2 text-sm text-gray-700">ลากิจ (Personal Leave)</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="isSickLeave" class="form-checkbox text-blue-600 rounded">
+                                <span class="ml-2 text-sm text-gray-700">ลาป่วย (Sick Leave)</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" name="isAnnualLeave" class="form-checkbox text-blue-600 rounded">
+                                <span class="ml-2 text-sm text-gray-700">ลาพักร้อน (Annual Leave)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">เลขที่เอกสารงาน (Work Doc
+                            No.)</label>
+                        <input type="text" name="workDocNumber"
+                            class="input-field w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="เช่น DOC-2025-001">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ไฟล์แนบ (ไม่บังคับ -
+                            รูปภาพ/ไฟล์)</label>
+                        <input type="file" id="addTripAttachment"
+                            class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            accept="image/*,.pdf" multiple>
+                        <p class="text-xs text-gray-500 mt-1">อัปโหลดรูปภาพหรือเอกสารที่เกี่ยวข้อง</p>
+                    </div>
+
+                    <div class="pt-4 flex justify-end gap-3">
+                        <button type="button" onclick="closeAddTripModal()"
+                            class="px-6 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                            class="px-6 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 shadow-md hover:shadow-lg transition-all">
+                            Submit Trip Plan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts for Add Trip -->
+    <script>
+        function openAddTripModal() {
+            populateAddTripDropdowns();
+            document.getElementById('addTripModal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        }
+
+        function closeAddTripModal() {
+            document.getElementById('addTripModal').classList.add('hidden');
+            document.body.style.overflow = 'auto'; // Restore scrolling
+        }
+
+        // Close on clicking outside
+        document.getElementById('addTripModal').addEventListener('click', function (e) {
+            if (e.target === this) closeAddTripModal();
+        });
+
+        // Populate Employee Dropdown
+        function populateAddTripDropdowns() {
+            const dropdown = document.querySelector('#addTripForm select[name="empId"]');
+            if (dropdown.options.length > 1) return; // Already populated
+
+            google.script.run.withSuccessHandler(function (employees) {
+                dropdown.innerHTML = '<option value="">-- Select Employee --</option>';
+                employees.forEach(emp => {
+                    const option = document.createElement('option');
+                    option.value = emp.id;
+                    option.textContent = emp.name;
+                    dropdown.appendChild(option);
+                });
+
+                // Auto-select current user if found
+                if (CURRENT_USER && CURRENT_USER.empId) {
+                    dropdown.value = CURRENT_USER.empId;
+                }
+            }).getEmployeeListV2(CURRENT_USER ? CURRENT_USER.email : "");
+        }
+
+        // Station Search Logic
+        function handleStationInput(input) {
+            const val = input.value.toLowerCase().trim();
+            const listId = input.getAttribute('list');
+            const datalist = document.getElementById(listId);
+
+            if (!datalist) return;
+
+            if (val.length < 1) {
+                datalist.innerHTML = '';
+                return;
+            }
+
+            // Using STORE_DB which is loaded in loadCalendar()
+            if (!STORE_DB) return;
+
+            const matches = STORE_DB
+                .filter(s => s.station && s.station.toLowerCase().includes(val))
+                .slice(0, 20); // Limit results
+
+            let html = '';
+            matches.forEach(s => {
+                html += `<option value="${s.station}">`;
+            });
+            datalist.innerHTML = html;
+        }
+
+        function handleAddTripSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            const fileInput = document.getElementById('addTripAttachment');
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            // Loading State
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            // Get Email Toggle
+            const emailToggle = document.getElementById('addTripEmailToggle');
+            const shouldSendEmail = emailToggle ? emailToggle.checked : false;
+
+            const submitData = (attachmentData = null) => {
+                const data = {
+                    empId: form.empId.value,
+                    project: form.project.value,
+                    workDocNumber: form.workDocNumber.value,
+                    estimatedDistance: form.estimatedDistance.value,
+                    workType: form.workType.value,
+                    contract: form.contract.value,
+                    vendor: form.vendor.value,
+                    station: form.station.value,
+                    additionalEmail: form.additionalEmail.value,
+                    priority: form.priority.value,
+                    startDate: form.startDate.value,
+                    deadline: form.deadline.value,
+                    details: form.details.value,
+                    isCompensatory: form.isCompensatory.checked,
+                    isPersonalLeave: form.isPersonalLeave.checked,
+                    isSickLeave: form.isSickLeave.checked,
+                    isAnnualLeave: form.isAnnualLeave.checked,
+                    sendEmail: shouldSendEmail,
+                    ...attachmentData
+                };
+
+                google.script.run.withSuccessHandler((res) => {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Trip Plan';
+
+                    if (res.success) {
+                        alert("Trip Plan Created Successfully!");
+                        form.reset();
+                        closeAddTripModal();
+                        loadCalendar(); // Refresh Calendar
+                    } else {
+                        alert("Error: " + res.error);
+                    }
+                }).withFailureHandler((err) => {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Trip Plan';
+                    alert("System Error: " + err);
+                }).processTripPlanForm(data);
+            };
+
+            // Handle Attachments
+            if (fileInput.files.length > 0) {
+                const files = Array.from(fileInput.files);
+                const attachmentList = [];
+                let filesProcessed = 0;
+
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        attachmentList.push({
+                            data: e.target.result.split(',')[1],
+                            mimeType: file.type,
+                            name: file.name
+                        });
+                        filesProcessed++;
+                        if (filesProcessed === files.length) {
+                            submitData({ attachmentList: attachmentList });
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                submitData();
+            }
+        }
+    </script>
+</body>
+
+</html>
