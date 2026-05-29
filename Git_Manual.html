@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Workflow Manual - Air Ref Survey</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --background: #0F172A;
+            --surface: #1E293B;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --code-bg: #0B1120;
+            --accent: #10B981;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--surface);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-top: 0;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin-top: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .code-block {
+            background-color: var(--code-bg);
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: #38BDF8;
+            margin: 15px 0;
+            overflow-x: auto;
+            border: 1px solid #334155; 
+            position: relative;
+        }
+
+        .code-block::before {
+            content: '$';
+            color: #64748B;
+            margin-right: 15px;
+            user-select: none;
+        }
+
+        .warning-box {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #EF4444;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box strong {
+            color: #F87171;
+        }
+
+        .step-list {
+            padding-left: 0;
+            list-style: none;
+            counter-reset: my-awesome-counter;
+        }
+
+        .step-list li {
+            counter-increment: my-awesome-counter;
+            margin-bottom: 20px;
+            padding-left: 40px;
+            position: relative;
+        }
+
+        .step-list li::before {
+            content: counter(my-awesome-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background-color: var(--primary);
+            color: white;
+            font-weight: bold;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background-color: #334155;
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Git Workflow Manual</h1>
+        <p>A quick reference guide for managing your project code via Git and GitHub, specifically tailored for the <strong>Air_Ref_Servey</strong> project.</p>
+
+        <div class="warning-box">
+            <strong>⚠️ CRITICAL RULE:</strong> Never push API keys, passwords, or Google Service Account `.json` files to GitHub. Make sure your `.gitignore` file includes the `Service Account/` directory.
+        </div>
+
+        <hr>
+
+        <h2>1. Initial Setup: Linking to GitHub (HTTPS vs SSH)</h2>
+        <p>Before you can push or pull, your local project folder must be connected to a repository on GitHub. You do this by adding a "remote" origin. There are two primary ways to format this connection link:</p>
+        
+        <div style="background-color: var(--surface); border: 1px solid #334155; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="color: #38BDF8; margin-top: 0;">Method A: HTTPS (Web Link)</h3>
+            <p><strong>Best for:</strong> Quick setup without technical hurdles. When you push, GitHub will periodically prompt you to authenticate via a pop-up web browser window or by using a Personal Access Token.</p>
+            <div class="code-block" style="word-wrap: break-word; white-space: normal;">git remote add origin https://github.com/Username/Repository.git</div>
+        </div>
+
+        <div style="background-color: var(--surface); border: 1px solid #334155; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="color: var(--accent); margin-top: 0;">Method B: SSH (Secure Shell)</h3>
+            <p><strong>Best for:</strong> Seamless, long-term workflow. It never asks for a password every time you push. However, it requires a one-time technical setup where you <a href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent" target="_blank" style="color: var(--primary);">generate an SSH key on your PC</a> and upload it to your GitHub profile settings.</p>
+            <div class="code-block" style="word-wrap: break-word; white-space: normal;">git remote add origin git@github.com:Username/Repository.git</div>
+        </div>
+
+        <p><strong>How to check what method you are currently using:</strong></p>
+        <div class="code-block">git remote -v</div>
+
+        <p><strong>How to change your link method (e.g., swapping from HTTPS to SSH):</strong></p>
+        <div class="code-block" style="word-wrap: break-word; white-space: normal;">git remote set-url origin git@github.com:Username/Repository.git</div>
+
+        <hr>
+
+        <h2>2. The Standard Workflow (Saving & Pushing)</h2>
+        <p>When you make changes to files or add new ones, follow these three steps in your terminal to safely send them to GitHub:</p>
+
+        <ul class="step-list">
+            <li>
+                <strong>Stage Your Changes:</strong> This tells Git which files you want to include in your next save.
+                <div class="code-block">git add .</div>
+                <p><em>Note: The `.` adds all modified and new files in your folder (ignoring whatever is in `.gitignore`).</em></p>
+            </li>
+            <li>
+                <strong>Commit Your Changes:</strong> Packages the staged files with a descriptive message.
+                <div class="code-block">git commit -m "Describe what changes you made here"</div>
+            </li>
+            <li>
+                <strong>Push to GitHub:</strong> Uploads your completed commit to the remote repository.
+                <div class="code-block">git push origin main</div>
+            </li>
+        </ul>
+
+        <hr>
+
+        <h2>3. Getting the Latest Updates</h2>
+        <p>If you or someone else made changes directly on GitHub, you need to pull those updates down to your computer before doing any new work.</p>
+        
+        <div class="code-block">git pull origin main</div>
+
+        <hr>
+
+        <h2>4. Checking Your Status</h2>
+        <p>If you ever get confused about what files have been changed, what is staged, or what branch you are on, use the status command:</p>
+
+        <div class="code-block">git status</div>
+
+        <hr>
+
+        <h2>5. Handling Sensitive Files</h2>
+        <p>We use a file named <code>.gitignore</code> to tell Git to ignore passwords or secret folders. If you add a new sensitive folder that you <strong>do not</strong> want on GitHub, you must open <code>.gitignore</code> and type its name <em>before</em> running your first `git add .` command.</p>
+        <p>If you accidentally added a sensitive file, you can untrack it <strong>without</strong> deleting it from your computer like this:</p>
+        <div class="code-block" style="word-wrap: break-word; white-space: normal;">git rm -r --cached "Name of Folder or File"</div>
+        <p>After running that, immediately create a new commit so it saves the removal.</p>
+
+    </div>
+
+</body>
+</html>

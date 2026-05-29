@@ -55,6 +55,7 @@
     <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('lookup')">🔍 ค้นหาสาขา</button>
     <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('submitted')">📥 ส่งแล้ว</button>
     <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('progress')">📋 รายงาน</button>
+    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('duplicate')">📌 ตรวจซ้ำ</button>
     <button class="tab-btn admin-only-tab hidden px-4 py-2 rounded-lg text-sm font-semibold" onclick="showTab('performance')">📊 Dashboard</button>
   </div>
 </div>
@@ -605,6 +606,68 @@
 
 </div>
 
+<!-- ══ TAB: DUPLICATE CHECK ═══════════════════════════════ -->
+<div id="tab-duplicate" class="hidden max-w-5xl mx-auto mt-4 px-3 pb-10">
+
+  <!-- Header + controls -->
+  <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+    <div>
+      <h2 class="text-sm font-bold text-gray-700">📌 ตรวจสอบข้อมูลซ้ำ</h2>
+      <p class="text-xs text-gray-400 mt-0.5">สาขาที่มีการส่ง Aircon หรือ Ref Survey ซ้ำกันมากกว่า 1 ครั้ง (ไม่นับ Draft)</p>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <button onclick="_downloadDuplicateExcel(this)" id="btn-dup-excel" class="text-xs text-emerald-600 hover:text-emerald-800 border border-emerald-200 hover:border-emerald-400 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">📥 Excel</button>
+      <button onclick="_reloadDuplicate()" class="text-xs text-gray-400 hover:text-sky-600 border border-gray-200 hover:border-sky-300 px-3 py-1.5 rounded-lg transition-colors">🔄 รีเฟรช</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="dup-loading" class="py-16 text-center text-gray-400 text-sm">⏳ กำลังโหลด...</div>
+
+  <!-- Content -->
+  <div id="dup-content" class="hidden space-y-3">
+
+    <!-- Summary pills -->
+    <div id="dup-summary" class="flex gap-2 flex-wrap"></div>
+
+    <!-- Filter bar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-3 flex flex-wrap gap-2 items-center">
+      <input type="text" id="dup-search" placeholder="ค้นหารหัส / ชื่อสาขา..."
+             oninput="_filterDuplicate()"
+             class="flex-1 min-w-[180px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 outline-none">
+      <select id="dup-filter-type" onchange="_filterDuplicate()"
+              class="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-orange-400">
+        <option value="">ทุกประเภท</option>
+        <option value="aircon">🌀 Aircon ซ้ำ</option>
+        <option value="ref">❄️ Ref ซ้ำ</option>
+        <option value="both">ซ้ำทั้งสองประเภท</option>
+      </select>
+      <button onclick="_clearDupFilters()" class="text-xs text-gray-400 hover:text-red-500 border border-gray-200 px-3 py-2 rounded-lg transition-colors">✕ ล้าง</button>
+      <span class="ml-auto text-xs text-orange-600 font-semibold" id="dup-count-label"></span>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-orange-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[760px] text-xs">
+          <thead>
+            <tr class="bg-orange-50 text-xs font-bold text-orange-800 uppercase">
+              <th class="px-3 py-2.5 text-left w-28">รหัสสาขา</th>
+              <th class="px-3 py-2.5 text-left">ชื่อสาขา</th>
+              <th class="px-3 py-2.5 text-left w-14">BU</th>
+              <th class="px-3 py-2.5 text-center w-52">🌀 Aircon</th>
+              <th class="px-3 py-2.5 text-center w-52">❄️ Ref</th>
+              <th class="px-3 py-2.5 text-center w-20">Extra Rows</th>
+            </tr>
+          </thead>
+          <tbody id="dup-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- ══ TOAST ═══════════════════════════════════════════════ -->
 <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-5 py-3 rounded-xl text-sm shadow-xl opacity-0 transition-opacity duration-300 pointer-events-none z-50 max-w-xs text-center"></div>
 
@@ -665,7 +728,7 @@ function showTab(name) {
     // Block non-admins from the Performance tab
     if (name === 'performance' && !IS_ADMIN) { name = 'daily'; }
     CURRENT_TAB = name;
-    ['setup','daily','lookup','submitted','progress','performance'].forEach(function(t) {
+    ['setup','daily','lookup','submitted','progress','duplicate','performance'].forEach(function(t) {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
     });
     document.querySelectorAll('.tab-btn').forEach(function(btn) {
@@ -675,12 +738,14 @@ function showTab(name) {
                      (name === 'lookup'      && txt.includes('🔍')) ||
                      (name === 'submitted'   && txt.includes('📥')) ||
                      (name === 'progress'    && txt.includes('📋')) ||
+                     (name === 'duplicate'   && txt.includes('📌')) ||
                      (name === 'performance' && txt.includes('📊'));
         btn.classList.toggle('active', active);
     });
     if (name === 'daily')       initDailyView();
     if (name === 'submitted')   loadSubmittedView();
     if (name === 'progress')    loadProgressReport();
+    if (name === 'duplicate')   loadDuplicateView();
     if (name === 'performance') loadPerformanceDashboard();
 }
 
@@ -2759,6 +2824,169 @@ function _renderProgress(res) {
         });
     }
     document.getElementById('progress-table-body').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════
+// DUPLICATE CHECK TAB
+// ══════════════════════════════════════════════
+var _dupData    = null;
+var _dupLoading = false;
+
+function loadDuplicateView() {
+    if (_dupData) { _renderDuplicate(_dupData); return; }
+    if (_dupLoading) return;
+    _dupLoading = true;
+    var loadEl = document.getElementById('dup-loading');
+    loadEl.textContent = '⏳ กำลังโหลดข้อมูล...';
+    loadEl.classList.remove('hidden');
+    document.getElementById('dup-content').classList.add('hidden');
+
+    google.script.run
+        .withSuccessHandler(function(res) {
+            _dupLoading = false;
+            if (!res || !res.success) {
+                document.getElementById('dup-loading').textContent = '❌ Error: ' + (res && res.error ? res.error : 'โหลดข้อมูลไม่ได้');
+                return;
+            }
+            _dupData = res;
+            _renderDuplicate(res);
+        })
+        .withFailureHandler(function(e) {
+            _dupLoading = false;
+            document.getElementById('dup-loading').textContent = '❌ Error: ' + e.message;
+        })
+        .getDuplicateSurveyData();
+}
+
+function _reloadDuplicate() {
+    _dupData    = null;
+    _dupLoading = false;
+    var searchEl = document.getElementById('dup-search');
+    var typeEl   = document.getElementById('dup-filter-type');
+    if (searchEl) searchEl.value = '';
+    if (typeEl)   typeEl.value   = '';
+    document.getElementById('dup-content').classList.add('hidden');
+    var loadEl = document.getElementById('dup-loading');
+    loadEl.textContent = '⏳ กำลังโหลดข้อมูล...';
+    loadEl.classList.remove('hidden');
+    loadDuplicateView();
+}
+
+function _filterDuplicate() {
+    if (_dupData) _renderDuplicate(_dupData);
+}
+
+function _clearDupFilters() {
+    document.getElementById('dup-search').value = '';
+    document.getElementById('dup-filter-type').value = '';
+    _filterDuplicate();
+}
+
+function _renderDuplicate(data) {
+    document.getElementById('dup-loading').classList.add('hidden');
+    document.getElementById('dup-content').classList.remove('hidden');
+
+    var s = data.summary || {};
+    document.getElementById('dup-summary').innerHTML = [
+        '<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700">⚠️ ' + (s.totalSites || 0) + ' สาขาที่มีซ้ำ</span>',
+        '<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-sky-100 text-sky-700">🌀 Aircon ซ้ำ: ' + (s.airconDupeSites || 0) + ' สาขา</span>',
+        '<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">❄️ Ref ซ้ำ: ' + (s.refDupeSites || 0) + ' สาขา</span>',
+        '<span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-700">🔴 Extra rows: ' + (s.totalExtraRows || 0) + '</span>'
+    ].join('');
+
+    var search     = (document.getElementById('dup-search').value || '').toLowerCase().trim();
+    var typeFilter = document.getElementById('dup-filter-type').value;
+
+    var filtered = (data.sites || []).filter(function(r) {
+        if (search && !r.code.toLowerCase().includes(search) && !r.name.toLowerCase().includes(search)) return false;
+        if (typeFilter === 'aircon' && r.airconCount <= 1) return false;
+        if (typeFilter === 'ref'    && r.refCount    <= 1) return false;
+        if (typeFilter === 'both'   && (r.airconCount <= 1 || r.refCount <= 1)) return false;
+        return true;
+    });
+
+    document.getElementById('dup-count-label').textContent = filtered.length + ' สาขา';
+
+    if (filtered.length === 0) {
+        document.getElementById('dup-table-body').innerHTML =
+            '<tr><td colspan="6" class="py-12 text-center text-gray-400">' +
+            (s.totalSites === 0 ? '✅ ไม่พบข้อมูลซ้ำ' : 'ไม่พบข้อมูลที่ตรงกับเงื่อนไข') + '</td></tr>';
+        return;
+    }
+
+    function subCell(subs, count) {
+        if (!subs || subs.length === 0) return '<span class="text-gray-300">—</span>';
+        var isDupe = count > 1;
+        var badge  = isDupe
+            ? '<span class="inline-block px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 text-xs font-bold mb-1">⚠️ ' + count + ' ครั้ง</span>'
+            : '<span class="inline-block px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 text-xs font-bold mb-1">1 ครั้ง</span>';
+        var rows = subs.map(function(sub, i) {
+            return '<div class="text-left text-gray-500">' + (i + 1) + '. ' + sub.ts +
+                   ' — <span class="font-semibold ' + (sub.status === 'Draft' ? 'text-gray-400' : 'text-gray-700') + '">' +
+                   sub.status + '</span></div>';
+        }).join('');
+        return '<div class="flex flex-col items-center gap-0.5">' + badge + '<div class="w-full max-w-[180px] text-[11px] leading-4">' + rows + '</div></div>';
+    }
+
+    var html = filtered.map(function(r) {
+        var extra = Math.max(0, r.airconCount - 1) + Math.max(0, r.refCount - 1);
+        return '<tr class="border-b border-gray-100 hover:bg-orange-50/40">' +
+               '<td class="px-3 py-2.5 font-mono font-semibold text-gray-800 align-top">' + r.code + '</td>' +
+               '<td class="px-3 py-2.5 text-gray-700 align-top">' + (r.name || '') + '</td>' +
+               '<td class="px-3 py-2.5 text-gray-500 align-top">' + (r.bu || '') + '</td>' +
+               '<td class="px-3 py-2.5 text-center align-top">' + subCell(r.airconSubs, r.airconCount) + '</td>' +
+               '<td class="px-3 py-2.5 text-center align-top">' + subCell(r.refSubs, r.refCount) + '</td>' +
+               '<td class="px-3 py-2.5 text-center align-top"><span class="font-bold text-orange-700 text-sm">+' + extra + '</span></td>' +
+               '</tr>';
+    }).join('');
+    document.getElementById('dup-table-body').innerHTML = html;
+}
+
+function _downloadDuplicateExcel(btn) {
+    if (!_dupData || !_dupData.sites) { showToast('ยังไม่มีข้อมูล กรุณารอโหลดก่อน', 'warning'); return; }
+    if (typeof XLSX === 'undefined') { showToast('ไม่พบ XLSX library', 'error'); return; }
+    var origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ...'; }
+    try {
+        // Sheet 1 — summary per site
+        var sumHeader = ['รหัสสาขา','ชื่อสาขา','BU','DM','CM','AM',
+                         'Aircon (จำนวนส่ง)','Ref (จำนวนส่ง)','Extra Rows (ซ้ำ)'];
+        var sumRows = _dupData.sites.map(function(r) {
+            return [r.code, r.name||'', r.bu||'', r.dm||'', r.cm||'', r.am||'',
+                    r.airconCount, r.refCount,
+                    Math.max(0, r.airconCount - 1) + Math.max(0, r.refCount - 1)];
+        });
+        var wsSummary = XLSX.utils.aoa_to_sheet([sumHeader].concat(sumRows));
+        wsSummary['!cols'] = [{wch:12},{wch:36},{wch:8},{wch:24},{wch:24},{wch:24},{wch:16},{wch:16},{wch:14}];
+
+        // Sheet 2 — detail per submission (only sites with duplicates)
+        var detHeader = ['รหัสสาขา','ชื่อสาขา','BU','ประเภท','ลำดับที่ส่ง','Timestamp','Status'];
+        var detRows = [];
+        _dupData.sites.forEach(function(r) {
+            if (r.airconCount > 1) {
+                r.airconSubs.forEach(function(sub, i) {
+                    detRows.push([r.code, r.name||'', r.bu||'', 'Aircon', i + 1, sub.ts, sub.status]);
+                });
+            }
+            if (r.refCount > 1) {
+                r.refSubs.forEach(function(sub, i) {
+                    detRows.push([r.code, r.name||'', r.bu||'', 'Ref', i + 1, sub.ts, sub.status]);
+                });
+            }
+        });
+        var wsDetail = XLSX.utils.aoa_to_sheet([detHeader].concat(detRows));
+        wsDetail['!cols'] = [{wch:12},{wch:36},{wch:8},{wch:10},{wch:14},{wch:20},{wch:18}];
+
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'สรุปซ้ำ');
+        XLSX.utils.book_append_sheet(wb, wsDetail,  'รายละเอียดซ้ำ');
+        XLSX.writeFile(wb, 'duplicate_check_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+        showToast('ดาวน์โหลด ' + _dupData.sites.length + ' สาขาที่มีซ้ำ', 'success');
+    } catch(e) {
+        showToast('Excel error: ' + e.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+    }
 }
 
 function _downloadProgressExcel(btn) {

@@ -576,38 +576,22 @@ function uploadWorkOrderAttachment(fileData) {
 
 function ensureWorkOrderHeaders(sheet) {
     if (!sheet) return;
-    
-    // Check/Add specific headers by index (1-based)
-    // Row 1 is headers.
 
-    // Col 11: Evidence URL
-    if(sheet.getLastColumn() >= 11 && sheet.getRange(1,11).getValue() === "") sheet.getRange(1, 11).setValue("Evidence URL");
-    // Col 12: Rating
-    if(sheet.getLastColumn() >= 12 && sheet.getRange(1,12).getValue() === "") sheet.getRange(1, 12).setValue("Rating");
-    // Col 13: Creation Attachment
-    if(sheet.getLastColumn() >= 13 && sheet.getRange(1,13).getValue() === "") sheet.getRange(1, 13).setValue("Creation Attachment");
-    
-    // Col 14: Start Date
-    if(sheet.getRange(1,14).getValue() !== "Start Date") {
-            sheet.getRange(1, 14).setValue("Start Date");
-            sheet.getRange(1, 14).setFontWeight("bold");
-    }
-    
-    // Col 15: Store
-    if(sheet.getRange(1,15).getValue() !== "Store") {
-            sheet.getRange(1, 15).setValue("Store");
-            sheet.getRange(1, 15).setFontWeight("bold");
-    }
-    
-    // Col 16: Classification
-    if(sheet.getRange(1,16).getValue() !== "Classification") {
-            sheet.getRange(1, 16).setValue("Classification");
-            sheet.getRange(1, 16).setFontWeight("bold");
-    }
-    
-    // Col 17: Confidential
-    if(sheet.getRange(1,17).getValue() !== "Confidential") {
-            sheet.getRange(1, 17).setValue("Confidential");
-            sheet.getRange(1, 17).setFontWeight("bold");
-    }
+    // Check/Add specific headers by index (1-based). Row 1 is headers.
+    // Read the whole header row once instead of 7 separate getValue() round-trips.
+    var lastCol = sheet.getLastColumn();
+    var maxCol  = sheet.getMaxColumns();
+    var hdr     = sheet.getRange(1, 1, 1, maxCol).getValues()[0];
+    var get     = function(c) { return c <= maxCol ? hdr[c - 1] : undefined; };
+
+    // Col 11-13: only label if the column already exists but is blank
+    if (lastCol >= 11 && get(11) === "") sheet.getRange(1, 11).setValue("Evidence URL");
+    if (lastCol >= 12 && get(12) === "") sheet.getRange(1, 12).setValue("Rating");
+    if (lastCol >= 13 && get(13) === "") sheet.getRange(1, 13).setValue("Creation Attachment");
+
+    // Col 14-17: ensure exact header text (bold)
+    if (get(14) !== "Start Date")     sheet.getRange(1, 14).setValue("Start Date").setFontWeight("bold");
+    if (get(15) !== "Store")          sheet.getRange(1, 15).setValue("Store").setFontWeight("bold");
+    if (get(16) !== "Classification") sheet.getRange(1, 16).setValue("Classification").setFontWeight("bold");
+    if (get(17) !== "Confidential")   sheet.getRange(1, 17).setValue("Confidential").setFontWeight("bold");
 }

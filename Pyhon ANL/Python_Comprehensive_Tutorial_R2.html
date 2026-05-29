@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Masterclass: Refig_Survey_AnalysysR2</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8B5CF6; /* Purple */
+            --background: #0F172A;
+            --surface: #1E293B;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --code-bg: #0B1120;
+            --accent: #10B981; /* Green */
+            --info: #38BDF8; /* Light blue */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background-color: var(--surface);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.6rem;
+            margin-top: 0;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 15px;
+        }
+
+        h2 {
+            color: var(--accent);
+            font-size: 1.6rem;
+            margin-top: 50px;
+            display: flex;
+            align-items: center;
+        }
+
+        .chapter {
+            background-color: rgba(15, 23, 42, 0.4);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-left: 5px solid var(--info);
+        }
+
+        p, li {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .code-block {
+            background-color: var(--code-bg);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: #E2E8F0;
+            margin: 20px 0;
+            overflow-x: auto;
+            border: 1px solid #334155; 
+            line-height: 1.5;
+        }
+
+        .keyword { color: #C678DD; font-weight: bold; } /* Purple */
+        .string { color: #98C379; } /* Green */
+        .method { color: #61AFEF; } /* Blue */
+        .comment { color: #7F848E; font-style: italic; } /* Gray */
+        .var { color: #E5C07B; } /* Yellow */
+        .number { color: #D19A66; } /* Orange */
+
+        hr {
+            border: none;
+            height: 1px;
+            background-color: #334155;
+            margin: 50px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Python Masterclass: <i>Refig_Survey_AnalysysR2</i></h1>
+        <p>This is a complete, comprehensive Python tutorial derived exclusively from the real code inside your <code>Refig_Survey_AnalysysR2_fill_recheck.ipynb</code> file. By understanding these concepts, you'll be able to build, edit, and troubleshoot major data pipelines.</p>
+
+        <hr>
+
+        <div class="chapter">
+            <h2>Chapter 1: Importing Power Tools</h2>
+            <p>Your notebook starts by pulling in external toolkits. Python is modular, meaning it relies on dedicated libraries to do heavy lifting.</p>
+            <div class="code-block">
+<span class="keyword">import</span> pandas <span class="keyword">as</span> pd  <span class="comment"># Pandas acts as an ultra-fast Excel processor inside memory</span><br>
+<span class="keyword">import</span> json  <span class="comment"># Allows Python to read and write web dictionary formats</span><br>
+<span class="keyword">from</span> openpyxl <span class="keyword">import</span> Workbook  <span class="comment"># A tool specifically needed to write physical .xlsx files</span>
+            </div>
+            <p><b>Learning Point:</b> <code>as pd</code> is just setting a universally recognized nickname. You could technically write <code>import pandas as excel_tool</code>, but <code>pd</code> is the global standard.</p>
+        </div>
+
+        <div class="chapter">
+            <h2>Chapter 2: Data Loading & Standardization</h2>
+            <p>You cannot do math on messy text. The notebook uses Pandas to ingest lists and standardizes fields immediately using the <b>assign</b> and <b>to_datetime</b> methods.</p>
+            <div class="code-block">
+df_refig_survey_Clean = df_refig_survey.assign(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=pd.<span class="method">to_datetime</span>(df_refig_survey[<span class="string">'Timestamp'</span>], errors=<span class="string">'coerce'</span>)<br>
+)
+            </div>
+            <p><b>Learning Point:</b> <code>.assign()</code> creates a new column or safely overwrites an existing one. <code>pd.to_datetime()</code> forces dates into a universal mathematical format. If someone typed "Last Tuesday" instead of a real date, <code>errors='coerce'</code> handles the error gracefully by turning it into a blank <code>NaT</code> (Not a Time) instead of crashing Python.</p>
+        </div>
+
+        <div class="chapter">
+            <h2>Chapter 3: Connecting Disjointed Data (VLOOKUP)</h2>
+            <p>Just like relational databases and Excel, you often have to match data lists. The notebook matches survey data against the active store list (<code>master_active</code>).</p>
+            <div class="code-block">
+_dd_lu = master_active[[<span class="string">'GOLD Code'</span>, <span class="string">'DD Name (14)'</span>]].<span class="method">copy</span>()<br>
+_dd_lu[<span class="string">'GOLD Code'</span>] = _dd_lu[<span class="string">'GOLD Code'</span>].<span class="method">astype</span>(<span class="method">str</span>).str.<span class="method">strip</span>()<br>
+<br>
+oc = oc.<span class="method">merge</span>(_dd_lu.<span class="method">rename</span>(columns={<span class="string">'GOLD Code'</span>:<span class="string">'_gkey'</span>}),<br> 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;left_on=<span class="string">'Store ID'</span>, right_on=<span class="string">'_gkey'</span>, how=<span class="string">'left'</span>)
+            </div>
+            <p><b>Learning Point:</b></p>
+            <ul>
+                <li><code>.astype(str)</code> forces store IDs to be treated as text. This prevents weird errors where '0114' gets reduced to '114' mathematically.</li>
+                <li><code>.str.strip()</code> is a lifesaver. It deletes any accidental invisible spaces around the store ID so that the match actually works.</li>
+                <li><code>.merge()</code> is Python's ultra-fast version of VLOOKUP, gluing the table together where the Store ID matches the GOLD Code.</li>
+            </ul>
+        </div>
+
+        <div class="chapter">
+            <h2>Chapter 4: Missing Data & Imputation Arrays</h2>
+            <p>Mathematical calculations crash when they hit blank rows. The notebook dynamically algorithms solutions for missing quantities.</p>
+            <div class="code-block">
+<span class="comment"># Filling counts with Zero</span><br>
+ref_df[<span class="string">'Ref Open Qty Num'</span>] = pd.<span class="method">to_numeric</span>(ref_df[<span class="string">'Ref Open Qty'</span>], errors=<span class="string">'coerce'</span>).<span class="method">fillna</span>(<span class="number">0</span>)<br>
+<br>
+<span class="comment"># Filling dimensions with Medians</span><br>
+fleet[<span class="string">'extra_kwh'</span>] = fleet[<span class="string">'extra_kwh_sqm'</span>] * fleet[<span class="string">'Net sqm'</span>].<span class="method">fillna</span>(fleet[<span class="string">'Net sqm'</span>].<span class="method">median</span>())
+            </div>
+            <p><b>Learning Point:</b> You don't want to fill missing store square-meters with "0" because that destroys your averages. <code>fleet['Net sqm'].median()</code> safely finds the middle size of all stores and quietly patches any missing data with that number.</p>
+        </div>
+
+        <div class="chapter">
+            <h2>Chapter 5: Feature Engineering (Creating new logic columns)</h2>
+            <p>The notebook creates a <b>Risk Key</b> and estimates store ages based on the time difference.</p>
+            <div class="code-block">
+analysis_df[<span class="string">'Store Age (yrs)'</span>] = pd.<span class="method">to_numeric</span>(analysis_df[<span class="string">'Store Age (yrs)'</span>], errors=<span class="string">'coerce'</span>)<br>
+<span class="comment"># Or calculated dynamically...</span><br>
+yoy_mean = pd.<span class="method">to_numeric</span>(sub[<span class="string">'YoY % (2024-2025)'</span>], errors=<span class="string">'coerce'</span>).<span class="method">mean</span>()
+            </div>
+            <p><b>Learning Point:</b> Pandas can do operations vertically. <code>.mean()</code> instantly takes the average of millions of rows in a microsecond.</p>
+        </div>
+
+        <div class="chapter">
+            <h2>Chapter 6: Formatted Outputs (Building Excel Files)</h2>
+            <p>Writing a basic Excel file is easy (<code>to_excel()</code>), but the notebook uses openpyxl to actively paint and construct professional workbooks.</p>
+            <div class="code-block">
+HEADER_FILL = PatternFill(<span class="string">"solid"</span>, fgColor=<span class="string">"1F4E79"</span>)<br>
+HEADER_FONT = Font(bold=<span class="keyword">True</span>, color=<span class="string">"FFFFFF"</span>, size=<span class="number">11</span>)<br>
+<br>
+<span class="keyword">def</span> <span class="method">set_cell</span>(ws, row, col, value, fill=<span class="keyword">None</span>, font=<span class="keyword">None</span>):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cell = ws.<span class="method">cell</span>(row=row, column=col, value=value)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> fill:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cell.fill = fill<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> font:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cell.font = font
+            </div>
+            <p><b>Learning Point:</b> You can create fully styled spreadsheets from Python. Here, we build custom blue <code>HEADER_FILL</code> and white <code>HEADER_FONT</code> variables, and then pipe them into a custom <code>set_cell</code> function to paint the cells block-by-block.</p>
+        </div>
+        
+    </div>
+
+</body>
+</html>

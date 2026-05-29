@@ -229,6 +229,7 @@ function loadStoreDatabase() {
 
 function processTripPlanForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Trip_Plans");
         
         // Define desired headers (column validation)
@@ -590,6 +591,7 @@ function getPendingTripPlans(clientEmail) {
 
 function uploadTripPlanEvidence(id, fileData) {
     try {
+        var _wlock = _acquireWriteLock_();
         var folderName = "Trip_Plans_Evidence";
         var folder;
         var folders = DriveApp.getFoldersByName(folderName);
@@ -719,6 +721,7 @@ function getManagersManagerEmail(empId) {
 
 function approveTripPlan(workOrderId, approverNameInput, rating, clientEmail) {
     try {
+        var _wlock = _acquireWriteLock_();
         var userEmail = clientEmail || Session.getActiveUser().getEmail();
         console.log("approveTripPlan called by:", userEmail, "for Order:", workOrderId);
         
@@ -877,6 +880,7 @@ function approveTripPlan(workOrderId, approverNameInput, rating, clientEmail) {
 
 function rejectTripPlan(workOrderId, rejectorName, reason, clientEmail) {
     try {
+        var _wlock = _acquireWriteLock_();
         var userEmail = clientEmail || Session.getActiveUser().getEmail();
         
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Trip_Plans");
@@ -1337,6 +1341,7 @@ function getAllTripPlansReport(clientEmail) {
 
 function updateTripPlan(form, clientEmail) {
     try {
+        var _wlock = _acquireWriteLock_();
         var userEmail = clientEmail || Session.getActiveUser().getEmail();
         
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Trip_Plans");
@@ -2053,6 +2058,7 @@ function getMyTodayTrips(empId) {
 
 function saveCheckIn(tripId, lat, lng) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Trip_Plans");
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
@@ -2150,6 +2156,7 @@ function saveCheckIn(tripId, lat, lng) {
 // --- Abort Trip Plan Function ---
 function abortTripPlan(tripId, empId, comment) {
     try {
+        var _wlock = _acquireWriteLock_();
         Logger.log('Abort Trip Plan Request - TripID: ' + tripId + ', EmpID: ' + empId);
         
         var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2735,6 +2742,7 @@ function uploadTripAttachment(fileData) {
 
 function addTripComment(tripId, commentText, filesData, userEmail, userName) {
   try {
+    var _wlock = _acquireWriteLock_();
     console.log("addTripComment:", tripId, userEmail);
     // --- Permission Check ---
     if (!canUserComment(tripId, userEmail)) {

@@ -822,10 +822,12 @@
                         <div>
                             <span class="block text-xs font-bold text-gray-500 uppercase mb-1">PR Number</span>
                             <p id="detailPrNumber" class="text-gray-800 font-mono"></p>
+                            <p id="detailPrDate" class="text-xs text-gray-400 mt-0.5"></p>
                         </div>
                         <div>
                             <span class="block text-xs font-bold text-gray-500 uppercase mb-1">PO Number</span>
                             <p id="detailPoNumber" class="text-gray-800 font-mono"></p>
+                            <p id="detailPoDate" class="text-xs text-gray-400 mt-0.5"></p>
                         </div>
                     </div>
                 </div>
@@ -1312,7 +1314,9 @@
                 'Station': o.station,
                 'Work Doc Number': o.workDocNumber,
                 'PR Number': o.prNumber,
+                'PR Date': o.prDate,
                 'PO Number': o.poNumber,
+                'PO Date': o.poDate,
                 'Estimated Budget': o.estimatedBudget,
                 'Budget Type': o.budgetType,
                 'Quotation Number': o.contract,
@@ -1377,6 +1381,8 @@
             document.getElementById('detailPrNumber').textContent = order.prNumber || '-';
             document.getElementById('detailPrNumber').textContent = order.prNumber || '-';
             document.getElementById('detailPoNumber').textContent = order.poNumber || '-';
+            document.getElementById('detailPrDate').textContent = order.prDate ? 'บันทึกเมื่อ ' + order.prDate : '';
+            document.getElementById('detailPoDate').textContent = order.poDate ? 'บันทึกเมื่อ ' + order.poDate : '';
             document.getElementById('detailBu').textContent = order.bu || '-';
             document.getElementById('detailObjective').textContent = order.objective || '-';
 

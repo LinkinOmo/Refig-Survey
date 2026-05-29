@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cell-by-Cell Notebook Breakdown</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --background: #0F172A;
+            --surface: #1E293B;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --code-bg: #0B1120;
+            --accent: #F43F5E;
+            --success: #34D399;
+            --info: #38BDF8;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background-color: var(--surface);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-top: 0;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: var(--info);
+            font-size: 1.4rem;
+            margin-top: 50px;
+            display: flex;
+            align-items: center;
+        }
+
+        p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .cell-container {
+            margin-bottom: 40px;
+        }
+
+        .code-row {
+            display: flex;
+            border-radius: 4px;
+            overflow: hidden;
+            border-bottom: 1px solid #334155;
+            background-color: rgba(15, 23, 42, 0.6);
+        }
+
+        .code-row:last-child {
+            border-bottom: none;
+        }
+
+        .code-part {
+            flex: 1;
+            padding: 15px 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            background-color: var(--code-bg);
+            border-right: 1px solid #334155;
+            color: #E2E8F0;
+            display: flex;
+            align-items: center;
+            font-size: 0.90rem;
+        }
+
+        .explanation-part {
+            flex: 1.5;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            color: #CBD5E1;
+            font-size: 0.95rem;
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background-color: #334155;
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Cell-by-Cell Notebook Breakdown</h1>
+        <p>You asked for maximum detail. Here is a literal line-by-line explanation of the first three code cells found inside your exact <code>Refig_Survey_AnalysysR2_fill_recheck.ipynb</code> file.</p>
+
+        <hr>
+
+        <h2>CELL 1: API Setup and Data Ingestion</h2>
+        <div class="cell-container" style="border: 1px solid #334155; border-radius: 8px;">
+            <div class="code-row">
+                <div class="code-part">
+                    import pandas as pd<br>
+                    import numpy as np<br>
+                    import gspread
+                </div>
+                <div class="explanation-part">
+                    Loading the required libraries. <b>pandas</b> processes DataFrames, <b>numpy</b> does advanced math, and <b>gspread</b> is the official tool allowing Python to talk to Google Sheets online.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    if os.path.exists(credentials_path):<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;credentials = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;gc = gspread.authorize(credentials)
+                </div>
+                <div class="explanation-part">
+                    This securely logs Python into Google using your <code>trans-lang-client...json</code> service account file, but only <b>if</b> the file exists on your PC. It creates the <code>gc</code> variable which is your authorized Google Client.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    sheet_master = gc.open_by_url("https://docs.google.com/...")<br>
+                    ws_master = sheet_master.worksheet("Store master")<br>
+                    Master = pd.DataFrame(ws_master.get_all_records())
+                </div>
+                <div class="explanation-part">
+                    Using the authorized client, it connects via URL directly to the live "Store master" Google sheet. It pulls every single row of data (<code>get_all_records()</code>) and converts it instantly into a Pandas DataFrame called <b>Master</b>. It repeats this pattern for both survey databases below this.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    else:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;print(f"Warning: {credentials_path} not found.")<br>
+                    energy_data = pd.read_excel("Energy_Analysis_Report.xlsx")
+                </div>
+                <div class="explanation-part">
+                    If the JSON key is missing, it skips the web download. Finally, it pulls a local Excel file directly from your folder to get the <b>energy_data</b>.
+                </div>
+            </div>
+        </div>
+
+        <h2>CELL 2: Clever Data Cleansing using Method Chaining</h2>
+        <div class="cell-container" style="border: 1px solid #334155; border-radius: 8px;">
+            <div class="code-row">
+                <div class="code-part">
+                    df_refig_survey_Clean = (<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;df_refig_survey
+                </div>
+                <div class="explanation-part">
+                    This begins a "Method Chain". By placing everything inside parentheses <code>()</code>, Python allows you to perform 5 consecutive data-cleaning steps on the survey without breaking the code onto messy single lines.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    &nbsp;&nbsp;&nbsp;&nbsp;.dropna(subset=['Branch Code'])
+                </div>
+                <div class="explanation-part">
+                    Step 1: Instantly delete any survey response where the user left the "Branch Code" completely blank.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    &nbsp;&nbsp;&nbsp;&nbsp;.assign(Timestamp=pd.to_datetime(df_refig_survey['Timestamp'], errors='coerce'))
+                </div>
+                <div class="explanation-part">
+                    Step 2: Overwrite the text 'Timestamp' column and mathematically force it into actual clock time/Dates.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    &nbsp;&nbsp;&nbsp;&nbsp;.sort_values(['Branch Code', 'Timestamp'], na_position='first')
+                </div>
+                <div class="explanation-part">
+                    Step 3: Organizes all the rows so that if the same Branch submitted the survey twice, they are grouped together chronologically based on their Timestamp.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    &nbsp;&nbsp;&nbsp;&nbsp;.drop_duplicates(subset=['Branch Code'], keep='last')
+                </div>
+                <div class="explanation-part">
+                    Step 4: The <b>magic line</b>. If a store submitted responses twice, it deletes the duplicates, but specifies <code>keep='last'</code> to ensure it only saves their most recent, up-to-date answers!
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    &nbsp;&nbsp;&nbsp;&nbsp;.reset_index(drop=True)<br>
+                    )
+                </div>
+                <div class="explanation-part">
+                    Step 5: Since we deleted rows, the row numbers (index) on the left side are broken (e.g., Row 1, Row 4, Row 7). This safely resets them to counting properly from 0 again.
+                </div>
+            </div>
+        </div>
+
+        <h2>CELL 3: The "Mega Merge"</h2>
+        <div class="cell-container" style="border: 1px solid #334155; border-radius: 8px;">
+            <div class="code-row">
+                <div class="code-part">
+                    merged_critical_df = pd.merge(df_refig_survey_Clean, df_aircon_survey_clean, on='Branch Code', how='outer', suffixes=('_Refig', '_Aircon'))
+                </div>
+                <div class="explanation-part">
+                    This combines the Refrigerator survey with the Aircon survey using <b>how='outer'</b> (meaning it keeps stores that only filled out one survey, padding the other side with blanks). If both surveys share identical column names, it intelligently renames them with the prefixes <code>_Refig</code> and <code>_Aircon</code> to avoid errors.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    .merge(Master[['Gold text', 'AMM MTN (23)', 'Date Open Store','Status']], left_on='Branch Code', right_on='Gold text', how='right')
+                </div>
+                <div class="explanation-part">
+                    It immediately takes that combined survey block and merges it against a 4-column slice of the official <code>Master</code> table. Notice <b>how='right'</b>!! This means the final table forces the Master list to be the absolute template. If a survey exists for a store not on the Master, it is thrown away.
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    .drop(columns=['Gold text'] )[Master['Status'] =="A"]
+                </div>
+                <div class="explanation-part">
+                    It drops the duplicate 'Gold text' column since 'Branch Code' does the same job. Then it does a lightning-fast filter: <b>[Master['Status'] == "A"]</b> ensures this mega-database only includes stores where the Master status is flagged as "Active".
+                </div>
+            </div>
+            <div class="code-row">
+                <div class="code-part">
+                    .merge(energy_data, left_on='Branch Code', right_on='Store ID', how='left')
+                </div>
+                <div class="explanation-part">
+                    Finally, it attaches the <b>energy_data</b> Excel sheet using a standard left-VLOOKUP to finalize the massive <b>merged_critical_df</b> DataFrame.
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

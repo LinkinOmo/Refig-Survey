@@ -15,6 +15,7 @@ function findSafetySheet() {
 
 function processSafetyIncidentForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = findSafetySheet();
         var headers = [
             "Timestamp", "ID", "Recorder ID", "Station", 
@@ -243,6 +244,7 @@ function getSafetyIncidentsReport_v2() {
 
 function updateSafetyIncident(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = findSafetySheet();
         if (!sheet) return { success: false, error: "Database sheet not found" };
 

@@ -1,6 +1,20 @@
 
 // --- Site Visit Report Feature ---
 
+// ─── Concurrency guard ───────────────────────────────────────────────────────
+// Serializes all data-mutating operations (submit/update/delete) so two
+// simultaneous web-app requests can't corrupt the shared header row or append
+// to the same range at once. The lock auto-releases when the execution ends,
+// so callers only need to acquire it; no explicit release is required.
+// Throws on timeout so the caller's existing try/catch returns {success:false}.
+function _acquireWriteLock_(timeoutMs) {
+    var lock = LockService.getScriptLock();
+    if (!lock.tryLock(timeoutMs || 30000)) {
+        throw new Error('ระบบกำลังบันทึกข้อมูลของผู้ใช้รายอื่นอยู่ กรุณารอสักครู่แล้วลองใหม่อีกครั้ง (system busy, please retry)');
+    }
+    return lock;
+}
+
 // Helper Functions (needed by getAllSurveysReport)
 function findEmployeeSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -383,6 +397,7 @@ function generateEmailBody(form, attachmentLinks, quantities) {
 
 function processSurveyForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Site_Visit_Database");
         
         // 1. Prepare Data Map (Header Name -> Value)
@@ -580,6 +595,7 @@ function processSurveyForm(form) {
 
 function processAirConSurveyForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
         
         // 1. Prepare Data Map
@@ -1747,6 +1763,7 @@ function getAirconSurveyRecordById(id) {
 function updateSurvey(form) {
     // Updating Status for either Survey or Aircon and maybe follow-up fields
     try {
+        var _wlock = _acquireWriteLock_();
         // Permission check: only admins and SMF team members can update status
         var authCheck = checkSurveyAdminStatus(form.clientEmail || Session.getActiveUser().getEmail());
         if (!authCheck.isAdmin && !authCheck.isSMF) {
@@ -2536,6 +2553,7 @@ function getSurveyObjectives() {
 
 function deleteSurvey(params) {
     try {
+        var _wlock = _acquireWriteLock_();
         // Prefer clientEmail passed from browser (Session.getActiveUser() returns empty in web app context)
         var userEmail = (typeof params === 'object' && params.clientEmail)
             ? params.clientEmail
@@ -2609,6 +2627,7 @@ function deleteReport(params) {
 
 function processRefSurveyForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
 
         var id = "RFS-" + new Date().getTime();
@@ -3053,27 +3072,33 @@ function getRefSurveyRecordById(id) {
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Ref_Survey_Database');
         if (!sheet) return { success: false, error: 'Sheet not found' };
         var lastRow = sheet.getLastRow();
+        var lastCol = sheet.getLastColumn();
         if (lastRow < 2) return { success: false, error: 'Record not found: ' + String(id) };
 
-        var data = sheet.getDataRange().getValues();
-        var headers = data[0];
+        var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
         var idIdx = headers.indexOf('ID');
         if (idIdx === -1) return { success: false, error: 'ID column not found' };
 
+        // Scan only the ID column to locate the row, then read that single row.
+        // Avoids pulling the entire sheet (incl. large Attachments_JSON blobs in
+        // every row) just to return one record.
+        var ids = sheet.getRange(2, idIdx + 1, lastRow - 1, 1).getValues();
         var searchId = String(id).trim();
-        for (var i = 1; i < data.length; i++) {
-            if (String(data[i][idIdx]).trim() === searchId) {
-                var row = {};
-                for (var j = 0; j < headers.length; j++) {
-                    var val = data[i][j];
-                    if (val instanceof Date) val = val.toISOString();
-                    row[headers[j]] = val;
-                }
-                try { row['Attachments_JSON'] = JSON.parse(row['Attachments_JSON'] || '{}'); } catch(e) { row['Attachments_JSON'] = {}; }
-                return { success: true, data: row };
-            }
+        var foundRow = -1;
+        for (var i = 0; i < ids.length; i++) {
+            if (String(ids[i][0]).trim() === searchId) { foundRow = i + 2; break; }
         }
-        return { success: false, error: 'Record not found: ' + searchId };
+        if (foundRow === -1) return { success: false, error: 'Record not found: ' + searchId };
+
+        var rowVals = sheet.getRange(foundRow, 1, 1, lastCol).getValues()[0];
+        var row = {};
+        for (var j = 0; j < headers.length; j++) {
+            var val = rowVals[j];
+            if (val instanceof Date) val = val.toISOString();
+            row[headers[j]] = val;
+        }
+        try { row['Attachments_JSON'] = JSON.parse(row['Attachments_JSON'] || '{}'); } catch(e) { row['Attachments_JSON'] = {}; }
+        return { success: true, data: row };
     } catch (e) {
         return { success: false, error: e.toString() };
     }
@@ -3132,6 +3157,7 @@ function getRefSurveyReport() {
 
 function updateRefSurveyStatus(id, newStatus, clientEmail, rejectReason) {
     try {
+        var _wlock = _acquireWriteLock_();
         var authCheck = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
         if (!authCheck.isAdmin && !authCheck.isSMF) {
             return { success: false, error: "Permission denied. Admin or SMF team required." };
@@ -3146,24 +3172,31 @@ function updateRefSurveyStatus(id, newStatus, clientEmail, rejectReason) {
         if (idCol === -1 || statusCol === -1) return { success: false, error: "Column not found" };
 
         function colOf(name) { var i = headers.indexOf(name); return i === -1 ? -1 : i + 1; }
+        function ensureCol(name) { var idx = headers.indexOf(name); if(idx !== -1) return idx + 1; var lastCol = sheet.getLastColumn() + 1; sheet.getRange(1, lastCol).setValue(name); headers.push(name); return lastCol; }
         var user = authCheck.email || Session.getActiveUser().getEmail();
 
         for (var i = 1; i < values.length; i++) {
             if (values[i][idCol] === id) {
                 var rowNum = i + 1;
+                var timestampCol = colOf('Timestamp');
+                var reportedAt = timestampCol > 0 ? new Date(values[i][timestampCol - 1]) : null;
+                var isValidDate = function(d) { return d && d instanceof Date && !isNaN(d.getTime()); };
+
                 sheet.getRange(rowNum, statusCol + 1).setValue(newStatus);
                 if (newStatus === 'Acknowledged') {
                     var c1 = colOf('Acknowledged By'), c2 = colOf('Acknowledge Date');
                     if (c1 > 0) sheet.getRange(rowNum, c1).setValue(user);
                     if (c2 > 0) sheet.getRange(rowNum, c2).setValue(new Date());
                 } else if (newStatus === 'Corrected') {
-                    var c3 = colOf('Corrected By'), c4 = colOf('Corrected Date');
-                    if (c3 > 0) sheet.getRange(rowNum, c3).setValue(user);
-                    if (c4 > 0) sheet.getRange(rowNum, c4).setValue(new Date());
+                    var correctedAt = new Date();
+                    sheet.getRange(rowNum, ensureCol('Corrected By')).setValue(user);
+                    sheet.getRange(rowNum, ensureCol('Corrected Date')).setValue(correctedAt);
+                    if (isValidDate(reportedAt)) sheet.getRange(rowNum, ensureCol('SLA Corrected (Days)')).setValue(Number(((correctedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2)));
                 } else if (newStatus === 'Closed') {
-                    var c5 = colOf('Closed By'), c6 = colOf('Closed Date');
-                    if (c5 > 0) sheet.getRange(rowNum, c5).setValue(user);
-                    if (c6 > 0) sheet.getRange(rowNum, c6).setValue(new Date());
+                    var closedAt = new Date();
+                    sheet.getRange(rowNum, ensureCol('Closed By')).setValue(user);
+                    sheet.getRange(rowNum, ensureCol('Closed Date')).setValue(closedAt);
+                    if (isValidDate(reportedAt)) sheet.getRange(rowNum, ensureCol('SLA Closed (Days)')).setValue(Number(((closedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2)));
                 } else if (newStatus === 'Rejected') {
                     var c7 = colOf('Rejected By'), c8 = colOf('Rejected Date'), c9 = colOf('Reject Reason');
                     if (c7 > 0) sheet.getRange(rowNum, c7).setValue(user);
@@ -3182,6 +3215,7 @@ function updateRefSurveyStatus(id, newStatus, clientEmail, rejectReason) {
 
 function deleteRefSurveyRecord(id, clientEmail) {
     try {
+        var _wlock = _acquireWriteLock_();
         // Prefer clientEmail passed from browser (Session.getActiveUser() returns empty in web app context)
         var adminCheck = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
         if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin) return { success: false, error: "Administrator privileges required." };
@@ -3328,6 +3362,7 @@ function getRefBrokenHistory(equipId) {
 // ── Lightweight update: frame rust status for a single unit (Admin + SMF + ScheduleAdmin) ──
 function updateRefUnitFrameRust(id, fieldKey, value, clientEmail) {
     try {
+        var _wlock = _acquireWriteLock_();
         var userEmail = clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
         if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.isSMF) {
@@ -3368,6 +3403,7 @@ function updateRefUnitFrameRust(id, fieldKey, value, clientEmail) {
 
 function updateRefSurveyRecord(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         // Prefer clientEmail from browser — Session.getActiveUser() returns empty in web app context
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
@@ -3412,18 +3448,27 @@ function updateRefSurveyRecord(form) {
         setVal("Broken Units",     form.brokenUnits);
         setVal("Broken Units Detail", form.brokenDetail);
 
-        // Status-specific timestamps
+        var reportedAt = colMap["Timestamp"] ? new Date(data[rowIndex - 1][colMap["Timestamp"] - 1]) : null;
+        var isValidDate = function(d) { return d && d instanceof Date && !isNaN(d.getTime()); };
+
+        // Status-specific timestamps and SLA
         var closedAt = null;
-        if (form.status === 'Acknowledged') {
+        if (form.status === 'Acknowledged' && prevStatus !== 'Acknowledged') {
             setVal("Acknowledged By",  userEmail);
             setVal("Acknowledge Date", new Date());
-        } else if (form.status === 'Corrected') {
+        } else if (form.status === 'Corrected' && prevStatus !== 'Corrected') {
+            var correctedAt = new Date();
             setVal("Corrected By",  userEmail);
-            setVal("Corrected Date", new Date());
-        } else if (form.status === 'Closed') {
+            setVal("Corrected Date", correctedAt);
+            if (isValidDate(reportedAt)) setVal("SLA Corrected (Days)", Number(((correctedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2)));
+        } else if (form.status === 'Closed' && prevStatus !== 'Closed') {
             closedAt = new Date();
             setVal("Closed By",  userEmail);
             setVal("Closed Date", closedAt);
+            if (isValidDate(reportedAt)) setVal("SLA Closed (Days)", Number(((closedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2)));
+        } else if (form.status === 'Closed') {
+            var exist = colMap["Closed Date"] ? new Date(data[rowIndex - 1][colMap["Closed Date"] - 1]) : null;
+            closedAt = isValidDate(exist) ? exist : new Date(); // Keep history timestamp
         }
 
         // Quantity fields  {colKey: value}
@@ -3438,8 +3483,8 @@ function updateRefSurveyRecord(form) {
             for (var uk in uf) { setVal(uk, uf[uk]); }
         }
 
-        // ── Log broken-unit symptom history on Close transition ───────────────
-        if (form.status === 'Closed' && prevStatus !== 'Closed' && form.hasBrokenRef === 'Yes') {
+        // ── Log broken-unit symptom history on Close (or edited after Close) ───────────────
+        if (form.status === 'Closed' && form.hasBrokenRef === 'Yes') {
             try {
                 var _bd = (typeof form.brokenDetail === 'string')
                     ? JSON.parse(form.brokenDetail || '{}')
@@ -3587,6 +3632,7 @@ function getAcBrokenHistory(equipId) {
 
 function updateAcSurveyRecord(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         // Prefer clientEmail from browser — Session.getActiveUser() returns empty in web app context
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
@@ -3641,21 +3687,30 @@ function updateAcSurveyRecord(form) {
             }
         }
 
+        var reportedAt = colMap["Timestamp"] ? new Date(data[rowIndex - 1][colMap["Timestamp"] - 1]) : null;
+        var isValidDate = function(d) { return d && d instanceof Date && !isNaN(d.getTime()); };
+
         var closedAt = null;
-        if (form.status === 'Acknowledged') {
-            if (colMap["Acknowledged By"]) sheet.getRange(rowIndex, colMap["Acknowledged By"]).setValue(userEmail);
-            if (colMap["Acknowledge Date"]) sheet.getRange(rowIndex, colMap["Acknowledge Date"]).setValue(new Date());
-        } else if (form.status === 'Corrected') {
-            if (colMap["Corrected By"]) sheet.getRange(rowIndex, colMap["Corrected By"]).setValue(userEmail);
-            if (colMap["Corrected Date"]) sheet.getRange(rowIndex, colMap["Corrected Date"]).setValue(new Date());
-        } else if (form.status === 'Closed') {
+        if (form.status === 'Acknowledged' && prevStatus !== 'Acknowledged') {
+            setVal("Acknowledged By", userEmail);
+            setVal("Acknowledge Date", new Date());
+        } else if (form.status === 'Corrected' && prevStatus !== 'Corrected') {
+            var correctedAt = new Date();
+            setVal("Corrected By", userEmail);
+            setVal("Corrected Date", correctedAt);
+            if (isValidDate(reportedAt)) setVal("SLA Corrected (Days)", Number(((correctedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2)));
+        } else if (form.status === 'Closed' && prevStatus !== 'Closed') {
             closedAt = new Date();
-            if (colMap["Closed By"]) sheet.getRange(rowIndex, colMap["Closed By"]).setValue(userEmail);
-            if (colMap["Closed Date"]) sheet.getRange(rowIndex, colMap["Closed Date"]).setValue(closedAt);
+            setVal("Closed By", userEmail);
+            setVal("Closed Date", closedAt);
+            if (isValidDate(reportedAt)) setVal("SLA Closed (Days)", Number(((closedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2)));
+        } else if (form.status === 'Closed') {
+            var exist = colMap["Closed Date"] ? new Date(data[rowIndex - 1][colMap["Closed Date"] - 1]) : null;
+            closedAt = isValidDate(exist) ? exist : new Date(); // Keep history timestamp
         }
 
-        // ── Log broken-unit symptom history on Close transition ───────────────
-        if (form.status === 'Closed' && prevStatus !== 'Closed') {
+        // ── Log broken-unit symptom history on Close (or edited after Close) ───────────────
+        if (form.status === 'Closed') {
             var _ac_brokenNumsStr = '';
             try {
                 if (form.brokenDetail) {
@@ -3687,6 +3742,7 @@ function updateAcSurveyRecord(form) {
 // ─────────────────────────────────────────────────────────────────────────────
 function saveAcUnitControllerTemp(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found" };
 
@@ -3836,6 +3892,7 @@ function addAcSurveyPhotos(id, unitKey, files) {
 // ─────────────────────────────────────────────────────────────────────────────
 function deleteRefSurveyPhoto(id, unitKey, url) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found." };
         var data = sheet.getDataRange().getValues();
@@ -3869,6 +3926,7 @@ function deleteRefSurveyPhoto(id, unitKey, url) {
 // ─────────────────────────────────────────────────────────────────────────────
 function deleteAcSurveyPhoto(id, unitKey, url) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found." };
         var data = sheet.getDataRange().getValues();
@@ -4261,6 +4319,7 @@ function getNpSurveyRecordById(id) {
 // ── Update Status ─────────────────────────────────────────────────────────────
 function updateNpSurveyStatus(id, newStatus, clientEmail, rejectReason) {
     try {
+        var _wlock = _acquireWriteLock_();
         var authCheck = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
         if (!authCheck.isAdmin && !authCheck.isSMF) return { success: false, error: 'Permission denied. Admin or SMF team required.' };
 
@@ -4274,15 +4333,20 @@ function updateNpSurveyStatus(id, newStatus, clientEmail, rejectReason) {
         if (idCol === -1 || statusCol === -1) return { success: false, error: 'Column not found' };
 
         function colOf(name) { var i = headers.indexOf(name); return i === -1 ? -1 : i + 1; }
+        function ensureCol(name) { var idx = headers.indexOf(name); if(idx !== -1) return idx + 1; var lastCol = sheet.getLastColumn() + 1; sheet.getRange(1, lastCol).setValue(name); headers.push(name); return lastCol; }
         var user = authCheck.email || Session.getActiveUser().getEmail();
 
         for (var i = 1; i < values.length; i++) {
             if (values[i][idCol] === id) {
                 var rowNum = i + 1;
+                var timestampCol = colOf('Timestamp');
+                var reportedAt = timestampCol > 0 ? new Date(values[i][timestampCol - 1]) : null;
+                var isValidDate = function(d) { return d && d instanceof Date && !isNaN(d.getTime()); };
+
                 sheet.getRange(rowNum, statusCol + 1).setValue(newStatus);
                 if      (newStatus === 'Acknowledged') { var c1=colOf('Acknowledged By'),c2=colOf('Acknowledge Date'); if(c1>0)sheet.getRange(rowNum,c1).setValue(user); if(c2>0)sheet.getRange(rowNum,c2).setValue(new Date()); }
-                else if (newStatus === 'Corrected')    { var c3=colOf('Corrected By'),c4=colOf('Corrected Date');     if(c3>0)sheet.getRange(rowNum,c3).setValue(user); if(c4>0)sheet.getRange(rowNum,c4).setValue(new Date()); }
-                else if (newStatus === 'Closed')       { var c5=colOf('Closed By'),c6=colOf('Closed Date');           if(c5>0)sheet.getRange(rowNum,c5).setValue(user); if(c6>0)sheet.getRange(rowNum,c6).setValue(new Date()); }
+                else if (newStatus === 'Corrected')    { var correctedAt = new Date(); sheet.getRange(rowNum, ensureCol('Corrected By')).setValue(user); sheet.getRange(rowNum, ensureCol('Corrected Date')).setValue(correctedAt); if (isValidDate(reportedAt)) sheet.getRange(rowNum, ensureCol('SLA Corrected (Days)')).setValue(Number(((correctedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2))); }
+                else if (newStatus === 'Closed')       { var closedAt = new Date(); sheet.getRange(rowNum, ensureCol('Closed By')).setValue(user); sheet.getRange(rowNum, ensureCol('Closed Date')).setValue(closedAt); if (isValidDate(reportedAt)) sheet.getRange(rowNum, ensureCol('SLA Closed (Days)')).setValue(Number(((closedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2))); }
                 else if (newStatus === 'Rejected')     { var c7=colOf('Rejected By'),c8=colOf('Rejected Date'),c9=colOf('Reject Reason'); if(c7>0)sheet.getRange(rowNum,c7).setValue(user); if(c8>0)sheet.getRange(rowNum,c8).setValue(new Date()); if(c9>0&&rejectReason)sheet.getRange(rowNum,c9).setValue(rejectReason); }
                 _invalidateNpSlimCache();
                 return { success: true };
@@ -4297,6 +4361,7 @@ function updateNpSurveyStatus(id, newStatus, clientEmail, rejectReason) {
 // ── Delete Record ─────────────────────────────────────────────────────────────
 function deleteNpSurveyRecord(id, clientEmail) {
     try {
+        var _wlock = _acquireWriteLock_();
         var adminCheck = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
         if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin) return { success: false, error: 'Administrator privileges required.' };
 
@@ -4324,6 +4389,7 @@ function deleteNpSurveyRecord(id, clientEmail) {
 // ── Update (edit) Record ──────────────────────────────────────────────────────
 function updateNpSurveyRecord(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
         if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin) return { success: false, error: 'Administrator privileges required.' };
@@ -4362,9 +4428,18 @@ function updateNpSurveyRecord(form) {
         setVal('Broken Units',      form.brokenUnits);
         setVal('Broken Units Detail', form.brokenDetail);
 
-        if (form.status === 'Acknowledged') { setVal('Acknowledged By', userEmail); setVal('Acknowledge Date', new Date()); }
-        else if (form.status === 'Corrected') { setVal('Corrected By', userEmail); setVal('Corrected Date', new Date()); }
-        else if (form.status === 'Closed')    { setVal('Closed By', userEmail);    setVal('Closed Date', new Date()); }
+        var prevStatus = (colMap['Status'] ? String(data[rowIndex - 1][colMap['Status'] - 1] || '') : '').trim();
+        var reportedAt = colMap['Timestamp'] ? new Date(data[rowIndex - 1][colMap['Timestamp'] - 1]) : null;
+        var isValidDate = function(d) { return d && d instanceof Date && !isNaN(d.getTime()); };
+
+        if (form.status === 'Acknowledged' && prevStatus !== 'Acknowledged') { setVal('Acknowledged By', userEmail); setVal('Acknowledge Date', new Date()); }
+        else if (form.status === 'Corrected' && prevStatus !== 'Corrected') { 
+            var correctedAt = new Date(); setVal('Corrected By', userEmail); setVal('Corrected Date', correctedAt); 
+            if (isValidDate(reportedAt)) setVal('SLA Corrected (Days)', Number(((correctedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2)));
+        } else if (form.status === 'Closed' && prevStatus !== 'Closed') { 
+            var closedAt = new Date(); setVal('Closed By', userEmail); setVal('Closed Date', closedAt); 
+            if (isValidDate(reportedAt)) setVal('SLA Closed (Days)', Number(((closedAt.getTime() - reportedAt.getTime()) / 86400000).toFixed(2)));
+        }
 
         if (form.unitQty) {
             var uq = (typeof form.unitQty === 'string') ? JSON.parse(form.unitQty) : form.unitQty;
@@ -4436,6 +4511,7 @@ function addNpSurveyPhotos(id, unitKey, files) {
 // ── Delete Photo ──────────────────────────────────────────────────────────────
 function deleteNpSurveyPhoto(id, unitKey, url) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
         if (!sheet) return { success: false, error: 'Sheet not found.' };
         var data = sheet.getDataRange().getValues();
@@ -4466,6 +4542,7 @@ function deleteNpSurveyPhoto(id, unitKey, url) {
 // ── Submit New Survey (called from np_survey.html form) ───────────────────────
 function submitNpSurvey(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         var sheet = ss.getSheetByName('NewProduct_Survey_Database');
         if (!sheet) {

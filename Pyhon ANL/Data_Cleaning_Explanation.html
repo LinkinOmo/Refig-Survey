@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Data Cleaning - Air Ref Survey</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #8B5CF6;
+            --background: #0F172A;
+            --surface: #1E293B;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --code-bg: #0B1120;
+            --accent: #F43F5E;
+            --success: #10B981;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: var(--surface);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-top: 0;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin-top: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3 {
+            color: var(--success);
+            font-size: 1.2rem;
+            margin-top: 20px;
+        }
+
+        p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        .code-block {
+            background-color: var(--code-bg);
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: #38BDF8;
+            margin: 15px 0;
+            overflow-x: auto;
+            border: 1px solid #334155; 
+        }
+
+        .card {
+            background-color: rgba(15, 23, 42, 0.5);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        ul {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+        
+        li {
+            margin-bottom: 10px;
+        }
+
+        hr {
+            border: none;
+            height: 1px;
+            background-color: #334155;
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Overview of Data Cleaning in Python</h1>
+        <p>This document explains the technical data cleansing operations performed across the Python scripts and analytical Jupyter Notebooks within the <strong>Air_Ref_Servey</strong> project.</p>
+
+        <p>The project employs a dual-layered data cleaning strategy: first addressing raw string encoding corruptions, and then performing rigorous structural data prep using Pandas.</p>
+
+        <hr>
+
+        <h2>1. Repairing Thai Encoding Corruptions (Mojibake)</h2>
+        <p>Early in the pipeline, exported text and system strings often suffer from Unicode corruption (mojibake) where Thai characters are misrendered (e.g., seeing <code>'เธฃเธฒเธข...'</code> instead of <code>'รายงาน'</code>).</p>
+        
+        <div class="card">
+            <h3>The Dictionary Mapping Strategy</h3>
+            <p>Standalone Python scripts (like <code>fix_final.py</code> and <code>fix_final2.py</code>) resolve this by scanning the project's source code and output files.</p>
+            <ul>
+                <li><strong>Hex/Unicode targeting:</strong> The scripts map specific corrupted Unicode sequences back to their correct Thai consonant/vowel counterparts.</li>
+                <li><strong>Length-aware replacement:</strong> The script intelligently sorts the mappings by length (longest first) before applying the <code>.replace()</code> function. This ensures that complex compound corrupted words are safely translated before smaller single-character replacements happen, preventing overlapping replacement errors.</li>
+            </ul>
+            <div class="code-block">
+# Example from fix_final.py
+for key in sorted(char_map.keys(), key=len, reverse=True):
+    text = text.replace(key, char_map[key])
+            </div>
+        </div>
+
+        <hr>
+
+        <h2>2. Structural Data Cleaning via Pandas (Jupyter Notebooks)</h2>
+        <p>Once raw text is legible, the core of the data cleansing happens inside the analytical Python Notebooks (e.g., <code>Refig_Survey_AnalysysR2_fill_recheck.ipynb</code>).</p>
+
+        <div class="card">
+            <h3>A. Coercing Data Types</h3>
+            <p>Survey inputs and spreadsheet formulas often leave numeric columns contaminated with text (like "N/A" or "Unknown"). Pandas is used to violently coerce these into workable numbers.</p>
+            <ul>
+                <li><strong>Numeric Coercion:</strong> By using <code>pd.to_numeric(..., errors='coerce')</code>, any stray string data in numeric fields (like <em>Ref Open Qty</em> or <em>kWh 2025</em>) is immediately converted into a safe <code>NaN</code> (Not a Number) value, preventing mathematical crashes.</li>
+                <li><strong>Datetime Coercion:</strong> Similar operations are performed on timestamps and <em>Date Open Store</em> columns, using <code>errors='coerce'</code> along with <code>dayfirst=True</code> to standardize the timeline.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h3>B. Imputing Missing Values (Filling)</h3>
+            <p>Machine learning models and aggregate charts cannot process missing blanks (<code>NaN</code>). Depending on the specific context of the data, different imputation strategies are used:</p>
+            <ul>
+                <li><strong>Zero-Filling:</strong> Missing counts (like the total number of refrigerator units) or missing initial foundation years are safely assumed to be zeros utilizing <code>.fillna(0)</code>.</li>
+                <li><strong>Median/Mean-Filling:</strong> Missing environmental variables (like <em>Net sqm</em>) are intelligently patched using the median square formatting of similar fleet stores (<code>.fillna(median_sqm)</code>) to preserve the integrity of the data distribution.</li>
+                <li><strong>Categorical Defaults:</strong> Missing text columns (like <em>BCM CM Region</em>) are safely defaulted to <code>'Unknown'</code>.</li>
+            </ul>
+            <div class="code-block">
+ref_df['Ref Open Qty Num'] = pd.to_numeric(ref_df['Ref Open Qty'], errors='coerce').fillna(0)
+uni['Net sqm'] = uni['Net sqm'].fillna(median_sqm)
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>C. Merging & Truth Validation</h3>
+            <p>The survey data inherently contains human error regarding store hierarchies and reporting regions. The cleaning process standardizes this by relying on a 'Source of Truth'.</p>
+            <ul>
+                <li>The scripts heavily rely on merging the raw survey frames with a trusted <code>master_active</code> store catalog using <code>Store ID</code> or <code>GOLD Code</code> as the key.</li>
+                <li>Once merged, user-submitted locations are overwritten or supplemented with verified internal regions (like <em>DD Name (14)</em> and <em>BCM CM Region</em>).</li>
+                <li>Finally, secondary columns like <em>Store Age (yrs)</em> are freshly calculated via Python, overriding any static age values typed into the survey.</li>
+            </ul>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -8,3 +8,6 @@ __pycache__/
 
 # Ignore backup files
 *.bak
+
+# Ignore MS Office temp/lock files
+~$*

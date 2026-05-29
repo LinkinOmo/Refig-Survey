@@ -2,8 +2,9 @@
 
 function processBigCWorkOrderForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BigC_Work_Orders");
-        var headers = ["Timestamp", "ID", "Employee ID", "Project/Task", "Details", "Priority", "Deadline", "Status", "Approved By", "Approval Date", "Evidence URL", "Rating", "Creation Attachment", "Start Date", "Work Doc Number", "Estimated Budget", "Budget Type", "Contract", "Vendor", "Station", "PR Number", "PO Number", "Objective", "BU"];
+        var headers =["Timestamp", "ID", "Employee ID", "Project/Task", "Details", "Priority", "Deadline", "Status", "Approved By", "Approval Date", "Evidence URL", "Rating", "Creation Attachment", "Start Date", "Work Doc Number", "Estimated Budget", "Budget Type", "Contract", "Vendor", "Station", "PR Number", "PO Number", "Objective", "BU", "PR Date", "PO Date"];
         
         if (!sheet) {
             sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet("BigC_Work_Orders");
@@ -74,7 +75,9 @@ function processBigCWorkOrderForm(form) {
             form.prNumber || "",
             form.poNumber || "",
             form.objective || "",
-            form.bu || ""
+            form.bu || "",
+            form.prNumber ? new Date() : "", // PR Date
+            form.poNumber ? new Date() : ""  // PO Date
         ]);
 
         // --- Email Notification Logic ---
@@ -362,6 +365,7 @@ function getPendingBigCWorkOrders(clientEmail) {
 
 function uploadBigCWorkOrderEvidence(id, fileData) {
     try {
+        var _wlock = _acquireWriteLock_();
         var folderName = "BigC_Work_Orders_Evidence";
         var folder;
         var folders = DriveApp.getFoldersByName(folderName);
@@ -399,6 +403,7 @@ function uploadBigCWorkOrderEvidence(id, fileData) {
 
 function approveBigCWorkOrder(workOrderId, approverName, rating) {
     try {
+        var _wlock = _acquireWriteLock_();
         var userEmail = Session.getActiveUser().getEmail();
         
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BigC_Work_Orders");
@@ -525,7 +530,9 @@ function getAllBigCWorkOrdersReport(userEmail) {
                 prNumber: row[20],
                 poNumber: row[21],
                 objective: row[22],
-                bu: row[23]
+                bu: row[23],
+                prDate: row[24] ? Utilities.formatDate(new Date(row[24]), Session.getScriptTimeZone(), "yyyy-MM-dd") : "",
+                poDate: row[25] ? Utilities.formatDate(new Date(row[25]), Session.getScriptTimeZone(), "yyyy-MM-dd") : ""
             });
         }
         
@@ -579,6 +586,7 @@ function getAllBigCWorkOrdersReport(userEmail) {
 
 function updateBigCWorkOrder(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BigC_Work_Orders");
         if (!sheet) return { success: false, error: "Sheet not found" };
 
@@ -645,11 +653,22 @@ function updateBigCWorkOrder(form) {
             // Handle PR Number
             // Column 21
             if (form.prNumber !== undefined) {
-                 sheet.getRange(rowIndex, 21).setValue(form.prNumber);
+                var currentPrNumber = data[rowIndex - 1][20];
+                var currentPrDate = data[rowIndex - 1][24];
+                sheet.getRange(rowIndex, 21).setValue(form.prNumber);
+                // Record PR Date only when PR Number is set for the first time
+                if (form.prNumber && !currentPrDate) {
+                    sheet.getRange(rowIndex, 25).setValue(new Date());
+                }
             }
             // PO Number - Column 22
             if (form.poNumber !== undefined) {
-                 sheet.getRange(rowIndex, 22).setValue(form.poNumber);
+                var currentPoDate = data[rowIndex - 1][25];
+                sheet.getRange(rowIndex, 22).setValue(form.poNumber);
+                // Record PO Date only when PO Number is set for the first time
+                if (form.poNumber && !currentPoDate) {
+                    sheet.getRange(rowIndex, 26).setValue(new Date());
+                }
             }
             
             // Handle Objective & BU

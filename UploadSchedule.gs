@@ -172,6 +172,7 @@ function createUploadSchedule(params) {
      }
     */
     try {
+        var _wlock = _acquireWriteLock_();
         var deadline    = new Date(params.deadline);
         var criticalSet = {};
         (params.criticalCodes || []).forEach(function(c) { criticalSet[c.trim()] = true; });
@@ -519,6 +520,7 @@ function getScheduleForBranch(searchTerm) {
 
 function rescheduleOverdue() {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = _getScheduleSheet(false);
         if (!sheet || sheet.getLastRow() < 2) return { success: true, rescheduled: 0 };
 
@@ -703,6 +705,7 @@ function getDailyScheduleWithSurvey(fromDate, toDate) {
 
 function syncScheduleWithSurveyDb() {
     try {
+        var _wlock = _acquireWriteLock_();
         var scheduleSheet = _getScheduleSheet(false);
         if (!scheduleSheet || scheduleSheet.getLastRow() < 2) {
             return { success: true, synced: 0 };
@@ -795,6 +798,7 @@ function syncScheduleWithSurveyDb() {
 
 function markBranchUploaded(branchCode) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = _getScheduleSheet(false);
         if (!sheet) return { success: false, error: "Schedule not found" };
 
@@ -899,6 +903,7 @@ function getScheduleExportUrl() {
 
 function updateScheduleBranchCritical(branchCode, isCritical) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = _getScheduleSheet(false);
         if (!sheet) return { success: false, error: "Schedule not found" };
         var data = sheet.getDataRange().getValues();
@@ -921,6 +926,7 @@ function updateScheduleBranchCritical(branchCode, isCritical) {
 // For each code: if found Pending → mark Critical=Yes; if not found → add new row.
 function addCriticalToSchedule(codes) {
     try {
+        var _wlock = _acquireWriteLock_();
         if (!codes || codes.length === 0) return { success: true, marked: 0, added: 0 };
 
         var sheet  = _getScheduleSheet(false);
@@ -1585,6 +1591,138 @@ function getScheduleUploadProgressReport() {
 
     } catch (e) {
         Logger.log('getScheduleUploadProgressReport Error: ' + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getDuplicateSurveyData
+// Scans Aircon_Survey_Database and Ref_Survey_Database for sites that have
+// more than one non-Draft submission. Returns a grouped list for the
+// "📌 ตรวจซ้ำ" tab in upload-schedule.html.
+// ─────────────────────────────────────────────────────────────────────────────
+function getDuplicateSurveyData() {
+    try {
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var sheetDefs = [
+            { name: 'Aircon_Survey_Database', typeKey: 'aircon' },
+            { name: 'Ref_Survey_Database',    typeKey: 'ref' }
+        ];
+
+        var siteMap = {};  // code -> { code, name, bu, dm, cm, am, aircon: [], ref: [] }
+
+        sheetDefs.forEach(function(def) {
+            var sheet = ss.getSheetByName(def.name);
+            if (!sheet || sheet.getLastRow() < 2) return;
+
+            var data    = sheet.getDataRange().getValues();
+            var headers = data[0];
+
+            var tsIdx = -1, codeIdx = -1, nameIdx = -1, statusIdx = -1,
+                buIdx = -1, dmIdx   = -1, cmIdx   = -1, amIdx     = -1;
+
+            for (var h = 0; h < headers.length; h++) {
+                var hdr = String(headers[h]).toLowerCase().trim();
+                if (hdr === 'timestamp')   tsIdx     = h;
+                if (hdr === 'branch code') codeIdx   = h;
+                if (hdr === 'branch name') nameIdx   = h;
+                if (hdr === 'status')      statusIdx = h;
+                if (hdr === 'bu')          buIdx     = h;
+                if (hdr === 'dm area')     dmIdx     = h;
+                if (hdr === 'cm area')     cmIdx     = h;
+                if (hdr === 'amm mtn')     amIdx     = h;
+            }
+            if (codeIdx < 0) return;
+
+            for (var i = 1; i < data.length; i++) {
+                var row    = data[i];
+                var code   = String(row[codeIdx] || '').trim();
+                var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
+                if (!code || status === 'Draft') continue;
+
+                var tsRaw  = tsIdx >= 0 ? row[tsIdx] : '';
+                var tsDate = tsRaw instanceof Date ? tsRaw : new Date(String(tsRaw));
+                var tsMs   = isNaN(tsDate.getTime()) ? 0 : tsDate.getTime();
+                var tsStr  = tsMs > 0
+                    ? Utilities.formatDate(tsDate, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm')
+                    : '-';
+
+                if (!siteMap[code]) {
+                    siteMap[code] = {
+                        code:   code,
+                        name:   nameIdx >= 0 ? String(row[nameIdx] || '').trim() : '',
+                        bu:     buIdx   >= 0 ? String(row[buIdx]   || '').trim() : '',
+                        dm:     dmIdx   >= 0 ? String(row[dmIdx]   || '').trim() : '',
+                        cm:     cmIdx   >= 0 ? String(row[cmIdx]   || '').trim() : '',
+                        am:     amIdx   >= 0 ? String(row[amIdx]   || '').trim() : '',
+                        aircon: [],
+                        ref:    []
+                    };
+                } else {
+                    // Fill missing name/bu/dm/cm/am from later rows
+                    if (!siteMap[code].name && nameIdx >= 0) siteMap[code].name = String(row[nameIdx] || '').trim();
+                    if (!siteMap[code].bu   && buIdx   >= 0) siteMap[code].bu   = String(row[buIdx]   || '').trim();
+                    if (!siteMap[code].dm   && dmIdx   >= 0) siteMap[code].dm   = String(row[dmIdx]   || '').trim();
+                    if (!siteMap[code].cm   && cmIdx   >= 0) siteMap[code].cm   = String(row[cmIdx]   || '').trim();
+                    if (!siteMap[code].am   && amIdx   >= 0) siteMap[code].am   = String(row[amIdx]   || '').trim();
+                }
+
+                siteMap[code][def.typeKey].push({ ts: tsStr, tsMs: tsMs, status: status });
+            }
+        });
+
+        // Keep only sites with at least one type having >1 submission
+        var duplicates = [];
+        Object.keys(siteMap).forEach(function(code) {
+            var site = siteMap[code];
+            if (site.aircon.length <= 1 && site.ref.length <= 1) return;
+
+            // Sort submissions oldest-first within each type
+            site.aircon.sort(function(a, b) { return a.tsMs - b.tsMs; });
+            site.ref.sort(function(a, b)    { return a.tsMs - b.tsMs; });
+
+            duplicates.push({
+                code:        site.code,
+                name:        site.name,
+                bu:          site.bu,
+                dm:          site.dm,
+                cm:          site.cm,
+                am:          site.am,
+                airconCount: site.aircon.length,
+                airconSubs:  site.aircon.map(function(s) { return { ts: s.ts, status: s.status }; }),
+                refCount:    site.ref.length,
+                refSubs:     site.ref.map(function(s)    { return { ts: s.ts, status: s.status }; })
+            });
+        });
+
+        // Sort by most extra rows first
+        duplicates.sort(function(a, b) {
+            var aExtra = Math.max(0, a.airconCount - 1) + Math.max(0, a.refCount - 1);
+            var bExtra = Math.max(0, b.airconCount - 1) + Math.max(0, b.refCount - 1);
+            return bExtra - aExtra;
+        });
+
+        var airconDupeSites = duplicates.filter(function(s) { return s.airconCount > 1; }).length;
+        var refDupeSites    = duplicates.filter(function(s) { return s.refCount    > 1; }).length;
+        var bothDupeSites   = duplicates.filter(function(s) { return s.airconCount > 1 && s.refCount > 1; }).length;
+        var totalExtraRows  = duplicates.reduce(function(acc, s) {
+            return acc + Math.max(0, s.airconCount - 1) + Math.max(0, s.refCount - 1);
+        }, 0);
+
+        return {
+            success:  true,
+            sites:    duplicates,
+            summary: {
+                totalSites:      duplicates.length,
+                airconDupeSites: airconDupeSites,
+                refDupeSites:    refDupeSites,
+                bothDupeSites:   bothDupeSites,
+                totalExtraRows:  totalExtraRows
+            }
+        };
+
+    } catch (e) {
+        Logger.log('getDuplicateSurveyData Error: ' + e.toString());
         return { success: false, error: e.toString() };
     }
 }

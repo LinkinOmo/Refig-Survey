@@ -330,6 +330,7 @@ function getOrgChartData() {
 }
 
 function updateEmployee(form) {
+  var _wlock = _acquireWriteLock_();
   var sheet = findEmployeeSheet();
   var data = sheet.getDataRange().getValues(); 
   
@@ -402,6 +403,7 @@ function updateEmployee(form) {
 
 function processForm(formObject) {
   try {
+    var _wlock = _acquireWriteLock_();
     // 0. Check for duplicate email
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     
@@ -842,6 +844,7 @@ function checkAdminStatusById(id) { return { isAdmin: false, logs: ["Deprecated 
 
 function processPerformanceForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         // Check Admin by Email (Same as Tab Visibility)
         var status = checkAdminStatus(form.adminEmail);
         if (!status.isAdmin) {
@@ -868,6 +871,7 @@ function processPerformanceForm(form) {
 
 function processTalentForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var status = checkAdminStatus(form.adminEmail);
         if (!status.isAdmin) {
              // Return FULL debug logs for user to share
@@ -892,6 +896,7 @@ function processTalentForm(form) {
 
 function processAssignmentForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Assignments");
         sheet.appendRow([
             form.empId,
@@ -970,6 +975,7 @@ function getAssignmentReport() {
 
 function processWorkOrderForm(form) {
     try {
+        var _wlock = _acquireWriteLock_();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
         var headers = ["Timestamp", "ID", "Employee ID", "Project/Task", "Details", "Priority", "Deadline", "Status", "Approved By", "Approval Date", "Evidence URL", "Rating", "Creation Attachment", "Start Date", "Store", "Classification", "Confidential"];
         
@@ -1440,6 +1446,7 @@ function loginUser(emailOrId, password) {
 
 function changePassword(email, oldPassword, newPassword) {
   try {
+    var _wlock = _acquireWriteLock_();
     var loginResult = loginUser(email, oldPassword);
     if (!loginResult.success) {
       return { success: false, error: "Old password incorrect." };
