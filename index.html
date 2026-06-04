@@ -244,6 +244,14 @@
                     adminBtn.classList.add('hidden');
                 }
             }
+            const pwdResetBtn = document.getElementById('admin-pwd-reset-btn');
+            if (pwdResetBtn) {
+                if (user.isAdmin) {
+                    pwdResetBtn.classList.remove('hidden');
+                } else {
+                    pwdResetBtn.classList.add('hidden');
+                }
+            }
 
             // Tab Visibility Logic
             const adminOnlyTabs = [
@@ -509,6 +517,15 @@
                             </path>
                         </svg>
                         Admin Dashboard
+                    </a>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin-password-reset" target="_blank"
+                        id="admin-pwd-reset-btn"
+                        class="hidden bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-orange-200 transition-colors flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11.536 11 13 12.464l-4 4L7.5 15l-4 4m6-1a2 2 0 002-2"/>
+                        </svg>
+                        Reset Password
                     </a>
                     <a href="<?= ScriptApp.getService().getUrl() ?>?page=report" target="_top"
                         class="admin-only-link bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-green-200 transition-colors">

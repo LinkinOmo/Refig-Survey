@@ -143,6 +143,12 @@ function doGet(e) {
         .setTitle('AI Prediction Analysis')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "admin-password-reset") {
+    return HtmlService.createTemplateFromFile('admin-password-reset')
+        .evaluate()
+        .setTitle('Admin - Password Reset')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page && page.trim().toLowerCase() == "survey-config") {
     Logger.log("Serving survey-config for page param: " + page);
     return HtmlService.createTemplateFromFile('survey-config')
@@ -1441,6 +1447,96 @@ function loginUser(emailOrId, password) {
         
     } catch (e) {
         return { success: false, error: e.toString() };
+    }
+}
+
+// Returns all employees as {email, display} for the admin password-reset page
+function getEmployeeListForReset() {
+    try {
+        var sheet = findEmployeeSheet();
+        if (!sheet) {
+            console.error("getEmployeeListForReset: Employee Sheet not found");
+            return [];
+        }
+        var data = sheet.getDataRange().getValues();
+        if (data.length < 2) return [];
+        
+        var headers = data[0];
+
+        var emailIdx = headers.indexOf("Email");
+        if (emailIdx === -1) emailIdx = 6;
+        var empIdIdx = headers.indexOf("Employee ID");
+        if (empIdIdx === -1) empIdIdx = 1;
+        var nameIdx = headers.indexOf("Full Name");
+        if (nameIdx === -1) nameIdx = 2;
+
+        var result = [];
+        for (var i = 1; i < data.length; i++) {
+            var email = String(data[i][emailIdx] || "").trim();
+            var name  = String(data[i][nameIdx]  || "").trim();
+            var empId = String(data[i][empIdIdx]  || "").trim();
+            if (!email && !name) continue;
+            result.push({
+                email:   email,
+                display: (empId ? "[" + empId + "] " : "") + name + (email ? " <" + email + ">" : "")
+            });
+        }
+        // Sort by name for better UX
+        result.sort(function(a, b) {
+            return a.display.localeCompare(b.display);
+        });
+        return result;
+    } catch (e) {
+        console.error("Error in getEmployeeListForReset: " + e.toString());
+        return [];
+    }
+}
+
+// Admin-only: reset any user's password without requiring the old one
+function adminResetPassword(adminEmail, targetEmail, newPassword) {
+    try {
+        if (!adminEmail) return { success: false, error: "Admin email is missing." };
+        
+        var adminCheck = checkAdminStatus(adminEmail);
+        if (!adminCheck.isAdmin) {
+            return { success: false, error: "Access denied — admins only. (Checked: " + adminEmail + ")" };
+        }
+
+        if (!targetEmail || !newPassword) {
+            return { success: false, error: "Target email and new password are required." };
+        }
+
+        var sheet = findEmployeeSheet();
+        if (!sheet) return { success: false, error: "Employee database sheet not found." };
+        
+        var data = sheet.getDataRange().getValues();
+        var headers = data[0];
+
+        var emailIdx = headers.indexOf("Email");
+        if (emailIdx === -1) emailIdx = 6;
+        var pwdIdx = headers.indexOf("Password");
+
+        if (pwdIdx === -1) {
+            return { success: false, error: "Password column not found in Employee Database." };
+        }
+
+        var target = String(targetEmail).trim().toLowerCase();
+        for (var i = 1; i < data.length; i++) {
+            if (String(data[i][emailIdx]).trim().toLowerCase() === target) {
+                sheet.getRange(i + 1, pwdIdx + 1).setValue(hashPassword(newPassword));
+                try {
+                    logUserActivity(adminEmail, "AdminResetPassword", "Reset pwd for: " + targetEmail);
+                } catch (e) {
+                    console.error("Logging failed for AdminResetPassword", e);
+                }
+                return { success: true };
+            }
+        }
+
+        return { success: false, error: "User not found: " + targetEmail };
+    } catch (e) {
+        console.error("Error in adminResetPassword: " + e.toString());
+        return { success: false, error: "System Error: " + e.toString() };
     }
 }
 
