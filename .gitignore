@@ -11,3 +11,9 @@ __pycache__/
 
 # Ignore MS Office temp/lock files
 ~$*
+
+# Non-app data/analysis folders (not part of the deployed app, excluded from clasp
+# push via skipSubdirectories — see CLAUDE.md "Non-code assets")
+Pyhon ANL/
+Refride CM Plan/
+SRD Layout Porject/

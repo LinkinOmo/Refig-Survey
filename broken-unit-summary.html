@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Broken Unit Summary</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 12px;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #3b82f6;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .pulse-wave {
+            box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+            animation: pulse-border 2s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+
+        @keyframes pulse-border {
+            to { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
+        }
+
+        .badge {
+            padding: 3px 10px;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .status-Pending      { color: #b45309; background-color: #fef3c7; border: 1px solid #fde68a; }
+        .status-Acknowledged { color: #1d4ed8; background-color: #dbeafe; border: 1px solid #bfdbfe; }
+        .status-Corrected    { color: #6d28d9; background-color: #ede9fe; border: 1px solid #ddd6fe; }
+        .status-Closed       { color: #15803d; background-color: #dcfce7; border: 1px solid #bbf7d0; }
+        .status-Rejected     { color: #b91c1c; background-color: #fee2e2; border: 1px solid #fecaca; }
+        .status-Unknown      { color: #475569; background-color: #f1f5f9; border: 1px solid #e2e8f0; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="hidden fixed inset-0 bg-slate-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8">
+            <div class="text-center mb-6">
+                <div class="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-3">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                </div>
+                <h2 class="text-xl font-bold text-slate-800">Sign In Required</h2>
+                <p class="text-slate-500 text-sm mt-1">กรุณาเข้าสู่ระบบก่อนใช้งาน</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Email</label>
+                    <input type="email" id="loginEmail" required placeholder="your.name@example.com"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Password</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 outline-none transition">
+                </div>
+                <div id="loginError" class="hidden text-red-600 text-xs text-center bg-red-50 border border-red-200 rounded-lg p-2"></div>
+                <button type="submit" id="loginBtn"
+                    class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2 text-sm">
+                    <svg id="loginSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span id="loginBtnText">เข้าสู่ระบบ</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white bg-opacity-95 backdrop-blur-sm transition-opacity duration-500">
+        <div class="relative mb-6">
+            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center pulse-wave">
+                <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"></path></svg>
+            </div>
+        </div>
+        <h2 class="text-xl font-bold text-slate-800 mb-2">Broken Unit Summary</h2>
+        <p id="loadingStatusText" class="text-sm text-slate-500 font-medium">Checking authorization...</p>
+        <div class="mt-6 w-64 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+            <div id="loadingProgress" class="bg-red-600 h-1.5 rounded-full" style="width: 10%; transition: width 0.3s ease;"></div>
+        </div>
+    </div>
+
+    <!-- Error Screen -->
+    <div id="errorScreen" class="hidden min-h-screen flex items-center justify-center bg-slate-50">
+        <div class="text-center p-8 glass-panel max-w-md w-full mx-4">
+            <div class="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h2 id="errorTitle" class="text-2xl font-bold text-slate-800 mb-2">Access Denied</h2>
+            <p id="errorMessage" class="text-slate-500 mb-6 text-sm">สิทธิ์หน้านี้จำกัดเฉพาะ <span class="font-semibold text-slate-700">ทีม SMF</span> เท่านั้น</p>
+            <div id="errorActions" class="flex flex-col sm:flex-row gap-3 justify-center">
+                <a id="errorBackBtn" href="<?= ScriptApp.getService().getUrl() ?>" class="inline-block px-6 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition">กลับหน้าหลัก</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboardContainer" class="hidden min-h-screen flex flex-col">
+
+        <!-- Header -->
+        <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-4">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-slate-400 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-slate-50">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                        </a>
+                        <div class="h-8 w-1 border-l-2 border-slate-200"></div>
+                        <div>
+                            <h1 class="text-xl font-bold text-slate-900 leading-tight">
+                                สรุปคำขอแจ้งซ่อมตู้/เครื่องชำรุด <span class="text-red-600">by Category</span>
+                            </h1>
+                            <p class="text-xs text-slate-500 font-medium">Broken Unit Request Summary — แยกตามหมวดอุปกรณ์ (AC / Refrigerator / New Product Line)</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right hidden sm:block">
+                            <p id="userEmailDisplay" class="text-xs font-bold text-slate-700"></p>
+                            <span class="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full uppercase">SMF Dashboard</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Content -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
+
+            <!-- KPI Cards: Grand Totals -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="glass-panel p-5 relative overflow-hidden border-l-4 border-red-500 bg-red-50/30">
+                    <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-2">คำขอแจ้งชำรุดทั้งหมด (Total Broken Requests)</p>
+                    <h3 class="text-4xl font-extrabold text-red-600" id="statTotalRequests">0</h3>
+                </div>
+                <div class="glass-panel p-5 relative overflow-hidden border-l-4 border-orange-500 bg-orange-50/30">
+                    <p class="text-xs font-bold text-orange-600 uppercase tracking-wider mb-2">จำนวนตู้/เครื่องที่ชำรุดทั้งหมด (Total Broken Units)</p>
+                    <h3 class="text-4xl font-extrabold text-orange-600" id="statTotalUnits">0</h3>
+                </div>
+            </div>
+
+            <!-- Per-Category KPI Cards -->
+            <div id="categoryCards" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- JS populated -->
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass-panel p-5 lg:col-span-1 flex flex-col">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider border-b border-slate-100 pb-2">
+                        สัดส่วนคำขอแยกตามหมวด (Requests by Category)
+                    </h3>
+                    <div class="relative flex-1 min-h-[250px] flex items-center justify-center">
+                        <canvas id="categoryDoughnutChart"></canvas>
+                    </div>
+                </div>
+                <div class="glass-panel p-5 lg:col-span-2 flex flex-col">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider border-b border-slate-100 pb-2">
+                        คำขอ vs จำนวนตู้/เครื่องที่ชำรุด แยกตามหมวด (Requests vs Broken Units)
+                    </h3>
+                    <div class="relative flex-1 min-h-[250px]">
+                        <canvas id="categoryBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Per-Category Breakdown Tables -->
+            <div id="categoryBreakdown" class="space-y-6">
+                <!-- JS populated -->
+            </div>
+
+            <div id="emptyState" class="hidden flex-col items-center justify-center py-16 text-center glass-panel">
+                <svg class="w-12 h-12 text-slate-300 mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <p class="text-slate-500 font-medium">ไม่พบคำขอแจ้งซ่อมตู้/เครื่องชำรุดในระบบ</p>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        let SUMMARY_DATA = null;
+        let CHARTS = {};
+
+        const CATEGORY_COLORS = {
+            ac:  { solid: '#3b82f6', light: 'rgba(59, 130, 246, 0.15)', text: 'text-blue-600',   bar: '#3b82f6' },
+            ref: { solid: '#0ea5e9', light: 'rgba(14, 165, 233, 0.15)', text: 'text-sky-600',    bar: '#0ea5e9' },
+            np:  { solid: '#8b5cf6', light: 'rgba(139, 92, 246, 0.15)', text: 'text-violet-600', bar: '#8b5cf6' }
+        };
+        const CATEGORY_ICONS = {
+            ac:  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V8a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 01-2 2M5 12a2 2 0 00-2 2v2a2 2 0 002 2h14a2 2 0 002-2v-2a2 2 0 00-2-2"></path>',
+            ref: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3h14a1 1 0 011 1v16a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1zM7 7h.01M7 14h.01"></path>',
+            np:  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>'
+        };
+        const STATUS_ORDER = ['Pending', 'Acknowledged', 'Corrected', 'Closed', 'Rejected', 'Unknown'];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkLoginAndStart();
+        });
+
+        // ==========================================
+        // 0. Login Gate
+        // ==========================================
+        function checkLoginAndStart() {
+            const cachedUserStr = localStorage.getItem('app_user_data');
+            if (cachedUserStr) {
+                try {
+                    const usr = JSON.parse(cachedUserStr);
+                    if (usr && usr.email) {
+                        initAuthAndData(usr.email, usr.name);
+                        return;
+                    }
+                } catch (e) {}
+            }
+            document.getElementById('loadingScreen').classList.add('hidden');
+            document.getElementById('loginOverlay').classList.remove('hidden');
+        }
+
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const spinner = document.getElementById('loginSpinner');
+            const btnText = document.getElementById('loginBtnText');
+            const errorDiv = document.getElementById('loginError');
+            const email = document.getElementById('loginEmail').value.trim();
+            const pwd = document.getElementById('loginPassword').value;
+
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            btnText.textContent = 'กำลังตรวจสอบ...';
+            errorDiv.classList.add('hidden');
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.disabled = false;
+                    spinner.classList.add('hidden');
+                    btnText.textContent = 'เข้าสู่ระบบ';
+                    if (res && res.success) {
+                        localStorage.setItem('app_user_data', JSON.stringify(res.user));
+                        document.getElementById('loginOverlay').classList.add('hidden');
+                        document.getElementById('loadingScreen').classList.remove('hidden');
+                        initAuthAndData(res.user.email, res.user.name);
+                    } else {
+                        errorDiv.textContent = (res && res.error) || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+                        errorDiv.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    btn.disabled = false;
+                    spinner.classList.add('hidden');
+                    btnText.textContent = 'เข้าสู่ระบบ';
+                    errorDiv.textContent = 'ระบบขัดข้อง: ' + (err.message || err);
+                    errorDiv.classList.remove('hidden');
+                })
+                .loginUser(email, pwd);
+        }
+
+        // ==========================================
+        // 1. Auth + Data Fetch
+        // ==========================================
+        function initAuthAndData(email, displayName) {
+            updateLoading('ตรวจสอบสิทธิ์การเข้าถึง...', 25);
+            if (displayName || email) {
+                document.getElementById('userEmailDisplay').textContent = displayName || email;
+            }
+
+            var fetchTimeout = setTimeout(function() {
+                showDataError('หมดเวลาเชื่อมต่อ (Timeout) กรุณา Reload หน้าเว็บแล้วลองใหม่');
+            }, 45000);
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    clearTimeout(fetchTimeout);
+                    handleSummaryResult(res);
+                })
+                .withFailureHandler(function(err) {
+                    clearTimeout(fetchTimeout);
+                    console.error('Fetch Error:', err);
+                    showDataError(err.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่');
+                })
+                .getBrokenUnitSummary(email || '');
+        }
+
+        function handleSummaryResult(res) {
+            updateLoading('กำลังประมวลผลข้อมูล...', 70);
+
+            if (!res) {
+                showDataError('Server ไม่ตอบสนอง — โปรดลองใหม่อีกครั้ง');
+                return;
+            }
+            if (res.success === false) {
+                if (/permission denied/i.test(res.error || '')) {
+                    showAccessDenied();
+                } else {
+                    showDataError(res.error || 'เกิดข้อผิดพลาดในการดึงข้อมูล');
+                }
+                return;
+            }
+
+            SUMMARY_DATA = res;
+            updateLoading('เตรียมข้อมูลแสดงผลเรียบร้อย', 100);
+
+            setTimeout(() => {
+                document.getElementById('loadingScreen').classList.add('opacity-0');
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').classList.add('hidden');
+                    document.getElementById('dashboardContainer').classList.remove('hidden');
+                    renderDashboard();
+                }, 500);
+            }, 400);
+        }
+
+        function showAccessDenied() {
+            document.getElementById('errorTitle').textContent = 'Access Denied';
+            document.getElementById('errorMessage').innerHTML = 'สิทธิ์หน้านี้จำกัดเฉพาะ <span class="font-semibold text-slate-700">ทีม SMF / Admin</span> เท่านั้น<br>กรุณาเข้าสู่ระบบด้วยบัญชีที่ถูกต้อง';
+            document.getElementById('errorActions').innerHTML =
+                '<a href="<?= ScriptApp.getService().getUrl() ?>" class="inline-block px-6 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition">กลับหน้าหลัก</a>';
+            localStorage.removeItem('app_user_data');
+            showErrorScreen();
+        }
+
+        function showDataError(msg) {
+            document.getElementById('errorTitle').textContent = 'เกิดข้อผิดพลาด (Error)';
+            document.getElementById('errorMessage').innerHTML = '<span class="font-semibold text-red-600">' + (msg || 'ไม่สามารถโหลดข้อมูลได้') + '</span>';
+            document.getElementById('errorActions').innerHTML =
+                '<button onclick="location.reload()" class="inline-block px-6 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition">โหลดใหม่ (Retry)</button>' +
+                '<a href="<?= ScriptApp.getService().getUrl() ?>" class="inline-block px-6 py-2 bg-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-300 transition">กลับหน้าหลัก</a>';
+            showErrorScreen();
+        }
+
+        function showErrorScreen() {
+            document.getElementById('loadingScreen').classList.add('opacity-0');
+            setTimeout(() => {
+                document.getElementById('loadingScreen').classList.add('hidden');
+                document.getElementById('errorScreen').classList.remove('hidden');
+            }, 500);
+        }
+
+        function updateLoading(msg, pct) {
+            document.getElementById('loadingStatusText').textContent = msg;
+            document.getElementById('loadingProgress').style.width = pct + '%';
+        }
+
+        // ==========================================
+        // 2. UI Rendering
+        // ==========================================
+        function renderDashboard() {
+            const cats = SUMMARY_DATA.categories || [];
+            const totals = SUMMARY_DATA.totals || { requestCount: 0, unitCount: 0 };
+
+            const grandTotal = cats.reduce((s, c) => s + c.requestCount, 0);
+            if (grandTotal === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+                document.getElementById('emptyState').classList.add('flex');
+            }
+
+            animateValue('statTotalRequests', 0, totals.requestCount || 0, 900);
+            animateValue('statTotalUnits', 0, totals.unitCount || 0, 900);
+
+            renderCategoryCards(cats, grandTotal);
+            renderCharts(cats);
+            renderBreakdown(cats);
+        }
+
+        function animateValue(id, start, end, duration) {
+            const obj = document.getElementById(id);
+            if (!obj) return;
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 4);
+                obj.innerHTML = Math.floor(ease * (end - start) + start).toLocaleString();
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function renderCategoryCards(cats, grandTotal) {
+            const container = document.getElementById('categoryCards');
+            container.innerHTML = cats.map(function(c) {
+                const colors = CATEGORY_COLORS[c.key] || CATEGORY_COLORS.ac;
+                const icon = CATEGORY_ICONS[c.key] || '';
+                const pct = grandTotal > 0 ? Math.round((c.requestCount / grandTotal) * 100) : 0;
+                return `
+                    <div class="glass-panel p-5 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="p-2.5 rounded-lg" style="background-color:${colors.light}">
+                                <svg class="w-6 h-6" style="color:${colors.solid}" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icon}</svg>
+                            </div>
+                            <span class="badge" style="background-color:${colors.light};color:${colors.solid};border:1px solid ${colors.solid}33">${pct}% ของคำขอทั้งหมด</span>
+                        </div>
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">${htmlEscape(c.label)}</p>
+                        <div class="flex items-end gap-4 mt-2">
+                            <div>
+                                <p class="text-[10px] text-slate-400 uppercase font-semibold">คำขอ (Requests)</p>
+                                <h3 class="text-3xl font-extrabold text-slate-800">${(c.requestCount || 0).toLocaleString()}</h3>
+                            </div>
+                            <div>
+                                <p class="text-[10px] text-slate-400 uppercase font-semibold">ตู้/เครื่องชำรุด (Units)</p>
+                                <h3 class="text-3xl font-extrabold" style="color:${colors.solid}">${(c.unitCount || 0).toLocaleString()}</h3>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function renderCharts(cats) {
+            const labels = cats.map(c => c.label);
+            const requestData = cats.map(c => c.requestCount || 0);
+            const unitData = cats.map(c => c.unitCount || 0);
+            const colors = cats.map(c => (CATEGORY_COLORS[c.key] || CATEGORY_COLORS.ac).solid);
+
+            // Doughnut — share of requests by category
+            const dCtx = document.getElementById('categoryDoughnutChart');
+            if (CHARTS.doughnut) CHARTS.doughnut.destroy();
+            CHARTS.doughnut = new Chart(dCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: requestData, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 11 }, padding: 12 } } }
+                }
+            });
+
+            // Bar — requests vs units per category
+            const bCtx = document.getElementById('categoryBarChart');
+            if (CHARTS.bar) CHARTS.bar.destroy();
+            CHARTS.bar = new Chart(bCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'คำขอ (Requests)', data: requestData, backgroundColor: colors.map(c => c + 'cc'), borderRadius: 6, maxBarThickness: 56 },
+                        { label: 'ตู้/เครื่องชำรุด (Units)', data: unitData, backgroundColor: colors.map(c => c + '55'), borderRadius: 6, maxBarThickness: 56 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { font: { family: 'Prompt', size: 11 } } } },
+                    plugins: { legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 11 }, padding: 12 } } }
+                }
+            });
+        }
+
+        function renderBreakdown(cats) {
+            const container = document.getElementById('categoryBreakdown');
+            container.innerHTML = cats.map(function(c) {
+                const colors = CATEGORY_COLORS[c.key] || CATEGORY_COLORS.ac;
+                const statusRows = buildBreakdownRows(c.byStatus, c.requestCount, true);
+                const areaRows = buildBreakdownRows(c.byArea, c.requestCount, false);
+
+                return `
+                    <div class="glass-panel overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                            <div class="w-2.5 h-2.5 rounded-full" style="background-color:${colors.solid}"></div>
+                            <h3 class="font-bold text-slate-800">${htmlEscape(c.label)}</h3>
+                            <span class="text-xs text-slate-400 ml-auto">${(c.requestCount || 0).toLocaleString()} คำขอ · ${(c.unitCount || 0).toLocaleString()} ตู้/เครื่อง</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                            <div class="p-4">
+                                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">แยกตามสถานะ (By Status)</p>
+                                ${statusRows || emptyRow()}
+                            </div>
+                            <div class="p-4">
+                                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">แยกตามพื้นที่ (By Area)</p>
+                                ${areaRows || emptyRow()}
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function buildBreakdownRows(map, total, isStatus) {
+            if (!map) return '';
+            let entries = Object.keys(map).map(k => ({ key: k, count: map[k] }));
+            if (isStatus) {
+                entries.sort((a, b) => STATUS_ORDER.indexOf(a.key) - STATUS_ORDER.indexOf(b.key));
+            } else {
+                entries.sort((a, b) => b.count - a.count);
+                entries = entries.slice(0, 8); // top 8 areas to keep it readable
+            }
+            if (entries.length === 0) return '';
+
+            return entries.map(function(e) {
+                const pct = total > 0 ? Math.round((e.count / total) * 100) : 0;
+                const badgeClass = isStatus ? ('badge status-' + (STATUS_ORDER.indexOf(e.key) > -1 ? e.key : 'Unknown')) : 'badge status-Unknown';
+                return `
+                    <div class="flex items-center gap-3 mb-2.5">
+                        <span class="${badgeClass} w-28 text-center shrink-0">${htmlEscape(e.key)}</span>
+                        <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-2 rounded-full bg-slate-400" style="width:${pct}%"></div>
+                        </div>
+                        <span class="text-xs font-semibold text-slate-600 w-16 text-right">${e.count.toLocaleString()} (${pct}%)</span>
+                    </div>`;
+            }).join('');
+        }
+
+        function emptyRow() {
+            return '<p class="text-xs text-slate-400">ไม่มีข้อมูล</p>';
+        }
+
+        function htmlEscape(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+    </script>
+</body>
+
+</html>

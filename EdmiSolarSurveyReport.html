@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDMI Solar Meter Survey Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #b45309; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: 0.75rem; font-weight: 600; color: #64748b; min-width: 160px; }
+        .detail-value { font-size: 0.85rem; color: #1e293b; }
+        #detailModal { transition: opacity 0.28s ease; }
+        #detailModal.modal-open { opacity: 1; }
+        #detailModal:not(.modal-open) { opacity: 0; }
+        #modalContent { transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1); will-change: transform; }
+        #detailModal:not(.modal-open) #modalContent { transform: translateY(100%); }
+        #detailModal.modal-open #modalContent { transform: translateY(0); }
+        @media (min-width: 768px) {
+            #modalContent { transition: transform 0.28s ease, opacity 0.28s ease; }
+            #detailModal:not(.modal-open) #modalContent { transform: scale(0.95); opacity: 0; }
+            #detailModal.modal-open #modalContent { transform: scale(1); opacity: 1; }
+        }
+        @media (max-width: 767px) {
+            #detailModal { background: #f1f5f9 !important; backdrop-filter: none !important; }
+            #detailModal #modalContent { max-height: 100dvh !important; height: 100dvh; border-radius: 0 !important; }
+        }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-sm bg-opacity-95">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-4">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>"
+                        class="text-slate-500 hover:text-amber-600 transition-colors p-2 rounded-lg hover:bg-slate-50 relative group">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                            </path>
+                        </svg>
+                        <span class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none">กลับหน้าหลัก</span>
+                    </a>
+                    <div class="h-8 w-1 bg-amber-500 rounded-full"></div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">☀️ รายงาน EDMI Solar Meter</h1>
+                        <p class="text-xs text-slate-500 font-medium">Solar Meter Reading Survey — Dashboard</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="loader" id="mainLoader"></div>
+                    <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                    <button id="exportExcelBtn" onclick="downloadEdmiExcel(this)"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16">
+                            </path>
+                        </svg>
+                        <span class="hidden sm:inline">Export Excel</span>
+                    </button>
+                    <button onclick="window.location.reload()"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-amber-600 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                        <span class="hidden sm:inline">Refresh</span>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200"></div>
+                    <div class="flex flex-col items-end">
+                        <span id="nav-user-name" class="text-xs font-bold text-slate-700"></span>
+                        <span id="access-level-display" class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide">User Access</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Stat Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-amber-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">รายการทั้งหมด</p>
+                <h3 class="text-3xl font-bold text-slate-800" id="statTotal">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">🔒 เข้าถึงไม่ได้</p>
+                <h3 class="text-3xl font-bold text-red-600" id="statBlocked">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-sky-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">สาขาที่ส่งข้อมูล</p>
+                <h3 class="text-3xl font-bold text-slate-800" id="statStores">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-emerald-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">ส่งใน 7 วันล่าสุด</p>
+                <h3 class="text-3xl font-bold text-slate-800" id="statThisWeek">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-orange-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">รวม kWh Total (Code 000)</p>
+                <h3 class="text-3xl font-bold text-slate-800" id="statTotalKwh">0</h3>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="glass-panel p-4 rounded-xl">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="md:col-span-2">
+                    <input type="text" id="searchInput" placeholder="ค้นหา รหัสสาขา / ชื่อสาขา / ผู้แจ้ง..."
+                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400"
+                        oninput="_debouncedApplyFilters()">
+                </div>
+                <div>
+                    <select id="formatFilter" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400" onchange="applyFilters()">
+                        <option value="">-- ทุกรูปแบบ (Format) --</option>
+                        <option value="Big Format">Big Format</option>
+                        <option value="Small Format (BCM)">Small Format (BCM)</option>
+                    </select>
+                </div>
+                <div>
+                    <input type="text" id="phaseFilter" placeholder="Solar Phase (เช่น 7)"
+                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400"
+                        oninput="_debouncedApplyFilters()">
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Card List -->
+        <div id="cardList" class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden"></div>
+
+        <!-- Desktop Table -->
+        <div class="glass-panel rounded-xl overflow-hidden hidden md:block">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3 text-left">สาขา</th>
+                            <th class="px-4 py-3 text-left">Format</th>
+                            <th class="px-4 py-3 text-left">Phase</th>
+                            <th class="px-4 py-3 text-left">วันที่อ่านค่า</th>
+                            <th class="px-4 py-3 text-right">Code 000</th>
+                            <th class="px-4 py-3 text-right">Code 001</th>
+                            <th class="px-4 py-3 text-right">Code 002</th>
+                            <th class="px-4 py-3 text-right">Code 003</th>
+                            <th class="px-4 py-3 text-left">ผู้แจ้ง</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="emptyState" class="hidden text-center py-16 text-slate-400">
+            <p class="text-lg font-semibold">ไม่พบข้อมูล</p>
+        </div>
+
+        <div id="loadErrorBanner" class="hidden max-w-lg mx-auto mt-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl text-center">
+            <p class="text-sm font-bold text-red-700" id="loadErrorTitle">โหลดข้อมูลไม่สำเร็จหลังลองหลายครั้ง</p>
+            <p class="text-xs text-red-500 mt-1">กรุณากดปุ่ม Refresh ด้านบน หรือโหลดหน้านี้ใหม่อีกครั้ง</p>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-3 pb-8" id="paginationBar"></div>
+    </div>
+
+    <!-- Detail / Edit Modal -->
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div id="modalContent" class="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl max-h-[92dvh] overflow-y-auto shadow-2xl">
+            <div class="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex justify-between items-center z-10">
+                <h3 class="text-lg font-bold text-slate-800">รายละเอียดการอ่านค่า EDMI Meter</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700 p-1">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5" id="modalBody"></div>
+            <div class="sticky bottom-0 bg-white border-t border-slate-100 px-5 py-3 flex justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ (Delete)</button>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="px-4 py-2 text-sm font-bold text-white bg-amber-600 rounded-lg hover:bg-amber-700 shadow">บันทึก (Save)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Hidden file input for per-photo-category reupload (Admin/SMF) -->
+    <input type="file" id="edmiPhotoUploadInput" multiple accept="image/*" style="display:none">
+
+    <script>
+        let allData = [];
+        let currentId = null;
+        let isAdmin = false;
+        let isSMF = false;
+        // Whether SMF may edit survey data (isSMF AND the Super Admin toggle is on) —
+        // separate from isSMF itself, which is also used by unrelated features (e.g.
+        // Capex Budget Cross-Check) that must keep working regardless of this toggle.
+        let smfCanEdit = false;
+        const PAGE_SIZE = 25;
+        let currentPage = 1;
+        let _currentFiltered = [];
+
+        let _filterDebounceTimer = null;
+        function _debouncedApplyFilters() {
+            clearTimeout(_filterDebounceTimer);
+            _filterDebounceTimer = setTimeout(applyFilters, 220);
+        }
+
+        function htmlEscape(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+        function fmtNum(v) {
+            const n = parseFloat(v);
+            return isNaN(n) ? '-' : n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+        }
+        // Sheets stores "Reading Date"/"Reading Time" as Date objects (time-only
+        // values get a dummy 1899-12-30 date part) and google.script.run serializes
+        // them to raw UTC ISO strings — format properly instead of printing that raw.
+        function fmtReadingDate(v) {
+            if (!v) return '-';
+            const d = new Date(v);
+            if (isNaN(d)) return String(v);
+            return d.toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', year: 'numeric', month: 'short', day: '2-digit' });
+        }
+        function fmtReadingTime(v) {
+            if (!v) return '';
+            const d = new Date(v);
+            if (isNaN(d)) return String(v);
+            return d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        // <input type="date">/<input type="time"> require "YYYY-MM-DD"/"HH:MM" exactly —
+        // feeding them the raw ISO string leaves them blank, and saving the (unedited,
+        // now-blank) modal would silently wipe the real reading date/time on the record.
+        function toDateInputValue(v) {
+            if (!v) return '';
+            const d = new Date(v);
+            if (isNaN(d)) return '';
+            const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+            const p = {}; parts.forEach(x => p[x.type] = x.value);
+            return p.year + '-' + p.month + '-' + p.day;
+        }
+        function toTimeInputValue(v) {
+            if (!v) return '';
+            // Plain "HH:MM" strings (never auto-converted to a Date by Sheets) aren't
+            // parseable by `new Date(...)` on their own — pass them through as-is.
+            const plainMatch = String(v).match(/^(\d{1,2}):(\d{2})/);
+            if (plainMatch) return plainMatch[1].padStart(2, '0') + ':' + plainMatch[2];
+            const d = new Date(v);
+            if (isNaN(d)) return '';
+            const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(d);
+            const p = {}; parts.forEach(x => p[x.type] = x.value);
+            return p.hour + ':' + p.minute;
+        }
+        function formatRecordDate(ts) {
+            if (!ts) return '-';
+            const d = new Date(ts);
+            if (isNaN(d)) return String(ts);
+            return d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        function applyAdminUI() {
+            document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                var _lsUser = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                if (_lsUser && localStorage.getItem('app_auth_token')) {
+                    var navName = document.getElementById('nav-user-name');
+                    if (navName) navName.textContent = _lsUser.name || _lsUser.email || '';
+                }
+            } catch(e) {}
+            applyAdminUI();
+            // Load the main data FIRST — firing two google.script.run calls back-to-back
+            // on first page load can silently drop the second call's callback (a known
+            // Apps Script sandboxed-iframe quirk), which was leaving the report looking
+            // empty until a manual refresh. The admin-badge call is lower stakes, so it
+            // goes second/last.
+            loadData();
+            try {
+                var _lsEmail = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                var _userEmail = (_lsEmail && _lsEmail.email) ? _lsEmail.email : '';
+                if (_userEmail) {
+                    google.script.run
+                        .withSuccessHandler(function(flags) {
+                            if (!flags) return;
+                            isAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
+                            isSMF = !!flags.isSMF;
+                            smfCanEdit = !!flags.smfEditAllowed;
+                            var ad = document.getElementById('access-level-display');
+                            if (ad) {
+                                ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
+                                ad.className = isAdmin
+                                    ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
+                                    : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
+                            }
+                            applyAdminUI();
+                        })
+                        .getUserFlags(_userEmail);
+                }
+            } catch(e) {}
+        });
+
+        let _loadDataAttempt = 0;
+        const _EDMI_MAX_ATTEMPTS = 3;
+        function loadData() {
+            document.getElementById('mainLoader').classList.remove('hidden');
+            var myAttempt = ++_loadDataAttempt;
+
+            // Shared retry path for the two transient failures below (no response at all,
+            // or a null response). Leaves the spinner up while retrying so the page keeps
+            // reading as "still loading" rather than "finished, no data".
+            function _retryOrFail(reason) {
+                if (myAttempt < _EDMI_MAX_ATTEMPTS) {
+                    console.warn('EDMI report: ' + reason + ' — retrying (' + myAttempt + '/' + _EDMI_MAX_ATTEMPTS + ')');
+                    setTimeout(loadData, 1500);
+                    return;
+                }
+                document.getElementById('mainLoader').classList.add('hidden');
+                var t = document.getElementById('loadErrorTitle');
+                if (t) t.textContent = 'โหลดข้อมูลไม่สำเร็จหลังลองหลายครั้ง';
+                document.getElementById('loadErrorBanner').classList.remove('hidden');
+                console.error('EDMI report: gave up after ' + _EDMI_MAX_ATTEMPTS + ' attempts — ' + reason);
+            }
+
+            // Safety net: if the callback never arrives (same silent-drop quirk as
+            // above), auto-retry instead of leaving the user staring at an empty report
+            // that looks like "no data" until they manually hit Refresh. 15s not 8s —
+            // a cold start has to load the script AND do a full uncached sheet read, and
+            // firing the retry while that first call is still running just doubles the
+            // server work and makes the timeout more likely, not less.
+            var watchdog = setTimeout(function() {
+                if (myAttempt !== _loadDataAttempt) return;
+                _retryOrFail('no response after 15s');
+            }, 15000);
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    clearTimeout(watchdog);
+                    // Ignore a late reply from an attempt the watchdog already superseded,
+                    // so a slow early call can't overwrite fresher data or re-show the spinner.
+                    if (myAttempt !== _loadDataAttempt) return;
+                    if (!res) {
+                        // A GAS cold start can resolve the callback with null instead of the
+                        // real payload — transient, so retry rather than reporting an error.
+                        // This branch is why the report used to come up empty on the very
+                        // first open: a null landed in the generic else-branch below, which
+                        // ran after clearTimeout() had already killed the only retry path,
+                        // so the page gave up until the user manually hit Refresh.
+                        // RefSurveyReport.html handles the same quirk the same way.
+                        _retryOrFail('null response (cold start)');
+                        return;
+                    }
+                    document.getElementById('mainLoader').classList.add('hidden');
+                    document.getElementById('loadErrorBanner').classList.add('hidden');
+                    if (res.success) {
+                        allData = res.data || [];
+                        renderStats();
+                        applyFilters();
+                    } else {
+                        // Server responded but reported failure (e.g. permission/sheet error) —
+                        // must surface this like Ref Survey Report does, otherwise the table/stats
+                        // stay at their empty initial state forever with no spinner and no
+                        // explanation, which reads to the user as a page stuck loading.
+                        console.error('Load failed', res.error);
+                        var errTitle = document.getElementById('loadErrorTitle');
+                        if (errTitle) errTitle.textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (res.error || 'Unknown error');
+                        document.getElementById('loadErrorBanner').classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    clearTimeout(watchdog);
+                    if (myAttempt !== _loadDataAttempt) return;
+                    document.getElementById('mainLoader').classList.add('hidden');
+                    var errTitle = document.getElementById('loadErrorTitle');
+                    if (errTitle) errTitle.textContent = 'เกิดข้อผิดพลาด: ' + (err.message || err);
+                    document.getElementById('loadErrorBanner').classList.remove('hidden');
+                })
+                .getEdmiSolarSurveyListSlim();
+        }
+
+        function renderStats() {
+            document.getElementById('statTotal').textContent = allData.length;
+            var blockedCount = allData.filter(function(r) { return r['Access Blocked'] === 'Yes'; }).length;
+            document.getElementById('statBlocked').textContent = blockedCount;
+            var stores = new Set(allData.map(function(r) { return r['Branch Code']; }));
+            document.getElementById('statStores').textContent = stores.size;
+            var weekAgo = Date.now() - 7 * 86400000;
+            var thisWeek = allData.filter(function(r) { var t = new Date(r['Timestamp']).getTime(); return t >= weekAgo; });
+            document.getElementById('statThisWeek').textContent = thisWeek.length;
+            var totalKwh = allData.reduce(function(sum, r) { var n = parseFloat(r['Code000 kWh Total']); return sum + (isNaN(n) ? 0 : n); }, 0);
+            document.getElementById('statTotalKwh').textContent = totalKwh.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+
+        function applyFilters() {
+            var q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+            var fmt = document.getElementById('formatFilter').value;
+            var phase = (document.getElementById('phaseFilter').value || '').trim();
+
+            _currentFiltered = allData.filter(function(r) {
+                if (fmt && r['Store Format'] !== fmt) return false;
+                if (phase && String(r['Solar Phase'] || '') !== phase) return false;
+                if (q) {
+                    var hay = [r['Branch Code'], r['Branch Name'], r['Reporter Name'], r['Reporter Email']].join(' ').toLowerCase();
+                    if (hay.indexOf(q) === -1) return false;
+                }
+                return true;
+            });
+            currentPage = 1;
+            renderList();
+        }
+
+        function renderList() {
+            var totalPages = Math.max(1, Math.ceil(_currentFiltered.length / PAGE_SIZE));
+            if (currentPage > totalPages) currentPage = totalPages;
+            var start = (currentPage - 1) * PAGE_SIZE;
+            var pageItems = _currentFiltered.slice(start, start + PAGE_SIZE);
+
+            document.getElementById('recordCount').textContent = _currentFiltered.length + ' รายการ';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', _currentFiltered.length > 0);
+
+            var cardList = document.getElementById('cardList');
+            var tbody = document.getElementById('tableBody');
+            cardList.innerHTML = '';
+            tbody.innerHTML = '';
+
+            pageItems.forEach(function(r) {
+                var branchLabel = htmlEscape(r['Branch Code']) + ' - ' + htmlEscape(r['Branch Name']);
+                var isBlocked = r['Access Blocked'] === 'Yes';
+                cardList.innerHTML += '' +
+                    '<div class="glass-panel rounded-xl p-4 cursor-pointer hover:shadow-md transition-all" onclick="openModal(\'' + r['ID'] + '\')">' +
+                        '<div class="flex justify-between items-start mb-2">' +
+                            '<p class="font-bold text-slate-800 text-sm">' + branchLabel + '</p>' +
+                            (isBlocked
+                                ? '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">🔒 Blocked</span>'
+                                : '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">' + htmlEscape(r['Store Format'] || '-') + '</span>') +
+                        '</div>' +
+                        '<p class="text-xs text-slate-500 mb-2">Phase ' + htmlEscape(r['Solar Phase'] || '-') + ' · ' + fmtReadingDate(r['Reading Date']) + ' ' + fmtReadingTime(r['Reading Time']) + '</p>' +
+                        (isBlocked
+                            ? '<p class="text-xs text-red-600 italic">' + htmlEscape(r['Access Blocked Reason'] || 'ไม่สามารถอ่านค่าได้') + '</p>'
+                            : '<div class="grid grid-cols-2 gap-1 text-xs text-slate-600">' +
+                                '<span>Code 000: <b>' + fmtNum(r['Code000 kWh Total']) + '</b></span>' +
+                                '<span>Code 001: <b>' + fmtNum(r['Code001 kWh Total Rate A (Peak)']) + '</b></span>' +
+                                '<span>Code 002: <b>' + fmtNum(r['Code002 kWh Total Rate B (OffPeak)']) + '</b></span>' +
+                                '<span>Code 003: <b>' + fmtNum(r['Code003 kWh Total Rate C (Holiday)']) + '</b></span>' +
+                            '</div>') +
+                        '<p class="text-xs text-slate-400 mt-2">โดย ' + htmlEscape(r['Reporter Name'] || '-') + '</p>' +
+                    '</div>';
+
+                tbody.innerHTML += '' +
+                    '<tr class="hover:bg-amber-50 cursor-pointer transition-colors" onclick="openModal(\'' + r['ID'] + '\')">' +
+                        '<td class="px-4 py-3"><div class="font-semibold text-slate-800">' + htmlEscape(r['Branch Code']) + '</div><div class="text-xs text-slate-500">' + htmlEscape(r['Branch Name']) + '</div></td>' +
+                        '<td class="px-4 py-3 text-xs">' + (isBlocked ? '<span class="text-red-600 font-semibold">🔒 Blocked</span>' : htmlEscape(r['Store Format'] || '-')) + '</td>' +
+                        '<td class="px-4 py-3 text-xs">' + htmlEscape(r['Solar Phase'] || '-') + '</td>' +
+                        '<td class="px-4 py-3 text-xs">' + fmtReadingDate(r['Reading Date']) + ' ' + fmtReadingTime(r['Reading Time']) + '</td>' +
+                        '<td class="px-4 py-3 text-right font-mono text-xs">' + fmtNum(r['Code000 kWh Total']) + '</td>' +
+                        '<td class="px-4 py-3 text-right font-mono text-xs">' + fmtNum(r['Code001 kWh Total Rate A (Peak)']) + '</td>' +
+                        '<td class="px-4 py-3 text-right font-mono text-xs">' + fmtNum(r['Code002 kWh Total Rate B (OffPeak)']) + '</td>' +
+                        '<td class="px-4 py-3 text-right font-mono text-xs">' + fmtNum(r['Code003 kWh Total Rate C (Holiday)']) + '</td>' +
+                        '<td class="px-4 py-3 text-xs">' + htmlEscape(r['Reporter Name'] || '-') + '</td>' +
+                    '</tr>';
+            });
+
+            renderPagination(totalPages);
+        }
+
+        function renderPagination(totalPages) {
+            var bar = document.getElementById('paginationBar');
+            if (totalPages <= 1) { bar.innerHTML = ''; return; }
+            var html = '';
+            html += '<button ' + (currentPage <= 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')" class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 disabled:opacity-40 hover:bg-slate-50">ก่อนหน้า</button>';
+            html += '<span class="text-sm text-slate-500">หน้า ' + currentPage + ' / ' + totalPages + '</span>';
+            html += '<button ' + (currentPage >= totalPages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')" class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 disabled:opacity-40 hover:bg-slate-50">ถัดไป</button>';
+            bar.innerHTML = html;
+        }
+        function goPage(p) { currentPage = p; renderList(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+        function downloadEdmiExcel(btn) {
+            if (!_currentFiltered || _currentFiltered.length === 0) { alert('ไม่มีข้อมูลที่จะดาวน์โหลด'); return; }
+            if (typeof XLSX === 'undefined') { alert('ไลบรารียังไม่โหลด กรุณารอแล้วลองใหม่'); return; }
+
+            var origHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ...'; }
+
+            try {
+                var toNum = function(v) { var n = parseFloat(v); return isNaN(n) ? '' : n; };
+
+                var header = ['วันเวลาที่ส่ง', 'รหัสสาขา', 'ชื่อสาขา', 'Format', 'Phase', 'วันที่อ่านค่า', 'เวลา',
+                    'Code 000 (Total)', 'Code 001 (Peak)', 'Code 002 (OffPeak)', 'Code 003 (Holiday)',
+                    'เข้าถึงไม่ได้', 'เหตุผลที่เข้าถึงไม่ได้', 'ผู้แจ้ง', 'อีเมลผู้แจ้ง', 'DM Area', 'CM Area', 'AMM MTN'];
+
+                var aoa = [header].concat(_currentFiltered.map(function(r) {
+                    var isBlocked = r['Access Blocked'] === 'Yes';
+                    return [
+                        formatRecordDate(r['Timestamp']),
+                        r['Branch Code'] || '',
+                        r['Branch Name'] || '',
+                        r['Store Format'] || '',
+                        r['Solar Phase'] || '',
+                        fmtReadingDate(r['Reading Date']),
+                        fmtReadingTime(r['Reading Time']),
+                        isBlocked ? '' : toNum(r['Code000 kWh Total']),
+                        isBlocked ? '' : toNum(r['Code001 kWh Total Rate A (Peak)']),
+                        isBlocked ? '' : toNum(r['Code002 kWh Total Rate B (OffPeak)']),
+                        isBlocked ? '' : toNum(r['Code003 kWh Total Rate C (Holiday)']),
+                        isBlocked ? 'Yes' : 'No',
+                        isBlocked ? (r['Access Blocked Reason'] || '') : '',
+                        r['Reporter Name'] || '',
+                        r['Reporter Email'] || '',
+                        r['DM Area'] || '',
+                        r['CM Area'] || '',
+                        r['AMM MTN'] || ''
+                    ];
+                }));
+
+                var ws = XLSX.utils.aoa_to_sheet(aoa);
+                ws['!cols'] = [
+                    {wch: 18}, {wch: 12}, {wch: 30}, {wch: 18}, {wch: 8}, {wch: 12}, {wch: 8},
+                    {wch: 14}, {wch: 14}, {wch: 14}, {wch: 14}, {wch: 12}, {wch: 30}, {wch: 20}, {wch: 26}, {wch: 16}, {wch: 16}, {wch: 12}
+                ];
+                ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+                var wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'EDMI Solar Survey');
+                var filename = 'edmi_solar_survey_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+                XLSX.writeFile(wb, filename);
+            } catch (e) {
+                alert('Excel error: ' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+            }
+        }
+
+        function openModal(id) {
+            currentId = id;
+            document.getElementById('modalBody').innerHTML = '<div class="text-center py-10 text-slate-400">กำลังโหลด...</div>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            requestAnimationFrame(function() { document.getElementById('detailModal').classList.add('modal-open'); });
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-500 text-sm">โหลดรายการไม่สำเร็จ</p>'; return; }
+                    renderModalBody(res.data);
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('modalBody').innerHTML = '<p class="text-red-500 text-sm">' + htmlEscape(err.message) + '</p>';
+                })
+                .getEdmiSolarSurveyRecordById(id);
+        }
+
+        function _photoThumbsHtml(photos) {
+            if (!photos || photos.length === 0) return '<p class="text-xs text-slate-400 mt-2">ไม่มีภาพถ่าย</p>';
+            var h = '<div class="flex gap-2 flex-wrap mt-2">';
+            photos.forEach(function(url) {
+                h += '<a href="' + url + '" target="_blank"><img src="' + url + '" class="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm"></a>';
+            });
+            return h + '</div>';
+        }
+
+        // Same as _photoThumbsHtml but adds delete (per photo) and reupload buttons,
+        // gated to Admin / SMF (when the Super Admin edit toggle is on) — matches the
+        // pattern already used for Ref Survey Report's per-unit photo editing.
+        function _photoEditBlockHtml(photos, unitKey, blockId, canEdit) {
+            var thumbs = (photos || []).map(function(url) {
+                var esc = htmlEscape(url);
+                var delBtn = canEdit
+                    ? '<button onclick="deleteEdmiPhoto(this,\'' + unitKey + '\',\'' + blockId + '\')" data-url="' + esc + '" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button>'
+                    : '';
+                return '<div class="relative group inline-block"><a href="' + url + '" target="_blank"><img src="' + url + '" class="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm"></a>' + delBtn + '</div>';
+            }).join('');
+            var emptyMsg = (!photos || photos.length === 0)
+                ? '<p class="text-xs text-slate-400 mt-2" data-empty-msg>ไม่มีภาพถ่าย</p>' : '';
+            var addBtn = canEdit
+                ? '<button onclick="pickEdmiUnitPhoto(\'' + unitKey + '\',\'' + blockId + '\')" class="text-[11px] text-sky-600 hover:text-sky-800 border border-sky-200 hover:bg-sky-50 px-2 py-0.5 rounded-lg transition mt-2 inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>เพิ่ม/อัปโหลดรูปใหม่</button>'
+                : '';
+            return '<div id="' + blockId + '"><div class="flex gap-2 flex-wrap mt-2">' + thumbs + '</div>' + emptyMsg + addBtn + '</div>';
+        }
+
+        function renderModalBody(r) {
+            var att = {};
+            try { att = r['Attachments_JSON'] || {}; } catch(e) {}
+            var photos000 = att.edmiMeter000 || [];
+            var photos001 = att.edmiMeter001 || [];
+            var photos002 = att.edmiMeter002 || [];
+            var photos003 = att.edmiMeter003 || [];
+            // Back-compat: old records saved a single shared "edmiMeter"/"EdmiMeter" category
+            var legacyPhotos = att.edmiMeter || att.EdmiMeter || [];
+            // Admin, or SMF team when the Super Admin "SMF Survey Edit" toggle is on, may
+            // edit/reupload EDMI meter photos — same permission model as Ref Survey Report.
+            var canEdit = isAdmin || smfCanEdit;
+
+            var html =
+                '<div class="detail-row"><span class="detail-label">รหัสสาขา</span><span class="detail-value">' + htmlEscape(r['Branch Code']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ชื่อสาขา</span><span class="detail-value">' + htmlEscape(r['Branch Name']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ผู้แจ้ง</span><span class="detail-value">' + htmlEscape(r['Reporter Name']) + ' (' + htmlEscape(r['Reporter Email']) + ')</span></div>' +
+                '<div class="detail-row"><span class="detail-label">เบอร์โทร</span><span class="detail-value">' + htmlEscape(r['Reporter Phone'] || '-') + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">วันเวลาที่ส่ง</span><span class="detail-value">' + formatRecordDate(r['Timestamp']) + '</span></div>';
+
+            // "Access Blocked" (เข้าถึงไม่ได้) is now editable post-submission — same permission
+            // model as the rest of this form (Admin, or SMF when the Super Admin edit toggle
+            // is on, or the original reporter — enforced server-side in updateEdmiSolarSurveyRecord).
+            var isBlocked = r['Access Blocked'] === 'Yes';
+            var blockedPhotos = att.edmiAccessBlockedPhoto || att.EdmiAccessBlockedPhoto || [];
+            html += '<div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">' +
+                '<label class="flex items-center gap-2 text-xs font-bold text-red-700 cursor-pointer">' +
+                    '<input type="checkbox" id="editAccessBlocked" ' + (isBlocked ? 'checked' : '') + ' onchange="_toggleEdmiBlockedFields(this.checked)" class="w-4 h-4">' +
+                    '🔒 เข้าถึงไม่ได้ (ตู้ควบคุมมิเตอร์ถูกล็อค / เข้าถึงไม่ได้)' +
+                '</label>' +
+                '<div id="edmiBlockedDetail" class="mt-2' + (isBlocked ? '' : ' hidden') + '">' +
+                    '<textarea id="editAccessBlockedReason" rows="2" placeholder="เหตุผลที่เข้าถึงไม่ได้" class="w-full border border-red-300 rounded-lg px-2 py-1.5 text-sm">' + htmlEscape(r['Access Blocked Reason'] || '') + '</textarea>' +
+                    _photoEditBlockHtml(blockedPhotos, 'edmiAccessBlockedPhoto', 'edmi-photos-blocked', canEdit) +
+                '</div>' +
+            '</div>';
+
+            if (legacyPhotos.length > 0) {
+                html += '<div class="mt-3"><p class="text-xs font-semibold text-slate-500 mb-1">ภาพถ่าย (รายการเก่า)</p>' + _photoThumbsHtml(legacyPhotos) + '</div>';
+            }
+
+            html += '<div class="grid grid-cols-2 gap-3 mt-4">' +
+                    '<div><label class="text-xs font-semibold text-slate-500 mb-1 block">Format</label>' +
+                        '<select id="editFormat" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm">' +
+                            '<option value="Big Format"' + (r['Store Format']==='Big Format'?' selected':'') + '>Big Format</option>' +
+                            '<option value="Small Format (BCM)"' + (r['Store Format']==='Small Format (BCM)'?' selected':'') + '>Small Format (BCM)</option>' +
+                        '</select></div>' +
+                    '<div><label class="text-xs font-semibold text-slate-500 mb-1 block">Solar Phase</label>' +
+                        '<input id="editPhase" type="number" value="' + htmlEscape(r['Solar Phase']) + '" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                    '<div><label class="text-xs font-semibold text-slate-500 mb-1 block">วันที่อ่านค่า</label>' +
+                        '<input id="editDate" type="date" value="' + toDateInputValue(r['Reading Date']) + '" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                    '<div><label class="text-xs font-semibold text-slate-500 mb-1 block">เวลาที่อ่านค่า</label>' +
+                        '<input id="editTime" type="time" value="' + toTimeInputValue(r['Reading Time']) + '" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                '</div>' +
+                '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">' +
+                    '<div class="bg-slate-50 border border-slate-200 rounded-lg p-3">' +
+                        '<label class="text-xs font-semibold text-slate-600 mb-1 block">Code 000 (Total)</label>' +
+                        '<input id="editCode000" type="number" step="0.01" value="' + htmlEscape(r['Code000 kWh Total']) + '" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm">' +
+                        _photoEditBlockHtml(photos000, 'edmiMeter000', 'edmi-photos-000', canEdit) +
+                    '</div>' +
+                    '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">' +
+                        '<label class="text-xs font-semibold text-orange-700 mb-1 block">Code 001 (Peak)</label>' +
+                        '<input id="editCode001" type="number" step="0.01" value="' + htmlEscape(r['Code001 kWh Total Rate A (Peak)']) + '" class="w-full border border-orange-300 rounded-lg px-2 py-1.5 text-sm">' +
+                        _photoEditBlockHtml(photos001, 'edmiMeter001', 'edmi-photos-001', canEdit) +
+                    '</div>' +
+                    '<div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3">' +
+                        '<label class="text-xs font-semibold text-indigo-700 mb-1 block">Code 002 (Off Peak)</label>' +
+                        '<input id="editCode002" type="number" step="0.01" value="' + htmlEscape(r['Code002 kWh Total Rate B (OffPeak)']) + '" class="w-full border border-indigo-300 rounded-lg px-2 py-1.5 text-sm">' +
+                        _photoEditBlockHtml(photos002, 'edmiMeter002', 'edmi-photos-002', canEdit) +
+                    '</div>' +
+                    '<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">' +
+                        '<label class="text-xs font-semibold text-emerald-700 mb-1 block">Code 003 (Holiday)</label>' +
+                        '<input id="editCode003" type="number" step="0.01" value="' + htmlEscape(r['Code003 kWh Total Rate C (Holiday)']) + '" class="w-full border border-emerald-300 rounded-lg px-2 py-1.5 text-sm">' +
+                        _photoEditBlockHtml(photos003, 'edmiMeter003', 'edmi-photos-003', canEdit) +
+                    '</div>' +
+                '</div>' +
+                '<div class="mt-3"><label class="text-xs font-semibold text-slate-500 mb-1 block">หมายเหตุ (Comments)</label>' +
+                    '<textarea id="editComments" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm">' + htmlEscape(r['Comments']) + '</textarea></div>';
+
+            document.getElementById('modalBody').innerHTML = html;
+        }
+
+        function _toggleEdmiBlockedFields(checked) {
+            var detail = document.getElementById('edmiBlockedDetail');
+            if (detail) detail.classList.toggle('hidden', !checked);
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('modal-open');
+            setTimeout(function() { document.getElementById('detailModal').classList.add('hidden'); }, 280);
+            currentId = null;
+        }
+
+        function saveRecord() {
+            if (!currentId) return;
+            var _lsU = null; try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+
+            var form = {
+                id: currentId,
+                clientEmail: clientEmail,
+                storeFormat: document.getElementById('editFormat').value,
+                solarPhase: document.getElementById('editPhase').value,
+                readingDate: document.getElementById('editDate').value,
+                readingTime: document.getElementById('editTime').value,
+                code000: document.getElementById('editCode000').value,
+                code001: document.getElementById('editCode001').value,
+                code002: document.getElementById('editCode002').value,
+                code003: document.getElementById('editCode003').value,
+                comments: document.getElementById('editComments').value,
+                accessBlocked: document.getElementById('editAccessBlocked').checked,
+                accessBlockedReason: document.getElementById('editAccessBlockedReason').value
+            };
+
+            document.getElementById('saveBtn').textContent = 'กำลังบันทึก...';
+            document.getElementById('saveBtn').disabled = true;
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    document.getElementById('saveBtn').textContent = 'บันทึก (Save)';
+                    document.getElementById('saveBtn').disabled = false;
+                    if (res && res.success) {
+                        closeModal();
+                        loadData();
+                    } else {
+                        alert('บันทึกไม่สำเร็จ: ' + (res && res.error));
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('saveBtn').textContent = 'บันทึก (Save)';
+                    document.getElementById('saveBtn').disabled = false;
+                    alert('Server Error: ' + err.message);
+                })
+                .updateEdmiSolarSurveyRecord(form);
+        }
+
+        function deleteRecord() {
+            if (!currentId) return;
+            if (!confirm('ยืนยันการลบรายการนี้? การลบไม่สามารถย้อนกลับได้')) return;
+            var _lsU = null; try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        closeModal();
+                        loadData();
+                    } else {
+                        alert('ลบไม่สำเร็จ: ' + (res && res.error));
+                    }
+                })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); })
+                .deleteEdmiSolarSurveyRecord(currentId, clientEmail);
+        }
+
+        // ─── Per-photo-category Upload (Admin / SMF, same pattern as Ref Survey Report) ──
+        var _edmiPhotoTarget = null; // { unitKey, photoBlockId }
+
+        function pickEdmiUnitPhoto(unitKey, photoBlockId) {
+            _edmiPhotoTarget = { unitKey: unitKey, photoBlockId: photoBlockId };
+            var inp = document.getElementById('edmiPhotoUploadInput');
+            inp.value = '';
+            inp.click();
+        }
+
+        document.getElementById('edmiPhotoUploadInput').addEventListener('change', function() {
+            if (!_edmiPhotoTarget || !currentId) return;
+            const files = Array.from(this.files);
+            if (!files.length) return;
+            const { unitKey, photoBlockId } = _edmiPhotoTarget;
+            _edmiPhotoTarget = null;
+            const capturedId = currentId; // capture before any async — prevents cross-record contamination
+            var _lsUpl = null;
+            try { _lsUpl = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsUpl && _lsUpl.email) ? _lsUpl.email : '';
+
+            const photoBlockEl = document.getElementById(photoBlockId);
+
+            const loadingId = 'edmi-ul-' + Date.now();
+            const loadingHtml = `<div id="${loadingId}" class="mt-2 flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">` +
+                `<svg class="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>` +
+                `กำลังอัปโหลด ${files.length} รูป...</div>`;
+            if (photoBlockEl) photoBlockEl.insertAdjacentHTML('beforeend', loadingHtml);
+
+            Promise.all(files.map(function(file) {
+                return new Promise(function(resolve, reject) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        resolve({ name: file.name, mimeType: file.type || 'image/jpeg', data: e.target.result.split(',')[1] });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            })).then(function(fileData) {
+                google.script.run
+                    .withSuccessHandler(function(res) {
+                        const loadingEl = document.getElementById(loadingId);
+                        if (loadingEl) loadingEl.remove();
+                        if (!res.success) { alert('อัปโหลดรูปไม่สำเร็จ: ' + res.error); return; }
+
+                        if (photoBlockEl) {
+                            const emptyMsg = photoBlockEl.querySelector('[data-empty-msg]');
+                            if (emptyMsg) emptyMsg.remove();
+                            const thumbHtml = res.newUrls.map(function(url) {
+                                const _esc = htmlEscape(url);
+                                return `<div class="relative group inline-block"><a href="${url}" target="_blank"><img src="${url}" class="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm"></a><button onclick="deleteEdmiPhoto(this,'${unitKey}','${photoBlockId}')" data-url="${_esc}" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button></div>`;
+                            }).join('');
+                            const grid = photoBlockEl.querySelector('.flex.gap-2.flex-wrap');
+                            if (grid) grid.insertAdjacentHTML('beforeend', thumbHtml);
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        const loadingEl = document.getElementById(loadingId);
+                        if (loadingEl) loadingEl.remove();
+                        alert('Error: ' + err.message);
+                    })
+                    .addEdmiSurveyPhotos(capturedId, unitKey, fileData, clientEmail);
+            });
+        });
+
+        function deleteEdmiPhoto(btn, unitKey, photoBlockId) {
+            if (!currentId) return;
+            const capturedId = currentId; // capture before confirm() dialog — user may open another record
+            if (!confirm('ลบรูปภาพนี้?')) return;
+            var _lsDel = null;
+            try { _lsDel = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsDel && _lsDel.email) ? _lsDel.email : '';
+            const url = btn.dataset.url;
+            const wrapper = btn.parentElement;
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '…';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) { alert('ลบรูปไม่สำเร็จ: ' + res.error); btn.disabled = false; btn.textContent = origText; return; }
+                    wrapper.remove();
+                    const photoBlockEl = document.getElementById(photoBlockId);
+                    if (photoBlockEl && photoBlockEl.querySelectorAll('img').length === 0 && !photoBlockEl.querySelector('[data-empty-msg]')) {
+                        const grid = photoBlockEl.querySelector('.flex.gap-2.flex-wrap');
+                        if (grid) grid.insertAdjacentHTML('afterend', '<p class="text-xs text-slate-400 mt-2" data-empty-msg>ไม่มีภาพถ่าย</p>');
+                    }
+                })
+                .withFailureHandler(function(err) { alert('Error: ' + err.message); btn.disabled = false; btn.textContent = origText; })
+                .deleteEdmiSurveyPhoto(capturedId, unitKey, url, clientEmail);
+        }
+    </script>
+</body>
+</html>

@@ -14,7 +14,7 @@ function _getScheduleSheet(createIfMissing) {
     if (!sheet && createIfMissing) {
         sheet = ss.insertSheet(UPLOAD_SCHEDULE_SHEET);
         sheet.appendRow(["Branch Code", "Branch Name", "BU", "Is Critical",
-                         "Assigned Date", "Assigned Time", "Status", "Updated At", "Skip Count"]);
+                         "Assigned Date", "Assigned Time", "Status", "Updated At", "Skip Count", "Round"]);
         sheet.setFrozenRows(1);
         // Force date & time columns to plain text so Sheets doesn't auto-convert
         sheet.getRange("E:F").setNumberFormat("@");
@@ -53,6 +53,17 @@ function _writeMeta(key, value) {
         }
     }
     sheet.appendRow([key, value]);
+}
+
+// Round label of the currently active Upload Schedule plan (e.g. "2026-Q1").
+// Used by the Aircon/Ref survey forms to stamp new submissions with the round
+// they were collected under.
+function getActiveScheduleRound() {
+    try {
+        return { round: _readMeta()['round'] || '' };
+    } catch (e) {
+        return { round: '' };
+    }
 }
 
 // Return list of working dates (Mon–Sat) between start (exclusive) and end (inclusive)
@@ -157,6 +168,51 @@ function _loadAllStores(includeInactive) {
     }
 }
 
+// For each branch code, whether Aircon_Survey_Database / Ref_Survey_Database
+// has at least one real (non-Draft) submission on file. A code that never
+// appears in a sheet at all, or only appears with Status="Draft" rows, comes
+// back false for that type — used by createUploadSchedule to prioritize
+// stores we have no usable data on.
+function _getSurveyDataCoverage() {
+    var coverage = {}; // code -> { Aircon: bool, Ref: bool }
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetDefs = [
+        { name: 'Aircon_Survey_Database', typeKey: 'Aircon' },
+        { name: 'Ref_Survey_Database',    typeKey: 'Ref' }
+    ];
+
+    sheetDefs.forEach(function(def) {
+        var sheet = ss.getSheetByName(def.name);
+        if (!sheet || sheet.getLastRow() < 2) return;
+
+        var data    = sheet.getDataRange().getValues();
+        var headers = data[0];
+        var codeIdx = -1, statusIdx = -1;
+        for (var h = 0; h < headers.length; h++) {
+            var hdr = String(headers[h]).toLowerCase().trim();
+            if (hdr === 'branch code') codeIdx   = h;
+            if (hdr === 'status')      statusIdx = h;
+        }
+        if (codeIdx < 0) return;
+
+        for (var i = 1; i < data.length; i++) {
+            var row    = data[i];
+            var code   = String(row[codeIdx] || '').trim();
+            if (!code) continue;
+            var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
+
+            if (!coverage[code]) coverage[code] = {};
+            if (status && status !== 'Draft') {
+                coverage[code][def.typeKey] = true;
+            } else if (coverage[code][def.typeKey] === undefined) {
+                coverage[code][def.typeKey] = false; // seen only Draft rows so far
+            }
+        }
+    });
+
+    return coverage;
+}
+
 // ─── Create Schedule ────────────────────────────────────────
 
 function createUploadSchedule(params) {
@@ -173,6 +229,10 @@ function createUploadSchedule(params) {
     */
     try {
         var _wlock = _acquireWriteLock_();
+        var round = String(params.round || '').trim();
+        if (!round) {
+            return { success: false, error: "Round label is required (e.g. \"2026-Q1\")" };
+        }
         var deadline    = new Date(params.deadline);
         var criticalSet = {};
         (params.criticalCodes || []).forEach(function(c) { criticalSet[c.trim()] = true; });
@@ -222,21 +282,33 @@ function createUploadSchedule(params) {
             allStores = allStores.filter(function(s) { return !excludedSet[s.code]; });
         }
 
-        // 2. Split into critical / regular
-        var critical = [], regular = [];
+        // 2. Split into critical / no-data-or-fragmented / regular.
+        // "No data" = for Aircon and/or Ref, this store has never had a real
+        // (non-Draft) submission on file — either no row at all, or only
+        // abandoned Drafts. These get scheduled right after Critical so gaps
+        // in our data get closed first, without stealing the Critical badge
+        // from stores an admin explicitly flagged.
+        var coverage = _getSurveyDataCoverage();
+        var byBuCode = function(a, b) {
+            if (a.bu !== b.bu) return a.bu.localeCompare(b.bu);
+            return a.code.localeCompare(b.code);
+        };
+
+        var critical = [], noData = [], regular = [];
         allStores.forEach(function(s) {
-            if (criticalSet[s.code]) critical.push(s);
+            if (criticalSet[s.code]) { critical.push(s); return; }
+            var cov = coverage[s.code];
+            var hasAircon = !!(cov && cov.Aircon);
+            var hasRef    = !!(cov && cov.Ref);
+            if (!hasAircon || !hasRef) noData.push(s);
             else regular.push(s);
         });
 
-        // Sort regular by BU then code
-        regular.sort(function(a, b) {
-            if (a.bu !== b.bu) return a.bu.localeCompare(b.bu);
-            return a.code.localeCompare(b.code);
-        });
+        noData.sort(byBuCode);
+        regular.sort(byBuCode);
 
-        // All stores ordered: critical first, then regular
-        var ordered = critical.concat(regular);
+        // All stores ordered: critical first, then no-data/fragmented, then regular
+        var ordered = critical.concat(noData).concat(regular);
 
         // 3. Get working days (from startDate to deadline)
         var days = _workingDays(startDate, deadline);
@@ -269,7 +341,8 @@ function createUploadSchedule(params) {
                     critical: criticalSet[store.code] ? "Yes" : "No",
                     date:     _dateStr(days[di]),
                     time:     _timeStr(h, m),
-                    status:   "Pending"
+                    status:   "Pending",
+                    round:    round
                 });
             });
             storeIdx += slotsPerDay;
@@ -279,17 +352,17 @@ function createUploadSchedule(params) {
         var sheet = _getScheduleSheet(true);
         var lastRow = sheet.getLastRow();
         if (lastRow > 1) {
-            sheet.getRange(2, 1, lastRow - 1, 9).clearContent();
+            sheet.getRange(2, 1, lastRow - 1, 10).clearContent();
         }
 
         if (schedule.length > 0) {
             var rows = schedule.map(function(s) {
-                return [s.code, s.name, s.bu, s.critical, s.date, s.time, s.status, new Date(), 0];
+                return [s.code, s.name, s.bu, s.critical, s.date, s.time, s.status, new Date(), 0, s.round];
             });
             // Force text format on date (col 5) and time (col 6) before writing
             sheet.getRange(2, 5, rows.length, 1).setNumberFormat("@");
             sheet.getRange(2, 6, rows.length, 1).setNumberFormat("@");
-            sheet.getRange(2, 1, rows.length, 9).setValues(rows);
+            sheet.getRange(2, 1, rows.length, 10).setValues(rows);
         }
 
         // 6. Save meta
@@ -301,6 +374,7 @@ function createUploadSchedule(params) {
         _writeMeta("maxPerDay",      String(maxPerDay));
         _writeMeta("totalStores",    String(schedule.length));
         _writeMeta("createdAt",      new Date().toISOString());
+        _writeMeta("round",          round);
 
         // Invalidate cache
         CacheService.getScriptCache().remove("UPLOAD_SCHEDULE_SUMMARY");
@@ -309,6 +383,7 @@ function createUploadSchedule(params) {
             success:      true,
             totalStores:  schedule.length,
             totalCritical: critical.length,
+            totalNoData:  noData.length,
             totalDays:    days.length,
             storesPerDay: slotsPerDay,
             deadline:     params.deadline
@@ -369,6 +444,7 @@ function getUploadScheduleSummary() {
 
         var result = {
             exists:          true,
+            round:           meta["round"]          || "",
             startDate:       meta["startDate"]      || "",
             deadline:        meta["deadline"]       || "",
             uploadTimeFrom:  meta["uploadTimeFrom"] || "08:00",
@@ -417,6 +493,7 @@ function getScheduleByDate(dateStr) {
                     time:      String(row[5]),
                     status:    String(row[6]),
                     skipCount: parseInt(row[8]) || 0,
+                    round:     String(row[9] || '').trim(),
                     rowIdx:    i + 1
                 });
             }
@@ -457,6 +534,7 @@ function getScheduleForBranch(searchTerm) {
                     time:         String(row[5]),
                     status:       String(row[6]),
                     skipCount:    parseInt(row[8]) || 0,
+                    round:        String(row[9] || '').trim(),
                     hasAircon: false, airconStatus: '', airconTs: '',
                     hasRef:    false, refStatus:    '', refTs:    ''
                 });
@@ -471,18 +549,20 @@ function getScheduleForBranch(searchTerm) {
             { name: 'Aircon_Survey_Database', isAircon: true },
             { name: 'Ref_Survey_Database',    isAircon: false }
         ];
-        var byCode = { Aircon: {}, Ref: {} };
+        var byCode       = { Aircon: {}, Ref: {} }; // key: "code|round"
+        var byCodeLegacy = { Aircon: {}, Ref: {} }; // key: code (no round on either side)
         sheetDefs.forEach(function(def) {
             var sht = ss.getSheetByName(def.name);
             if (!sht || sht.getLastRow() < 2) return;
             var sData = sht.getDataRange().getValues();
             var hdrs = sData[0];
-            var tsIdx = -1, codeIdx = -1, statusIdx = -1;
+            var tsIdx = -1, codeIdx = -1, statusIdx = -1, roundIdx = -1;
             for (var h = 0; h < hdrs.length; h++) {
                 var hdr = String(hdrs[h]).toLowerCase().trim();
-                if (hdr === 'timestamp')   tsIdx     = h;
-                if (hdr === 'branch code') codeIdx   = h;
-                if (hdr === 'status')      statusIdx = h;
+                if (hdr === 'timestamp')    tsIdx     = h;
+                if (hdr === 'branch code')  codeIdx   = h;
+                if (hdr === 'status')       statusIdx = h;
+                if (hdr === 'survey round') roundIdx  = h;
             }
             if (codeIdx < 0) return;
             var typeKey = def.isAircon ? 'Aircon' : 'Ref';
@@ -492,20 +572,29 @@ function getScheduleForBranch(searchTerm) {
                 if (!sCode || !codeSet[sCode]) continue;
                 var status = statusIdx >= 0 ? String(sRow[statusIdx] || '').trim() : '';
                 if (!status || status === 'Draft') continue;
+                var sRound = roundIdx >= 0 ? String(sRow[roundIdx] || '').trim() : '';
                 var tsRaw  = tsIdx >= 0 ? sRow[tsIdx] : '';
                 var tsDate = tsRaw instanceof Date ? tsRaw : new Date(String(tsRaw));
                 var tsMs   = isNaN(tsDate) ? 0 : tsDate.getTime();
                 var tsStr  = tsMs > 0 ? Utilities.formatDate(tsDate, Session.getScriptTimeZone(), 'dd/MM/yy HH:mm') : '-';
-                var existing = byCode[typeKey][sCode];
+                var sKey = sCode + '|' + sRound;
+                var existing = byCode[typeKey][sKey];
                 if (!existing || tsMs > existing.tsMs) {
-                    byCode[typeKey][sCode] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                    byCode[typeKey][sKey] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                }
+                if (!sRound) {
+                    var legacyExisting = byCodeLegacy[typeKey][sCode];
+                    if (!legacyExisting || tsMs > legacyExisting.tsMs) {
+                        byCodeLegacy[typeKey][sCode] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                    }
                 }
             }
         });
         result.forEach(function(r) {
-            var ac = byCode.Aircon[r.code];
+            var key = r.code + '|' + r.round;
+            var ac = byCode.Aircon[key] || (!r.round ? byCodeLegacy.Aircon[r.code] : null);
             if (ac) { r.hasAircon = true; r.airconStatus = ac.status; r.airconTs = ac.tsStr; }
-            var rf = byCode.Ref[r.code];
+            var rf = byCode.Ref[key] || (!r.round ? byCodeLegacy.Ref[r.code] : null);
             if (rf) { r.hasRef = true; r.refStatus = rf.status; r.refTs = rf.tsStr; }
         });
 
@@ -632,6 +721,7 @@ function getDailyScheduleWithSurvey(fromDate, toDate) {
                 time:         String(row[5] || '').trim(),
                 status:       String(row[6] || '').trim(),
                 skipCount:    parseInt(row[8]) || 0,
+                round:        String(row[9] || '').trim(),
                 rowIdx:       i + 1,
                 hasAircon:    false, airconStatus: '', airconTs: '',
                 hasRef:       false, refStatus:    '', refTs:    ''
@@ -646,19 +736,21 @@ function getDailyScheduleWithSurvey(fromDate, toDate) {
             { name: 'Aircon_Survey_Database', isAircon: true },
             { name: 'Ref_Survey_Database',    isAircon: false }
         ];
-        var byCode = { Aircon: {}, Ref: {} };
+        var byCode       = { Aircon: {}, Ref: {} }; // key: "code|round"
+        var byCodeLegacy = { Aircon: {}, Ref: {} }; // key: code (rows with no round on either side)
 
         sheetDefs.forEach(function(def) {
             var sht = ss.getSheetByName(def.name);
             if (!sht || sht.getLastRow() < 2) return;
             var sData   = sht.getDataRange().getValues();
             var hdrs    = sData[0];
-            var tsIdx = -1, codeIdx = -1, statusIdx = -1;
+            var tsIdx = -1, codeIdx = -1, statusIdx = -1, roundIdx = -1;
             for (var h = 0; h < hdrs.length; h++) {
                 var hdr = String(hdrs[h]).toLowerCase().trim();
-                if (hdr === 'timestamp')   tsIdx     = h;
-                if (hdr === 'branch code') codeIdx   = h;
-                if (hdr === 'status')      statusIdx = h;
+                if (hdr === 'timestamp')    tsIdx     = h;
+                if (hdr === 'branch code')  codeIdx   = h;
+                if (hdr === 'status')       statusIdx = h;
+                if (hdr === 'survey round') roundIdx  = h;
             }
             if (codeIdx < 0) return;
             var typeKey = def.isAircon ? 'Aircon' : 'Ref';
@@ -668,21 +760,35 @@ function getDailyScheduleWithSurvey(fromDate, toDate) {
                 if (!code || !codeSet[code]) continue;
                 var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
                 if (!status || status === 'Draft') continue;
+                var round  = roundIdx >= 0 ? String(row[roundIdx] || '').trim() : '';
                 var tsRaw  = tsIdx >= 0 ? row[tsIdx] : '';
                 var tsDate = tsRaw instanceof Date ? tsRaw : new Date(String(tsRaw));
                 var tsMs   = isNaN(tsDate) ? 0 : tsDate.getTime();
                 var tsStr  = tsMs > 0 ? Utilities.formatDate(tsDate, Session.getScriptTimeZone(), 'dd/MM/yy HH:mm') : '-';
-                var existing = byCode[typeKey][code];
+
+                // Key on "code|round" so a completed survey from an earlier round
+                // doesn't get credited against a later round's schedule entry.
+                // The legacy (code-only) map keeps the old behavior for records
+                // submitted before the Survey Round field existed.
+                var key = code + '|' + round;
+                var existing = byCode[typeKey][key];
                 if (!existing || tsMs > existing.tsMs) {
-                    byCode[typeKey][code] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                    byCode[typeKey][key] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                }
+                if (!round) {
+                    var legacyExisting = byCodeLegacy[typeKey][code];
+                    if (!legacyExisting || tsMs > legacyExisting.tsMs) {
+                        byCodeLegacy[typeKey][code] = { status: status, tsMs: tsMs, tsStr: tsStr };
+                    }
                 }
             }
         });
 
         rows.forEach(function(r) {
-            var ac = byCode.Aircon[r.code];
+            var key = r.code + '|' + r.round;
+            var ac = byCode.Aircon[key] || (!r.round ? byCodeLegacy.Aircon[r.code] : null);
             if (ac) { r.hasAircon = true; r.airconStatus = ac.status; r.airconTs = ac.tsStr; }
-            var rf = byCode.Ref[r.code];
+            var rf = byCode.Ref[key] || (!r.round ? byCodeLegacy.Ref[r.code] : null);
             if (rf) { r.hasRef = true; r.refStatus = rf.status; r.refTs = rf.tsStr; }
         });
 
@@ -824,7 +930,7 @@ function clearUploadSchedule() {
     try {
         var sheet = _getScheduleSheet(false);
         if (sheet && sheet.getLastRow() > 1) {
-            sheet.getRange(2, 1, sheet.getLastRow() - 1, 9).clearContent();
+            sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).clearContent();
         }
         var metaSheet = _getMetaSheet(false);
         if (metaSheet && metaSheet.getLastRow() > 1) {
@@ -865,6 +971,74 @@ function setGuestButtonSetting(enabled) {
     }
 }
 
+// ─── General-User Tab Visibility Setting ──────────────────────
+// Lets an Admin/System Admin temporarily restrict which of the general-user
+// tabs (Aircon/Ref/NP/EDMI surveys, Register Profile) are shown to non-admin
+// users — e.g. showing only the EDMI Solar Meter survey on a collection day.
+// Stored as a JSON map {tabId: true/false}; a tab missing from the map
+// defaults to visible (so adding a brand-new tab never silently hides it).
+// Also stores which of those tabs opens by default when the app first loads
+// (GENERAL_DEFAULT_TAB_V1), so an Admin can e.g. land everyone on EDMI Solar
+// Meter on a collection day instead of the usual Aircon Survey tab.
+
+function getGeneralTabVisibility() {
+    try {
+        var val = PropertiesService.getScriptProperties().getProperty('GENERAL_TAB_VISIBILITY_V1');
+        var config = val ? JSON.parse(val) : {};
+        var defaultTab = PropertiesService.getScriptProperties().getProperty('GENERAL_DEFAULT_TAB_V1') || 'tab-aircon-survey';
+        return { success: true, data: config, defaultTab: defaultTab };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function setGeneralTabVisibility(config, defaultTab, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin && !status.isSysAdmin) return { success: false, error: "Administrator privileges required." };
+        PropertiesService.getScriptProperties().setProperty('GENERAL_TAB_VISIBILITY_V1', JSON.stringify(config || {}));
+        if (defaultTab) {
+            PropertiesService.getScriptProperties().setProperty('GENERAL_DEFAULT_TAB_V1', defaultTab);
+        }
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─── Team-Restricted Tab Access ────────────────────────────────
+// Generalizes the Trading Hours Survey's "SMF team only" requirement so any future
+// tab can be locked to a specific team (rather than all general/Operation users) via
+// admin config instead of a hardcoded check. Stored as {tabId: 'SMF'|'MMS'|'ALL'};
+// a tab missing from the stored config falls back to TEAM_TAB_DEFAULTS below, so a
+// newly added restricted tab is never silently opened to everyone before an Admin
+// configures it. Mirrors General Tab Visibility above (same modal on the client).
+var TEAM_TAB_DEFAULTS = { 'tab-hours-survey': 'SMF' };
+
+function getTeamTabAccess() {
+    try {
+        var val = PropertiesService.getScriptProperties().getProperty('TEAM_TAB_ACCESS_V1');
+        var stored = val ? JSON.parse(val) : {};
+        var merged = {};
+        Object.keys(TEAM_TAB_DEFAULTS).forEach(function(id) { merged[id] = TEAM_TAB_DEFAULTS[id]; });
+        Object.keys(stored).forEach(function(id) { merged[id] = stored[id]; });
+        return { success: true, data: merged };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function setTeamTabAccess(config, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin && !status.isSysAdmin) return { success: false, error: "Administrator privileges required." };
+        PropertiesService.getScriptProperties().setProperty('TEAM_TAB_ACCESS_V1', JSON.stringify(config || {}));
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
 // ─── SMF Admin Access Setting ────────────────────────────────
 
 function getSMFAdminSetting() {
@@ -875,6 +1049,29 @@ function getSMFAdminSetting() {
 function setSMFAdminSetting(enabled) {
     try {
         PropertiesService.getScriptProperties().setProperty('SMF_ADMIN_ENABLED', enabled ? 'true' : 'false');
+        return { success: true, enabled: enabled };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─── SMF Survey Data Edit Setting ─────────────────────────────
+// Narrower than SMF_ADMIN_ENABLED above — that toggle grants SMF team members
+// full Admin rights everywhere. This one only controls whether SMF can edit
+// survey data (Ref/EDMI report fields + photo reupload), checked via
+// checkSurveyAdminStatus().smfEditAllowed in Survey.gs. Defaults to true so
+// existing SMF edit access (previously hardcoded on) doesn't regress silently.
+
+function getSmfSurveyEditSetting() {
+    var val = PropertiesService.getScriptProperties().getProperty('SMF_SURVEY_EDIT_ENABLED_V1');
+    return val === null ? true : (val === 'true');
+}
+
+function setSmfSurveyEditSetting(enabled, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin && !status.isSysAdmin) return { success: false, error: "Administrator privileges required." };
+        PropertiesService.getScriptProperties().setProperty('SMF_SURVEY_EDIT_ENABLED_V1', enabled ? 'true' : 'false');
         return { success: true, enabled: enabled };
     } catch (e) {
         return { success: false, error: e.toString() };
@@ -999,7 +1196,7 @@ function addCriticalToSchedule(codes) {
                 dateCount[assignedDay] = slotPos + 1;
 
                 newRows.push([storeInfo.code, storeInfo.name, storeInfo.bu || '',
-                              'Yes', assignedDay, newTime, 'Pending', now, 0]);
+                              'Yes', assignedDay, newTime, 'Pending', now, 0, meta['round'] || '']);
                 added++;
             }
         });
@@ -1009,7 +1206,7 @@ function addCriticalToSchedule(codes) {
             var lastRow = sheet.getLastRow();
             sheet.getRange(lastRow + 1, 5, newRows.length, 1).setNumberFormat('@');
             sheet.getRange(lastRow + 1, 6, newRows.length, 1).setNumberFormat('@');
-            sheet.getRange(lastRow + 1, 1, newRows.length, 9).setValues(newRows);
+            sheet.getRange(lastRow + 1, 1, newRows.length, 10).setValues(newRows);
         }
 
         CacheService.getScriptCache().remove('UPLOAD_SCHEDULE_SUMMARY');
@@ -1185,6 +1382,12 @@ function _getSurveyStats() {
 
 function getDashboardData() {
     try {
+        // Cache 60s — full Upload_Schedule scan on every call, fired on every
+        // admin dashboard load.
+        var _udCache = CacheService.getScriptCache();
+        var _udHit = _udCache.get('UPLOAD_DASHBOARD_V1');
+        if (_udHit) return JSON.parse(_udHit);
+
         var sheet = _getScheduleSheet(false);
         if (!sheet || sheet.getLastRow() < 2) {
             // No schedule yet — still return basic survey stats for display
@@ -1263,7 +1466,7 @@ function getDashboardData() {
             daysLeft = Math.ceil((dl - today) / 86400000);
         }
 
-        return {
+        var _udResult = {
             exists:           true,
             total:            total,
             uploaded:         uploaded,
@@ -1276,6 +1479,8 @@ function getDashboardData() {
             byDay:            byDay,
             recentUploads:    recentUploads
         };
+        try { _udCache.put('UPLOAD_DASHBOARD_V1', JSON.stringify(_udResult), 60); } catch (e) {}
+        return _udResult;
 
     } catch (e) {
         Logger.log('getDashboardData Error: ' + e.toString());
@@ -1288,8 +1493,20 @@ function getDashboardData() {
 // Returns per-branch status summary for the Performance tab.
 // Visible only to Admin / Schedule Admin (frontend enforces).
 // ─────────────────────────────────────────────────────────
-function getAcknowledgedPerformanceDashboard() {
+function getAcknowledgedPerformanceDashboard(round) {
     try {
+        // Defaults to the currently active plan's round, so the dashboard
+        // reflects only this round's submissions and not an all-time mixture
+        // once quarterly resurveys start accumulating in the survey databases.
+        round = (round === undefined || round === null) ? (_readMeta()['round'] || '') : String(round).trim();
+
+        // Cache 60s — full scan of BOTH Aircon_Survey_Database and Ref_Survey_Database
+        // on every call, fired on every Performance tab load.
+        var _apdCache = CacheService.getScriptCache();
+        var _apdCacheKey = 'ACK_PERF_DASHBOARD_V2_' + round;
+        var _apdHit = _apdCache.get(_apdCacheKey);
+        if (_apdHit) return JSON.parse(_apdHit);
+
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         var DONE = ['Acknowledged', 'Corrected', 'Closed', 'Rejected'];
 
@@ -1309,7 +1526,7 @@ function getAcknowledgedPerformanceDashboard() {
             var headers = data[0];
 
             var idxCode = -1, idxName = -1, idxStatus = -1,
-                idxDM   = -1, idxCM   = -1, idxAM     = -1, idxTs = -1;
+                idxDM   = -1, idxCM   = -1, idxAM     = -1, idxTs = -1, idxRound = -1;
 
             for (var h = 0; h < headers.length; h++) {
                 var hdr = String(headers[h]).toLowerCase().trim();
@@ -1320,6 +1537,7 @@ function getAcknowledgedPerformanceDashboard() {
                 if (hdr === 'cm area')      idxCM     = h;
                 if (hdr === 'amm mtn')      idxAM     = h;
                 if (hdr === 'timestamp')    idxTs     = h;
+                if (hdr === 'survey round') idxRound  = h;
             }
             // Fallback column positions if headers not found
             if (idxCode   < 0) idxCode   = 4;
@@ -1335,6 +1553,12 @@ function getAcknowledgedPerformanceDashboard() {
                 var code   = String(row[idxCode] || '').trim();
                 var status = idxStatus >= 0 ? String(row[idxStatus] || '').trim() : '';
                 if (!code || status === 'Draft') continue;
+
+                // When a round is active, exclude rows explicitly tagged with a
+                // DIFFERENT round — rows with no round tag (pre-migration data,
+                // or off-schedule submissions) still count.
+                var rowRound = idxRound >= 0 ? String(row[idxRound] || '').trim() : '';
+                if (round && rowRound && rowRound !== round) continue;
 
                 var ts     = row[idxTs];
                 var tsDate = ts instanceof Date ? ts : new Date(ts);
@@ -1403,7 +1627,7 @@ function getAcknowledgedPerformanceDashboard() {
 
         var totalAck = stores.filter(function(s) { return s.acknowledged; }).length;
 
-        return {
+        var _apdResult = {
             success:  true,
             stores:   stores,
             dmList:   dmList,
@@ -1412,6 +1636,8 @@ function getAcknowledgedPerformanceDashboard() {
             totalAck: totalAck,
             total:    stores.length
         };
+        try { _apdCache.put(_apdCacheKey, JSON.stringify(_apdResult), 60); } catch (e) {}
+        return _apdResult;
 
     } catch (e) {
         Logger.log('getAcknowledgedPerformanceDashboard Error: ' + e.toString());
@@ -1426,6 +1652,13 @@ function getAcknowledgedPerformanceDashboard() {
 // ─────────────────────────────────────────────────────────────────────────────
 function getScheduleUploadProgressReport() {
     try {
+        // Cache 60s — this is the heaviest of the three dashboard endpoints: Store
+        // Master + Upload_Schedule + Aircon_Survey_Database + Ref_Survey_Database,
+        // all read in full on every call, fired on every report tab load.
+        var _supCache = CacheService.getScriptCache();
+        var _supHit = _supCache.get('SCHED_UPLOAD_PROGRESS_V1');
+        if (_supHit) return JSON.parse(_supHit);
+
         var ss = SpreadsheetApp.getActiveSpreadsheet();
 
         // 1. Load ALL branches from Store Master as the primary source (including inactive)
@@ -1576,7 +1809,7 @@ function getScheduleUploadProgressReport() {
         var withRefOnly     = result.filter(function(r) { return !r.hasAircon && r.hasRef; }).length;
         var withNone        = result.filter(function(r) { return !r.hasAircon && !r.hasRef; }).length;
 
-        return {
+        var _supResult = {
             success: true,
             data: result,
             summary: {
@@ -1588,6 +1821,8 @@ function getScheduleUploadProgressReport() {
                 withNone:       withNone
             }
         };
+        try { _supCache.put('SCHED_UPLOAD_PROGRESS_V1', JSON.stringify(_supResult), 60); } catch (e) { Logger.log('SUP cache put skipped: ' + e); }
+        return _supResult;
 
     } catch (e) {
         Logger.log('getScheduleUploadProgressReport Error: ' + e.toString());
@@ -1609,7 +1844,11 @@ function getDuplicateSurveyData() {
             { name: 'Ref_Survey_Database',    typeKey: 'ref' }
         ];
 
-        var siteMap = {};  // code -> { code, name, bu, dm, cm, am, aircon: [], ref: [] }
+        // Keyed by "code|round" (not code alone) — a store legitimately gets one
+        // submission per round now, so only >1 submission WITHIN the same round
+        // should ever surface here. Rows with no round tag (pre-migration data)
+        // group under their own "code|" bucket, preserving the old behavior.
+        var siteMap = {};  // "code|round" -> { code, round, name, bu, dm, cm, am, aircon: [], ref: [] }
 
         sheetDefs.forEach(function(def) {
             var sheet = ss.getSheetByName(def.name);
@@ -1619,18 +1858,19 @@ function getDuplicateSurveyData() {
             var headers = data[0];
 
             var tsIdx = -1, codeIdx = -1, nameIdx = -1, statusIdx = -1,
-                buIdx = -1, dmIdx   = -1, cmIdx   = -1, amIdx     = -1;
+                buIdx = -1, dmIdx   = -1, cmIdx   = -1, amIdx     = -1, roundIdx = -1;
 
             for (var h = 0; h < headers.length; h++) {
                 var hdr = String(headers[h]).toLowerCase().trim();
-                if (hdr === 'timestamp')   tsIdx     = h;
-                if (hdr === 'branch code') codeIdx   = h;
-                if (hdr === 'branch name') nameIdx   = h;
-                if (hdr === 'status')      statusIdx = h;
-                if (hdr === 'bu')          buIdx     = h;
-                if (hdr === 'dm area')     dmIdx     = h;
-                if (hdr === 'cm area')     cmIdx     = h;
-                if (hdr === 'amm mtn')     amIdx     = h;
+                if (hdr === 'timestamp')    tsIdx     = h;
+                if (hdr === 'branch code')  codeIdx   = h;
+                if (hdr === 'branch name')  nameIdx   = h;
+                if (hdr === 'status')       statusIdx = h;
+                if (hdr === 'bu')           buIdx     = h;
+                if (hdr === 'dm area')      dmIdx     = h;
+                if (hdr === 'cm area')      cmIdx     = h;
+                if (hdr === 'amm mtn')      amIdx     = h;
+                if (hdr === 'survey round') roundIdx  = h;
             }
             if (codeIdx < 0) return;
 
@@ -1640,6 +1880,9 @@ function getDuplicateSurveyData() {
                 var status = statusIdx >= 0 ? String(row[statusIdx] || '').trim() : '';
                 if (!code || status === 'Draft') continue;
 
+                var round  = roundIdx >= 0 ? String(row[roundIdx] || '').trim() : '';
+                var key    = code + '|' + round;
+
                 var tsRaw  = tsIdx >= 0 ? row[tsIdx] : '';
                 var tsDate = tsRaw instanceof Date ? tsRaw : new Date(String(tsRaw));
                 var tsMs   = isNaN(tsDate.getTime()) ? 0 : tsDate.getTime();
@@ -1647,9 +1890,10 @@ function getDuplicateSurveyData() {
                     ? Utilities.formatDate(tsDate, Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm')
                     : '-';
 
-                if (!siteMap[code]) {
-                    siteMap[code] = {
+                if (!siteMap[key]) {
+                    siteMap[key] = {
                         code:   code,
+                        round:  round,
                         name:   nameIdx >= 0 ? String(row[nameIdx] || '').trim() : '',
                         bu:     buIdx   >= 0 ? String(row[buIdx]   || '').trim() : '',
                         dm:     dmIdx   >= 0 ? String(row[dmIdx]   || '').trim() : '',
@@ -1660,21 +1904,21 @@ function getDuplicateSurveyData() {
                     };
                 } else {
                     // Fill missing name/bu/dm/cm/am from later rows
-                    if (!siteMap[code].name && nameIdx >= 0) siteMap[code].name = String(row[nameIdx] || '').trim();
-                    if (!siteMap[code].bu   && buIdx   >= 0) siteMap[code].bu   = String(row[buIdx]   || '').trim();
-                    if (!siteMap[code].dm   && dmIdx   >= 0) siteMap[code].dm   = String(row[dmIdx]   || '').trim();
-                    if (!siteMap[code].cm   && cmIdx   >= 0) siteMap[code].cm   = String(row[cmIdx]   || '').trim();
-                    if (!siteMap[code].am   && amIdx   >= 0) siteMap[code].am   = String(row[amIdx]   || '').trim();
+                    if (!siteMap[key].name && nameIdx >= 0) siteMap[key].name = String(row[nameIdx] || '').trim();
+                    if (!siteMap[key].bu   && buIdx   >= 0) siteMap[key].bu   = String(row[buIdx]   || '').trim();
+                    if (!siteMap[key].dm   && dmIdx   >= 0) siteMap[key].dm   = String(row[dmIdx]   || '').trim();
+                    if (!siteMap[key].cm   && cmIdx   >= 0) siteMap[key].cm   = String(row[cmIdx]   || '').trim();
+                    if (!siteMap[key].am   && amIdx   >= 0) siteMap[key].am   = String(row[amIdx]   || '').trim();
                 }
 
-                siteMap[code][def.typeKey].push({ ts: tsStr, tsMs: tsMs, status: status });
+                siteMap[key][def.typeKey].push({ ts: tsStr, tsMs: tsMs, status: status });
             }
         });
 
         // Keep only sites with at least one type having >1 submission
         var duplicates = [];
-        Object.keys(siteMap).forEach(function(code) {
-            var site = siteMap[code];
+        Object.keys(siteMap).forEach(function(key) {
+            var site = siteMap[key];
             if (site.aircon.length <= 1 && site.ref.length <= 1) return;
 
             // Sort submissions oldest-first within each type
@@ -1683,6 +1927,7 @@ function getDuplicateSurveyData() {
 
             duplicates.push({
                 code:        site.code,
+                round:       site.round,
                 name:        site.name,
                 bu:          site.bu,
                 dm:          site.dm,

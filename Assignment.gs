@@ -1,8 +1,13 @@
 function getAssignmentReport() {
     try {
+        // Cache 60s — full Assignments + Employee_Database scan on every call.
+        var _arCache = CacheService.getScriptCache();
+        var _arHit = _arCache.get('ASSIGNMENT_REPORT_V1');
+        if (_arHit) return JSON.parse(_arHit);
+
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Assignments");
         if (!sheet) return { assignments: [] };
-        
+
         var data = sheet.getDataRange().getValues();
         if (data.length <= 1) return { assignments: [] };
         
@@ -43,7 +48,9 @@ function getAssignmentReport() {
             results.push(assign);
         }
         
-        return { assignments: results.reverse() };
+        var _arResult = { assignments: results.reverse() };
+        try { _arCache.put('ASSIGNMENT_REPORT_V1', JSON.stringify(_arResult), 60); } catch (e) {}
+        return _arResult;
 
     } catch (e) {
         return { error: e.toString() };

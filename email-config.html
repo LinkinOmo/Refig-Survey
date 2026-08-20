@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Delivery Config</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background-color: #f3f4f6; }
+    </style>
+</head>
+
+<body>
+
+    <?!= include('auth') ?>
+
+    <!-- Access Denied (shown if not System Admin) -->
+    <div id="access-denied" class="hidden min-h-screen flex items-center justify-center">
+        <div class="text-center bg-white rounded-xl shadow-lg p-10 max-w-sm">
+            <div class="text-6xl mb-4">🔒</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
+            <p class="text-gray-500 mb-6">This page is restricted to Admins only.</p>
+            <a href="<?= ScriptApp.getService().getUrl() ?>" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Back to App</a>
+        </div>
+    </div>
+
+    <!-- Main Page -->
+    <div id="main-page" class="hidden min-h-screen">
+
+        <!-- Header -->
+        <header class="bg-emerald-700 text-white shadow-md">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <div>
+                    <h1 class="text-xl font-bold">✉️ Email Delivery — Brevo Fallback</h1>
+                    <p class="text-emerald-200 text-xs mt-0.5">Configure the backup email channel used when the Gmail daily quota runs out</p>
+                </div>
+                <a href="<?= ScriptApp.getService().getUrl() ?>"
+                    class="bg-emerald-800 hover:bg-emerald-900 px-4 py-2 rounded text-sm transition">Back to App</a>
+            </div>
+        </header>
+
+        <main class="container mx-auto px-4 py-10 max-w-lg">
+
+            <div class="bg-white rounded-xl shadow-lg p-8">
+
+                <p class="text-sm text-gray-500 mb-6">
+                    When the Gmail daily quota (~100 recipients/day) is exhausted, app emails (survey
+                    notifications, work-order approvals, safety incidents…) are sent through the
+                    <a href="https://app.brevo.com" target="_blank" class="text-emerald-600 underline">Brevo</a>
+                    transactional API instead. The sender email must be a <b>verified sender</b> in your Brevo account.
+                </p>
+
+                <div class="space-y-4">
+                    <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <input id="brevoEnabled" type="checkbox" class="w-4 h-4">
+                        Enable Brevo fallback
+                    </label>
+
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Sender Email (verified in Brevo)</label>
+                            <input id="brevoSender" type="email" placeholder="you@example.com"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Sender Name</label>
+                            <input id="brevoName" placeholder="Mini Big C Maintenance"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Brevo API Key</label>
+                        <input id="brevoKey" type="password" autocomplete="off"
+                            class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
+                        <p id="brevoKeyHint" class="text-xs text-gray-400 mt-1">Paste your xkeysib-… key. Leave blank to keep the saved key.</p>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap pt-2">
+                        <button onclick="saveBrevoConfig()" id="brevoSaveBtn"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">💾 Save</button>
+                        <button onclick="testBrevo()" id="brevoTestBtn"
+                            class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">📨 Send Test (via Brevo)</button>
+                        <span id="brevoStatus" class="text-xs text-gray-400 italic"></span>
+                    </div>
+                    <p id="brevoQuota" class="text-xs text-gray-400"></p>
+                </div>
+
+                <p class="text-center text-xs text-gray-400 mt-6 border-t pt-4">The API key is stored in this app's Script Properties only — never exposed to the browser after saving.</p>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
+                updateUserUI(CURRENT_USER);
+            }
+        });
+
+        // Called by auth.html after successful login OR by our DOMContentLoaded listener
+        function updateUserUI(user) {
+            const display = document.getElementById('user-email-display');
+            if (display) display.textContent = user.name || user.email;
+
+            const mainPage = document.getElementById('main-page');
+            const accessDenied = document.getElementById('access-denied');
+
+            if (!user || !(user.isAdmin || user.isSysAdmin)) {
+                if (accessDenied) accessDenied.classList.remove('hidden');
+                if (mainPage) mainPage.classList.add('hidden');
+                return;
+            }
+
+            if (mainPage) mainPage.classList.remove('hidden');
+            if (accessDenied) accessDenied.classList.add('hidden');
+            loadBrevoConfig();
+        }
+
+        function _callerEmail() {
+            return (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.email : '';
+        }
+
+        function loadBrevoConfig() {
+            var st = document.getElementById('brevoStatus');
+            if (st) st.textContent = 'Loading…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (!res || !res.success) { if (st) st.textContent = (res && res.error) || 'Load failed'; return; }
+                    document.getElementById('brevoEnabled').checked = !!res.enabled;
+                    document.getElementById('brevoSender').value = res.senderEmail || '';
+                    document.getElementById('brevoName').value = res.senderName || '';
+                    var hint = document.getElementById('brevoKeyHint');
+                    if (hint) hint.textContent = res.hasKey
+                        ? 'A key is saved (…' + res.keyTail + '). Leave blank to keep it, or paste a new one to replace.'
+                        : 'Paste your xkeysib-… key. No key saved yet.';
+                    var q = document.getElementById('brevoQuota');
+                    if (q && res.gmailQuotaLeft >= 0) q.textContent = 'Gmail quota remaining today: ' + res.gmailQuotaLeft + ' recipients.';
+                    if (st) st.textContent = res.enabled ? 'Fallback is ON' : 'Fallback is OFF';
+                })
+                .withFailureHandler(function (e) { if (st) st.textContent = 'Load failed: ' + e.message; })
+                .getEmailConfig(_callerEmail());
+        }
+
+        function saveBrevoConfig() {
+            var st = document.getElementById('brevoStatus');
+            var btn = document.getElementById('brevoSaveBtn');
+            btn.disabled = true; if (st) st.textContent = 'Saving…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    if (res && res.success) {
+                        document.getElementById('brevoKey').value = '';
+                        if (st) st.textContent = 'Saved ✓';
+                        loadBrevoConfig();
+                    } else {
+                        if (st) st.textContent = (res && res.error) || 'Save failed';
+                    }
+                })
+                .withFailureHandler(function (e) { btn.disabled = false; if (st) st.textContent = 'Save failed: ' + e.message; })
+                .saveEmailConfig(_callerEmail(), {
+                    enabled: document.getElementById('brevoEnabled').checked,
+                    senderEmail: document.getElementById('brevoSender').value,
+                    senderName: document.getElementById('brevoName').value,
+                    apiKey: document.getElementById('brevoKey').value
+                });
+        }
+
+        function testBrevo() {
+            var st = document.getElementById('brevoStatus');
+            var btn = document.getElementById('brevoTestBtn');
+            btn.disabled = true; if (st) st.textContent = 'Sending test via Brevo…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    if (res && res.success) {
+                        if (st) st.textContent = 'Test sent ✓ — check your inbox';
+                    } else {
+                        if (st) st.textContent = 'Test failed: ' + ((res && res.error) || '');
+                    }
+                })
+                .withFailureHandler(function (e) { btn.disabled = false; if (st) st.textContent = 'Test failed: ' + e.message; })
+                .testBrevoEmail(_callerEmail());
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>คู่มือแบบสำรวจแอร์ & ตู้แช่ - Mini Big C Maintenance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .step-num {
+            flex: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto">
+
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="text-3xl">📖</span>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">คู่มือการกรอกแบบสำรวจ<br class="sm:hidden">เครื่องปรับอากาศ &amp; ตู้แช่</h1>
+            </div>
+            <p class="text-gray-500 text-sm sm:text-base">คู่มือฉบับเต็มสำหรับผู้ใช้งานทั่วไป — อธิบายทีละขั้นตอนตามหน้าจอจริงของฟอร์ม
+                <b>แบบสำรวจแอร์</b> และ <b>แบบสำรวจตู้แช่</b> ในระบบ Mini Big C Maintenance</p>
+        </div>
+
+        <!-- Before You Start -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-emerald-600 mb-4 flex items-center gap-2">🧰 ก่อนเริ่มสำรวจ</h2>
+            <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
+                <li>เตรียมชื่อ-นามสกุลของผู้สำรวจ และทราบรหัสสาขา (5 หลัก) หรือชื่อสาขาที่จะเข้าไปสำรวจ</li>
+                <li>เดินสำรวจอุปกรณ์ให้ครบทุกตัวในพื้นที่ก่อน แล้วค่อยกรอกข้อมูลลงระบบ เพื่อไม่ให้นับจำนวนตกหล่น</li>
+                <li>ถ่ายภาพอุปกรณ์ที่ชำรุด/มีปัญหาเก็บไว้ (ถ้าฟอร์มมีช่องแนบไฟล์) เพื่อประกอบการแจ้งซ่อม</li>
+                <li>สัญญาณอินเทอร์เน็ตควรเสถียร หากสัญญาณไม่ดีให้ใช้ปุ่ม <b>Save Draft</b> บันทึกร่างไว้ก่อน แล้วค่อยกลับมากรอกต่อ</li>
+            </ul>
+        </div>
+
+        <!-- SECTION: Aircon -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-blue-600 mb-1 flex items-center gap-2">❄️ แบบสำรวจเครื่องปรับอากาศ (Aircon Survey)</h2>
+            <p class="text-xs text-gray-400 mb-5">เมนู: <b>แบบสำรวจแอร์</b></p>
+
+            <div class="space-y-5">
+                <div class="flex gap-3">
+                    <div class="step-num bg-blue-500">1</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">ข้อมูลสาขา (Branch Information)</h3>
+                        <p class="text-sm text-gray-600 mt-1">กรอก <b>เทรนเนอร์ / ผู้แจ้ง</b> เป็นชื่อ-นามสกุลของผู้ทำการสำรวจ
+                            จากนั้นพิมพ์ <b>รหัสสาขา 5 หลัก</b> หรือ <b>ชื่อสาขา</b> ในช่อง "ค้นหาสาขา" แล้วเลือกสาขาจากรายการที่แสดงขึ้นมา —
+                            ระบบจะเติม รหัสสาขา และ ชื่อสาขา ให้อัตโนมัติ (แก้ไขเองไม่ได้)</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="step-num bg-blue-500">2</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">สำรวจแอร์ทุกตัว (AC Unit Inventory)</h3>
+                        <p class="text-sm text-gray-600 mt-1">กรอก <b>จำนวนแอร์ทั้งหมดในพื้นที่ขาย</b> (1–20 เครื่อง) —
+                            ระบบจะสร้างการ์ดสำรวจให้ทีละเครื่องโดยอัตโนมัติตามจำนวนที่กรอก
+                            ให้กรอกรายละเอียดของแอร์แต่ละตัวให้ครบก่อน (เช่น ยี่ห้อ ขนาด BTU สภาพการทำงาน) จึงค่อยไปขั้นตอนถัดไป</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="step-num bg-blue-500">3</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">แอร์ที่ชำรุด (Broken AC)</h3>
+                        <p class="text-sm text-gray-600 mt-1">เลือก <b>มี (Yes)</b> หรือ <b>ไม่มี (No)</b> ว่าพบเครื่องปรับอากาศชำรุด/ไม่เย็นหรือไม่
+                            หากเลือก "มี" ระบบจะให้เลือก <b>เครื่องที่ชำรุด</b> (เลือกได้มากกว่า 1 เครื่อง จากรายการที่สร้างไว้ในขั้นตอนที่ 2)
+                            แล้วติ๊กเลือก <b>อาการเสีย</b> ของแต่ละเครื่องที่เลือกไว้</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="step-num bg-blue-500">4</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">สรุปปัญหา (Additional Findings)</h3>
+                        <p class="text-sm text-gray-600 mt-1">ช่องข้อความอิสระสำหรับระบุปัญหาเพิ่มเติมที่ไม่มีในรายการ (ไม่บังคับกรอก)</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="step-num bg-blue-500">5</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">CC Email Notification (ไม่บังคับ)</h3>
+                        <p class="text-sm text-gray-600 mt-1">ใส่อีเมลของ <b>DM</b> และ/หรือ <b>CM</b> เพื่อสำเนาแจ้งเตือนผลการสำรวจ (หากไม่กรอก ระบบจะพยายามหาอีเมลให้อัตโนมัติจากชื่อ DM/CM ของสาขานั้น)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
+                <b>เมื่อกรอกครบแล้ว:</b> กด <b>Submit</b> เพื่อส่งข้อมูลเข้าระบบ หรือกด <b>💾 Save Draft</b> เพื่อบันทึกร่างไว้กรอกต่อภายหลัง
+                (กรอกไม่ครบ/ยังไม่พร้อมส่ง สามารถกด Save Draft ได้ตลอด) กด <b>Clear form</b> หากต้องการล้างข้อมูลทั้งหมดแล้วเริ่มใหม่
+            </div>
+        </div>
+
+        <!-- SECTION: Refrigeration -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-cyan-600 mb-1 flex items-center gap-2">🧊 แบบสำรวจตู้แช่ (Refrigeration Survey)</h2>
+            <p class="text-xs text-gray-400 mb-5">เมนู: <b>แบบสำรวจตู้แช่</b></p>
+
+            <div class="space-y-5">
+                <div class="flex gap-3">
+                    <div class="step-num bg-cyan-500">1</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">ข้อมูลสาขา (Branch Information)</h3>
+                        <p class="text-sm text-gray-600 mt-1">กรอกเหมือนแบบสำรวจแอร์: ชื่อผู้แจ้ง แล้วค้นหาสาขาด้วยรหัส 5 หลักหรือชื่อสาขา
+                            ระบบจะเติมรหัส/ชื่อสาขาให้อัตโนมัติ</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="step-num bg-cyan-500">2</div>
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-gray-800">ข้อมูลตู้แช่ (Refrigerator Details)</h3>
+                        <p class="text-sm text-gray-600 mt-1 mb-3">กรอก <b>จำนวนตู้</b> ของอุปกรณ์แต่ละประเภทต่อไปนี้ —
+                            <b>ใส่ 0 หากสาขานั้นไม่มีตู้ประเภทนั้น</b> เมื่อกรอกจำนวนแล้ว ระบบจะสร้างการ์ดรายละเอียดของตู้แต่ละตัวให้อัตโนมัติ ให้กรอกข้อมูลเพิ่มเติมในการ์ดนั้น ๆ ต่อ</p>
+
+                        <div class="space-y-2.5">
+                            <div class="bg-orange-50 border border-orange-100 rounded-lg p-3">
+                                <p class="font-semibold text-orange-700 text-sm">2.1) ตู้แช่ OPEN (ตู้เปิด)</p>
+                                <p class="text-xs text-orange-700/80 mt-1">💡 นับจำนวนตาม <b>จอ Controller</b> (1 จอ = 1 ตู้) ประเภทสินค้า เช่น หมู/ไก่/เนื้อสัตว์, แซนวิช/แฮมเบอร์เกอร์, ยำ/โยเกิร์ต/น้ำผลไม้, อาหารพร้อมทาน, อื่นๆ</p>
+                            </div>
+                            <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                                <p class="font-semibold text-blue-700 text-sm">2.2) ตู้แช่เย็นบานกระจก (Glass Door Chiller)</p>
+                                <p class="text-xs text-blue-700/80 mt-1">แยกกรอกจำนวน 3 ชนิดย่อย: <b>Plugin</b>, <b>Walk-in</b>, <b>Remote</b> (แต่ละชนิดกรอกแยกช่องกัน)</p>
+                            </div>
+                            <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+                                <p class="font-semibold text-indigo-700 text-sm">2.3) ตู้อาหารแช่แข็ง</p>
+                                <p class="text-xs text-indigo-700/80 mt-1">แยกกรอกตามจำนวนประตู: <b>1 ประตู</b>, <b>2 ประตู</b>, <b>3 ประตู</b></p>
+                            </div>
+                            <div class="bg-pink-50 border border-pink-100 rounded-lg p-3">
+                                <p class="font-semibold text-pink-700 text-sm">2.4) ตู้แช่ไอศกรีม</p>
+                                <p class="text-xs text-pink-700/80 mt-1">กรอกจำนวนตู้ และระบุผู้จัดจำหน่าย (Supplier) ของแต่ละตู้</p>
+                            </div>
+                            <div class="bg-cyan-50 border border-cyan-100 rounded-lg p-3">
+                                <p class="font-semibold text-cyan-700 text-sm">2.5) ตู้แช่น้ำแข็ง</p>
+                                <p class="text-xs text-cyan-700/80 mt-1">กรอกจำนวนตู้แช่น้ำแข็งทั้งหมด</p>
+                            </div>
+                            <div class="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                                <p class="font-semibold text-amber-700 text-sm">2.6) ตู้ 4 ประตู Stainless</p>
+                                <p class="text-xs text-amber-700/80 mt-1">กรอกจำนวนตู้ 4 ประตูสแตนเลสทั้งหมด</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="step-num bg-cyan-500">3</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">รายการตรวจสอบตู้แช่ที่ชำรุด</h3>
+                        <p class="text-sm text-gray-600 mt-1">เลือก <b>มี (Yes)</b> หรือ <b>ไม่มี (No)</b> ว่าพบตู้แช่ชำรุดหรือไม่
+                            หากเลือก "มี" ระบบจะให้เลือก <b>ตู้ที่ชำรุด</b> (เลือกได้หลายตู้ จากตู้ทั้งหมดที่กรอกไว้ในขั้นตอนที่ 2)
+                            แล้วติ๊กเลือก <b>อาการเสีย</b> ของแต่ละตู้ที่เลือก</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="step-num bg-cyan-500">4</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">สรุปปัญหา (Additional Findings)</h3>
+                        <p class="text-sm text-gray-600 mt-1">ช่องข้อความอิสระสำหรับระบุปัญหาเพิ่มเติม (ไม่บังคับกรอก)</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="step-num bg-cyan-500">5</div>
+                    <div>
+                        <h3 class="font-semibold text-gray-800">CC Email Notification (ไม่บังคับ)</h3>
+                        <p class="text-sm text-gray-600 mt-1">ใส่อีเมลของ DM และ/หรือ CM เพื่อสำเนาแจ้งเตือนผลการสำรวจ เช่นเดียวกับแบบสำรวจแอร์</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-cyan-50 border border-cyan-100 rounded-lg p-4 text-sm text-cyan-800">
+                <b>เมื่อกรอกครบแล้ว:</b> กด <b>Submit</b> เพื่อส่งข้อมูล หรือกด <b>💾 Save Draft</b> เพื่อบันทึกร่างไว้กรอกต่อภายหลัง
+            </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-amber-600 mb-4 flex items-center gap-2">💡 เคล็ดลับ & ข้อควรระวัง</h2>
+            <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
+                <li>ให้สำรวจและกรอก <b>รายละเอียดอุปกรณ์ทุกตัวในขั้นตอนที่ 2 ก่อนเสมอ</b> แล้วจึงค่อยไปเลือก "เครื่อง/ตู้ที่ชำรุด" ในขั้นตอนถัดไป
+                    เพราะระบบจะดึงรายชื่อเครื่อง/ตู้ให้เลือกจากข้อมูลที่กรอกไว้ในขั้นตอนที่ 2 เท่านั้น</li>
+                <li>ช่องที่มีเครื่องหมาย <span class="text-red-500 font-semibold">*</span> เป็นช่องบังคับกรอก หากกด Submit ไม่ได้ ให้ตรวจสอบว่ากรอกช่องเหล่านี้ครบหรือไม่</li>
+                <li>หากเน็ตหลุดหรือทำสำรวจไม่เสร็จ ให้กด <b>Save Draft</b> ทันที ระบบจะจำข้อมูลที่กรอกไว้ล่าสุด สามารถกลับมากรอกต่อได้</li>
+                <li>ตรวจสอบชื่อสาขาที่เลือกให้ถูกต้องก่อนกด Submit เพราะรหัส/ชื่อสาขาจะไม่สามารถแก้ไขเองได้หลังเลือกแล้ว (ต้องค้นหาใหม่)</li>
+                <li>สามารถดูรายงานสรุปแบบสำรวจที่เคยส่งแล้วได้ผ่านลิงก์ <b>"View All Reports"</b> ที่มุมขวาบนของแต่ละแบบฟอร์ม</li>
+            </ul>
+        </div>
+
+        <!-- FAQ -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center gap-2">❓ คำถามที่พบบ่อย</h2>
+            <div class="space-y-4 text-sm">
+                <div>
+                    <p class="font-semibold text-gray-800">กด Submit ไม่ได้ ทำอย่างไร?</p>
+                    <p class="text-gray-600">ตรวจสอบว่ากรอกช่องบังคับ (มีเครื่องหมาย *) ครบทุกช่อง โดยเฉพาะชื่อผู้แจ้งและการเลือกสาขา</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">ส่งข้อมูลผิดหรือกรอกผิดหลังจาก Submit แล้ว ต้องทำอย่างไร?</p>
+                    <p class="text-gray-600">ติดต่อผู้ดูแลระบบ (Admin) หรือทีมงานฝ่ายซ่อมบำรุง เพื่อขอแก้ไขข้อมูลในระบบ ไม่สามารถแก้ไขข้อมูลที่ส่งแล้วได้ด้วยตนเอง</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">หาสาขาที่ต้องการสำรวจในช่องค้นหาไม่เจอ ทำอย่างไร?</p>
+                    <p class="text-gray-600">ลองพิมพ์เฉพาะรหัสสาขา 5 หลัก หรือพิมพ์ชื่อสาขาบางส่วน หากยังหาไม่เจอ ให้แจ้งผู้ดูแลระบบเพื่อตรวจสอบข้อมูลสาขาในฐานข้อมูล</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer / Contact -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 text-center">
+            <p class="text-sm text-gray-500">หากพบปัญหาการใช้งานที่ไม่ได้อยู่ในคู่มือนี้ กรุณาติดต่อผู้ดูแลระบบ (Admin)
+                หรือทีมงานฝ่ายซ่อมบำรุง (Maintenance) ของท่าน</p>
+            <a href="<?= ScriptApp.getService().getUrl() ?>"
+                class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors text-sm">
+                &larr; กลับสู่หน้าแรก
+            </a>
+        </div>
+
+    </div>
+</body>
+
+</html>

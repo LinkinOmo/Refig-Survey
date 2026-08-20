@@ -594,6 +594,10 @@
                                     <span class="font-medium text-blue-900" id="mReporter"></span>
                                 </div>
                                 <div class="flex justify-between items-center">
+                                    <span class="text-blue-600">เบอร์โทร</span>
+                                    <span class="font-medium text-blue-900" id="mReporterPhone"></span>
+                                </div>
+                                <div class="flex justify-between items-center">
                                     <span class="text-blue-600">DM</span>
                                     <span class="font-medium text-blue-900" id="mDM"></span>
                                 </div>
@@ -754,7 +758,14 @@
         let currentReportId = null;
         let _acBrokenSelMap = {};  // { equipId → { checked, meta } } — AC broken unit picker state
         let isAdmin = false;
+        // AppSheet-style "enum with add new" — see getEnumFieldOptions (Survey.gs).
+        let _enumCache = {};
+        function _mergedOptions(groupKey, fallbackDefaults) { return _enumCache[groupKey] || fallbackDefaults; }
         let isSMF = false;
+        // Whether SMF may edit survey data (isSMF AND the Super Admin toggle is on) —
+        // separate from isSMF itself, which is also used by unrelated features (e.g.
+        // Capex Budget Cross-Check) that must keep working regardless of this toggle.
+        let smfCanEdit = false;
 
         let filters = {
             search: '',
@@ -808,6 +819,14 @@
             }
             applyAdminUI();
 
+            // Fetch Brand/Type enum options (defaults ∪ real submitted data) for the edit modal.
+            ['aircon_brand', 'aircon_type'].forEach(function(k) {
+                google.script.run
+                    .withSuccessHandler(function(res) { if (res && res.success) _enumCache[k] = res.options; })
+                    .withFailureHandler(function(e) { console.error('enum fetch failed', k, e); })
+                    .getEnumFieldOptions(k);
+            });
+
             // Load combined Aircon + Ref monthly aggregation chart — independent of main data
             google.script.run
                 .withSuccessHandler(function(res) {
@@ -842,6 +861,7 @@
                                 applyAdminUI();
                             }
                             isSMF = !!flags.isSMF;
+                            smfCanEdit = !!flags.smfEditAllowed;
                         })
                         .getUserFlags(_acUserEmail);
                 }
@@ -1410,6 +1430,7 @@
             document.getElementById('mBranch').innerText = r.station;
             document.getElementById('mDate').innerText = formatRecordDate(r.timestamp);
             document.getElementById('mReporter').innerText = r.recorderName;
+            document.getElementById('mReporterPhone').innerText = r.recorderPhone || '-';
             document.getElementById('mDM').innerText = r.dm || '-';
             document.getElementById('mCM').innerText = r.cluster || '-';
             document.getElementById('mAMM').innerText = r.ammMtn || '-';
@@ -1473,7 +1494,7 @@
             const units = d.units || [];
             const att = d.attachments || {};
             const branchCode = fullRecord.station ? fullRecord.station.split(' - ')[0].trim() : '';
-            const acTypeCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+            const acTypeCodes = { 'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
 
             document.getElementById('mACQuantity').innerText = g.acQuantity || 'N/A';
             document.getElementById('mACBrand').innerText = g.acBrand || 'N/A';
@@ -1502,7 +1523,7 @@
                 noise:     'เสียงการทำงาน',
                 condition: 'สภาพอุปกรณ์/หน้ากากแอร์'
             };
-            const typeNameMap = { 'Wall Type': 'แอร์ติดผนัง', 'Cassette Type': 'แอร์แขวน/ฝังฝ้า', 'Floor Standing': 'แอร์ตั้งพื้น', 'Package Type': 'แอร์ตู้ตั้งพื้น' };
+            const typeNameMap = { 'Wall Type': 'แอร์ติดผนัง', 'Hanging Type': 'แอร์แขวน', 'Cassette Type': 'แอร์ฝังฝ้า', 'Floor Standing': 'แอร์ตั้งพื้น', 'Package Type': 'แอร์ตู้ตั้งพื้น' };
             const statusColor = {
                 'OK':       'text-green-700 bg-green-50 border-green-200',
                 'NG':       'text-red-700 bg-red-50 border-red-200',
@@ -1623,6 +1644,15 @@
                                     </div>
                                 </div>
                             </div>` : ''}
+                            ${(u.condRating !== '' && u.condRating !== undefined && u.condRating !== null) ? (function() {
+                                var _cc = ['#dc2626','#ea580c','#d97706','#ca8a04','#65a30d','#16a34a'];
+                                var _cl = ['0 – ชำรุด/หมดสภาพ','1 – แย่มาก','2 – แย่ ควรซ่อม','3 – พอใช้','4 – ดี','5 – ใหม่/สมบูรณ์'];
+                                var _v = parseInt(u.condRating, 10);
+                                if (isNaN(_v) || _v < 0 || _v > 5) return '';
+                                return '<div class="mt-1 rounded-lg p-2 text-xs flex items-center gap-2" style="background:' + _cc[_v] + '1a;border:1px solid ' + _cc[_v] + '55;">' +
+                                    '<span class="font-semibold" style="color:' + _cc[_v] + ';">⭐ สภาพเครื่อง:</span>' +
+                                    '<span class="font-bold" style="color:' + _cc[_v] + ';">' + htmlEscape(_cl[_v]) + '</span></div>';
+                            })() : ''}
                             <div id="${acPhotoBlockId}">${photoBlock}</div>
                             <div class="mt-2 flex items-center justify-between gap-2 flex-wrap">
                                 <button onclick="pickAcUnitPhoto('${acUnitKey}','${acPhotoBlockId}')" class="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 hover:bg-blue-50 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5">
@@ -1712,7 +1742,7 @@
                 var _existBD = g.brokenDetail
                     ? (typeof g.brokenDetail === 'string' ? JSON.parse(g.brokenDetail || '{}') : g.brokenDetail)
                     : null;
-                const _acTCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+                const _acTCodes = { 'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
                 const _stStr    = (fullR && fullR.station) ? fullR.station : (report.station || '');
                 const _bc2      = _stStr.split(' - ')[0].trim();
                 if (_existBD && Object.keys(_existBD).length > 0) {
@@ -1867,7 +1897,7 @@
                 return;
             }
 
-            var _acTCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+            var _acTCodes = { 'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
             var fullR  = _acFullCache[currentReportId];
             var stStr  = (fullR && fullR.station) ? fullR.station : '';
             var bc     = stStr.split(' - ')[0].trim();
@@ -1922,7 +1952,7 @@
             // Rebuild chip button
             var fd = (_acFullCache[currentReportId] && _acFullCache[currentReportId].fullData) || {};
             var units = fd.units || [];
-            var _acTCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+            var _acTCodes = { 'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
             var fullR = _acFullCache[currentReportId];
             var stStr = (fullR && fullR.station) ? fullR.station : '';
             var bc    = stStr.split(' - ')[0].trim();
@@ -2040,7 +2070,7 @@
                 container.innerHTML = '<p class="text-sm text-slate-400 italic">ระบุจำนวนแอร์ในแท็บ "จำนวนแอร์" ก่อน</p>';
                 return;
             }
-            const acTypeCodes = { 'Wall Type': 'WT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+            const acTypeCodes = { 'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
             const stationStr = (report || {}).station || '';
             const branchCode = stationStr ? stationStr.split(' - ')[0].trim() : '';
             function makeEqId(typeVal, num) {
@@ -2051,16 +2081,13 @@
             for (let n = 1; n <= qty; n++) {
                 const u = unitMap[n] || {};
                 const equipmentId = makeEqId(u.type, n);
-                const typeOpts = ['Wall Type', 'Cassette Type', 'Floor Standing', 'Package Type'].map(function(opt) {
-                    return `<option value="${opt}" ${(u.type || '') === opt ? 'selected' : ''}>${opt}</option>`;
-                }).join('');
-                const AC_BRANDS = ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train'];
+                const AC_TYPE_DEFAULTS = ['Wall Type', 'Hanging Type', 'Cassette Type', 'Floor Standing', 'Package Type'];
+                const AC_TYPES = _mergedOptions('aircon_type', AC_TYPE_DEFAULTS);
+                const currentType = u.type || '';
+                const typeOpts = AC_TYPES.map(function(opt) { return `<option value="${opt}">`; }).join('');
+                const AC_BRANDS = _mergedOptions('aircon_brand', ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train']);
                 const currentBrand = u.brand || '';
-                const isOtherBrand = !!currentBrand && !AC_BRANDS.includes(currentBrand);
-                const brandOpts = [''].concat(AC_BRANDS).map(function(b) {
-                    if (!b) return '<option value="">-- เลือกยี่ห้อ --</option>';
-                    return `<option value="${b}" ${currentBrand === b ? 'selected' : ''}>${b}</option>`;
-                }).join('') + `<option value="Other" ${isOtherBrand ? 'selected' : ''}>อื่นๆ โปรดระบุ</option>`;
+                const brandOpts = AC_BRANDS.map(function(b) { return `<option value="${b}">`; }).join('');
                 const statusOpts = ['ใช้งาน', 'ชำรุด', 'ซ่อมแล้ว'].map(function(opt) {
                     return `<option value="${opt}" ${(u.unitStatus || 'ใช้งาน') === opt ? 'selected' : ''}>${opt}</option>`;
                 }).join('');
@@ -2072,12 +2099,18 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                             <label class="block text-xs text-slate-500 mb-1">ประเภท</label>
-                            <select data-ac-edit-field="Unit ${n} Type" onchange="(function(sel){var codes={'Wall Type':'WT','Cassette Type':'CT','Floor Standing':'FS','Package Type':'PT'};var code=codes[sel.value]||'AC';var bc='${htmlEscape(branchCode)}';var eid=bc?bc+'-'+code+String(${n}).padStart(2,'0'):code+String(${n}).padStart(2,'0');var lbl=document.getElementById('acEditEqId_${n}');if(lbl)lbl.textContent=eid;})(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">${typeOpts}</select>
+                            <input type="text" list="acTypeList_${n}" data-ac-edit-field="Unit ${n} Type" autocomplete="off" value="${htmlEscape(currentType)}"
+                                placeholder="พิมพ์เพื่อค้นหา หรือระบุประเภทใหม่..."
+                                oninput="(function(sel){var codes={'Wall Type':'WT','Hanging Type':'HT','Cassette Type':'CT','Floor Standing':'FS','Package Type':'PT'};var code=codes[sel.value]||'AC';var bc='${htmlEscape(branchCode)}';var eid=bc?bc+'-'+code+String(${n}).padStart(2,'0'):code+String(${n}).padStart(2,'0');var lbl=document.getElementById('acEditEqId_${n}');if(lbl)lbl.textContent=eid;})(this)"
+                                class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">
+                            <datalist id="acTypeList_${n}">${typeOpts}</datalist>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1">ยี่ห้อ</label>
-                            <select data-ac-edit-field="Unit ${n} Brand" onchange="(function(el){var inp=document.getElementById('acBrandOther_${n}');if(inp)inp.style.display=el.value==='Other'?'':'none';})(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">${brandOpts}</select>
-                            <input type="text" id="acBrandOther_${n}" placeholder="ระบุยี่ห้อ..." value="${isOtherBrand ? htmlEscape(currentBrand) : ''}" style="display:${isOtherBrand ? '' : 'none'}" class="mt-1 w-full border border-orange-300 rounded p-1.5 text-sm bg-orange-50">
+                            <input type="text" list="acBrandList_${n}" data-ac-edit-field="Unit ${n} Brand" autocomplete="off" value="${htmlEscape(currentBrand)}"
+                                placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่..."
+                                class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">
+                            <datalist id="acBrandList_${n}">${brandOpts}</datalist>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1">Asset No</label>
@@ -2112,6 +2145,16 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="sm:col-span-2 border-t border-emerald-100 pt-2 mt-1">
+                            <label class="block text-xs text-slate-500 mb-1">⭐ สภาพเครื่อง (Condition Rating)</label>
+                            <select data-ac-edit-field="Unit ${n} Cond Rating" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">
+                                ${['', '0', '1', '2', '3', '4', '5'].map(function(v) {
+                                    const cur = String(u.condRating ?? '');
+                                    const lbl = v === '' ? '— ยังไม่ให้คะแนน —' : v + ' - ' + ['ชำรุด/หมดสภาพ','แย่มาก','แย่ ควรซ่อม','พอใช้','ดี','ใหม่/สมบูรณ์'][parseInt(v, 10)];
+                                    return `<option value="${v}" ${cur === v ? 'selected' : ''}>${lbl}</option>`;
+                                }).join('')}
+                            </select>
+                        </div>
                     </div>
                 </div>`;
             }
@@ -2127,7 +2170,7 @@
             // Status Management section — visible only to Admin or SMF
             var statusSection = document.getElementById('statusMgmtSection');
             if (statusSection) {
-                if (isAdmin || isSMF) statusSection.classList.remove('hidden');
+                if (isAdmin || smfCanEdit) statusSection.classList.remove('hidden');
                 else statusSection.classList.add('hidden');
             }
         }
@@ -2149,6 +2192,9 @@
             const { unitKey, photoBlockId } = _acPhotoTarget;
             _acPhotoTarget = null;
             const capturedId = currentReportId; // capture before any async — prevents cross-record contamination
+            var _lsUplAc = null;
+            try { _lsUplAc = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsUplAc && _lsUplAc.email) ? _lsUplAc.email : '';
 
             const photoBlockEl = document.getElementById(photoBlockId);
 
@@ -2219,7 +2265,7 @@
                         if (loadingEl) loadingEl.remove();
                         alert('Error: ' + err.message);
                     })
-                    .addAcSurveyPhotos(capturedId, unitKey, fileData);
+                    .addAcSurveyPhotos(capturedId, unitKey, fileData, clientEmail);
             });
         });
         // ─────────────────────────────────────────────────────────────────────────
@@ -2228,6 +2274,9 @@
             if (!currentReportId) return;
             const capturedId = currentReportId; // capture before confirm() dialog — user may open another record
             if (!confirm('ลบรูปภาพนี้?')) return;
+            var _lsDelAc = null;
+            try { _lsDelAc = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsDelAc && _lsDelAc.email) ? _lsDelAc.email : '';
             const url = btn.dataset.url;
             const wrapper = btn.parentElement;
             const origText = btn.textContent;
@@ -2249,7 +2298,7 @@
                     }
                 })
                 .withFailureHandler(function(err) { alert('Error: ' + err.message); btn.disabled = false; btn.textContent = origText; })
-                .deleteAcSurveyPhoto(capturedId, unitKey, url);
+                .deleteAcSurveyPhoto(capturedId, unitKey, url, clientEmail);
         }
 
         function saveAcEdit() {
@@ -2262,15 +2311,7 @@
             const acQuantity = document.getElementById('acEditQty').value;
             const unitFields = {};
             document.querySelectorAll('#_acEditUnitsBody [data-ac-edit-field]').forEach(function(el) {
-                unitFields[el.dataset.acEditField] = el.value;
-            });
-            // Replace "Other" brand values with the typed custom text
-            Object.keys(unitFields).forEach(function(key) {
-                if (unitFields[key] === 'Other' && /^Unit \d+ Brand$/.test(key)) {
-                    var n = key.match(/^Unit (\d+) Brand$/)[1];
-                    var otherEl = document.getElementById('acBrandOther_' + n);
-                    if (otherEl && otherEl.value.trim()) unitFields[key] = otherEl.value.trim();
-                }
+                unitFields[el.dataset.acEditField] = el.value.trim();
             });
 
             var _lsUserAcEdit = null;
@@ -2328,7 +2369,7 @@
 
         // Save Status (Similar to Survey App)
         document.getElementById('saveStatusBtn').addEventListener('click', function () {
-            if (!isAdmin && !isSMF) return alert("You must be an Administrator or SMF team member to update the status.");
+            if (!isAdmin && !smfCanEdit) return alert("You must be an Administrator or SMF team member to update the status.");
             const newStatus = document.getElementById('statusSelect').value;
             const btn = this;
             var _lsUserAc = null;

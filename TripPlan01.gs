@@ -994,7 +994,15 @@ function getAllTripPlansReport(clientEmail) {
         var dbAdminCheck = checkAdminStatus(userEmail);
         var isAdmin = dbAdminCheck.isAdmin;
         console.log("User:", userEmail, "isAdmin:", isAdmin);
-        
+
+        // Cache 60s — full Trip_Plans + Employee_Database scan on every call, fired
+        // on every report/map load and after every save/approve/check-in. Cache key
+        // includes email since per-row canApprove is computed relative to the caller.
+        var _tprCache = CacheService.getScriptCache();
+        var _tprKey = 'TP_REPORT_V1_' + String(userEmail || '').trim().toLowerCase();
+        var _tprHit = _tprCache.get(_tprKey);
+        if (_tprHit) return _tprHit;
+
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Trip_Plans");
         if (!sheet) {
             console.log("Trip_Plans sheet not found");
@@ -1331,6 +1339,7 @@ function getAllTripPlansReport(clientEmail) {
         var jsonResult = JSON.stringify(result);
         console.log("Result size:", jsonResult.length, "characters");
         console.log("getAllTripPlansReport: Complete");
+        try { _tprCache.put(_tprKey, jsonResult, 60); } catch (e) { console.warn("TP report cache put skipped (likely >100KB): " + e); }
         return jsonResult;
 
     } catch (e) {
@@ -1740,7 +1749,7 @@ function sendTripPlanEmail(data, type) {
                 emailOptions.cc = uniqueCC.join(",");
             }
             
-            MailApp.sendEmail(emailOptions);
+            sendAppEmail_(emailOptions);
             console.log("Email sent to:", toEmail, "CC:", uniqueCC, "Type:", type);
         } else {
              console.warn("No employee email found for trip plan.");
@@ -2300,7 +2309,7 @@ function abortTripPlan(tripId, empId, comment) {
             emailBody += '</div>';
             
             try {
-                MailApp.sendEmail({
+                sendAppEmail_({
                     to: managerEmail,
                     subject: emailSubject,
                     htmlBody: emailBody
@@ -3030,7 +3039,7 @@ function sendCommentEmail(tripId, comment, authorEmail, fileNamesStr, fileUrlsSt
         </div>
     `;
     
-    MailApp.sendEmail({
+    sendAppEmail_({
         to: to.join(","),
         cc: cc.join(","),
         subject: subject,

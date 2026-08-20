@@ -122,7 +122,7 @@ function processSafetyIncidentForm(form) {
                     emailOptions.cc = uniqueCC.join(",");
                 }
                 
-                MailApp.sendEmail(emailOptions);
+                sendAppEmail_(emailOptions);
             }
         } catch (e) {
             console.error("Email error: " + e);
@@ -139,6 +139,12 @@ function getSafetyIncidentsReport_v2() {
     var logs = [];
     logs.push("Function started");
     try {
+        // Cache 60s — full safety-incident + Employee_Database scan on every call,
+        // fired on every report load and after every update.
+        var _sirCache = CacheService.getScriptCache();
+        var _sirHit = _sirCache.get('SAFETY_INCIDENTS_V1');
+        if (_sirHit) return _sirHit;
+
         var sheet = findSafetySheet();
         
         // --- Debug Info Collecting ---
@@ -234,7 +240,9 @@ function getSafetyIncidentsReport_v2() {
         }
         
         logs.push("Processed results: " + results.length);
-        return JSON.stringify({ orders: results.reverse(), debug: debug, logs: logs }); 
+        var _sirJson = JSON.stringify({ orders: results.reverse(), debug: debug, logs: logs });
+        try { _sirCache.put('SAFETY_INCIDENTS_V1', _sirJson, 60); } catch (e) {}
+        return _sirJson;
 
     } catch (e) {
         logs.push("ERROR: " + e.toString());

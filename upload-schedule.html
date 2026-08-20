@@ -132,11 +132,34 @@
         </button>
       </div>
     </div>
+    <hr class="my-3 border-gray-100">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm font-semibold text-gray-700">SMF แก้ไขข้อมูลแบบสำรวจ (Ref &amp; EDMI Report)</p>
+        <p class="text-xs text-gray-400 mt-0.5">เมื่อเปิด: ทีม SMF แก้ไขข้อมูล/อัปโหลดรูปใหม่ได้ — ไม่ได้ให้สิทธิ์ Admin เต็มรูปแบบเหมือนสวิตช์ด้านบน</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="smf-edit-status-label" class="text-xs font-semibold text-gray-500">โหลด...</span>
+        <button id="smf-edit-toggle"
+                onclick="toggleSmfSurveyEdit()"
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none bg-gray-300"
+                aria-label="toggle SMF survey edit">
+          <span id="smf-edit-thumb" class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform translate-x-1"></span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Setup form -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-5">
     <h2 class="font-bold text-gray-800">สร้างแผน Upload ใหม่</h2>
+
+    <div>
+      <label class="block text-xs font-semibold text-gray-600 mb-1">🏷️ รอบสำรวจ (Round) *</label>
+      <input type="text" id="inp-round" placeholder="เช่น 2026-Q1"
+             class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-400">
+      <p class="text-xs text-gray-400 mt-1">ใช้แยกรอบสำรวจแต่ละไตรมาส — ระบบจะติดป้ายนี้ให้ทุกแบบสำรวจ Aircon/Ref ที่ส่งในรอบนี้</p>
+    </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
@@ -803,6 +826,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     loadGuestButtonSetting();
                     loadSMFAdminSetting();
+                    loadSmfSurveyEditSetting();
                 })
                 .withFailureHandler(function() {}) // silent fail
                 .getUserFlags(_email);
@@ -855,14 +879,16 @@ function renderSummary(res) {
     }
 
     // Header chips — stat chips + created date + last upload date
-    var chipList = [
+    var chipList = [];
+    if (res.round) chipList.push(chipHtml('🏷️ รอบ: ' + res.round, '#fff', '#4338ca'));
+    chipList = chipList.concat([
         chipHtml('📦 ' + res.total + ' สาขา', '#fff', '#0284c7'),
         chipHtml('🔴 ' + res.critical + ' Critical', '#fff', '#b91c1c'),
         chipHtml('✅ ' + res.uploaded, '#fff', '#047857'),
         chipHtml('⏳ ' + res.pending, '#fff', '#b45309'),
         chipHtml('🗓 ' + res.dayCount + ' วัน', '#fff', '#7c3aed'),
         chipHtml('📅 สร้าง: ' + fmtIso(res.createdAt), '#e0f2fe', '#075985')
-    ];
+    ]);
     if (res.lastUploadedAt) {
         chipList.push(chipHtml('📤 Upload ล่าสุด: ' + fmtIso(res.lastUploadedAt), '#d1fae5', '#065f46'));
     }
@@ -1249,6 +1275,7 @@ function getSelectedBUs() {
 // ──────────────────────────────────────────────
 function generateSchedule() {
     if (!IS_ADMIN) { showToast('ไม่มีสิทธิ์ใช้งานนี้', 'error'); return; }
+    var round       = (document.getElementById('inp-round').value || '').trim();
     var startDate   = document.getElementById('inp-start-date').value;
     var deadline    = document.getElementById('inp-deadline').value;
     var maxPerDay   = parseInt(document.getElementById('inp-max-per-day').value) || 80;
@@ -1256,6 +1283,7 @@ function generateSchedule() {
     var timeTo      = document.getElementById('inp-time-to').value    || '17:00';
     var selectedBUs = getSelectedBUs();
 
+    if (!round)      { showToast('กรุณาระบุรอบสำรวจ (Round) ก่อน เช่น 2026-Q1', 'error'); return; }
     if (!startDate)  { showToast('กรุณาระบุวันเริ่มต้นแผนก่อน', 'error'); return; }
     if (!deadline)   { showToast('กรุณาระบุ Deadline ก่อน', 'error'); return; }
     if (timeFrom >= timeTo) { showToast('เวลาเริ่มต้องน้อยกว่าเวลาสิ้นสุด', 'error'); return; }
@@ -1264,7 +1292,8 @@ function generateSchedule() {
 
     var buLabel = selectedBUs.length === 0 ? 'ทุก BU' : selectedBUs.join(', ');
     var excludedLine = excludedCodes.length > 0 ? '\n• Excluded: ' + excludedCodes.length + ' สาขา' : '';
-    if (!confirm('ยืนยันสร้างแผน Upload?\n\n• วันเริ่ม: ' + fmtDate(startDate) +
+    if (!confirm('ยืนยันสร้างแผน Upload?\n\n• รอบสำรวจ: ' + round +
+                 '\n• วันเริ่ม: ' + fmtDate(startDate) +
                  '\n• Deadline: ' + fmtDate(deadline) +
                  '\n• ช่วงเวลา Upload: ' + timeFrom + ' – ' + timeTo +
                  '\n• Max per day: ' + maxPerDay +
@@ -1282,7 +1311,8 @@ function generateSchedule() {
             if (res.success) {
                 statusBox.className = 'bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-center text-emerald-700 font-semibold';
                 statusBox.textContent = '✅ สร้างแผนสำเร็จ! ' + res.totalStores + ' สาขา / ' +
-                                        res.totalDays + ' วัน / ~' + res.storesPerDay + ' สาขา/วัน';
+                                        res.totalDays + ' วัน / ~' + res.storesPerDay + ' สาขา/วัน' +
+                                        (res.totalNoData ? ' (🆕 ' + res.totalNoData + ' สาขาไม่มีข้อมูล/ข้อมูลค้าง ถูกจัดคิวแรกๆ ให้)' : '');
                 loadSummary();
             } else {
                 statusBox.className = 'bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-center text-red-700 font-semibold';
@@ -1294,6 +1324,7 @@ function generateSchedule() {
             statusBox.textContent = '❌ Server Error: ' + e.message;
         })
         .createUploadSchedule({
+            round:         round,
             startDate:     startDate,
             deadline:      deadline,
             uploadTimeFrom: timeFrom,
@@ -1599,6 +1630,72 @@ function toggleSMFAdmin() {
             _renderSMFAdminToggle(!newVal);
         })
         .setSMFAdminSetting(newVal);
+}
+// ──────────────────────────────────────────────
+// SMF Survey Data Edit Toggle (narrower than SMF Admin above — only affects
+// whether SMF can edit/reupload photos on Ref & EDMI survey reports)
+// ──────────────────────────────────────────────
+var _smfEditEnabled = false;
+
+function loadSmfSurveyEditSetting() {
+    google.script.run
+        .withSuccessHandler(function(enabled) {
+            _smfEditEnabled = !!enabled;
+            _renderSmfEditToggle(!!enabled);
+        })
+        .withFailureHandler(function() {
+            var lbl = document.getElementById('smf-edit-status-label');
+            if (lbl) lbl.textContent = 'Error';
+        })
+        .getSmfSurveyEditSetting();
+}
+
+function _renderSmfEditToggle(enabled) {
+    var toggle = document.getElementById('smf-edit-toggle');
+    var thumb  = document.getElementById('smf-edit-thumb');
+    var label  = document.getElementById('smf-edit-status-label');
+    if (!toggle) return;
+    if (enabled) {
+        toggle.classList.remove('bg-gray-300');
+        toggle.classList.add('bg-indigo-500');
+        thumb.classList.remove('translate-x-1');
+        thumb.classList.add('translate-x-6');
+        label.textContent = 'เปิดอยู่';
+        label.className = 'text-xs font-semibold text-indigo-600';
+    } else {
+        toggle.classList.remove('bg-indigo-500');
+        toggle.classList.add('bg-gray-300');
+        thumb.classList.remove('translate-x-6');
+        thumb.classList.add('translate-x-1');
+        label.textContent = 'ปิดอยู่';
+        label.className = 'text-xs font-semibold text-red-500';
+    }
+}
+
+function toggleSmfSurveyEdit() {
+    if (!IS_ADMIN) return;
+    var newVal = !_smfEditEnabled;
+    var _lsU = null;
+    try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+    var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+    _smfEditEnabled = newVal;
+    _renderSmfEditToggle(newVal);
+    google.script.run
+        .withSuccessHandler(function(res) {
+            if (res.success) {
+                showToast(newVal ? '✅ เปิดสิทธิ์ SMF แก้ไขข้อมูลแล้ว' : '🔒 ปิดสิทธิ์ SMF แก้ไขข้อมูลแล้ว');
+            } else {
+                showToast('Error: ' + res.error, 'error');
+                _smfEditEnabled = !newVal;
+                _renderSmfEditToggle(!newVal);
+            }
+        })
+        .withFailureHandler(function(e) {
+            showToast('Error: ' + e.message, 'error');
+            _smfEditEnabled = !newVal;
+            _renderSmfEditToggle(!newVal);
+        })
+        .setSmfSurveyEditSetting(newVal, clientEmail);
 }
 // ──────────────────────────────────────────────
 function initDailyView() {

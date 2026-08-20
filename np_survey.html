@@ -212,6 +212,67 @@ const _photoFiles = {};
 const _photoPreviews = {};
 let globalNpStoreData = [];
 
+// AppSheet-style "enum with add new" — see getEnumFieldOptions (Survey.gs).
+// Populated async below; buildUnitCard() reads via _mergedOptions(), falling
+// back to prod.brands until the fetch lands, then a later re-render (e.g.
+// changing a product's quantity) picks up the fuller list automatically.
+let _enumCache = {};
+function _mergedOptions(groupKey, fallbackDefaults) { return _enumCache[groupKey] || fallbackDefaults; }
+NP_PRODUCTS_FORM.forEach(function(p) {
+    google.script.run
+        .withSuccessHandler(function(res) { if (res && res.success) _enumCache['np_brand_' + p.code] = res.options; })
+        .withFailureHandler(function(e) { console.error('enum fetch failed', p.code, e); })
+        .getEnumFieldOptions('np_brand_' + p.code);
+});
+
+// Client-side Levenshtein distance — mirrors _levenshtein_ in Survey.gs.
+function _levenshteinJS(a, b) {
+    a = String(a).toLowerCase(); b = String(b).toLowerCase();
+    var m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    var prev = [], curr = [];
+    for (var j = 0; j <= n; j++) prev[j] = j;
+    for (var i = 1; i <= m; i++) {
+        curr[0] = i;
+        for (var j2 = 1; j2 <= n; j2++) {
+            var cost = a.charAt(i - 1) === b.charAt(j2 - 1) ? 0 : 1;
+            curr[j2] = Math.min(curr[j2 - 1] + 1, prev[j2] + 1, prev[j2 - 1] + cost);
+        }
+        prev = curr.slice();
+    }
+    return prev[n];
+}
+
+// Soft "did you mean...?" check before a real submit — never blocks, just
+// offers to swap in the closest existing spelling. Same threshold as the
+// server-side cleanup in Survey.gs.
+function _fuzzyCheckAndConfirm(checks) {
+    var flagged = [];
+    checks.forEach(function(c) {
+        var val = (c.value || '').trim();
+        if (!val) return;
+        var options = _mergedOptions(c.groupKey, c.fallbackDefaults);
+        var lower = val.toLowerCase();
+        if (options.some(function(o) { return o.toLowerCase() === lower; })) return;
+        var best = null, bestDist = Infinity;
+        options.forEach(function(o) {
+            var d = _levenshteinJS(val, o);
+            var minLen = Math.min(val.length, o.length);
+            var maxAllowed = minLen < 5 ? 1 : 2;
+            if (d <= maxAllowed && d < bestDist) { best = o; bestDist = d; }
+        });
+        if (best) flagged.push({ label: c.label, typed: val, suggested: best, apply: c.apply });
+    });
+    if (flagged.length === 0) return;
+    var lines = flagged.map(function(f) { return '• ' + f.label + ': "' + f.typed + '" → "' + f.suggested + '"?'; }).join('\n');
+    var useAll = confirm(
+        'พบคำที่อาจสะกดผิด ' + flagged.length + ' รายการ:\n\n' + lines +
+        '\n\nกด OK เพื่อแก้ไขตามคำแนะนำทั้งหมด\nกด Cancel เพื่อใช้ค่าที่พิมพ์ไว้ตามเดิม'
+    );
+    if (useAll) flagged.forEach(function(f) { f.apply(f.suggested); });
+}
+
 google.script.run
     .withSuccessHandler(function(data) {
         globalNpStoreData = data || [];
@@ -330,8 +391,9 @@ function renderUnits(code, qty) {
 }
 
 function buildUnitCard(prod, u) {
-    var brandOpts = '<option value="">&#8212; เลือกยี่ห้อ &#8212;</option>' +
-        prod.brands.map(function(b){ return '<option value="' + b + '">' + b + '</option>'; }).join('');
+    var brandDefaults = prod.brands.filter(function(b){ return b !== 'อื่นๆ'; });
+    var brandList = _mergedOptions('np_brand_' + prod.code, brandDefaults);
+    var brandOpts = brandList.map(function(b){ return '<option value="' + b + '">'; }).join('');
     return '<div class="border ' + prod.accentBorder + ' rounded-xl overflow-hidden unit-card shadow-sm">' +
         '<div class="' + prod.headerBg + ' text-white px-3 py-2 flex items-center justify-between">' +
             '<div class="flex items-center gap-2">' +
@@ -344,8 +406,8 @@ function buildUnitCard(prod, u) {
             '<div class="grid grid-cols-2 gap-2">' +
                 '<div class="col-span-2">' +
                     '<label class="block text-xs font-semibold text-gray-500 mb-1">ยี่ห้อ (Brand)</label>' +
-                    '<select id="u_' + prod.code + '_' + u + '_brand" class="input-field w-full border border-gray-300 rounded text-sm p-2 bg-gray-50" onchange="toggleNpOtherBrand(\'other_brand_' + prod.code + '_' + u + '\',this.value)">' + brandOpts + '</select>' +
-                    '<input type="text" id="other_brand_' + prod.code + '_' + u + '" placeholder="ระบุยี่ห้อ..." class="hidden mt-1 w-full border border-gray-300 rounded text-sm p-2 input-field">' +
+                    '<input type="text" list="brand_list_' + prod.code + '_' + u + '" id="u_' + prod.code + '_' + u + '_brand" autocomplete="off" placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่..." class="input-field w-full border border-gray-300 rounded text-sm p-2 bg-gray-50">' +
+                    '<datalist id="brand_list_' + prod.code + '_' + u + '">' + brandOpts + '</datalist>' +
                 '</div>' +
                 '<div>' +
                     '<label class="block text-xs font-semibold text-gray-500 mb-1">Asset No.</label>' +
@@ -387,13 +449,6 @@ function buildUnitCard(prod, u) {
             '</div>' +
         '</div>' +
     '</div>';
-}
-
-function toggleNpOtherBrand(inputId, val) {
-    var el = document.getElementById(inputId);
-    if (!el) return;
-    if (val === 'อื่นๆ') { el.classList.remove('hidden'); el.required = true; }
-    else                  { el.classList.add('hidden');    el.required = false; el.value = ''; }
 }
 
 function _npSetStatus(code, u, isWorking) {
@@ -489,11 +544,7 @@ function collectFormData() {
         form[prod.code + '_qty'] = qty;
         for (var u = 1; u <= qty; u++) {
             var brandEl = document.getElementById('u_' + prod.code + '_' + u + '_brand');
-            var brandVal = brandEl ? brandEl.value : '';
-            if (brandVal === 'อื่นๆ') {
-                var otherEl = document.getElementById('other_brand_' + prod.code + '_' + u);
-                brandVal = otherEl ? otherEl.value.trim() : '';
-            }
+            var brandVal = brandEl ? brandEl.value.trim() : '';
             var pre = prod.code + '_' + u + '_';
             form[pre + 'brand']  = brandVal;
             form[pre + 'asset']  = (document.getElementById('u_' + prod.code + '_' + u + '_asset') || {}).value || '';
@@ -541,11 +592,7 @@ function restoreDraft() {
                 var pre = prod.code + '_' + u + '_';
                 var savedBrand = d[pre + 'brand'] || '';
                 var brandEl = document.getElementById('u_' + prod.code + '_' + u + '_brand');
-                if (brandEl && savedBrand) {
-                    var exact = prod.brands.find(function(b){ return b === savedBrand && b !== 'อื่นๆ'; });
-                    if (exact) { brandEl.value = exact; }
-                    else { brandEl.value = 'อื่นๆ'; var oe = document.getElementById('other_brand_' + prod.code + '_' + u); if (oe){ oe.value = savedBrand; oe.classList.remove('hidden'); } }
-                }
+                if (brandEl && savedBrand) brandEl.value = savedBrand;
                 ['asset','serial','note'].forEach(function(f) {
                     var el = document.getElementById('u_' + prod.code + '_' + u + '_' + f);
                     if (el && d[pre + f]) el.value = d[pre + f];
@@ -595,6 +642,23 @@ async function submitForm() {
     if (missingPlug) { alert('กรุณาระบุสถานะปลั๊กไฟสำหรับทุกเครื่องก่อนส่ง'); return; }
 
     var form = collectFormData();
+
+    // Soft typo check — offers to fix, never blocks the submit.
+    var fuzzyChecks = [];
+    NP_PRODUCTS_FORM.forEach(function(prod) {
+        var qty = parseInt(document.getElementById('qty_' + prod.code).value) || 0;
+        var brandDefaults = prod.brands.filter(function(b) { return b !== 'อื่นๆ'; });
+        for (var u = 1; u <= qty; u++) {
+            var key = prod.code + '_' + u + '_brand';
+            fuzzyChecks.push({
+                value: form[key], groupKey: 'np_brand_' + prod.code, fallbackDefaults: brandDefaults,
+                label: prod.label + ' เครื่องที่ ' + u + ' - ยี่ห้อ',
+                apply: (function(k) { return function(v) { form[k] = v; }; })(key)
+            });
+        }
+    });
+    _fuzzyCheckAndConfirm(fuzzyChecks);
+
     var btn  = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> กำลังส่ง...';

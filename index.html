@@ -70,7 +70,10 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-sm font-medium text-gray-700">Password</label>
+                        <button type="button" onclick="openForgotPassword()" class="text-xs text-blue-600 hover:text-blue-800 hover:underline">Forgot Password?</button>
+                    </div>
                     <input type="password" id="loginPassword"
                         class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
                         required placeholder="********">
@@ -103,9 +106,165 @@
                             class="w-full mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-lg transition-colors border border-gray-300 hidden">
                             Skip Login / Continue as Guest
                         </button>
+                        <button type="button" onclick="toggleUserManual(true)"
+                            class="flex items-center gap-1.5 text-gray-500 hover:text-gray-700 text-sm font-medium mt-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            User Manual
+                        </button>
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div id="forgot-password-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-70 z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-8">
+            <div id="fpRequestState">
+                <div class="text-center mb-5">
+                    <h2 class="text-xl font-bold text-gray-800">ลืมรหัสผ่าน?</h2>
+                    <p class="text-gray-500 text-sm mt-1">กรอกอีเมลหรือรหัสพนักงาน ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ไปให้ทางอีเมล</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">อีเมล หรือ รหัสพนักงาน</label>
+                    <input type="text" id="fpEmailInput"
+                        class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        placeholder="your.name@bigc.co.th">
+                </div>
+                <div id="fpError" class="hidden text-red-500 text-sm text-center bg-red-50 p-2 rounded mb-4"></div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeForgotPassword()"
+                        class="flex-1 border border-gray-300 text-gray-600 font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition-colors">ยกเลิก</button>
+                    <button type="button" id="fpSendBtn" onclick="submitForgotPassword()"
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg transition-colors">ส่งลิงก์</button>
+                </div>
+            </div>
+            <div id="fpSentState" class="hidden text-center py-4">
+                <div class="text-5xl mb-3">📧</div>
+                <h2 class="text-lg font-bold text-gray-800 mb-1">ส่งลิงก์แล้ว</h2>
+                <p class="text-gray-500 text-sm mb-6">หากอีเมลนี้มีอยู่ในระบบ คุณจะได้รับลิงก์สำหรับตั้งรหัสผ่านใหม่ภายในไม่กี่นาที (ลิงก์ใช้ได้ 30 นาที)</p>
+                <button type="button" onclick="closeForgotPassword()"
+                    class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition font-semibold text-sm">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Manual Modal -->
+    <div id="user-manual-modal"
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 z-[120] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between p-5 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-800">📖 คู่มือแบบสำรวจทั้งหมด</h3>
+                <button type="button" onclick="toggleUserManual(false)"
+                    class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-5 text-sm text-gray-700 leading-relaxed">
+                <p class="text-gray-600">คู่มือนี้เน้นวิธีกรอกแบบฟอร์มหลักที่ผู้ใช้งานทั่วไปต้องกรอกเป็นประจำ —
+                    <b>EDMI Solar Meter</b>, <b>เครื่องปรับอากาศ</b>, <b>ตู้แช่</b>, <b>New Product</b> และ
+                    <b>พื้นที่ก่อนติดตั้ง (Layout)</b> — แต่ละแบบฟอร์มมีคู่มือฉบับเต็มแยกของตัวเอง กดปุ่มด้านล่างแต่ละหัวข้อเพื่อเปิดอ่าน</p>
+
+                <section>
+                    <h4 class="font-bold text-amber-700 mb-1">☀️ อ่านค่า EDMI Meter (Solar) — สรุปย่อ</h4>
+                    <ol class="list-decimal list-inside space-y-1">
+                        <li>กรอกชื่อผู้แจ้ง แล้วค้นหา/เลือกสาขาด้วยรหัส 5 หลักหรือชื่อสาขา</li>
+                        <li>เลือกรูปแบบสาขา (Small Format (BCM) หรือ Big Format) และ Solar Phase</li>
+                        <li>ระบุวันที่และเวลาที่อ่านค่าจากมิเตอร์จริง</li>
+                        <li>กรอกค่าทั้ง 4 Code (000 Total, 001 Peak, 002 Off Peak, 003 Holiday) พร้อม<b>ถ่ายภาพหน้าจอมิเตอร์แนบทุก Code</b></li>
+                        <li>ตรวจสอบข้อมูลให้ครบถ้วนแล้วกด Submit</li>
+                    </ol>
+                </section>
+
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=edmi-manual" target="_blank"
+                    class="flex items-center justify-center gap-2 w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-lg transition-colors">
+                    📄 เปิดคู่มือ EDMI Solar Meter ฉบับเต็ม (พร้อมตัวอย่างและวิธีพิมพ์)
+                </a>
+
+                <hr class="border-gray-200">
+
+                <hr class="border-gray-200">
+
+                <section>
+                    <h4 class="font-bold text-blue-700 mb-1">❄️ แบบสำรวจเครื่องปรับอากาศ (แอร์) — สรุปย่อ</h4>
+                    <ol class="list-decimal list-inside space-y-1">
+                        <li>กรอกชื่อผู้แจ้ง แล้วค้นหา/เลือกสาขาด้วยรหัส 5 หลักหรือชื่อสาขา</li>
+                        <li>กรอก <b>จำนวนแอร์ทั้งหมด</b> ในพื้นที่ขาย → ระบบสร้างการ์ดให้กรอกรายละเอียดทีละเครื่อง (ยี่ห้อ ประเภท สภาพเครื่อง ฯลฯ)</li>
+                        <li>ระบุว่ามีเครื่องชำรุดหรือไม่ หากมี ให้เลือกเครื่องที่ชำรุดและติ๊ก Checklist 5 หัวข้อ</li>
+                        <li>สรุปปัญหาเพิ่มเติม (ถ้ามี) แล้วกด Submit หรือ Save Draft</li>
+                    </ol>
+                </section>
+
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=aircon-manual" target="_blank"
+                    class="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors">
+                    📄 เปิดคู่มือแอร์ฉบับเต็ม (ทีละขั้นตอน + เคล็ดลับ + FAQ)
+                </a>
+
+                <hr class="border-gray-200">
+
+                <section>
+                    <h4 class="font-bold text-cyan-700 mb-1">🧊 แบบสำรวจตู้แช่ — สรุปย่อ</h4>
+                    <ol class="list-decimal list-inside space-y-1">
+                        <li>กรอกชื่อผู้แจ้ง แล้วค้นหา/เลือกสาขา เช่นเดียวกับแบบสำรวจแอร์</li>
+                        <li>กรอกจำนวนตู้แต่ละประเภท: ตู้ OPEN, ตู้บานกระจก (Plugin/Walk-in/Remote), ตู้แช่แข็ง (1/2/3 ประตู), ตู้ไอศกรีม, ตู้น้ำแข็ง, ตู้ 4 ประตู Stainless — <b>ใส่ 0 หากไม่มี</b></li>
+                        <li>ระบุว่ามีตู้ชำรุดหรือไม่ หากมี ให้เลือกตู้ที่ชำรุดและติ๊ก Checklist 10 หัวข้อ</li>
+                        <li>สรุปปัญหาเพิ่มเติม (ถ้ามี) แล้วกด Submit หรือ Save Draft</li>
+                    </ol>
+                </section>
+
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=ref-manual" target="_blank"
+                    class="flex items-center justify-center gap-2 w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-lg transition-colors">
+                    📄 เปิดคู่มือตู้แช่ฉบับเต็ม (ทีละขั้นตอน + เคล็ดลับ + FAQ)
+                </a>
+
+                <section class="bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-800">
+                    💡 สำรวจอุปกรณ์ทุกตัวให้ครบก่อนเสมอ แล้วจึงค่อยเลือกเครื่อง/ตู้ที่ชำรุดในขั้นตอนถัดไป — ระบบจะดึงรายชื่อให้เลือกจากข้อมูลที่กรอกไว้ก่อนหน้าเท่านั้น
+                </section>
+
+                <hr class="border-gray-200">
+
+                <section>
+                    <h4 class="font-bold text-emerald-700 mb-1">🍦 แบบสำรวจ New Product — สรุปย่อ</h4>
+                    <ol class="list-decimal list-inside space-y-1">
+                        <li>กรอกชื่อผู้สำรวจ <b>และเบอร์โทรศัพท์</b> (บังคับทั้งคู่) แล้วค้นหา/เลือกสาขา</li>
+                        <li>กรอกจำนวนเครื่องแต่ละหมวด: Soft Serve, Jet Spray, Slushy, Ice Maker, เครื่องกรองน้ำ — <b>ใส่ 0 หากไม่มี</b></li>
+                        <li>ต่อเครื่อง 1 ตัว ต้องถ่ายรูป 3 อย่าง: 📷 ตัวเครื่อง, 🔌 ปลั๊กไฟ, 📍 บริเวณที่ติดตั้ง</li>
+                        <li>ระบุอุปกรณ์ชำรุด (ถ้ามี) พร้อมคำอธิบาย แล้วกด Submit หรือ Save Draft</li>
+                    </ol>
+                </section>
+
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=np-manual" target="_blank"
+                    class="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition-colors">
+                    📄 เปิดคู่มือ New Product ฉบับเต็ม
+                </a>
+
+                <hr class="border-gray-200">
+
+                <section>
+                    <h4 class="font-bold text-violet-700 mb-1">📐 แบบสำรวจพื้นที่ก่อนติดตั้ง (Layout) — สรุปย่อ</h4>
+                    <ol class="list-decimal list-inside space-y-1">
+                        <li>ใช้เฉพาะสาขาที่อยู่ในโครงการ — กรอกผู้แจ้ง เบอร์โทร แล้วค้นหาสาขาจากรายการที่จำกัดไว้</li>
+                        <li>กรอกข้อมูลโครงการ: รูปแบบสาขา ชื่อโครงการ วันที่สำรวจ</li>
+                        <li>ตรวจ 3 ประเด็นหน้างาน: มีคานกีดขวางหรือไม่ / มีแอร์อยู่เหนือจุดติดตั้งหรือไม่ / อุปสรรคอื่น ๆ — พร้อมแนบภาพประกอบทุกข้อ</li>
+                        <li>กด Submit (แบบฟอร์มนี้ไม่มี Save Draft)</li>
+                    </ol>
+                </section>
+
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=layout-manual" target="_blank"
+                    class="flex items-center justify-center gap-2 w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-lg transition-colors">
+                    📄 เปิดคู่มือ Layout Survey ฉบับเต็ม
+                </a>
+
+                <section>
+                    <h4 class="font-bold text-gray-800 mb-1">ต้องการความช่วยเหลือเพิ่มเติม?</h4>
+                    <p>หากพบปัญหาในการเข้าสู่ระบบ หรือกรอกแบบสำรวจไม่ได้ กรุณาติดต่อผู้ดูแลระบบ (Admin) หรือทีมงานฝ่ายซ่อมบำรุง (Maintenance) ของท่าน</p>
+                </section>
+            </div>
         </div>
     </div>
 
@@ -154,7 +313,24 @@
             <span id="user-email-display" class="text-xs font-bold text-gray-700"></span>
             <span class="text-[10px] text-gray-500">Logged in</span>
         </div>
+        <button id="admin-view-toggle-btn" onclick="toggleAdminView()"
+            class="hidden items-center gap-1 bg-amber-100 hover:bg-amber-200 text-amber-700 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-colors"
+            title="สลับไปมุมมองผู้ดูแลระบบ">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span id="admin-view-toggle-label">Admin View</span>
+        </button>
         <div class="h-6 w-px bg-gray-200 mx-1"></div>
+        <button onclick="toggleUserManual(true)" class="flex items-center gap-1 text-gray-600 hover:text-blue-600 px-1.5 py-1 text-xs font-semibold" title="คู่มือการใช้งาน">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            <span class="hidden sm:inline">คู่มือ</span>
+        </button>
         <button onclick="toggleChangePwd(true)" class="text-gray-600 hover:text-blue-600 p-1" title="Change Password">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                 stroke="currentColor">
@@ -176,6 +352,14 @@
         class="hidden fixed top-4 right-4 z-[90] flex items-center gap-2 bg-white/90 backdrop-blur-sm p-2 px-4 rounded-full shadow-lg border border-gray-100 transition-all hover:shadow-xl">
         <span class="text-xs text-gray-500 font-medium">Guest</span>
         <div class="h-4 w-px bg-gray-200"></div>
+        <button onclick="toggleUserManual(true)" class="text-gray-600 hover:text-blue-600 p-1" title="User Manual">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+        </button>
+        <div class="h-4 w-px bg-gray-200"></div>
         <button onclick="document.getElementById('auth-overlay').classList.remove('hidden'); setGuestMode(false);" class="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-sm font-semibold transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
@@ -191,12 +375,63 @@
         const AUTH_USER = 'app_user_data';
         let CURRENT_USER = null;
 
+        // Admin/Super Admin users land on the same restricted view as a general user first —
+        // they must click the "Admin View" toggle button to reveal admin-only tabs/links.
+        // Declared here (before checkAuth() runs) so updateUserUI() can safely read them
+        // on the very first (synchronous) page-load call.
+        let _userIsAdmin = false;
+        let _userIsSysAdmin = false;
+        let _userIsSMF = false;
+        let _userIsMMS = false;
+        let _adminViewUnlocked = false;
+        const ADMIN_ONLY_TABS = [
+            'tab-work-orders',
+            'tab-bigc-work-orders',
+            'tab-trip-plan',
+            'tab-survey',
+            'tab-assignment',
+            'tab-safety-incident',
+            'tab-performance',
+            'tab-talent'
+        ];
+        const GENERAL_USER_TABS = ['tab-register', 'tab-aircon-survey', 'tab-ref-survey', 'tab-np-survey', 'tab-edmi-survey', 'tab-layout-survey'];
+        // Admin-configurable override of which GENERAL_USER_TABS a non-admin user sees
+        // (e.g. showing only EDMI Solar Meter on a collection day). {tabId: true/false};
+        // a tab missing from this map defaults to visible. Populated async in initApp()
+        // via getGeneralTabVisibility() — starts empty (= everything visible) so there's
+        // no flash-to-restricted before the server responds.
+        let _generalTabVisibility = {};
+        // Admin-configurable default landing tab (which tab shows first when the app
+        // opens). Same source/modal as _generalTabVisibility above; starts at the app's
+        // historical default so there's no flash before the server responds.
+        let _generalDefaultTab = 'tab-aircon-survey';
+
+        // Tabs restricted to a specific team rather than all general/Operation users —
+        // opt-in list (unlike GENERAL_USER_TABS, missing here means "not restricted").
+        // Generalizes the Trading Hours Survey's SMF-only requirement so any future tab
+        // can be locked to a team via admin config instead of a hardcoded check.
+        // {tabId: 'SMF'|'MMS'|'ALL'} — TEAM_TAB_DEFAULTS is the secure fallback used both
+        // client-side (before the server responds) and server-side (getTeamTabAccess in
+        // UploadSchedule.gs) so a newly added restricted tab never flashes open to everyone.
+        const TEAM_RESTRICTED_TABS = ['tab-hours-survey'];
+        const TEAM_TAB_DEFAULTS = { 'tab-hours-survey': 'SMF' };
+        const TEAM_TAB_LABELS = { 'tab-hours-survey': '⏰ Trading Hours Survey (24hr→Non-24hr)' };
+        const TEAM_TAB_ROLE_OPTIONS = [
+            { value: 'SMF', label: 'ทีม SMF เท่านั้น' },
+            { value: 'MMS', label: 'ทีม MMS เท่านั้น' },
+            { value: 'ALL', label: 'ทุกคน (Everyone)' }
+        ];
+        let _teamTabAccess = Object.assign({}, TEAM_TAB_DEFAULTS);
+
         // Check Login on Load
         function checkAuth() {
             const user = localStorage.getItem(AUTH_USER);
             if (user) {
                 try {
                     CURRENT_USER = JSON.parse(user);
+                    // Show UI immediately with cached flags (fast).
+                    // Admin flags are refreshed by the single checkAdminStatus call in
+                    // initApp() — no separate background call here (saves a round-trip).
                     updateUserUI(CURRENT_USER);
                     document.getElementById('auth-overlay').classList.add('hidden');
                     document.getElementById('user-controls').classList.remove('hidden');
@@ -235,79 +470,13 @@
             // Show View All Reports links for all authenticated users
             document.querySelectorAll('.report-view-link').forEach(function(el) { el.classList.remove('hidden'); });
 
-            // Admin Button Visibility
-            const adminBtn = document.getElementById('admin-dashboard-btn');
-            if (adminBtn) {
-                if (user.isAdmin) {
-                    adminBtn.classList.remove('hidden');
-                } else {
-                    adminBtn.classList.add('hidden');
-                }
-            }
-            const pwdResetBtn = document.getElementById('admin-pwd-reset-btn');
-            if (pwdResetBtn) {
-                if (user.isAdmin) {
-                    pwdResetBtn.classList.remove('hidden');
-                } else {
-                    pwdResetBtn.classList.add('hidden');
-                }
-            }
-
-            // Tab Visibility Logic
-            const adminOnlyTabs = [
-                'tab-work-orders',
-                'tab-bigc-work-orders',
-                'tab-trip-plan',
-                'tab-survey',
-                'tab-assignment',
-                'tab-safety-incident',
-                'tab-performance',
-                'tab-talent',
-                'tab-register'
-            ];
-
-            if (!user.isAdmin) {
-                // Hide all admin-only tabs
-                adminOnlyTabs.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.classList.add('hidden');
-                });
-                // Always show New Product tab for everyone
-                const npTab = document.getElementById('tab-np-survey');
-                if (npTab) npTab.classList.remove('hidden');
-                // Force open the aircon survey tab
-                if (typeof openTab === 'function') {
-                    openTab('aircon-survey');
-                }
-
-                // Hide top map/report links as well for a cleaner view
-                const topLinksContainer = document.querySelector('.mb-6 > .flex.flex-wrap.items-center.justify-between.gap-2.mb-4');
-                if (topLinksContainer) topLinksContainer.classList.add('hidden');
-
-                // Also hide any specific links designated as admin-only
-                const adminLinks = document.querySelectorAll('.admin-only-link');
-                adminLinks.forEach(link => link.classList.add('hidden'));
-
-            } else {
-                // Show tabs for admin (keeping performance/talent hidden by default unless explicitly needed)
-                adminOnlyTabs.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el && id !== 'tab-performance' && id !== 'tab-talent') {
-                        el.classList.remove('hidden');
-                    }
-                });
-                // Always show New Product tab for everyone
-                const npTab = document.getElementById('tab-np-survey');
-                if (npTab) npTab.classList.remove('hidden');
-
-                // Show top map/report links
-                const topLinksContainer = document.querySelector('.mb-6 > .flex.flex-wrap.items-center.justify-between.gap-2.mb-4');
-                if (topLinksContainer) topLinksContainer.classList.remove('hidden');
-
-                // Show specific admin links
-                const adminLinks = document.querySelectorAll('.admin-only-link');
-                adminLinks.forEach(link => link.classList.remove('hidden'));
-            }
+            // Cache role flags — actual visibility is decided by _renderViewByRole(),
+            // which starts every Admin/Super Admin in the same restricted (general-user)
+            // view until they click the "Admin View" toggle button.
+            _userIsAdmin = !!user.isAdmin;
+            _userIsSysAdmin = !!user.isSysAdmin;
+            _userIsSMF = !!user.isSMF;
+            _renderViewByRole();
 
             // Pre-fill user names in forms
             const nameInputs = document.querySelectorAll('input[name="reporterName"]');
@@ -315,8 +484,141 @@
                 input.value = user.name || user.email;
             });
 
+            // Pre-fill phone from the profile's Phone column when we have it. Only fills a
+            // blank input — never overwrite something the user has already typed, and never
+            // blank the field for sessions cached before loginUser started returning phone
+            // (those users just type it once; it is re-read from the profile on next login).
+            if (user.phone) {
+                document.querySelectorAll('input[name="reporterPhone"]').forEach(input => {
+                    if (!input.value.trim()) input.value = user.phone;
+                });
+            }
+
             // Show local draft banners if drafts exist
             if (typeof checkLocalDrafts === 'function') checkLocalDrafts();
+        }
+
+        // Single source of truth for role-based visibility. Called from updateUserUI()
+        // (login/reload), handleAdminStatus() (server flag refresh), and toggleAdminView()
+        // (the button) — all three just update state above and re-render here.
+        function _renderViewByRole() {
+            const isElevated = _userIsAdmin || _userIsSysAdmin;
+            const showAdminExtras = isElevated && _adminViewUnlocked;
+
+            // "Admin View" toggle button — visible to any elevated role, regardless of unlock state
+            const toggleBtn = document.getElementById('admin-view-toggle-btn');
+            if (toggleBtn) {
+                if (isElevated) {
+                    toggleBtn.classList.remove('hidden');
+                    toggleBtn.classList.add('flex');
+                } else {
+                    toggleBtn.classList.add('hidden');
+                    toggleBtn.classList.remove('flex');
+                }
+                toggleBtn.title = _adminViewUnlocked ? 'สลับกลับมุมมองผู้ใช้งานทั่วไป' : 'สลับไปมุมมองผู้ดูแลระบบ';
+            }
+            const label = document.getElementById('admin-view-toggle-label');
+            if (label) label.textContent = _adminViewUnlocked ? 'General View' : 'Admin View';
+
+            // Tabs: general-user tabs are gated by the admin-configurable _generalTabVisibility
+            // override when viewed as a general user; an unlocked Admin View always sees everything.
+            // Admin-only tabs are gated by showAdminExtras as before.
+            GENERAL_USER_TABS.forEach(id => {
+                const tab = document.getElementById(id);
+                if (!tab) return;
+                if (showAdminExtras) {
+                    tab.classList.remove('hidden');
+                } else {
+                    const visible = _generalTabVisibility.hasOwnProperty(id) ? _generalTabVisibility[id] : true;
+                    tab.classList.toggle('hidden', !visible);
+                }
+            });
+            ADMIN_ONLY_TABS.forEach(id => {
+                const tab = document.getElementById(id);
+                if (tab) tab.classList.toggle('hidden', !showAdminExtras);
+            });
+
+            // Team-restricted tabs (e.g. Trading Hours Survey — SMF team only): an
+            // unlocked Admin View always sees everything, same as GENERAL_USER_TABS;
+            // otherwise gated by the admin-configurable _teamTabAccess role per tab.
+            TEAM_RESTRICTED_TABS.forEach(id => {
+                const tab = document.getElementById(id);
+                if (!tab) return;
+                if (showAdminExtras) {
+                    tab.classList.remove('hidden');
+                    return;
+                }
+                const role = _teamTabAccess.hasOwnProperty(id) ? _teamTabAccess[id] : (TEAM_TAB_DEFAULTS[id] || 'ALL');
+                let visible = true;
+                if (role === 'SMF') visible = _userIsSMF;
+                else if (role === 'MMS') visible = _userIsMMS;
+                tab.classList.toggle('hidden', !visible);
+            });
+
+            // Tab Visibility config button — Admin/Super Admin only, same gate as other admin extras
+            const tabVisBtn = document.getElementById('tab-visibility-btn');
+            if (tabVisBtn) tabVisBtn.classList.toggle('hidden', !showAdminExtras);
+
+            // Top links row (Dashboard / Map / admin-only-link items)
+            const topLinksContainer = document.querySelector('.mb-6 > .flex.flex-wrap.items-center.justify-between.gap-2.mb-4');
+            if (topLinksContainer) topLinksContainer.classList.toggle('hidden', !showAdminExtras);
+            document.querySelectorAll('.admin-only-link').forEach(link => link.classList.toggle('hidden', !showAdminExtras));
+
+            // Admin-only buttons in the public links row
+            const adminBtn = document.getElementById('admin-dashboard-btn');
+            if (adminBtn) adminBtn.classList.toggle('hidden', !showAdminExtras);
+            const pwdResetBtn = document.getElementById('admin-pwd-reset-btn');
+            if (pwdResetBtn) pwdResetBtn.classList.toggle('hidden', !showAdminExtras);
+
+            // Email Delivery (Brevo config) — Admin/System Admin, same gate as the page itself
+            const emailConfigBtn = document.getElementById('email-config-btn');
+            if (emailConfigBtn) emailConfigBtn.classList.toggle('hidden', !showAdminExtras);
+
+            // Broken Unit Summary — SMF team keep seeing it always (their own permission,
+            // not an "admin view" thing); Admins/Super Admins need to unlock it like the rest.
+            const brokenSummaryBtn = document.getElementById('smf-broken-summary-btn');
+            if (brokenSummaryBtn) brokenSummaryBtn.classList.toggle('hidden', !(_userIsSMF || showAdminExtras));
+
+            // CAPEX Budget Cross-Check — same gate as Broken Unit Summary (SMF team's own
+            // permission; Admins need to unlock the admin view like the rest).
+            const capexCrossCheckBtn = document.getElementById('smf-capex-crosscheck-btn');
+            if (capexCrossCheckBtn) capexCrossCheckBtn.classList.toggle('hidden', !(_userIsSMF || showAdminExtras));
+
+            // If the currently active tab just became hidden, fall back to the first tab
+            // that's actually visible right now (respects _generalTabVisibility restrictions).
+            // The admin-configured _generalDefaultTab is tried first (falls back to
+            // 'tab-aircon-survey' if unset); GENERAL_USER_TABS itself is not in
+            // landing-preference order (register is listed first there only for the admin
+            // tab-visibility toggle list).
+            const activeTab = document.querySelector('.tab-btn.active');
+            if ((!activeTab || activeTab.classList.contains('hidden')) && typeof openTab === 'function') {
+                const BASE_FALLBACK_ORDER = ['tab-aircon-survey', 'tab-ref-survey', 'tab-np-survey', 'tab-edmi-survey', 'tab-layout-survey', 'tab-register'];
+                const FALLBACK_ORDER = [_generalDefaultTab].concat(BASE_FALLBACK_ORDER.filter(id => id !== _generalDefaultTab));
+                const candidateIds = showAdminExtras ? FALLBACK_ORDER.concat(ADMIN_ONLY_TABS) : FALLBACK_ORDER;
+                const fallbackId = candidateIds.find(id => {
+                    const tab = document.getElementById(id);
+                    return tab && !tab.classList.contains('hidden');
+                });
+                if (fallbackId) openTab(fallbackId.replace(/^tab-/, ''));
+            }
+        }
+
+        function handleAdminStatus(res) {
+            console.log("handleAdminStatus called with:", res);
+            // Set tech-team flag — controls visibility of measuring tool fields
+            _userIsTechTeam = !!(res && (res.isSMF || res.isMMS));
+            _userIsAdmin = !!(res && res.isAdmin);
+            _userIsSysAdmin = !!(res && res.isSysAdmin);
+            _userIsSMF = !!(res && res.isSMF);
+            _userIsMMS = !!(res && res.isMMS);
+            _renderViewByRole();
+        }
+
+        // Reveals (or re-hides) the admin-only tabs/links. Called by the "Admin View" button.
+        function toggleAdminView() {
+            if (!_userIsAdmin && !_userIsSysAdmin) return;
+            _adminViewUnlocked = !_adminViewUnlocked;
+            _renderViewByRole();
         }
 
         function handleLogin(e) {
@@ -360,9 +662,74 @@
                 .loginUser(email, pwd);
         }
 
+        // --- Forgot Password ---
+        function openForgotPassword() {
+            document.getElementById('fpEmailInput').value = document.getElementById('loginEmail').value || '';
+            document.getElementById('fpError').classList.add('hidden');
+            document.getElementById('fpRequestState').classList.remove('hidden');
+            document.getElementById('fpSentState').classList.add('hidden');
+            document.getElementById('forgot-password-modal').classList.remove('hidden');
+        }
+        function closeForgotPassword() {
+            document.getElementById('forgot-password-modal').classList.add('hidden');
+        }
+        function submitForgotPassword() {
+            const input = document.getElementById('fpEmailInput').value.trim();
+            const errEl = document.getElementById('fpError');
+            errEl.classList.add('hidden');
+            if (!input) {
+                errEl.textContent = 'กรุณากรอกอีเมลหรือรหัสพนักงาน';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            const btn = document.getElementById('fpSendBtn');
+            btn.disabled = true;
+            btn.textContent = 'กำลังส่ง...';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    btn.disabled = false;
+                    btn.textContent = 'ส่งลิงก์';
+                    if (res && res.success) {
+                        document.getElementById('fpRequestState').classList.add('hidden');
+                        document.getElementById('fpSentState').classList.remove('hidden');
+                    } else {
+                        errEl.textContent = (res && res.error) || 'ส่งไม่สำเร็จ กรุณาลองใหม่';
+                        errEl.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    btn.disabled = false;
+                    btn.textContent = 'ส่งลิงก์';
+                    errEl.textContent = 'Server Error: ' + err.message;
+                    errEl.classList.remove('hidden');
+                })
+                .requestPasswordReset(input);
+        }
+
+        // Registration form's Department/Position dropdowns — reveals a free-text
+        // fallback when "Other" is picked, since the enum list can't cover every
+        // real title/department in the org.
+        function toggleRegOtherField(selectId, otherInputId) {
+            const select = document.getElementById(selectId);
+            const other = document.getElementById(otherInputId);
+            if (!select || !other) return;
+            const isOther = select.value === 'Other';
+            other.classList.toggle('hidden', !isOther);
+            other.required = isOther;
+            if (!isOther) other.value = '';
+        }
+
         function goToRegistration() {
             document.getElementById('auth-overlay').classList.add('hidden');
             setGuestMode(true);
+            // Registration flow: show ONLY the Register Profile tab — someone who
+            // hasn't registered yet shouldn't be able to wander into the
+            // Aircon/Ref/EDMI/New Product survey forms before they have an account.
+            // Restored to the normal general-tab bar once registration succeeds
+            // (see handleFormSubmit's success handler).
+            document.querySelectorAll('.tab-btn').forEach(function (tab) {
+                tab.classList.toggle('hidden', tab.id !== 'tab-register');
+            });
             openTab('register');
         }
 
@@ -375,6 +742,17 @@
         // Allow Global Access (if needed by other scripts)
         window.logout = logout;
         window.checkAuth = checkAuth; // in case we need to re-verify
+
+        // User Manual Logic
+        function toggleUserManual(show) {
+            const modal = document.getElementById('user-manual-modal');
+            if (show) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+        window.toggleUserManual = toggleUserManual;
 
         // Change Password Logic
         function toggleChangePwd(show) {
@@ -457,6 +835,50 @@
             </svg>
             Upload Schedule
         </a>
+        <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin-password-reset" target="_blank"
+            id="admin-pwd-reset-btn"
+            class="hidden bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-orange-200 transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11.536 11 13 12.464l-4 4L7.5 15l-4 4m6-1a2 2 0 002-2"/>
+            </svg>
+            Reset Password
+        </a>
+        <a href="<?= ScriptApp.getService().getUrl() ?>?page=email-config" target="_blank"
+            id="email-config-btn"
+            class="hidden bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            Email Delivery
+        </a>
+        <button type="button" id="tab-visibility-btn" onclick="openTabVisibilityModal()"
+            class="hidden bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-indigo-200 transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+            Tab Visibility
+        </button>
+        <a href="<?= ScriptApp.getService().getUrl() ?>?page=broken-unit-summary" target="_blank"
+            id="smf-broken-summary-btn"
+            class="hidden bg-rose-100 text-rose-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-rose-200 transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14"/>
+            </svg>
+            Broken Unit Summary
+        </a>
+        <a href="<?= ScriptApp.getService().getUrl() ?>?page=capex-budget-crosscheck" target="_blank"
+            id="smf-capex-crosscheck-btn"
+            class="hidden bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-blue-200 transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 7h6m0 10v-3m-3 3v-6m-3 6v-9m-2 9h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            CAPEX Budget Cross-Check
+        </a>
     </div>
 
     <div class="max-w-4xl mx-auto glass-panel p-6">
@@ -518,15 +940,6 @@
                         </svg>
                         Admin Dashboard
                     </a>
-                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin-password-reset" target="_blank"
-                        id="admin-pwd-reset-btn"
-                        class="hidden bg-orange-100 text-orange-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-orange-200 transition-colors flex items-center gap-1">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11.536 11 13 12.464l-4 4L7.5 15l-4 4m6-1a2 2 0 002-2"/>
-                        </svg>
-                        Reset Password
-                    </a>
                     <a href="<?= ScriptApp.getService().getUrl() ?>?page=report" target="_top"
                         class="admin-only-link bg-green-100 text-green-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-green-200 transition-colors">
                         View Org Chart
@@ -584,6 +997,18 @@
                 <button onclick="openTab('np-survey')" id="tab-np-survey"
                     class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
                     🍦 New Product
+                </button>
+                <button onclick="openTab('edmi-survey')" id="tab-edmi-survey"
+                    class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                    ☀️ EDMI Solar Meter
+                </button>
+                <button onclick="openTab('layout-survey')" id="tab-layout-survey"
+                    class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                    📐 Layout Survey
+                </button>
+                <button onclick="openTab('hours-survey')" id="tab-hours-survey"
+                    class="tab-btn hidden flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                    ⏰ Trading Hours
                 </button>
                 <button onclick="openTab('assignment')" id="tab-assignment"
                     class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
@@ -896,14 +1321,32 @@
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">หน่วยงาน (Department)</label>
-                            <input type="text" name="department" required placeholder="e.g. SMF Nationwide"
-                                class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                            <select name="department" id="reg-department-select" required
+                                onchange="toggleRegOtherField('reg-department-select', 'reg-department-other')"
+                                class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-white">
+                                <option value="">-- Select Department --</option>
+                                <option value="BCM">BCM</option>
+                                <option value="PPT">PPT</option>
+                                <option value="Other">Other (โปรดระบุ)</option>
+                            </select>
+                            <input type="text" name="departmentOther" id="reg-department-other"
+                                class="hidden input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none mt-2"
+                                placeholder="ระบุหน่วยงาน...">
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">ตำแหน่ง (Position)</label>
-                            <input type="text" name="position" required
-                                class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none">
+                            <select name="position" id="reg-position-select" required
+                                onchange="toggleRegOtherField('reg-position-select', 'reg-position-other')"
+                                class="input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-white">
+                                <option value="">-- Select Position --</option>
+                                <option value="Store Manager">Store Manager</option>
+                                <option value="Store Assistant">Store Assistant</option>
+                                <option value="Other">Other (โปรดระบุ)</option>
+                            </select>
+                            <input type="text" name="positionOther" id="reg-position-other"
+                                class="hidden input-field w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none mt-2"
+                                placeholder="ระบุตำแหน่ง...">
                         </div>
 
                         <div>
@@ -1778,6 +2221,8 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-gray-800">สำรวจเครื่องปรับอากาศ</h2>
                     <div class="flex items-center gap-3">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=aircon-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
                         <a href="<?= ScriptApp.getService().getUrl() ?>?page=aircon_survey_report" target="_blank"
                             class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
                     </div>
@@ -1794,6 +2239,12 @@
                                 required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
                         </div>
                         <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
                             <div class="relative">
                             <input type="text" id="aircon-station-search" autocomplete="off"
@@ -1802,13 +2253,15 @@
                             <div id="aircon-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
                             </div>
                         </div>
-                        <div>
+                        <!-- Auto-filled from Search Branch above — hidden as redundant, still
+                             submitted with the form (name= is what matters, not visibility) -->
+                        <div class="hidden">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">รหัสสาขา (Branch Code) *</label>
                             <input type="text" name="branchCode"
                                 class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
                                 placeholder="รหัสสาขา (Auto-fill)" readonly>
                         </div>
-                        <div>
+                        <div class="hidden">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อสาขา (Branch Name) *</label>
                             <input type="text" name="branchName"
                                 class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
@@ -1816,6 +2269,7 @@
                             <input type="hidden" name="ammMtn">
                             <input type="hidden" name="dmArea">
                             <input type="hidden" name="cmArea">
+                            <input type="hidden" name="surveyRound" id="aircon_surveyRound">
                         </div>
                     </div>
                 </div>
@@ -1918,6 +2372,8 @@
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-gray-800">สำรวจตู้แช่</h2>
                     <div class="flex items-center gap-3">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=ref-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
                         <a href="<?= ScriptApp.getService().getUrl() ?>?page=ref_survey_report" target="_blank"
                             class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
                     </div>
@@ -1935,6 +2391,12 @@
                                 required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
                         </div>
                         <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch)
                                 *</label>
                             <div class="relative">
@@ -1944,14 +2406,16 @@
                             <div id="ref-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
                             </div>
                         </div>
-                        <div>
+                        <!-- Auto-filled from Search Branch above — hidden as redundant, still
+                             submitted with the form (name= is what matters, not visibility) -->
+                        <div class="hidden">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">รหัสสาขา (Branch Code)
                                 *</label>
                             <input type="text" name="branchCode"
                                 class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
                                 placeholder="รหัสสาขา (Auto-fill)" readonly>
                         </div>
-                        <div>
+                        <div class="hidden">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อสาขา (Branch Name)
                                 *</label>
                             <input type="text" name="branchName"
@@ -1960,6 +2424,7 @@
                             <input type="hidden" name="ammMtn">
                             <input type="hidden" name="dmArea">
                             <input type="hidden" name="cmArea">
+                            <input type="hidden" name="surveyRound" id="ref_surveyRound">
                         </div>
                     </div>
                 </div>
@@ -2223,12 +2688,534 @@
             </form>
         </div> <!-- End content-ref-survey -->
 
+        <!-- CONTENT: EDMI SOLAR METER SURVEY -->
+        <div id="content-edmi-survey" class="tab-content hidden">
+            <form onsubmit="handleEdmiSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">☀️ อ่านค่า EDMI Meter (Solar)</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=edmi_solar_survey_report" target="_blank"
+                            class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=edmi-manual" target="_blank"
+                    class="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-lg px-4 py-2.5 mb-4 shadow-sm transition-colors">
+                    <span class="text-lg">📖</span>
+                    <span class="flex-1">คู่มือกรอกแบบฟอร์ม EDMI Solar Meter — พร้อมตัวอย่างและวิธีพิมพ์</span>
+                    <span aria-hidden="true">→</span>
+                </a>
+
+                <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-4 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>ถ่ายภาพหน้าจอ EDMI Meter ของระบบ Solar ตามวันที่กำหนด ช่วงเวลา 11.00-12.00 น. และส่งข้อมูลภายในเวลา 15.00 น. ของวันเดียวกัน</span>
+                </p>
+
+                <div class="bg-amber-50 border-2 border-amber-300 rounded-lg p-4 mb-4">
+                    <p class="text-sm font-bold text-amber-800 mb-2">📋 ขั้นตอนการเก็บข้อมูลหน้างาน</p>
+                    <ol class="space-y-2 text-sm text-amber-800">
+                        <li class="flex gap-2">
+                            <span class="flex-none w-5 h-5 rounded-full bg-amber-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                            <span><b>ถ่ายภาพนิ่ง</b> หน้าจอมิเตอร์ด้วยมือถือ ให้เห็น Code และตัวเลขชัดเจน ครบทั้ง 4 Code (000-003)</span>
+                        </li>
+                        <li class="flex gap-2">
+                            <span class="flex-none w-5 h-5 rounded-full bg-amber-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                            <span><b>อัดวิดีโอ</b> กดวนดูครบทุก Code ตั้งแต่ 000 ถึง 003 ในคลิปเดียว (ใช้เป็นหลักฐานสำรอง หากภาพนิ่งไม่ชัดหรือมีข้อโต้แย้งภายหลัง) — เก็บคลิปไว้ที่เครื่อง ไม่ต้องอัปโหลดเข้าแอป</span>
+                        </li>
+                        <li class="flex gap-2">
+                            <span class="flex-none w-5 h-5 rounded-full bg-amber-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                            <span><b>กรอกตัวเลข</b> ที่อ่านได้ลงในแบบฟอร์มด้านล่าง และ<b>อัปโหลดภาพถ่าย</b> (จากข้อ 1) แนบทุก Code แล้วกด Submit</span>
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- 1. Branch Info -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ผู้แจ้ง (Reporter) *</label>
+                            <input type="text" name="reporterName"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-amber-500"
+                                required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-amber-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="edmi-station-search" autocomplete="off"
+                                    class="input-field w-full border p-2 rounded text-sm bg-amber-50 focus:ring-2 focus:ring-amber-500"
+                                    placeholder="พิมพ์รหัส 5 หลัก หรือชื่อสาขา..." oninput="handleEdmiStationInput(this)">
+                                <div id="edmi-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <!-- Auto-filled from Search Branch above — hidden as redundant, still
+                             submitted with the form (name= is what matters, not visibility) -->
+                        <div class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">รหัสสาขา (Branch Code) *</label>
+                            <input type="text" name="branchCode"
+                                class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
+                                placeholder="รหัสสาขา (Auto-fill)" readonly>
+                        </div>
+                        <div class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อสาขา (Branch Name) *</label>
+                            <input type="text" name="branchName"
+                                class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
+                                placeholder="ชื่อสาขา (Auto-fill)" readonly>
+                            <input type="hidden" name="ammMtn">
+                            <input type="hidden" name="dmArea">
+                            <input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="edmi-rest-form" class="hidden">
+                    <!-- 2. Format / Phase / Date-Time -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">2. ข้อมูลระบบ Solar (Solar System Info)</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">รูปแบบสาขา (Format) *</label>
+                                <select name="storeFormat" class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-amber-400" required>
+                                    <option value="">-- เลือก --</option>
+                                    <option value="Big Format">Big Format</option>
+                                    <option value="Small Format (BCM)" selected>Small Format (BCM)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Solar Phase</label>
+                                <input type="number" name="solarPhase" min="1" value="7"
+                                    class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-amber-400">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">วันที่อ่านค่า (Reading Date) *</label>
+                                <input type="date" name="readingDate" required
+                                    class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-amber-400">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">เวลาที่อ่านค่า (Reading Time) *</label>
+                                <input type="time" name="readingTime" required
+                                    class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-amber-400">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Meter Readings — each Code has its own photo evidence block -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">3. หน่วยไฟฟ้าจาก EDMI Meter (kWh) และภาพถ่ายหน้าจอ</h3>
+
+                        <!-- Real-world escape hatch: the meter's control box/panel is
+                             physically locked or otherwise inaccessible at this store, so
+                             the 4 Code values genuinely cannot be read this round. Lets the
+                             store still submit something (with a reason + evidence photo)
+                             instead of being blocked entirely by the required Code fields. -->
+                        <div class="mb-4 p-3 bg-red-50 border-2 border-red-200 rounded-lg">
+                            <label class="flex items-center gap-2 text-sm font-semibold text-red-700">
+                                <input type="checkbox" name="accessBlocked" id="edmi-access-blocked"
+                                    onchange="toggleEdmiAccessBlocked(this)" class="w-4 h-4 text-red-600 rounded">
+                                🔒 ไม่สามารถอ่านค่าได้ (ตู้ควบคุมมิเตอร์ถูกล็อค / เข้าถึงไม่ได้)
+                            </label>
+                            <div id="edmi-access-blocked-detail" class="hidden mt-3 pt-3 border-t border-red-200">
+                                <label class="block text-xs font-semibold text-red-600 mb-1">รายละเอียดปัญหา *</label>
+                                <textarea name="accessBlockedReason" rows="2"
+                                    class="w-full border border-red-300 p-2 rounded text-sm focus:ring-2 focus:ring-red-400"
+                                    placeholder="เช่น ตู้ควบคุมล็อคกุญแจ ไม่มีผู้ถือกุญแจ / ตู้ชำรุดเปิดไม่ได้ / ช่างไฟฟ้ายังไม่มาเปิด..."></textarea>
+                                <script>document.write(photoUpload('ภาพหลักฐานตู้ที่ล็อค/เข้าถึงไม่ได้', 'edmiAccessBlockedPhoto'));</script>
+                            </div>
+                        </div>
+
+                        <div class="mb-4 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                            <p class="text-sm font-bold text-yellow-800">⚠️ กรอก "ตัวเลขค่าไฟที่อ่านได้จากหน้าจอมิเตอร์จริง" เท่านั้น (ปกติเป็นเลขหลักพัน-หลักแสน เช่น 45231.50)</p>
+                            <p class="text-xs text-yellow-700 mt-1">อย่ากรอก 0, 1, 2, 3 ตามชื่อ Code 000-003 — คำว่า "Code 000/001/002/003" เป็นแค่ชื่อเรียกช่องนั้นๆ ไม่ใช่ค่าที่ต้องกรอก</p>
+                        </div>
+
+                        <div id="edmi-codes-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Code 000 — kWh Total *</label>
+                                <p class="text-xs text-slate-400 mb-1">ค่าไฟทั้งหมดที่ติดตั้งมิเตอร์มา ทุกช่วงเวลา — <span class="font-semibold">กรอกเลขจากหน้าจอมิเตอร์</span></p>
+                                <input type="number" step="0.01" name="code000" min="0" required
+                                    class="input-field w-full border border-slate-300 p-2 rounded text-sm focus:ring-slate-400" placeholder="เช่น 45231.50">
+                                <script>document.write(photoUpload('ภาพหน้าจอ Code 000', 'edmiMeter000'));</script>
+                            </div>
+                            <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                                <label class="block text-xs font-semibold text-orange-700 mb-1">Code 001 — Rate A (Peak) *</label>
+                                <p class="text-xs text-orange-400 mb-1">ยอดสะสมเฉพาะช่วง Peak (09.00-22.00 น.) — <span class="font-semibold">ไม่ใช่เวลาที่ต้องอ่านค่า</span> อ่านได้ทุกเมื่อ — <span class="font-semibold">กรอกเลขจากหน้าจอมิเตอร์</span></p>
+                                <input type="number" step="0.01" name="code001" min="0" required
+                                    class="input-field w-full border border-orange-300 p-2 rounded text-sm focus:ring-orange-400" placeholder="เช่น 27890.25">
+                                <script>document.write(photoUpload('ภาพหน้าจอ Code 001', 'edmiMeter001'));</script>
+                            </div>
+                            <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                                <label class="block text-xs font-semibold text-indigo-700 mb-1">Code 002 — Rate B (Off Peak) *</label>
+                                <p class="text-xs text-indigo-400 mb-1">ยอดสะสมเฉพาะช่วง Off Peak (22.00-09.00 น.) — <span class="font-semibold">ไม่ใช่เวลาที่ต้องอ่านค่า</span> อ่านได้ทุกเมื่อ — <span class="font-semibold">กรอกเลขจากหน้าจอมิเตอร์</span></p>
+                                <input type="number" step="0.01" name="code002" min="0" required
+                                    class="input-field w-full border border-indigo-300 p-2 rounded text-sm focus:ring-indigo-400" placeholder="เช่น 3456.10">
+                                <script>document.write(photoUpload('ภาพหน้าจอ Code 002', 'edmiMeter002'));</script>
+                            </div>
+                            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                                <label class="block text-xs font-semibold text-emerald-700 mb-1">Code 003 — Rate C (Holiday) *</label>
+                                <p class="text-xs text-emerald-400 mb-1">ยอดสะสมเฉพาะวันหยุด (เสาร์-อาทิตย์ และวันหยุด ตลอด 24 ชม.) — <span class="font-semibold">ไม่ใช่เวลาที่ต้องอ่านค่า</span> อ่านได้ทุกเมื่อ — <span class="font-semibold">กรอกเลขจากหน้าจอมิเตอร์</span></p>
+                                <input type="number" step="0.01" name="code003" min="0" required
+                                    class="input-field w-full border border-emerald-300 p-2 rounded text-sm focus:ring-emerald-400" placeholder="เช่น 12980.75">
+                                <script>document.write(photoUpload('ภาพหน้าจอ Code 003', 'edmiMeter003'));</script>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Comments -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">4. หมายเหตุ (Comments)</h3>
+                        <textarea name="comments" rows="3"
+                            class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-amber-400"
+                            placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"></textarea>
+                    </div>
+
+                    <div class="pt-4 flex justify-end items-center gap-2">
+                        <button type="reset" class="text-red-600 text-sm font-medium hover:underline mr-auto">Clear form</button>
+                        <button type="submit"
+                            class="bg-amber-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-amber-700 transition transform hover:-translate-y-0.5">
+                            Submit
+                        </button>
+                    </div>
+                </div> <!-- End hidden edmi-rest-form -->
+            </form>
+        </div> <!-- End content-edmi-survey -->
+
+        <!-- CONTENT: LAYOUT SURVEY -->
+        <div id="content-layout-survey" class="tab-content hidden">
+            <form onsubmit="handleLayoutSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">📐 สำรวจพื้นที่ก่อนติดตั้ง (Layout Survey)</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=layout-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=layout_survey_report" target="_blank"
+                            class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+
+                <p class="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded px-3 py-2 mb-4 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>สำรวจพื้นที่หน้างานก่อนติดตั้งอุปกรณ์ตาม Layout ใหม่ของแต่ละโครงการ ถ่ายภาพบริเวณที่จะติดตั้งให้ชัดเจน แนบภาพประกอบทุกข้อ แล้วกด Submit</span>
+                </p>
+
+                <!-- 1. Branch Info -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ผู้แจ้ง (Reporter) *</label>
+                            <input type="text" name="reporterName"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-violet-500"
+                                required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-violet-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="layout-station-search" autocomplete="off"
+                                    class="input-field w-full border p-2 rounded text-sm bg-violet-50 focus:ring-2 focus:ring-violet-500"
+                                    placeholder="พิมพ์รหัส 5 หลัก หรือชื่อสาขา (เฉพาะสาขาในโครงการ)..." oninput="handleLayoutStationInput(this)">
+                                <div id="layout-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <!-- Auto-filled from Search Branch above — hidden as redundant, still
+                             submitted with the form (name= is what matters, not visibility) -->
+                        <div class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">รหัสสาขา (Branch Code) *</label>
+                            <input type="text" name="branchCode"
+                                class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
+                                placeholder="รหัสสาขา (Auto-fill)" readonly>
+                        </div>
+                        <div class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อสาขา (Branch Name) *</label>
+                            <input type="text" name="branchName"
+                                class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
+                                placeholder="ชื่อสาขา (Auto-fill)" readonly>
+                            <input type="hidden" name="ammMtn">
+                            <input type="hidden" name="dmArea">
+                            <input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                    <div id="layout-target-docs"></div>
+                </div>
+
+                <div id="layout-rest-form" class="hidden">
+                    <!-- 2. Project Info -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">2. ข้อมูลโครงการ (Project Info)</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">รูปแบบสาขา (Format) *</label>
+                                <select name="storeFormat" class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-violet-400" required>
+                                    <option value="">-- เลือก --</option>
+                                    <option value="Big Format">Big Format</option>
+                                    <option value="Small Format (BCM)" selected>Small Format (BCM)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">ชื่อโครงการ (Project Name) *</label>
+                                <input type="text" name="projectName" value="Add Chill Bev" required
+                                    class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-violet-400" placeholder="เช่น Add Chill Bev">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">วันที่สำรวจ (Survey Date) *</label>
+                                <input type="date" name="surveyDate" required
+                                    class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-violet-400">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Survey Questions -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">3. ตรวจสอบพื้นที่หน้างาน (Site Checks)</h3>
+
+                        <div class="mb-4 p-3 bg-red-50 border-2 border-red-200 rounded-lg">
+                            <label class="flex items-center gap-2 text-sm font-semibold text-red-700">
+                                <input type="checkbox" name="beamObstruction" id="layout-beam" class="w-4 h-4 text-red-600 rounded">
+                                บริเวณพื้นที่ติดตั้งตู้แช่ ติดคานหรือไม่ (Is the install area under a beam?)
+                            </label>
+                            <script>document.write(photoUpload('ภาพบริเวณที่จะติดตั้ง (มุมกว้าง)', 'layoutBeamPhoto'));</script>
+                        </div>
+
+                        <div class="mb-4 p-3 bg-orange-50 border-2 border-orange-200 rounded-lg">
+                            <label class="flex items-center gap-2 text-sm font-semibold text-orange-700">
+                                <input type="checkbox" name="airconAboveArea" id="layout-aircon" class="w-4 h-4 text-orange-600 rounded">
+                                บริเวณพื้นที่ติดตั้งตู้แช่ มีแอร์อยู่เหนือบริเวณที่จะติดตั้งหรือไม่ (Is there an aircon unit above the install area?)
+                            </label>
+                            <script>document.write(photoUpload('ภาพแอร์เหนือบริเวณที่จะติดตั้ง', 'layoutAirconPhoto'));</script>
+                        </div>
+
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">หากเจออุปสรรคอื่นๆ รบกวนระบุกลับมาด้วยครับ (Other obstacles)</label>
+                            <textarea name="otherObstacles" rows="2"
+                                class="w-full border border-slate-300 p-2 rounded text-sm focus:ring-2 focus:ring-slate-400"
+                                placeholder="ระบุอุปสรรคอื่นๆ ที่พบหน้างาน (ถ้ามี)"></textarea>
+                            <script>document.write(photoUpload('ภาพอุปสรรคอื่นๆ (ถ้ามี)', 'layoutObstaclePhoto'));</script>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end items-center gap-2">
+                        <button type="reset" class="text-red-600 text-sm font-medium hover:underline mr-auto">Clear form</button>
+                        <button type="submit"
+                            class="bg-violet-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-violet-700 transition transform hover:-translate-y-0.5">
+                            Submit
+                        </button>
+                    </div>
+                </div> <!-- End hidden layout-rest-form -->
+            </form>
+        </div> <!-- End content-layout-survey -->
+
+        <!-- TAB: TRADING HOURS SURVEY (24hr → Non-24hr conversion readiness) -->
+        <div id="content-hours-survey" class="tab-content hidden">
+            <form onsubmit="handleTradingHoursSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">⏰ สำรวจความพร้อมปรับลดเวลาทำการ (24 ชม. → ไม่ 24 ชม.)</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hours-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=trading_hours_survey_report" target="_blank"
+                            class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+
+                <p class="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded px-3 py-2 mb-4 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>สำรวจความพร้อมหน้าร้านก่อนปรับลดเวลาทำการ — ตรวจกุญแจล็อกประตูหน้าร้าน และถอดสติกเกอร์/ป้าย 24 ชม. เดิมออก ถ่ายภาพประกอบทุกข้อ แล้วกด Submit</span>
+                </p>
+
+                <!-- 1. Branch Info -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ผู้แจ้ง (Reporter) *</label>
+                            <input type="text" name="reporterName"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-violet-500"
+                                required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-violet-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="hours-station-search" autocomplete="off"
+                                    class="input-field w-full border p-2 rounded text-sm bg-violet-50 focus:ring-2 focus:ring-violet-500"
+                                    placeholder="พิมพ์รหัส 5 หลัก หรือชื่อสาขา (เฉพาะสาขาในเฟส 1/2)..." oninput="handleHoursStationInput(this)">
+                                <div id="hours-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <!-- Auto-filled from Search Branch above — hidden as redundant, still
+                             submitted with the form (name= is what matters, not visibility) -->
+                        <div class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">รหัสสาขา (Branch Code) *</label>
+                            <input type="text" name="branchCode"
+                                class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
+                                placeholder="รหัสสาขา (Auto-fill)" readonly>
+                        </div>
+                        <div class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อสาขา (Branch Name) *</label>
+                            <input type="text" name="branchName"
+                                class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
+                                placeholder="ชื่อสาขา (Auto-fill)" readonly>
+                            <input type="hidden" name="ammMtn">
+                            <input type="hidden" name="dmArea">
+                            <input type="hidden" name="cmArea">
+                            <input type="hidden" name="phase">
+                            <input type="hidden" name="targetDate">
+                        </div>
+                    </div>
+                    <div id="hours-target-info"></div>
+                </div>
+
+                <div id="hours-rest-form" class="hidden">
+                    <!-- 2. Survey Stage -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">2. ประเภทการตรวจสอบ (Survey Stage)</h3>
+                        <select name="surveyStage" onchange="toggleHoursStageSections(this.value)"
+                            class="input-field w-full md:w-1/2 border border-gray-300 p-2 rounded text-sm focus:ring-violet-400">
+                            <option value="Pre-Conversion">ก่อนปรับเปลี่ยนเวลาทำการ (Pre-Conversion — ตรวจกุญแจล็อก/ถอดสติกเกอร์)</option>
+                            <option value="Post-Conversion">หลังปรับเปลี่ยนเวลาทำการ (Post-Conversion — ตรวจยืนยันหลังใช้เวลาทำการใหม่จริง)</option>
+                        </select>
+                    </div>
+
+                    <!-- 3. Conversion Info -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">3. ข้อมูลการปรับเปลี่ยนเวลาทำการ (Conversion Info)</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">เวลาทำการปัจจุบัน (Current Hours) *</label>
+                                <input type="text" name="currentHours" value="24 Hrs." required
+                                    class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-violet-400" placeholder="เช่น 24 Hrs.">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">เวลาทำการใหม่ (New Hours) *</label>
+                                <input type="text" name="newHours" required
+                                    class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-violet-400" placeholder="เช่น 06:00–24:00">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">วันที่สำรวจ (Survey Date) *</label>
+                                <input type="date" name="surveyDate" required
+                                    class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-violet-400">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Site Readiness Checklist (Pre) / Post-Conversion Verification -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">4. ตรวจสอบความพร้อม / ยืนยันหลังปรับเปลี่ยน (Checklist)</h3>
+
+                        <div id="hours-pre-checklist">
+                            <div class="mb-4 p-3 bg-red-50 border-2 border-red-200 rounded-lg">
+                                <label class="flex items-center gap-2 text-sm font-semibold text-red-700">
+                                    <input type="checkbox" name="lockInstalled" id="hours-lock" class="w-4 h-4 text-red-600 rounded">
+                                    มีกุญแจล็อกประตูหน้าร้านที่ใช้งานได้แล้วหรือไม่ (Working front-door lock installed?)
+                                </label>
+                                <script>document.write(photoUpload('ภาพประตู/กุญแจล็อกหน้าร้าน', 'hoursLockPhoto'));</script>
+                            </div>
+
+                            <div class="mb-4 p-3 bg-orange-50 border-2 border-orange-200 rounded-lg">
+                                <label class="flex items-center gap-2 text-sm font-semibold text-orange-700">
+                                    <input type="checkbox" name="stickerRemoved" id="hours-sticker" class="w-4 h-4 text-orange-600 rounded">
+                                    ถอดสติกเกอร์/ป้ายแจ้ง 24 ชม. เดิมออกจากหน้าร้านแล้วหรือไม่ (Old 24hr sticker/signage removed?)
+                                </label>
+                                <script>document.write(photoUpload('ภาพหน้าร้านหลังถอดสติกเกอร์ 24 ชม.', 'hoursStickerPhoto'));</script>
+                            </div>
+
+                            <div class="mb-4 p-3 bg-sky-50 border border-sky-200 rounded-lg">
+                                <p class="text-sm font-semibold text-sky-700 mb-2">ความปลอดภัยช่วงปิดร้าน (Closed-hours security — เช็คเพิ่มเติม)</p>
+                                <label class="flex items-center gap-2 text-sm text-sky-700 mb-1.5">
+                                    <input type="checkbox" name="exteriorLightingOk" class="w-4 h-4 text-sky-600 rounded">
+                                    ไฟส่องสว่างหน้าร้าน/ลานจอดทำงานปกติ (Exterior lighting working)
+                                </label>
+                                <label class="flex items-center gap-2 text-sm text-sky-700">
+                                    <input type="checkbox" name="cctvOk" class="w-4 h-4 text-sky-600 rounded">
+                                    กล้องวงจรปิดทำงานปกติ (CCTV working)
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Post-Conversion Verification — filled out AFTER the store has actually
+                             started operating on the new (shorter) hours, confirming the conversion
+                             held up in real use, not just that it was set up. -->
+                        <div id="hours-post-checklist" class="hidden">
+                            <p class="text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded px-3 py-2 mb-4">
+                                💡 ใช้แบบนี้หลังสาขาเริ่มใช้เวลาทำการใหม่จริงแล้ว เพื่อยืนยันว่าทุกระบบทำงานถูกต้องตามเวลาปิดร้านใหม่
+                            </p>
+                            <div class="mb-4 p-3 bg-red-50 border-2 border-red-200 rounded-lg">
+                                <label class="flex items-center gap-2 text-sm font-semibold text-red-700">
+                                    <input type="checkbox" name="lockUsedAtClosing" id="hours-lock-used" class="w-4 h-4 text-red-600 rounded">
+                                    มีการล็อกประตูจริงตอนปิดร้านตามเวลาใหม่ (Door lock actually used at the new closing time?)
+                                </label>
+                            </div>
+                            <div class="mb-4 p-3 bg-indigo-50 border-2 border-indigo-200 rounded-lg">
+                                <label class="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+                                    <input type="checkbox" name="alarmRearmed" id="hours-alarm" class="w-4 h-4 text-indigo-600 rounded">
+                                    ตั้งเวลาระบบสัญญาณกันขโมย/รักษาความปลอดภัยให้ตรงกับเวลาปิดร้านใหม่แล้ว (Alarm/security system re-armed to match new closing hours?)
+                                </label>
+                            </div>
+                            <div class="mb-4 p-3 bg-cyan-50 border-2 border-cyan-200 rounded-lg">
+                                <label class="flex items-center gap-2 text-sm font-semibold text-cyan-700">
+                                    <input type="checkbox" name="refrigTempStable" id="hours-refrig" class="w-4 h-4 text-cyan-600 rounded">
+                                    อุณหภูมิตู้แช่/ห้องเย็นปกติช่วงปิดร้าน ไม่มีเหตุของเสีย (Refrigeration/freezer temps stable overnight, no spoilage incident?)
+                                </label>
+                            </div>
+                            <div class="mb-4 p-3 bg-amber-50 border-2 border-amber-200 rounded-lg">
+                                <label class="flex items-center gap-2 text-sm font-semibold text-amber-700">
+                                    <input type="checkbox" name="lightingAcScheduleOk" id="hours-lighting-ac" class="w-4 h-4 text-amber-600 rounded">
+                                    ระบบไฟ/แอร์ทั่วไป (ไม่รวมตู้แช่) ตัด-ต่อตามตารางเวลาทำการใหม่ถูกต้อง (General lighting/AC — not refrigeration — cutting on/off correctly per the new schedule?)
+                                </label>
+                            </div>
+                            <div class="mb-4 p-3 bg-emerald-50 border-2 border-emerald-200 rounded-lg">
+                                <label class="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                                    <input type="checkbox" name="afterHoursAccessOk" id="hours-access" class="w-4 h-4 text-emerald-600 rounded">
+                                    ช่องทางแจ้งเหตุฉุกเฉิน/ขอเข้าซ่อมบำรุงนอกเวลาทำการ ทดสอบแล้วใช้งานได้ (After-hours emergency/maintenance access procedure tested & working?)
+                                </label>
+                            </div>
+                            <script>document.write(photoUpload('ภาพหลักฐานการตรวจยืนยันหลังปรับเปลี่ยน', 'hoursPostVerifyPhoto'));</script>
+                        </div>
+
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg mt-4">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">หากเจออุปสรรคอื่นๆ รบกวนระบุกลับมาด้วยครับ (Other notes)</label>
+                            <textarea name="otherNotes" rows="2"
+                                class="w-full border border-slate-300 p-2 rounded text-sm focus:ring-2 focus:ring-slate-400"
+                                placeholder="ระบุอุปสรรคอื่นๆ ที่พบหน้างาน (ถ้ามี)"></textarea>
+                            <script>document.write(photoUpload('ภาพอุปสรรคอื่นๆ (ถ้ามี)', 'hoursObstaclePhoto'));</script>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-end items-center gap-2">
+                        <button type="reset" class="text-red-600 text-sm font-medium hover:underline mr-auto">Clear form</button>
+                        <button type="submit"
+                            class="bg-violet-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-violet-700 transition transform hover:-translate-y-0.5">
+                            Submit
+                        </button>
+                    </div>
+                </div> <!-- End hidden hours-rest-form -->
+            </form>
+        </div> <!-- End content-hours-survey -->
+
         <!-- CONTENT: NEW PRODUCT SURVEY -->
         <div id="content-np-survey" class="tab-content hidden">
             <form onsubmit="handleNpSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!='TEXTAREA'&&event.target.type!='submit'){event.preventDefault();event.stopPropagation();}">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold text-gray-800">&#127846; สำรวจ New Product</h2>
                     <div class="flex items-center gap-3">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=np-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
                         <a href="<?= ScriptApp.getService().getUrl() ?>?page=np_survey_report" target="_blank"
                             class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
                     </div>
@@ -2245,6 +3232,12 @@
                                 required placeholder="ชื่อ-นามสกุล (พิมพ์แก้ไขได้)">
                         </div>
                         <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้สำรวจ (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-emerald-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
                             <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
                             <div class="relative">
                                 <input type="text" id="np-station-search" autocomplete="off"
@@ -2253,13 +3246,15 @@
                                 <div id="np-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
                             </div>
                         </div>
-                        <div>
+                        <!-- Auto-filled from Search Branch above — hidden as redundant, still
+                             submitted with the form (name= is what matters, not visibility) -->
+                        <div class="hidden">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">รหัสสาขา (Branch Code) *</label>
                             <input type="text" name="branchCode" id="np_branchCode"
                                 class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
                                 placeholder="รหัสสาขา (Auto-fill)" readonly>
                         </div>
-                        <div>
+                        <div class="hidden">
                             <label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อสาขา (Branch Name) *</label>
                             <input type="text" name="branchName" id="np_branchName"
                                 class="input-field w-full border p-2 rounded text-sm bg-gray-100" required
@@ -2365,6 +3360,34 @@
         </div>
     </div>
 
+    <!-- Tab Visibility Config Modal (Admin / Super Admin) -->
+    <div id="tabVisibilityModal"
+        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div class="relative p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <h3 class="text-lg font-bold text-gray-800 mb-1">แสดง Tab สำหรับผู้ใช้ทั่วไป</h3>
+            <p class="text-xs text-gray-500 mb-4">เลือก Tab ที่ต้องการให้ผู้ใช้ทั่วไป (ไม่ใช่ Admin) มองเห็น เช่น เปิดเฉพาะ EDMI Solar Meter ในวันศุกร์นี้ — Admin ที่เปิด Admin View จะเห็นทุก Tab เสมอ</p>
+            <div id="tabVisibilityList" class="space-y-2 mb-4"></div>
+            <div class="mb-4 pt-3 border-t">
+                <label for="defaultTabSelect" class="block text-xs font-semibold text-gray-600 mb-1">Tab เริ่มต้นเมื่อเปิดแอป (Default Tab)</label>
+                <select id="defaultTabSelect" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2"></select>
+            </div>
+            <div class="mb-4 pt-3 border-t">
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Tab จำกัดเฉพาะทีม (Team-Restricted Tabs)</label>
+                <p class="text-xs text-gray-400 mb-2">กำหนดว่า Tab เหล่านี้ให้ทีมไหนมองเห็นได้ — Admin ที่เปิด Admin View จะเห็นทุก Tab เสมอ</p>
+                <div id="teamTabAccessList" class="space-y-2"></div>
+            </div>
+            <div class="flex justify-between items-center gap-2 pt-3 border-t">
+                <button type="button" onclick="_setAllTabVisibility(true)" class="text-xs text-indigo-600 hover:underline">เลือกทั้งหมด</button>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeTabVisibilityModal()"
+                        class="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="button" onclick="saveTabVisibility()" id="saveTabVisibilityBtn"
+                        class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Draft Saved Toast -->
     <div id="draftToast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 transition-opacity duration-500 pointer-events-none">
         <div class="bg-green-700 text-white text-sm font-semibold px-6 py-3 rounded-full shadow-xl flex items-center gap-2">
@@ -2416,6 +3439,78 @@
         let globalVendors = [];
         let _userIsTechTeam = false; // SMF or MMS team — can see measuring tool fields
 
+        // AppSheet-style "enum with add new" — see getEnumFieldOptions (Survey.gs).
+        // Populated async in initApp(); dynamic option-list builders read via
+        // _mergedOptions(), falling back to their hardcoded defaults until the
+        // fetch lands (or if it fails), so there's no behavior change on a slow
+        // network — later re-renders (e.g. changing AC quantity) pick up the
+        // fuller list automatically once _enumCache is filled in.
+        let _enumCache = {};
+        const ENUM_GROUP_KEYS = ['aircon_brand', 'aircon_type', 'ref_brand', 'ref_ice_cream_supplier',
+            'np_brand_SC', 'np_brand_JT', 'np_brand_SH', 'np_brand_MK', 'np_brand_WF', 'np_plug'];
+        function _mergedOptions(groupKey, fallbackDefaults) { return _enumCache[groupKey] || fallbackDefaults; }
+        function _prefetchEnumOptions() {
+            ENUM_GROUP_KEYS.forEach(function (k) {
+                google.script.run
+                    .withSuccessHandler(function (res) { if (res && res.success) _enumCache[k] = res.options; })
+                    .withFailureHandler(function (e) { console.error('enum fetch failed', k, e); })
+                    .getEnumFieldOptions(k);
+            });
+        }
+
+        // Client-side Levenshtein distance — mirrors _levenshtein_ in Survey.gs,
+        // used to warn about likely typos before they ever reach the sheet.
+        function _levenshteinJS(a, b) {
+            a = String(a).toLowerCase(); b = String(b).toLowerCase();
+            const m = a.length, n = b.length;
+            if (m === 0) return n;
+            if (n === 0) return m;
+            let prev = [], curr = [];
+            for (let j = 0; j <= n; j++) prev[j] = j;
+            for (let i = 1; i <= m; i++) {
+                curr[0] = i;
+                for (let j = 1; j <= n; j++) {
+                    const cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+                    curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+                }
+                prev = curr.slice();
+            }
+            return prev[n];
+        }
+
+        // Soft "did you mean...?" check, run once right before a real (non-draft)
+        // submit. `checks` = [{ value, groupKey, fallbackDefaults, label, apply(newValue) }].
+        // Never blocks submission — just offers to swap in the closest existing
+        // spelling. Same distance threshold as the server-side cleanup in Survey.gs
+        // (_computeEnumCanonicalCasing_ / _clusterEnumValues_): distance<=1 for
+        // strings under 5 chars, else <=2, so short brand codes like "LG" don't
+        // trip false positives.
+        function _fuzzyCheckAndConfirm(checks) {
+            const flagged = [];
+            checks.forEach(function (c) {
+                const val = (c.value || '').trim();
+                if (!val) return;
+                const options = _mergedOptions(c.groupKey, c.fallbackDefaults);
+                const lower = val.toLowerCase();
+                if (options.some(function (o) { return o.toLowerCase() === lower; })) return; // exact match already
+                let best = null, bestDist = Infinity;
+                options.forEach(function (o) {
+                    const d = _levenshteinJS(val, o);
+                    const minLen = Math.min(val.length, o.length);
+                    const maxAllowed = minLen < 5 ? 1 : 2;
+                    if (d <= maxAllowed && d < bestDist) { best = o; bestDist = d; }
+                });
+                if (best) flagged.push({ label: c.label, typed: val, suggested: best, apply: c.apply });
+            });
+            if (flagged.length === 0) return;
+            const lines = flagged.map(function (f) { return `• ${f.label}: "${f.typed}" → "${f.suggested}"?`; }).join('\n');
+            const useAll = confirm(
+                `พบคำที่อาจสะกดผิด ${flagged.length} รายการ:\n\n${lines}\n\n` +
+                `กด OK เพื่อแก้ไขตามคำแนะนำทั้งหมด\nกด Cancel เพื่อใช้ค่าที่พิมพ์ไว้ตามเดิม`
+            );
+            if (useAll) flagged.forEach(function (f) { f.apply(f.suggested); });
+        }
+
         function initApp() {
             try {
                 // Default: Load Big C Orders
@@ -2428,8 +3523,90 @@
                 // Fetch Store DB Data (Stations & BUs)
                 google.script.run.withSuccessHandler(populateStoreData).withFailureHandler(function (e) { console.error(e); }).getStoreDBDataForFrontend();
 
+                // Fetch Layout Survey target-store list + ASIS/To-Be reference doc links
+                // (restricts the Layout Survey tab's branch search to just the confirmed
+                // target-project stores — see layoutTargetCodesSet / _layoutMatchPool()).
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        if (!res || !res.success) { console.error("Failed to load layout target docs:", res && res.error); return; }
+                        layoutTargetDocsMap = {};
+                        layoutTargetCodesSet = new Set();
+                        (res.data || []).forEach(function (r) {
+                            layoutTargetDocsMap[r.code] = { asisUrl: r.asisUrl, tobeUrl: r.tobeUrl };
+                            layoutTargetCodesSet.add(r.code);
+                        });
+                    })
+                    .withFailureHandler(function (e) { console.error("Failed to load layout target docs:", e); })
+                    .getLayoutTargetDocs();
+
+                // Trading Hours Survey target-store allowlist (Phase 1/2) — restricts
+                // the branch search to just the confirmed conversion-project stores
+                // (see hoursTargetStoresMap / _hoursMatchPool()). Deliberately fired
+                // after a short delay, not immediately back-to-back with the
+                // getLayoutTargetDocs() call above — two google.script.run calls fired
+                // back-to-back on first page load can silently drop the second call's
+                // callback (known Apps Script sandboxed-iframe quirk, see
+                // feedback_gas_temp_diag_testing / this file's report-page loadData()
+                // comments) — confirmed live: without this delay hoursTargetCodesSet
+                // never populated, so the search silently failed open to every store.
+                setTimeout(function () {
+                    google.script.run
+                        .withSuccessHandler(function (res) {
+                            if (!res || !res.success) { console.error("Failed to load trading hours target stores:", res && res.error); return; }
+                            hoursTargetStoresMap = {};
+                            hoursTargetCodesSet = new Set();
+                            (res.data || []).forEach(function (r) {
+                                hoursTargetStoresMap[r.code] = { phase: r.phase, targetDate: r.targetDate };
+                                hoursTargetCodesSet.add(r.code);
+                            });
+                        })
+                        .withFailureHandler(function (e) { console.error("Failed to load trading hours target stores:", e); })
+                        .getTradingHoursTargetStores();
+                }, 600);
+
                 // Fetch Vendors
                 google.script.run.withSuccessHandler(populateVendorList).withFailureHandler(function (e) { console.error(e); }).getVendorList();
+
+                // Fetch Brand/Type/Product enum options (defaults ∪ real submitted data)
+                _prefetchEnumOptions();
+
+                // Fetch the active Upload Schedule round (e.g. "2026-Q1") and stamp it
+                // onto the Aircon/Ref survey forms' hidden surveyRound input, so each
+                // submission records which quarterly round it belongs to.
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        var round = (res && res.round) || '';
+                        var acField  = document.getElementById('aircon_surveyRound');
+                        var refField = document.getElementById('ref_surveyRound');
+                        if (acField)  acField.value  = round;
+                        if (refField) refField.value = round;
+                    })
+                    .withFailureHandler(function (e) { console.error("Failed to load active schedule round:", e); })
+                    .getActiveScheduleRound();
+
+                // Fetch admin-configured general-tab visibility (e.g. "EDMI only this Friday")
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        if (res && res.success) {
+                            _generalTabVisibility = res.data || {};
+                            _generalDefaultTab = res.defaultTab || 'tab-aircon-survey';
+                            _renderViewByRole();
+                        }
+                    })
+                    .withFailureHandler(function (e) { console.error("Failed to load tab visibility:", e); })
+                    .getGeneralTabVisibility();
+
+                // Fetch admin-configured team-restricted tab access (e.g. Trading Hours
+                // Survey defaulting to SMF-only) — same source of truth as _renderViewByRole().
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        if (res && res.success) {
+                            _teamTabAccess = Object.assign({}, TEAM_TAB_DEFAULTS, res.data || {});
+                            _renderViewByRole();
+                        }
+                    })
+                    .withFailureHandler(function (e) { console.error("Failed to load team tab access:", e); })
+                    .getTeamTabAccess();
 
                 // Fetch Survey Configuration (with delay to ensure DOM is ready)
                 setTimeout(function () {
@@ -2459,7 +3636,18 @@
                 }
 
                 if (email) {
-                    google.script.run.withSuccessHandler(handleAdminStatus).checkAdminStatus(email);
+                    google.script.run.withSuccessHandler(function (res) {
+                        // Persist refreshed flags so role changes take effect without re-login
+                        if (res && CURRENT_USER) {
+                            CURRENT_USER.isAdmin = res.isAdmin || false;
+                            CURRENT_USER.isSysAdmin = res.isSysAdmin || false;
+                            CURRENT_USER.isSMF = res.isSMF || false;
+                            CURRENT_USER.isScheduleAdmin = res.isScheduleAdmin || false;
+                            localStorage.setItem(AUTH_USER, JSON.stringify(CURRENT_USER));
+                            updateUserUI(CURRENT_USER);
+                        }
+                        handleAdminStatus(res);
+                    }).checkAdminStatus(email);
                 }
 
                 // Ensure overlay is handled if we are already logged in (double check)
@@ -2480,40 +3668,10 @@
             }
         }
 
-        function handleAdminStatus(res) {
-            console.log("handleAdminStatus called with:", res);
-            // Set tech-team flag — controls visibility of measuring tool fields
-            _userIsTechTeam = !!(res && (res.isSMF || res.isMMS));
-            if (res && res.isAdmin) {
-                console.log("User is Admin. Unhiding tabs and config button.");
-
-                // Show admin specific tabs
-                document.getElementById('tab-performance').classList.remove('hidden');
-                document.getElementById('tab-talent').classList.remove('hidden');
-
-                // Show standard app tabs for admins
-                const adminTabs = [
-                    'tab-work-orders',
-                    'tab-bigc-work-orders',
-                    'tab-trip-plan',
-                    'tab-survey',
-                    'tab-assignment',
-                    'tab-safety-incident'
-                ];
-                adminTabs.forEach(id => {
-                    const tab = document.getElementById(id);
-                    if (tab) tab.classList.remove('hidden');
-                });
-
-                // Show the top links container (Dashboard / Map)
-                const topLinksContainer = document.querySelector('.mb-6 > .flex.flex-wrap.items-center.justify-between.gap-2.mb-4');
-                if (topLinksContainer) topLinksContainer.classList.remove('hidden');
-
-            } else {
-                console.log("User is NOT Admin.");
-            }
-        }
-
+        // NOTE: _renderViewByRole() / handleAdminStatus() / toggleAdminView() and the
+        // related state (_userIsAdmin, _adminViewUnlocked, etc.) now live earlier in this
+        // file, right after updateUserUI() — they must be defined before checkAuth() runs
+        // synchronously on page load, which happens in the first <script> block.
 
         function populateStations(list) {
             // Replace the entire datalist element to force browser to re-evaluate suggestions
@@ -2600,7 +3758,7 @@
 
         // Close dropdown on outside click
         document.addEventListener('click', function(e) {
-            ['aircon-station-dropdown','ref-station-dropdown','np-station-dropdown'].forEach(function(id) {
+            ['aircon-station-dropdown','ref-station-dropdown','np-station-dropdown','edmi-station-dropdown','layout-station-dropdown'].forEach(function(id) {
                 const d = document.getElementById(id);
                 if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) {
                     d.classList.add('hidden');
@@ -2689,6 +3847,179 @@
             });
             // Also try auto-fill if user typed exact match
             _applyRefMatch(input.value.trim());
+        }
+
+        function _applyEdmiMatch(stationName) {
+            let match = globalStoreData.find(s => s.station === stationName);
+            if (!match) match = globalStoreData.find(s => s.station.toLowerCase().trim() === stationName.toLowerCase());
+            if (match) {
+                const codeInput = document.querySelector('#content-edmi-survey input[name="branchCode"]');
+                const nameInput = document.querySelector('#content-edmi-survey input[name="branchName"]');
+                if (codeInput) codeInput.value = match.id || "";
+                let cleanName = match.station;
+                if (match.id && cleanName.startsWith(match.id)) cleanName = cleanName.substring(match.id.length).trim();
+                if (nameInput) nameInput.value = cleanName;
+                const ammMtnInputEdmi = document.querySelector('#content-edmi-survey input[name="ammMtn"]');
+                if (ammMtnInputEdmi) ammMtnInputEdmi.value = match.ammMtn || '';
+                const dmAreaInputEdmi = document.querySelector('#content-edmi-survey input[name="dmArea"]');
+                const cmAreaInputEdmi = document.querySelector('#content-edmi-survey input[name="cmArea"]');
+                if (dmAreaInputEdmi) dmAreaInputEdmi.value = match.dmName || '';
+                if (cmAreaInputEdmi) cmAreaInputEdmi.value = match.cmName || '';
+                const restForm = document.getElementById('edmi-rest-form');
+                if (restForm) restForm.classList.remove('hidden');
+            } else {
+                const restForm = document.getElementById('edmi-rest-form');
+                if (restForm) restForm.classList.add('hidden');
+            }
+        }
+
+        function handleEdmiStationInput(input) {
+            const val = input.value.toLowerCase().trim();
+            const dropdown = document.getElementById('edmi-station-dropdown');
+            if (val.length < 1) { if (dropdown) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; } return; }
+            const matches = globalStoreData.filter(s => s.station.toLowerCase().includes(val)).map(s => s.station);
+            renderStationDropdown('edmi-station-dropdown', matches, function(selected) {
+                input.value = selected;
+                _applyEdmiMatch(selected);
+            });
+            _applyEdmiMatch(input.value.trim());
+        }
+
+        // Populated from getLayoutTargetDocs() on init (see initApp) — restricts the
+        // Layout Survey branch search to just the confirmed target-project stores
+        // (currently the 51 "Add Chill Bev" stores) and supplies their ASIS/To-Be
+        // reference layout PDFs.
+        let layoutTargetDocsMap = {};
+        let layoutTargetCodesSet = new Set();
+
+        function _layoutMatchPool() {
+            if (layoutTargetCodesSet.size === 0) return globalStoreData; // not loaded yet — fail open rather than blocking search
+            return globalStoreData.filter(s => layoutTargetCodesSet.has(s.id));
+        }
+
+        function _renderLayoutTargetDocs(code) {
+            const container = document.getElementById('layout-target-docs');
+            if (!container) return;
+            const docs = layoutTargetDocsMap[code];
+            if (!docs || (!docs.asisUrl && !docs.tobeUrl)) { container.innerHTML = ''; return; }
+            let html = '<div class="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex flex-wrap items-center gap-2">' +
+                '<span class="text-xs font-semibold text-indigo-700">📄 แบบ Layout อ้างอิงสำหรับสาขานี้:</span>';
+            if (docs.asisUrl) {
+                html += '<a href="' + docs.asisUrl + '" target="_blank" class="text-xs font-semibold text-white bg-slate-600 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors">ดูแบบ ASIS (ก่อนปรับปรุง)</a>';
+            }
+            if (docs.tobeUrl) {
+                html += '<a href="' + docs.tobeUrl + '" target="_blank" class="text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors">ดูแบบ To Be (หลังปรับปรุง)</a>';
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function _applyLayoutMatch(stationName) {
+            const pool = _layoutMatchPool();
+            let match = pool.find(s => s.station === stationName);
+            if (!match) match = pool.find(s => s.station.toLowerCase().trim() === stationName.toLowerCase());
+            if (match) {
+                const codeInput = document.querySelector('#content-layout-survey input[name="branchCode"]');
+                const nameInput = document.querySelector('#content-layout-survey input[name="branchName"]');
+                if (codeInput) codeInput.value = match.id || "";
+                let cleanName = match.station;
+                if (match.id && cleanName.startsWith(match.id)) cleanName = cleanName.substring(match.id.length).trim();
+                if (nameInput) nameInput.value = cleanName;
+                const ammMtnInputLayout = document.querySelector('#content-layout-survey input[name="ammMtn"]');
+                if (ammMtnInputLayout) ammMtnInputLayout.value = match.ammMtn || '';
+                const dmAreaInputLayout = document.querySelector('#content-layout-survey input[name="dmArea"]');
+                const cmAreaInputLayout = document.querySelector('#content-layout-survey input[name="cmArea"]');
+                if (dmAreaInputLayout) dmAreaInputLayout.value = match.dmName || '';
+                if (cmAreaInputLayout) cmAreaInputLayout.value = match.cmName || '';
+                _renderLayoutTargetDocs(match.id);
+                const restForm = document.getElementById('layout-rest-form');
+                if (restForm) restForm.classList.remove('hidden');
+            } else {
+                const restForm = document.getElementById('layout-rest-form');
+                if (restForm) restForm.classList.add('hidden');
+                const container = document.getElementById('layout-target-docs');
+                if (container) container.innerHTML = '';
+            }
+        }
+
+        function handleLayoutStationInput(input) {
+            const val = input.value.toLowerCase().trim();
+            const dropdown = document.getElementById('layout-station-dropdown');
+            if (val.length < 1) { if (dropdown) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; } return; }
+            const matches = _layoutMatchPool().filter(s => s.station.toLowerCase().includes(val)).map(s => s.station);
+            renderStationDropdown('layout-station-dropdown', matches, function(selected) {
+                input.value = selected;
+                _applyLayoutMatch(selected);
+            });
+            _applyLayoutMatch(input.value.trim());
+        }
+
+        // Populated from getTradingHoursTargetStores() on init (see initApp) —
+        // restricts the Trading Hours Survey branch search to the confirmed
+        // Phase 1 (and later Phase 2) target-store list, same pattern as Layout
+        // Survey's layoutTargetDocsMap / _layoutMatchPool().
+        let hoursTargetStoresMap = {};
+        let hoursTargetCodesSet = new Set();
+
+        function _hoursMatchPool() {
+            if (hoursTargetCodesSet.size === 0) return globalStoreData; // not loaded yet — fail open rather than blocking search
+            return globalStoreData.filter(s => hoursTargetCodesSet.has(s.id));
+        }
+
+        function _renderHoursTargetInfo(code) {
+            const container = document.getElementById('hours-target-info');
+            if (!container) return;
+            const info = hoursTargetStoresMap[code];
+            if (!info) { container.innerHTML = ''; return; }
+            container.innerHTML = '<div class="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex flex-wrap items-center gap-4 text-xs">' +
+                '<span class="font-semibold text-indigo-700">📋 ' + (info.phase || '-') + '</span>' +
+                '<span class="text-indigo-700">🎯 เป้าหมายเริ่ม: ' + (info.targetDate || '-') + '</span>' +
+                '</div>';
+        }
+
+        function _applyHoursMatch(stationName) {
+            const pool = _hoursMatchPool();
+            let match = pool.find(s => s.station === stationName);
+            if (!match) match = pool.find(s => s.station.toLowerCase().trim() === stationName.toLowerCase());
+            if (match) {
+                const codeInput = document.querySelector('#content-hours-survey input[name="branchCode"]');
+                const nameInput = document.querySelector('#content-hours-survey input[name="branchName"]');
+                if (codeInput) codeInput.value = match.id || "";
+                let cleanName = match.station;
+                if (match.id && cleanName.startsWith(match.id)) cleanName = cleanName.substring(match.id.length).trim();
+                if (nameInput) nameInput.value = cleanName;
+                const ammMtnInputHours = document.querySelector('#content-hours-survey input[name="ammMtn"]');
+                if (ammMtnInputHours) ammMtnInputHours.value = match.ammMtn || '';
+                const dmAreaInputHours = document.querySelector('#content-hours-survey input[name="dmArea"]');
+                const cmAreaInputHours = document.querySelector('#content-hours-survey input[name="cmArea"]');
+                if (dmAreaInputHours) dmAreaInputHours.value = match.dmName || '';
+                if (cmAreaInputHours) cmAreaInputHours.value = match.cmName || '';
+                const info = hoursTargetStoresMap[match.id] || {};
+                const phaseInput = document.querySelector('#content-hours-survey input[name="phase"]');
+                const targetDateInput = document.querySelector('#content-hours-survey input[name="targetDate"]');
+                if (phaseInput) phaseInput.value = info.phase || '';
+                if (targetDateInput) targetDateInput.value = info.targetDate || '';
+                _renderHoursTargetInfo(match.id);
+                const restForm = document.getElementById('hours-rest-form');
+                if (restForm) restForm.classList.remove('hidden');
+            } else {
+                const restForm = document.getElementById('hours-rest-form');
+                if (restForm) restForm.classList.add('hidden');
+                const container = document.getElementById('hours-target-info');
+                if (container) container.innerHTML = '';
+            }
+        }
+
+        function handleHoursStationInput(input) {
+            const val = input.value.toLowerCase().trim();
+            const dropdown = document.getElementById('hours-station-dropdown');
+            if (val.length < 1) { if (dropdown) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; } return; }
+            const matches = _hoursMatchPool().filter(s => s.station.toLowerCase().includes(val)).map(s => s.station);
+            renderStationDropdown('hours-station-dropdown', matches, function(selected) {
+                input.value = selected;
+                _applyHoursMatch(selected);
+            });
+            _applyHoursMatch(input.value.trim());
         }
 
         function updateBUFromStation(input) {
@@ -2945,74 +4276,39 @@
         }
 
         // Ice Cream supplier brand field — rendered first inside each ice cream unit card
+        const ICE_CREAM_SUPPLIER_DEFAULTS = ["Wall's (Unilever)", 'Nestle', 'Chomthana', 'Magnolia', 'Selecta', 'Dairy Queen', "Swensen's"];
         function renderIceCreamSupplierField(unitNum, namePrefix) {
             const selectName = `${namePrefix}Supplier_${unitNum}`;
-            const otherId    = `${namePrefix}_other_supplier_${unitNum}`;
-            const otherName  = `${namePrefix}SupplierOther_${unitNum}`;
+            const listId = `${namePrefix}_supplier_list_${unitNum}`;
+            const opts = _mergedOptions('ref_ice_cream_supplier', ICE_CREAM_SUPPLIER_DEFAULTS)
+                .map(b => `<option value="${b}">${b === 'Chomthana' ? 'Chomthana (ชมธนา)' : b}</option>`).join('');
             return `
                 <div class="mb-3 p-2 bg-pink-50 border border-pink-200 rounded-lg">
                     <label class="block text-xs font-bold text-pink-700 mb-1">แบรนด์ไอศกรีม (Supplier)</label>
-                    <select name="${selectName}" id="${selectName}" onchange="toggleRefOtherBrand('${otherId}', this.value)"
-                        class="w-full text-sm border-pink-300 rounded-md shadow-sm focus:border-pink-500 focus:ring-pink-400">
-                        <option value="">-- เลือกแบรนด์ไอศกรีม --</option>
-                        <option value="Wall's (Unilever)">Wall's (Unilever)</option>
-                        <option value="Nestle">Nestle</option>
-                        <option value="Chomthana">Chomthana (ชมธนา)</option>
-                        <option value="Magnolia">Magnolia</option>
-                        <option value="Selecta">Selecta</option>
-                        <option value="Dairy Queen">Dairy Queen</option>
-                        <option value="Swensen's">Swensen's</option>
-                        <option value="Other">อื่นๆ โปรดระบุ</option>
-                    </select>
-                    <input type="text" name="${otherName}" id="${otherId}"
-                        class="hidden mt-1 w-full text-sm border border-pink-300 rounded-md p-2 focus:ring-1 focus:ring-pink-400"
-                        placeholder="ระบุแบรนด์ไอศกรีม...">
+                    <input type="text" list="${listId}" name="${selectName}" id="${selectName}" autocomplete="off"
+                        class="w-full text-sm border-pink-300 rounded-md shadow-sm focus:border-pink-500 focus:ring-pink-400"
+                        placeholder="พิมพ์เพื่อค้นหา หรือระบุแบรนด์ใหม่...">
+                    <datalist id="${listId}">${opts}</datalist>
                 </div>
             `;
         }
 
+        const REF_BRAND_DEFAULTS = ['Themedez', 'Systemform', 'Carrier', 'Pattana Inter Cool', 'LG', 'ETSR', 'Panasonic', 'Sanden', 'The Cool', 'Haier', 'VSR'];
         function renderRefBrandDropdown(unitNum, namePrefix, labelOverride) {
             const selectName = `${namePrefix}Brand_${unitNum}`;
-            const otherId = `${namePrefix}_other_brand_${unitNum}`;
-            const otherName = `${namePrefix}BrandOther_${unitNum}`;
+            const listId = `${namePrefix}_brand_list_${unitNum}`;
             const brandLabel = labelOverride || 'ยี่ห้อ (Brand)';
+            const opts = _mergedOptions('ref_brand', REF_BRAND_DEFAULTS)
+                .map(b => `<option value="${b}">`).join('');
             return `
                 <div class="mb-3">
                     <label class="block text-xs font-semibold text-gray-600 mb-1">${brandLabel}</label>
-                    <select name="${selectName}" id="${selectName}" onchange="toggleRefOtherBrand('${otherId}', this.value)"
-                        class="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-cyan-500 focus:ring-cyan-500">
-                        <option value="">-- เลือกยี่ห้อ --</option>
-                        <option value="Themedez">Themedez</option>
-                        <option value="Systemform">Systemform</option>
-                        <option value="Carrier">Carrier</option>
-                        <option value="Pattana Inter Cool">Pattana Inter Cool</option>
-                        <option value="LG">LG</option>
-                        <option value="ETSR">ETSR</option>
-                        <option value="Panasonic">Panasonic</option>
-                        <option value="Sanden">Sanden</option>
-                        <option value="The Cool">The Cool</option>
-                        <option value="Haier">Haier</option>
-                        <option value="VSR">VSR</option>
-                        <option value="Other">อื่นๆ โปรดระบุ</option>
-                    </select>
-                    <input type="text" name="${otherName}" id="${otherId}"
-                        class="hidden mt-1 w-full text-sm border border-gray-300 rounded-md p-2 focus:ring-1 focus:ring-cyan-500"
-                        placeholder="ระบุยี่ห้อ...">
+                    <input type="text" list="${listId}" name="${selectName}" id="${selectName}" autocomplete="off"
+                        class="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                        placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่...">
+                    <datalist id="${listId}">${opts}</datalist>
                 </div>
             `;
-        }
-
-        function toggleRefOtherBrand(inputId, val) {
-            const el = document.getElementById(inputId);
-            if (!el) return;
-            if (val === 'Other') {
-                el.classList.remove('hidden');
-                el.required = true;
-            } else {
-                el.classList.add('hidden');
-                el.required = false;
-                el.value = '';
-            }
         }
 
         function renderRefProductCheckboxes(unitNum, namePrefix, productOptions) {
@@ -3045,6 +4341,63 @@
             if (baseLabel.includes('ไอศกรีม')) return 'IC';
             if (baseLabel.includes('น้ำแข็ง')) return 'IM';
             return 'RF';
+        }
+
+        // ─── Condition Rating (⭐ 0-5) Widget — adapted from People MNC app ───
+        const _condColors = ['#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d', '#16a34a'];
+        const _condLabels = ['0 – ชำรุด/หมดสภาพ', '1 – แย่มาก', '2 – แย่ ควรซ่อม', '3 – พอใช้', '4 – ดี', '5 – ใหม่/สมบูรณ์'];
+
+        function condRatingRow(name) {
+            let btns = '';
+            for (let v = 0; v <= 5; v++) {
+                btns += `<button type="button" onclick="setCondRating('${name}',${v})" id="${name}_btn_${v}" title="${_condLabels[v]}"
+                    style="width:24px;height:24px;border-radius:50%;border:2px solid ${_condColors[v]};color:${_condColors[v]};background:transparent;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;">${v}</button>`;
+            }
+            return `
+            <div class="border-t border-gray-100 pt-2 mt-1">
+                <label class="block text-xs font-semibold text-gray-600 mb-1" title="0 = ชำรุด/หมดสภาพ, 5 = ใหม่/สมบูรณ์">⭐ สภาพเครื่อง (Condition Rating) <span class="text-red-500">*</span></label>
+                <div id="${name}_group" class="flex items-center gap-1.5 flex-wrap rounded px-1 py-0.5">
+                    ${btns}
+                    <input type="hidden" name="${name}" id="${name}" value="">
+                    <span id="${name}_label" class="text-xs text-gray-400 ml-1 italic">ยังไม่ให้คะแนน</span>
+                </div>
+            </div>`;
+        }
+
+        function setCondRating(name, val) {
+            const hidden = document.getElementById(name);
+            if (hidden) hidden.value = val;
+            const grp = document.getElementById(name + '_group');
+            if (grp) grp.classList.remove('bg-red-50', 'ring-2', 'ring-red-200');
+            const lbl = document.getElementById(name + '_label');
+            if (lbl) { lbl.textContent = _condLabels[val]; lbl.style.color = _condColors[val]; lbl.classList.remove('italic', 'text-gray-400'); }
+            for (let v = 0; v <= 5; v++) {
+                const btn = document.getElementById(name + '_btn_' + v);
+                if (!btn) continue;
+                if (v <= val) {
+                    btn.style.background = _condColors[v];
+                    btn.style.color = '#fff';
+                } else {
+                    btn.style.background = 'transparent';
+                    btn.style.color = _condColors[v];
+                }
+            }
+        }
+
+        // Validate all condition ratings in a form are filled; highlights and scrolls to the first missing one
+        function validateCondRatings(form) {
+            const unrated = [];
+            form.querySelectorAll('input[type="hidden"][name*="CondRating"]').forEach(el => {
+                if (el.value === '') unrated.push(el.name);
+            });
+            if (unrated.length === 0) return true;
+            alert('⚠️ กรุณาให้คะแนนสภาพเครื่อง (⭐ 0-5) ให้ครบทุกเครื่อง/ตู้ก่อนส่งแบบสำรวจ\nPlease give a condition rating (⭐ 0-5) for every unit before submitting.\n\nยังไม่ได้ให้คะแนน: ' + unrated.length + ' รายการ');
+            const firstGrp = document.getElementById(unrated[0] + '_group');
+            if (firstGrp) {
+                firstGrp.classList.add('bg-red-50', 'ring-2', 'ring-red-200');
+                firstGrp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return false;
         }
 
         function updateDynamicUnitDetails(containerId, qtyOrConfigs, baseLabel, idPrefix, namePrefix, productOptions = [], eqPrefix = '', extraFieldFn = null) {
@@ -3117,6 +4470,7 @@
                                     </label>
                                 </div>
                             </div>
+                            ${condRatingRow(`${namePrefix}CondRating_${globalIndex}`)}
                             <div class="border-t border-gray-100 pt-2 mt-1">
                                 <label class="block text-xs font-semibold text-gray-600 mb-1">🌡️ อุณหภูมิที่ Controller (°C)</label>
                                 <input type="number" name="${namePrefix}ControllerTemp_${globalIndex}" step="0.1"
@@ -3255,12 +4609,15 @@
                 adminLinks.forEach(link => link.classList.add('hidden'));
             }
 
+            // Guests (and any signed-in user before their admin status resolves) only
+            // ever see GENERAL_USER_TABS, filtered by the admin-configured
+            // _generalTabVisibility override (e.g. "EDMI only this Friday") — same
+            // source of truth as _renderViewByRole(), so Tab Visibility applies here
+            // too instead of this function keeping its own separate hardcoded list.
             tabs.forEach(tab => {
-                // By default, for ANY non-admin user (guest or logged in), 
-                // only show Register and Aircon Survey tabs.
-                // The handleAdminStatus function will reveal the rest if they are an admin.
-                if (tab.id === 'tab-register' || tab.id === 'tab-aircon-survey' || tab.id === 'tab-ref-survey' || tab.id === 'tab-np-survey') {
-                    tab.classList.remove('hidden');
+                if (GENERAL_USER_TABS.indexOf(tab.id) !== -1) {
+                    const visible = _generalTabVisibility.hasOwnProperty(tab.id) ? _generalTabVisibility[tab.id] : true;
+                    tab.classList.toggle('hidden', !visible);
                 } else {
                     tab.classList.add('hidden');
                 }
@@ -3279,8 +4636,8 @@
             // Trigger guest mode UI setup
             setGuestMode(true);
 
-            // Default open the Aircon Survey tab for guests (or Register)
-            openTab('aircon-survey');
+            // Default open the admin-configured default tab for guests (falls back to Aircon Survey)
+            openTab(_generalDefaultTab.replace(/^tab-/, ''));
         }
 
         let fileData = {
@@ -3460,6 +4817,7 @@
         };
         const acTypeCodes = {
             "Wall Type": "WT",
+            "Hanging Type": "HT",
             "Cassette Type": "CT",
             "Floor Standing": "FS",
             "Package Type": "PT"
@@ -3510,7 +4868,8 @@
             const formattedNum = String(unitNum).padStart(2, '0');
             let descriptiveType = typeVal;
             if (typeVal === "Wall Type") descriptiveType = "แอร์ติดผนัง";
-            if (typeVal === "Cassette Type") descriptiveType = "แอร์แขวน/ฝังฝ้า";
+            if (typeVal === "Hanging Type") descriptiveType = "แอร์แขวน";
+            if (typeVal === "Cassette Type") descriptiveType = "แอร์ฝังฝ้า";
             if (typeVal === "Floor Standing") descriptiveType = "แอร์ตั้งพื้น";
             if (typeVal === "Package Type") descriptiveType = "แอร์ตู้ตั้งพื้น";
 
@@ -3611,13 +4970,18 @@
                 }
             }
 
+            // Department/Position are dropdowns with an "Other" free-text fallback —
+            // substitute the typed value when Other was picked.
+            const departmentValue = form.department.value === 'Other' ? form.departmentOther.value.trim() : form.department.value;
+            const positionValue = form.position.value === 'Other' ? form.positionOther.value.trim() : form.position.value;
+
             const formData = {
                 empId: form.empId.value,
                 name: form.name.value,
                 nickname: form.nickname.value,
                 manager: form.manager.value,
-                department: form.department.value,
-                position: form.position.value,
+                department: departmentValue,
+                position: positionValue,
                 email: form.email.value,
                 password: form.password ? form.password.value : "", // Capture Password
                 phone: form.phone.value,
@@ -3641,8 +5005,10 @@
                         document.getElementById('uploadPlaceholder').classList.remove('hidden');
                         fileData = {};
 
-                        // Redirect to Aircon survey
+                        // Redirect to Aircon survey — restore the full general-tab
+                        // bar first (goToRegistration() narrowed it to Register-only).
                         alert("ลงทะเบียนสำเร็จ ระบบจะพาท่านไปยังหน้าสำรวจแอร์");
+                        setGuestMode(true);
                         openTab('aircon-survey');
                     } else { alert("Error: " + res.error); }
                 })
@@ -4467,6 +5833,7 @@
 
         // --- Refrigerator Survey Submit ---
         async function _runRefSurvey(form, isDraft) {
+            if (!isDraft && !validateCondRatings(form)) return;
             showLoading();
             const loadingText = document.querySelector('#globalLoading span');
             if (loadingText) loadingText.textContent = isDraft ? "กำลังบันทึกร่าง..." : "กำลังส่งข้อมูล...";
@@ -4581,15 +5948,30 @@
                     data[key] = checkboxArrayValues[key].join(', ');
                 }
 
-                // Replace "Other" brand values with the typed custom brand text
-                Object.keys(data).forEach(key => {
-                    if (/Brand_\d+$/.test(key) && data[key] === 'Other') {
-                        const otherKey = key.replace(/Brand_(\d+)$/, 'BrandOther_$1');
-                        if (data[otherKey]) data[key] = data[otherKey];
-                    }
-                });
-                // Remove BrandOther helper fields from submission
-                Object.keys(data).forEach(key => { if (/BrandOther_\d+$/.test(key)) delete data[key]; });
+                // Soft typo check — only on a real submit, never on drafts. Scans any
+                // field ending in Brand_N / Supplier_N regardless of equipment-type
+                // prefix, since the brand pool is shared across Ref equipment types.
+                if (!isDraft) {
+                    const refFuzzyChecks = [];
+                    Object.keys(data).forEach(function (key) {
+                        if (/Brand_\d+$/.test(key)) {
+                            refFuzzyChecks.push({
+                                value: data[key], groupKey: 'ref_brand',
+                                fallbackDefaults: ['Themedez', 'Systemform', 'Carrier', 'Pattana Inter Cool', 'LG', 'ETSR', 'Panasonic', 'Sanden', 'The Cool', 'Haier', 'VSR'],
+                                label: 'ยี่ห้อ (' + key + ')',
+                                apply: (v => { data[key] = v; })
+                            });
+                        } else if (/Supplier_\d+$/.test(key)) {
+                            refFuzzyChecks.push({
+                                value: data[key], groupKey: 'ref_ice_cream_supplier',
+                                fallbackDefaults: ["Wall's (Unilever)", 'Nestle', 'Chomthana', 'Magnolia', 'Selecta', 'Dairy Queen', "Swensen's"],
+                                label: 'แบรนด์ไอศกรีม (' + key + ')',
+                                apply: (v => { data[key] = v; })
+                            });
+                        }
+                    });
+                    _fuzzyCheckAndConfirm(refFuzzyChecks);
+                }
 
                 // Guard: estimate total attachment payload size (~4/3 base64 overhead)
                 const totalB64Bytes = Object.values(attachments).flat().reduce((sum, f) => sum + (f && f.data ? f.data.length : 0), 0);
@@ -4662,6 +6044,11 @@
                 form.reporterName.focus();
                 return;
             }
+            if (!form.reporterPhone.value.trim()) {
+                alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone) ก่อนกดยืนยัน");
+                form.reporterPhone.focus();
+                return;
+            }
             if (!form.branchCode.value || !form.branchName.value) {
                 alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)");
                 return;
@@ -4670,6 +6057,641 @@
         }
         async function saveDraftRef(btn) {
             saveLocalDraftRef(btn);
+        }
+
+        // --- EDMI Solar Meter Survey ---
+        async function _runEdmiSurvey(form) {
+            showLoading();
+            const loadingText = document.querySelector('#globalLoading span');
+            if (loadingText) loadingText.textContent = "กำลังส่งข้อมูล...";
+
+            let attachments = {};
+
+            try {
+                // Process file uploads (single category: EdmiMeter)
+                const allTasks = [];
+                const _seenEdmiCats = new Set();
+                for (const input of form.querySelectorAll('input[type="file"][data-category-upload]')) {
+                    const cat = input.dataset.categoryUpload;
+                    if (_seenEdmiCats.has(cat)) continue;
+                    _seenEdmiCats.add(cat);
+                    const accumulated = (_accumulatedFiles[cat] || []).filter(Boolean);
+                    if (accumulated.length === 0) continue;
+                    if (!attachments[cat]) attachments[cat] = [];
+                    for (const file of accumulated) {
+                        const slot = attachments[cat].length;
+                        attachments[cat].push(null);
+                        allTasks.push({ cat, file, slot });
+                    }
+                }
+
+                const totalFiles = allTasks.length;
+                if (totalFiles > 0) {
+                    if (loadingText) loadingText.textContent = `บีบอัดรูปภาพ 0/${totalFiles}...`;
+                    await new Promise((resolveBatch, rejectBatch) => {
+                        const LIMIT = 3;
+                        let running = 0, idx = 0, doneCount = 0, hasError = false;
+                        function runNext() {
+                            if (hasError) return;
+                            if (idx >= allTasks.length && running === 0) { resolveBatch(); return; }
+                            while (running < LIMIT && idx < allTasks.length) {
+                                const task = allTasks[idx++];
+                                running++;
+                                resizeImage(task.file, 800, 800, 0.60)
+                                    .catch(() => new Promise(r => {
+                                        const fr = new FileReader();
+                                        fr.onload = e => r({ name: task.file.name, mimeType: task.file.type, data: e.target.result.split(',')[1] });
+                                        fr.readAsDataURL(task.file);
+                                    }))
+                                    .then(result => {
+                                        attachments[task.cat][task.slot] = result;
+                                        doneCount++; running--;
+                                        if (loadingText) loadingText.textContent = `บีบอัดรูปภาพ ${doneCount}/${totalFiles}...`;
+                                        runNext();
+                                    })
+                                    .catch(err => { hasError = true; rejectBatch(err); });
+                            }
+                        }
+                        runNext();
+                    });
+                    for (const cat in attachments) {
+                        attachments[cat] = attachments[cat].filter(Boolean);
+                        if (attachments[cat].length === 0) delete attachments[cat];
+                    }
+                }
+
+                if (loadingText) loadingText.textContent = "กำลังส่งข้อมูล...";
+
+                const data = { reporterEmail: CURRENT_USER ? CURRENT_USER.email : "" };
+                for (let i = 0; i < form.elements.length; i++) {
+                    const el = form.elements[i];
+                    if (!el.name || el.disabled || el.type === 'file' || el.type === 'submit') continue;
+                    // A checkbox's .value is its static value attribute ("on" by default) —
+                    // it stays truthy even when unchecked. Use .checked instead so
+                    // accessBlocked only reports "Yes" when the box is actually ticked.
+                    data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+                }
+                data.attachments = attachments;
+
+                console.log("Submitting EDMI Solar Survey data:", data);
+
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        hideLoading();
+                        if (res.success) {
+                            showSuccess();
+                            form.reset();
+                            form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(inp) {
+                                delete _accumulatedFiles[inp.dataset.categoryUpload];
+                            });
+                            document.querySelectorAll('#content-edmi-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                            document.getElementById('edmi-rest-form').classList.add('hidden');
+                            var edmiSearch = document.getElementById('edmi-station-search');
+                            if (edmiSearch) edmiSearch.value = '';
+                            var phaseInput = document.querySelector('#content-edmi-survey input[name="solarPhase"]');
+                            if (phaseInput) phaseInput.value = 7;
+                            // form.reset() unchecks accessBlocked but doesn't undo the
+                            // JS-driven disabled/hidden state it set — reset that too.
+                            var accessBlockedCb = document.getElementById('edmi-access-blocked');
+                            if (accessBlockedCb) { accessBlockedCb.checked = false; toggleEdmiAccessBlocked(accessBlockedCb); }
+                        } else {
+                            alert("Error: " + res.error);
+                        }
+                    })
+                    .withFailureHandler(function (err) {
+                        hideLoading();
+                        alert("Server Error: " + err.message);
+                    })
+                    .processEdmiSolarSurveyForm(data);
+
+            } catch (error) {
+                hideLoading();
+                alert("Error processing form: " + error.message);
+            }
+        }
+
+        // Control box locked / meter physically inaccessible — a store-visit
+        // reality the required Code fields didn't originally account for. Makes
+        // the 4 Code inputs optional+disabled (so a real "0.00" never gets
+        // submitted as if it were a real reading) and requires a reason instead.
+        function toggleEdmiAccessBlocked(checkbox) {
+            const blocked = checkbox.checked;
+            const detail = document.getElementById('edmi-access-blocked-detail');
+            if (detail) detail.classList.toggle('hidden', !blocked);
+
+            const grid = document.getElementById('edmi-codes-grid');
+            if (grid) grid.classList.toggle('opacity-40', blocked);
+            const codeInputs = document.querySelectorAll('#edmi-codes-grid input[name^="code0"]');
+            codeInputs.forEach(function (inp) {
+                inp.required = !blocked;
+                inp.disabled = blocked;
+                if (blocked) inp.value = '';
+            });
+
+            const reasonInput = document.querySelector('textarea[name="accessBlockedReason"]');
+            if (reasonInput) reasonInput.required = blocked;
+        }
+
+        async function handleEdmiSurveySubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            if (!form.reporterName.value.trim()) {
+                alert("กรุณากรอกชื่อผู้แจ้ง (Reporter) ก่อนกดยืนยัน");
+                form.reporterName.focus();
+                return;
+            }
+            if (!form.reporterPhone.value.trim()) {
+                alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone) ก่อนกดยืนยัน");
+                form.reporterPhone.focus();
+                return;
+            }
+            if (!form.branchCode.value || !form.branchName.value) {
+                alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)");
+                return;
+            }
+            if (!form.storeFormat.value) {
+                alert("กรุณาเลือกรูปแบบสาขา (Format)");
+                return;
+            }
+            // readingDate/readingTime carry `required` in the HTML, but the form has
+            // novalidate (see below) so that alone never blocked submission — enforce
+            // it here explicitly, since a blank Reading Date/Time was reaching the sheet.
+            if (!form.readingDate.value) {
+                alert("กรุณาระบุวันที่อ่านค่า (Reading Date)");
+                form.readingDate.focus();
+                return;
+            }
+            if (!form.readingTime.value) {
+                alert("กรุณาระบุเวลาที่อ่านค่า (Reading Time)");
+                form.readingTime.focus();
+                return;
+            }
+
+            const blocked = form.accessBlocked && form.accessBlocked.checked;
+            if (blocked) {
+                if (!form.accessBlockedReason.value.trim()) {
+                    alert("กรุณาระบุรายละเอียดปัญหาที่ทำให้ไม่สามารถอ่านค่าได้");
+                    form.accessBlockedReason.focus();
+                    return;
+                }
+            } else {
+                // Value + photo are both required per Code. The form has novalidate
+                // (so the HTML `required` attribute alone won't block submission) —
+                // enforce both explicitly here, since the photo is the only evidence
+                // backing that Code's number.
+                const edmiCodeFields = [
+                    { field: 'code000', cat: 'edmiMeter000', label: 'Code 000' },
+                    { field: 'code001', cat: 'edmiMeter001', label: 'Code 001' },
+                    { field: 'code002', cat: 'edmiMeter002', label: 'Code 002' },
+                    { field: 'code003', cat: 'edmiMeter003', label: 'Code 003' }
+                ];
+                const missingValueCodes = edmiCodeFields
+                    .filter(c => form[c.field].value.trim() === '')
+                    .map(c => c.label);
+                if (missingValueCodes.length > 0) {
+                    alert("กรุณากรอกค่าให้ครบทุก Code — ยังขาดค่าของ: " + missingValueCodes.join(', '));
+                    return;
+                }
+                const missingPhotoCodes = edmiCodeFields
+                    .filter(c => (_accumulatedFiles[c.cat] || []).filter(Boolean).length === 0)
+                    .map(c => c.label);
+                if (missingPhotoCodes.length > 0) {
+                    alert("กรุณาถ่ายภาพหน้าจอมิเตอร์แนบให้ครบทุก Code — ยังขาดรูปของ: " + missingPhotoCodes.join(', '));
+                    return;
+                }
+                // Recurring real-world mistake: some users type the Code's own label
+                // (0, 1, 2, 3) instead of reading the actual meter display, since a real
+                // cumulative kWh Total is essentially always in the thousands+. Catch
+                // any set of 4 small values and make them explicitly confirm before submit.
+                const codeVals = edmiCodeFields.map(c => parseFloat(form[c.field].value));
+                if (codeVals.every(v => !isNaN(v) && v < 10)) {
+                    const proceed = confirm(
+                        "ค่าที่กรอก (" + codeVals.join(', ') + ") ดูน้อยผิดปกติสำหรับค่าไฟสะสม (ปกติเป็นหลักพัน-หลักแสน)\n\n" +
+                        "กรุณาตรวจสอบว่าไม่ได้พิมพ์เลข 0, 1, 2, 3 ตามชื่อ Code 000-003 แทนตัวเลขจริงจากหน้าจอมิเตอร์\n\n" +
+                        "กด OK หากตัวเลขนี้ถูกต้องจริง หรือกด Cancel เพื่อกลับไปแก้ไข"
+                    );
+                    if (!proceed) return;
+                }
+            }
+            await _runEdmiSurvey(form);
+        }
+
+        // --- Layout Survey ---
+        async function _runLayoutSurvey(form) {
+            showLoading();
+            const loadingText = document.querySelector('#globalLoading span');
+            if (loadingText) loadingText.textContent = "กำลังส่งข้อมูล...";
+
+            let attachments = {};
+
+            try {
+                const allTasks = [];
+                const _seenLayoutCats = new Set();
+                for (const input of form.querySelectorAll('input[type="file"][data-category-upload]')) {
+                    const cat = input.dataset.categoryUpload;
+                    if (_seenLayoutCats.has(cat)) continue;
+                    _seenLayoutCats.add(cat);
+                    const accumulated = (_accumulatedFiles[cat] || []).filter(Boolean);
+                    if (accumulated.length === 0) continue;
+                    if (!attachments[cat]) attachments[cat] = [];
+                    for (const file of accumulated) {
+                        const slot = attachments[cat].length;
+                        attachments[cat].push(null);
+                        allTasks.push({ cat, file, slot });
+                    }
+                }
+
+                const totalFiles = allTasks.length;
+                if (totalFiles > 0) {
+                    if (loadingText) loadingText.textContent = `บีบอัดรูปภาพ 0/${totalFiles}...`;
+                    await new Promise((resolveBatch, rejectBatch) => {
+                        const LIMIT = 3;
+                        let running = 0, idx = 0, doneCount = 0, hasError = false;
+                        function runNext() {
+                            if (hasError) return;
+                            if (idx >= allTasks.length && running === 0) { resolveBatch(); return; }
+                            while (running < LIMIT && idx < allTasks.length) {
+                                const task = allTasks[idx++];
+                                running++;
+                                resizeImage(task.file, 800, 800, 0.60)
+                                    .catch(() => new Promise(r => {
+                                        const fr = new FileReader();
+                                        fr.onload = e => r({ name: task.file.name, mimeType: task.file.type, data: e.target.result.split(',')[1] });
+                                        fr.readAsDataURL(task.file);
+                                    }))
+                                    .then(result => {
+                                        attachments[task.cat][task.slot] = result;
+                                        doneCount++; running--;
+                                        if (loadingText) loadingText.textContent = `บีบอัดรูปภาพ ${doneCount}/${totalFiles}...`;
+                                        runNext();
+                                    })
+                                    .catch(err => { hasError = true; rejectBatch(err); });
+                            }
+                        }
+                        runNext();
+                    });
+                    for (const cat in attachments) {
+                        attachments[cat] = attachments[cat].filter(Boolean);
+                        if (attachments[cat].length === 0) delete attachments[cat];
+                    }
+                }
+
+                if (loadingText) loadingText.textContent = "กำลังส่งข้อมูล...";
+
+                const data = { reporterEmail: CURRENT_USER ? CURRENT_USER.email : "" };
+                for (let i = 0; i < form.elements.length; i++) {
+                    const el = form.elements[i];
+                    if (!el.name || el.disabled || el.type === 'file' || el.type === 'submit') continue;
+                    data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+                }
+                data.attachments = attachments;
+
+                console.log("Submitting Layout Survey data:", data);
+
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        hideLoading();
+                        if (res.success) {
+                            showSuccess();
+                            form.reset();
+                            form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(inp) {
+                                delete _accumulatedFiles[inp.dataset.categoryUpload];
+                            });
+                            document.querySelectorAll('#content-layout-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                            document.getElementById('layout-rest-form').classList.add('hidden');
+                            var layoutSearch = document.getElementById('layout-station-search');
+                            if (layoutSearch) layoutSearch.value = '';
+                            var projectInput = document.querySelector('#content-layout-survey input[name="projectName"]');
+                            if (projectInput) projectInput.value = 'Add Chill Bev';
+                        } else {
+                            alert("Error: " + res.error);
+                        }
+                    })
+                    .withFailureHandler(function (err) {
+                        hideLoading();
+                        alert("Server Error: " + err.message);
+                    })
+                    .processLayoutSurveyForm(data);
+
+            } catch (error) {
+                hideLoading();
+                alert("Error processing form: " + error.message);
+            }
+        }
+
+        async function handleLayoutSurveySubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            if (!form.reporterName.value.trim()) {
+                alert("กรุณากรอกชื่อผู้แจ้ง (Reporter) ก่อนกดยืนยัน");
+                form.reporterName.focus();
+                return;
+            }
+            if (!form.reporterPhone.value.trim()) {
+                alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone) ก่อนกดยืนยัน");
+                form.reporterPhone.focus();
+                return;
+            }
+            if (!form.branchCode.value || !form.branchName.value) {
+                alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)");
+                return;
+            }
+            if (!form.storeFormat.value) {
+                alert("กรุณาเลือกรูปแบบสาขา (Format)");
+                return;
+            }
+            if (!form.projectName.value.trim()) {
+                alert("กรุณาระบุชื่อโครงการ (Project Name)");
+                form.projectName.focus();
+                return;
+            }
+            // surveyDate carries `required` in the HTML, but the form has novalidate
+            // (see below) so that alone never blocked submission — enforce it here
+            // explicitly, matching the EDMI Reading Date pattern.
+            if (!form.surveyDate.value) {
+                alert("กรุณาระบุวันที่สำรวจ (Survey Date)");
+                form.surveyDate.focus();
+                return;
+            }
+
+            // Value + photo are both required per question — the photo is the only
+            // evidence backing that Yes/No answer, same pattern as EDMI's Code photos.
+            if ((_accumulatedFiles['layoutBeamPhoto'] || []).filter(Boolean).length === 0) {
+                alert("กรุณาแนบภาพบริเวณที่จะติดตั้งตู้แช่ (สำหรับคำถามเรื่องคาน)");
+                return;
+            }
+            if ((_accumulatedFiles['layoutAirconPhoto'] || []).filter(Boolean).length === 0) {
+                alert("กรุณาแนบภาพบริเวณที่จะติดตั้งตู้แช่ (สำหรับคำถามเรื่องแอร์เหนือพื้นที่)");
+                return;
+            }
+
+            await _runLayoutSurvey(form);
+        }
+
+        // --- Trading Hours Survey (24hr → Non-24hr conversion readiness) ---
+        async function _runTradingHoursSurvey(form) {
+            showLoading();
+            const loadingText = document.querySelector('#globalLoading span');
+            if (loadingText) loadingText.textContent = "กำลังส่งข้อมูล...";
+
+            let attachments = {};
+
+            try {
+                const allTasks = [];
+                const _seenHoursCats = new Set();
+                for (const input of form.querySelectorAll('input[type="file"][data-category-upload]')) {
+                    const cat = input.dataset.categoryUpload;
+                    if (_seenHoursCats.has(cat)) continue;
+                    _seenHoursCats.add(cat);
+                    const accumulated = (_accumulatedFiles[cat] || []).filter(Boolean);
+                    if (accumulated.length === 0) continue;
+                    if (!attachments[cat]) attachments[cat] = [];
+                    for (const file of accumulated) {
+                        const slot = attachments[cat].length;
+                        attachments[cat].push(null);
+                        allTasks.push({ cat, file, slot });
+                    }
+                }
+
+                const totalFiles = allTasks.length;
+                if (totalFiles > 0) {
+                    if (loadingText) loadingText.textContent = `บีบอัดรูปภาพ 0/${totalFiles}...`;
+                    await new Promise((resolveBatch, rejectBatch) => {
+                        const LIMIT = 3;
+                        let running = 0, idx = 0, doneCount = 0, hasError = false;
+                        function runNext() {
+                            if (hasError) return;
+                            if (idx >= allTasks.length && running === 0) { resolveBatch(); return; }
+                            while (running < LIMIT && idx < allTasks.length) {
+                                const task = allTasks[idx++];
+                                running++;
+                                resizeImage(task.file, 800, 800, 0.60)
+                                    .catch(() => new Promise(r => {
+                                        const fr = new FileReader();
+                                        fr.onload = e => r({ name: task.file.name, mimeType: task.file.type, data: e.target.result.split(',')[1] });
+                                        fr.readAsDataURL(task.file);
+                                    }))
+                                    .then(result => {
+                                        attachments[task.cat][task.slot] = result;
+                                        doneCount++; running--;
+                                        if (loadingText) loadingText.textContent = `บีบอัดรูปภาพ ${doneCount}/${totalFiles}...`;
+                                        runNext();
+                                    })
+                                    .catch(err => { hasError = true; rejectBatch(err); });
+                            }
+                        }
+                        runNext();
+                    });
+                    for (const cat in attachments) {
+                        attachments[cat] = attachments[cat].filter(Boolean);
+                        if (attachments[cat].length === 0) delete attachments[cat];
+                    }
+                }
+
+                if (loadingText) loadingText.textContent = "กำลังส่งข้อมูล...";
+
+                const data = { reporterEmail: CURRENT_USER ? CURRENT_USER.email : "" };
+                for (let i = 0; i < form.elements.length; i++) {
+                    const el = form.elements[i];
+                    if (!el.name || el.disabled || el.type === 'file' || el.type === 'submit') continue;
+                    data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+                }
+                data.attachments = attachments;
+
+                console.log("Submitting Trading Hours Survey data:", data);
+
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        hideLoading();
+                        if (res.success) {
+                            showSuccess();
+                            form.reset();
+                            form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(inp) {
+                                delete _accumulatedFiles[inp.dataset.categoryUpload];
+                            });
+                            document.querySelectorAll('#content-hours-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                            document.getElementById('hours-rest-form').classList.add('hidden');
+                            toggleHoursStageSections('Pre-Conversion');
+                            var hoursSearch = document.getElementById('hours-station-search');
+                            if (hoursSearch) hoursSearch.value = '';
+                            var curHoursInput = document.querySelector('#content-hours-survey input[name="currentHours"]');
+                            if (curHoursInput) curHoursInput.value = '24 Hrs.';
+                        } else {
+                            alert("Error: " + res.error);
+                        }
+                    })
+                    .withFailureHandler(function (err) {
+                        hideLoading();
+                        alert("Server Error: " + err.message);
+                    })
+                    .processTradingHoursSurveyForm(data);
+
+            } catch (error) {
+                hideLoading();
+                alert("Error processing form: " + error.message);
+            }
+        }
+
+        async function handleTradingHoursSurveySubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+            if (!form.reporterName.value.trim()) {
+                alert("กรุณากรอกชื่อผู้แจ้ง (Reporter) ก่อนกดยืนยัน");
+                form.reporterName.focus();
+                return;
+            }
+            if (!form.reporterPhone.value.trim()) {
+                alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone) ก่อนกดยืนยัน");
+                form.reporterPhone.focus();
+                return;
+            }
+            if (!form.branchCode.value || !form.branchName.value) {
+                alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)");
+                return;
+            }
+            if (!form.newHours.value.trim()) {
+                alert("กรุณาระบุเวลาทำการใหม่ (New Hours)");
+                form.newHours.focus();
+                return;
+            }
+            // surveyDate carries `required` in the HTML, but the form has novalidate
+            // (see below) so that alone never blocked submission — enforce it here
+            // explicitly, matching the EDMI Reading Date pattern.
+            if (!form.surveyDate.value) {
+                alert("กรุณาระบุวันที่สำรวจ (Survey Date)");
+                form.surveyDate.focus();
+                return;
+            }
+
+            // Value + photo are both required per question — the photo is the only
+            // evidence backing that Yes/No answer, same pattern as Layout Survey.
+            // Which photos are required depends on Survey Stage (Pre vs Post-Conversion) —
+            // see toggleHoursStageSections().
+            const isPostStage = form.surveyStage.value === 'Post-Conversion';
+            if (!isPostStage) {
+                if ((_accumulatedFiles['hoursLockPhoto'] || []).filter(Boolean).length === 0) {
+                    alert("กรุณาแนบภาพประตู/กุญแจล็อกหน้าร้าน");
+                    return;
+                }
+                if ((_accumulatedFiles['hoursStickerPhoto'] || []).filter(Boolean).length === 0) {
+                    alert("กรุณาแนบภาพหน้าร้าน (สำหรับคำถามเรื่องสติกเกอร์ 24 ชม.)");
+                    return;
+                }
+            } else {
+                if ((_accumulatedFiles['hoursPostVerifyPhoto'] || []).filter(Boolean).length === 0) {
+                    alert("กรุณาแนบภาพหลักฐานการตรวจยืนยันหลังปรับเปลี่ยน");
+                    return;
+                }
+            }
+
+            await _runTradingHoursSurvey(form);
+        }
+
+        // Survey Stage toggle — Pre-Conversion (readiness) vs Post-Conversion (verification)
+        // checklists are mutually exclusive sections of the same form; see index.html:3108+.
+        function toggleHoursStageSections(stage) {
+            const isPost = stage === 'Post-Conversion';
+            document.getElementById('hours-pre-checklist').classList.toggle('hidden', isPost);
+            document.getElementById('hours-post-checklist').classList.toggle('hidden', !isPost);
+        }
+
+        // --- Tab Visibility Config (Admin / Super Admin) ---
+        const TAB_VISIBILITY_LABELS = {
+            'tab-register': 'Register Profile',
+            'tab-aircon-survey': 'แบบสำรวจแอร์ (Aircon Survey)',
+            'tab-ref-survey': 'แบบสำรวจตู้แช่ (Ref Survey)',
+            'tab-np-survey': '🍦 New Product',
+            'tab-edmi-survey': '☀️ EDMI Solar Meter',
+            'tab-layout-survey': '📐 Layout Survey'
+        };
+
+        function openTabVisibilityModal() {
+            const list = document.getElementById('tabVisibilityList');
+            list.innerHTML = '';
+            GENERAL_USER_TABS.forEach(function(id) {
+                const visible = _generalTabVisibility.hasOwnProperty(id) ? _generalTabVisibility[id] : true;
+                const row = document.createElement('label');
+                row.className = 'flex items-center gap-2 text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50';
+                row.innerHTML = '<input type="checkbox" data-tab-id="' + id + '" ' + (visible ? 'checked' : '') +
+                    ' class="w-4 h-4 text-indigo-600 rounded"> <span>' + (TAB_VISIBILITY_LABELS[id] || id) + '</span>';
+                list.appendChild(row);
+            });
+
+            const defaultSelect = document.getElementById('defaultTabSelect');
+            defaultSelect.innerHTML = '';
+            GENERAL_USER_TABS.forEach(function(id) {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = TAB_VISIBILITY_LABELS[id] || id;
+                if (id === _generalDefaultTab) opt.selected = true;
+                defaultSelect.appendChild(opt);
+            });
+
+            const teamList = document.getElementById('teamTabAccessList');
+            teamList.innerHTML = '';
+            TEAM_RESTRICTED_TABS.forEach(function(id) {
+                const current = _teamTabAccess.hasOwnProperty(id) ? _teamTabAccess[id] : (TEAM_TAB_DEFAULTS[id] || 'ALL');
+                const opts = TEAM_TAB_ROLE_OPTIONS.map(function(o) {
+                    return '<option value="' + o.value + '"' + (o.value === current ? ' selected' : '') + '>' + o.label + '</option>';
+                }).join('');
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-2 text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2';
+                row.innerHTML = '<span>' + (TEAM_TAB_LABELS[id] || id) + '</span>' +
+                    '<select data-team-tab-id="' + id + '" class="text-xs border border-gray-300 rounded-lg px-2 py-1">' + opts + '</select>';
+                teamList.appendChild(row);
+            });
+
+            document.getElementById('tabVisibilityModal').classList.remove('hidden');
+        }
+
+        function closeTabVisibilityModal() {
+            document.getElementById('tabVisibilityModal').classList.add('hidden');
+        }
+
+        function _setAllTabVisibility(val) {
+            document.querySelectorAll('#tabVisibilityList input[type=checkbox]').forEach(function(cb) { cb.checked = val; });
+        }
+
+        function saveTabVisibility() {
+            const config = {};
+            document.querySelectorAll('#tabVisibilityList input[type=checkbox]').forEach(function(cb) {
+                config[cb.dataset.tabId] = cb.checked;
+            });
+            const defaultTab = document.getElementById('defaultTabSelect').value || 'tab-aircon-survey';
+            const teamConfig = {};
+            document.querySelectorAll('#teamTabAccessList select[data-team-tab-id]').forEach(function(sel) {
+                teamConfig[sel.dataset.teamTabId] = sel.value;
+            });
+            const btn = document.getElementById('saveTabVisibilityBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            let _savePending = 2;
+            let _saveFailed = false;
+            function _onSaveStepDone(ok, errMsg) {
+                if (!ok) { _saveFailed = true; alert('บันทึกไม่สำเร็จ: ' + errMsg); }
+                _savePending--;
+                if (_savePending > 0) return;
+                btn.disabled = false;
+                btn.textContent = 'Save';
+                if (!_saveFailed) {
+                    _generalTabVisibility = config;
+                    _generalDefaultTab = defaultTab;
+                    _teamTabAccess = teamConfig;
+                    closeTabVisibilityModal();
+                    _renderViewByRole();
+                }
+            }
+
+            const clientEmail = CURRENT_USER ? CURRENT_USER.email : '';
+            google.script.run
+                .withSuccessHandler(function(res) { _onSaveStepDone(!!(res && res.success), res && res.error); })
+                .withFailureHandler(function(err) { _onSaveStepDone(false, err.message); })
+                .setGeneralTabVisibility(config, defaultTab, clientEmail);
+            google.script.run
+                .withSuccessHandler(function(res) { _onSaveStepDone(!!(res && res.success), res && res.error); })
+                .withFailureHandler(function(err) { _onSaveStepDone(false, err.message); })
+                .setTeamTabAccess(teamConfig, clientEmail);
         }
 
 
@@ -4690,13 +6712,6 @@
             }
         }
 
-        function toggleAcOtherBrand(unitNum, val) {
-            const el = document.getElementById('ac_other_brand_' + unitNum);
-            if (!el) return;
-            if (val === 'Other') { el.classList.remove('hidden'); el.required = true; }
-            else { el.classList.add('hidden'); el.required = false; el.value = ''; }
-        }
-
         function toggleAcUnitChecklist(unitNum, show) {
             // Legacy compatibility
             toggleAcUnitSymptomChecklist(unitNum, show);
@@ -4714,7 +6729,7 @@
             const brand = brandEl ? brandEl.value : '';
             const type = typeEl ? typeEl.value : '';
             const assetNo = assetEl ? assetEl.value : '';
-            const typeNames = { 'Wall Type': 'แอร์ติดผนัง', 'Cassette Type': 'แอร์แขวน/ฝังฝ้า', 'Floor Standing': 'แอร์ตั้งพื้น', 'Package Type': 'แอร์ตู้ตั้งพื้น' };
+            const typeNames = { 'Wall Type': 'แอร์ติดผนัง', 'Hanging Type': 'แอร์แขวน', 'Cassette Type': 'แอร์ฝังฝ้า', 'Floor Standing': 'แอร์ตั้งพื้น', 'Package Type': 'แอร์ตู้ตั้งพื้น' };
             const typeName = typeNames[type] || type || '(ยังไม่ได้ระบุประเภท)';
 
             const branchInput = document.querySelector('#content-aircon-survey input[name="branchCode"]');
@@ -4803,13 +6818,15 @@
             if (n <= 0 || n > 20) { if (hint) hint.classList.remove('hidden'); return; }
             if (hint) hint.classList.add('hidden');
 
-            const brands = ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train', 'Other'];
-            const types = [
-                { value: 'Wall Type', label: 'แอร์ติดผนัง (Wall Type)' },
-                { value: 'Cassette Type', label: 'แอร์แขวน/ฝังฝ้า (Cassette Type)' },
-                { value: 'Floor Standing', label: 'แอร์ตั้งพื้น (Floor Standing)' },
-                { value: 'Package Type', label: 'แอร์ตู้ตั้งพื้น (Package Type)' },
-            ];
+            const AC_BRAND_DEFAULTS = ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train'];
+            const brands = _mergedOptions('aircon_brand', AC_BRAND_DEFAULTS);
+            const AC_TYPE_LABELS = {
+                'Wall Type': 'แอร์ติดผนัง (Wall Type)', 'Hanging Type': 'แอร์แขวน (Hanging Type)',
+                'Cassette Type': 'แอร์ฝังฝ้า (Cassette Type)', 'Floor Standing': 'แอร์ตั้งพื้น (Floor Standing)',
+                'Package Type': 'แอร์ตู้ตั้งพื้น (Package Type)'
+            };
+            const types = _mergedOptions('aircon_type', Object.keys(AC_TYPE_LABELS))
+                .map(v => ({ value: v, label: AC_TYPE_LABELS[v] || v }));
 
             for (let i = 1; i <= n; i++) {
                 // Inventory card
@@ -4827,18 +6844,22 @@
                     <div class="p-3 space-y-2 bg-white">
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">ยี่ห้อ (Brand) *</label>
-                            <select name="AcUnit${i}_Brand" onchange="toggleAcOtherBrand(${i}, this.value)" class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-blue-500">
-                                <option value="">-- เลือกยี่ห้อ --</option>
-                                ${brands.map(b => `<option value="${b}">${b === 'Other' ? 'อื่นๆ โปรดระบุ' : b}</option>`).join('')}
-                            </select>
-                            <input type="text" id="ac_other_brand_${i}" name="AcUnit${i}_BrandOther" placeholder="โปรดระบุยี่ห้อ" class="hidden mt-1 w-full border border-orange-300 rounded text-sm p-2 bg-orange-50 focus:ring-1 focus:ring-orange-400">
+                            <input type="text" list="ac_brand_list_${i}" name="AcUnit${i}_Brand" autocomplete="off"
+                                class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-blue-500"
+                                placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่...">
+                            <datalist id="ac_brand_list_${i}">
+                                ${brands.map(b => `<option value="${b}">`).join('')}
+                            </datalist>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทแอร์ (Type) *</label>
-                            <select name="AcUnit${i}_Type" onchange="updateAcUnitLabel(${i}, this.value)" class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-blue-500">
-                                <option value="">-- เลือกประเภท --</option>
+                            <input type="text" list="ac_type_list_${i}" name="AcUnit${i}_Type" autocomplete="off"
+                                onchange="updateAcUnitLabel(${i}, this.value)"
+                                class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-blue-500"
+                                placeholder="พิมพ์เพื่อค้นหา หรือระบุประเภทใหม่...">
+                            <datalist id="ac_type_list_${i}">
                                 ${types.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}
-                            </select>
+                            </datalist>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Asset No. (ถ้ามี)</label>
@@ -4855,6 +6876,7 @@
                                 </label>
                             </div>
                         </div>
+                        ${condRatingRow(`AcUnit${i}_CondRating`)}
                         <div class="border-t border-gray-100 pt-2 mt-1">
                             <label class="block text-xs font-semibold text-gray-600 mb-1">🌡️ อุณหภูมิที่ Controller (°C)</label>
                             <input type="number" name="AcUnit${i}_ControllerTemp" step="0.1"
@@ -5089,6 +7111,7 @@
 
         // --- Air Conditioner Survey Submit ---
         async function _runAcSurvey(form, isDraft) {
+            if (!isDraft && !validateCondRatings(form)) return;
             showLoading();
             const loadingText = document.querySelector('#globalLoading span');
             if (loadingText) loadingText.textContent = isDraft ? "กำลังบันทึกร่าง..." : "กำลังส่งข้อมูล...";
@@ -5175,24 +7198,36 @@
                     }
                 }
 
-                // Derive acBrand from per-unit inventory selects
+                // Derive acBrand from per-unit inventory inputs (searchable datalist
+                // fields — the submitted value is already final, no "Other" sentinel to resolve)
                 const invQty = parseInt(data.acQuantity) || 0;
+
+                // Soft typo check — only on a real submit, never on drafts
+                if (!isDraft) {
+                    const acFuzzyChecks = [];
+                    for (let bi = 1; bi <= invQty; bi++) {
+                        acFuzzyChecks.push({
+                            value: data[`AcUnit${bi}_Brand`], groupKey: 'aircon_brand',
+                            fallbackDefaults: ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train'],
+                            label: `แอร์เบอร์ ${bi} - ยี่ห้อ`,
+                            apply: (v => { data[`AcUnit${bi}_Brand`] = v; })
+                        });
+                        acFuzzyChecks.push({
+                            value: data[`AcUnit${bi}_Type`], groupKey: 'aircon_type',
+                            fallbackDefaults: ['Wall Type', 'Hanging Type', 'Cassette Type', 'Floor Standing', 'Package Type'],
+                            label: `แอร์เบอร์ ${bi} - ประเภท`,
+                            apply: (v => { data[`AcUnit${bi}_Type`] = v; })
+                        });
+                    }
+                    _fuzzyCheckAndConfirm(acFuzzyChecks);
+                }
+
                 const invBrands = new Set();
                 for (let bi = 1; bi <= invQty; bi++) {
                     const b = data[`AcUnit${bi}_Brand`];
                     if (b) invBrands.add(b);
                 }
-                // Replace "Other" brand with typed custom text
-                for (let bi = 1; bi <= invQty; bi++) {
-                    const brandKey = `AcUnit${bi}_Brand`;
-                    const otherKey = `AcUnit${bi}_BrandOther`;
-                    if (data[brandKey] === 'Other' && data[otherKey]) data[brandKey] = data[otherKey];
-                    delete data[otherKey];
-                }
-                // Rebuild acBrand after replacement
-                const finalBrands = new Set();
-                for (let bi = 1; bi <= invQty; bi++) { const b = data[`AcUnit${bi}_Brand`]; if (b) finalBrands.add(b); }
-                data.acBrand = Array.from(finalBrands).join(", ");
+                data.acBrand = Array.from(invBrands).join(", ");
                 data.brokenUnits = brokenUnits.join(", ");
                 data.attachments = attachments;
                 data.isDraft = isDraft;
@@ -5240,6 +7275,16 @@
         async function handleAirConSurveySubmit(e) {
             e.preventDefault();
             const form = e.target;
+            if (!form.reporterName.value.trim()) {
+                alert("กรุณากรอกชื่อผู้แจ้ง (Reporter) ก่อนกดยืนยัน");
+                form.reporterName.focus();
+                return;
+            }
+            if (!form.reporterPhone.value.trim()) {
+                alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone) ก่อนกดยืนยัน");
+                form.reporterPhone.focus();
+                return;
+            }
             if (!form.branchCode.value || !form.branchName.value) {
                 alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)");
                 return;
@@ -5346,17 +7391,16 @@
                                 const el = form.querySelector('[name="' + key + '"]');
                                 if (el && draft[key] !== undefined) {
                                     el.value = draft[key];
-                                    if (f === 'Brand' && typeof toggleAcOtherBrand === 'function') toggleAcOtherBrand(i, draft[key]);
                                     if (f === 'Type' && typeof updateAcUnitLabel === 'function') updateAcUnitLabel(i, draft[key]);
                                 }
                             });
-                            // Brand Other
-                            const otherKey = 'AcUnit' + i + '_BrandOther';
-                            const otherEl = form.querySelector('[name="' + otherKey + '"]');
-                            if (otherEl && draft[otherKey]) otherEl.value = draft[otherKey];
                             // Status
                             if (draft['AcUnit' + i + '_Status'] && typeof _acStatus === 'function')
                                 _acStatus(i, draft['AcUnit' + i + '_Status'] === '\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19');
+                            // Condition Rating (restore value + button visuals)
+                            const condKey = 'AcUnit' + i + '_CondRating';
+                            if (draft[condKey] !== undefined && draft[condKey] !== '' && typeof setCondRating === 'function')
+                                setCondRating(condKey, parseInt(draft[condKey], 10));
                             // Note
                             const noteEl = form.querySelector('[name="AcUnit' + i + '_Note"]');
                             if (noteEl && draft['AcUnit' + i + '_Note']) noteEl.value = draft['AcUnit' + i + '_Note'];
@@ -5448,6 +7492,10 @@
                             const key = np + 'Status_' + li;
                             if (draft[key] && typeof _refStatus === 'function')
                                 _refStatus(np, li, draft[key] === '\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19');
+                            // Re-apply condition rating visuals
+                            const condKey = np + 'CondRating_' + li;
+                            if (draft[condKey] !== undefined && draft[condKey] !== '' && typeof setCondRating === 'function')
+                                setCondRating(condKey, parseInt(draft[condKey], 10));
                         });
                         // hasBrokenRef
                         if (draft.hasBrokenRef) {
@@ -5577,14 +7625,16 @@
                         </svg>QR
                     </button>`;
 
-                // Brand dropdown options
-                const brandOptions = (cfg.brands || []).map(function(b) {
-                    return `<option value="${b}">${b}</option>`;
+                // Brand/Plug options (defaults ∪ real submitted data) — searchable datalist,
+                // typing a value not in the list adds it directly, no separate "Other" needed.
+                const brandDefaults = (cfg.brands || []).filter(function(b) { return b !== 'อื่นๆ'; });
+                const brandOptions = _mergedOptions('np_brand_' + cfg.code, brandDefaults).map(function(b) {
+                    return `<option value="${b}">`;
                 }).join('');
 
-                // Plug type options
-                const plugOptions = ['','16A 1 เฟส','20A 1 เฟส','32A 1 เฟส','3 เฟส 380V','อื่นๆ'].map(function(v) {
-                    return v ? `<option value="${v}">${v}</option>` : '<option value="">-- เลือกประเภทปลั๊ก --</option>';
+                const plugDefaults = ['16A 1 เฟส', '20A 1 เฟส', '32A 1 เฟส', '3 เฟส 380V'];
+                const plugOptions = _mergedOptions('np_plug', plugDefaults).map(function(v) {
+                    return `<option value="${v}">`;
                 }).join('');
 
                 newHtml += `
@@ -5604,15 +7654,10 @@
                     <div class="p-3 space-y-2 bg-white">
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">ยี่ห้อ (Brand)</label>
-                            <select name="${formCode}_${i}_brand" id="np_brand_${formCode}_${i}"
-                                onchange="document.getElementById('np_brand_other_${formCode}_${i}').classList.toggle('hidden', this.value!=='อื่นๆ')"
-                                class="w-full text-sm border border-gray-300 rounded-md shadow-sm p-2 ${cfg.focus || ''}">
-                                <option value="">-- เลือกยี่ห้อ --</option>
-                                ${brandOptions}
-                            </select>
-                            <input type="text" name="${formCode}_${i}_brand_other" id="np_brand_other_${formCode}_${i}"
-                                class="hidden mt-1 w-full text-sm border border-gray-300 rounded-md p-2"
-                                placeholder="ระบุยี่ห้อ...">
+                            <input type="text" list="np_brand_list_${formCode}_${i}" name="${formCode}_${i}_brand" id="np_brand_${formCode}_${i}" autocomplete="off"
+                                class="w-full text-sm border border-gray-300 rounded-md shadow-sm p-2 ${cfg.focus || ''}"
+                                placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่...">
+                            <datalist id="np_brand_list_${formCode}_${i}">${brandOptions}</datalist>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Asset No. (ถ้ามี)</label>
@@ -5626,8 +7671,10 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทปลั๊กไฟ</label>
-                            <select name="${formCode}_${i}_plug"
-                                class="w-full text-sm border border-gray-300 rounded-md p-2 shadow-sm">${plugOptions}</select>
+                            <input type="text" list="np_plug_list_${formCode}_${i}" name="${formCode}_${i}_plug" id="np_plug_${formCode}_${i}" autocomplete="off"
+                                class="w-full text-sm border border-gray-300 rounded-md p-2 shadow-sm"
+                                placeholder="พิมพ์เพื่อค้นหา หรือระบุประเภทใหม่...">
+                            <datalist id="np_plug_list_${formCode}_${i}">${plugOptions}</datalist>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">สถานะการใช้งาน</label>
@@ -5865,6 +7912,10 @@
                 alert('กรุณากรอกชื่อผู้สำรวจ (Reporter) ก่อนกดยืนยัน');
                 form.reporterName.focus(); return;
             }
+            if (!form.reporterPhone.value.trim()) {
+                alert('กรุณากรอกเบอร์โทรศัพท์ผู้สำรวจ (Phone) ก่อนกดยืนยัน');
+                form.reporterPhone.focus(); return;
+            }
             const branchCodeEl = form.querySelector('[name="branchCode"]');
             const branchNameEl = form.querySelector('[name="branchName"]');
             if (!branchCodeEl || !branchCodeEl.value || !branchNameEl || !branchNameEl.value) {
@@ -5881,19 +7932,30 @@
             form.querySelectorAll('input[type=radio]:checked').forEach(function(el) {
                 if (el.name) fd[el.name] = el.value;
             });
-            // Merge brand other fields
+            // Brand/Plug are searchable datalist inputs now — fd already has the
+            // final typed-or-picked value directly from the generic collection loop above.
+            const npFuzzyChecks = [];
             NP_PRODUCTS_CONFIG.forEach(function(p) {
                 const qtyEl = document.getElementById('np_qty_' + p.code);
                 const qty = parseInt(qtyEl ? qtyEl.value : 0) || 0;
                 fd[p.code + '_qty'] = qty;
+                const brandDefaults = (p.brands || []).filter(function(b) { return b !== 'อื่นๆ'; });
                 for (let u = 1; u <= qty; u++) {
-                    const brandSel = document.getElementById('np_brand_' + p.code + '_' + u);
-                    const brandOther = document.getElementById('np_brand_other_' + p.code + '_' + u);
-                    if (brandSel && brandSel.value === 'อื่นๆ' && brandOther && brandOther.value.trim()) {
-                        fd[p.code + '_' + u + '_brand'] = brandOther.value.trim();
-                    }
+                    const brandKey = p.code + '_' + u + '_brand';
+                    npFuzzyChecks.push({
+                        value: fd[brandKey], groupKey: 'np_brand_' + p.code, fallbackDefaults: brandDefaults,
+                        label: p.label + ' เครื่องที่ ' + u + ' - ยี่ห้อ',
+                        apply: (v => { fd[brandKey] = v; })
+                    });
+                    const plugKey = p.code + '_' + u + '_plug';
+                    npFuzzyChecks.push({
+                        value: fd[plugKey], groupKey: 'np_plug', fallbackDefaults: ['16A 1 เฟส', '20A 1 เฟส', '32A 1 เฟส', '3 เฟส 380V'],
+                        label: p.label + ' เครื่องที่ ' + u + ' - ปลั๊กไฟ',
+                        apply: (v => { fd[plugKey] = v; })
+                    });
                 }
             });
+            _fuzzyCheckAndConfirm(npFuzzyChecks);
             // Broken unit fields - collect from ID checkboxes
             const brokenChecked = form.querySelectorAll('input[name="brokenNpUnit"]:checked');
             fd.brokenUnits = Array.from(brokenChecked).map(function(cb) { return cb.value; }).join(', ');

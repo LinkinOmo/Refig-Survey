@@ -15,6 +15,407 @@ function _acquireWriteLock_(timeoutMs) {
     return lock;
 }
 
+// ─── Enum field options (Brand/Type/Product dropdowns) ────────────────────────
+// AppSheet-style "enum with add new": each group's dropdown options are the
+// hardcoded defaults below UNION whatever distinct values already exist in
+// that column across past submissions. A value typed via a form's "Other"
+// free-text box is saved immediately regardless of this cache's freshness —
+// staleness here only delays how soon OTHER users see it as a pickable option.
+var ENUM_FIELD_GROUPS = {
+    aircon_brand: {
+        sheet: 'Aircon_Survey_Database', pattern: /^Unit \d+ Brand$/,
+        defaults: ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train']
+    },
+    aircon_type: {
+        sheet: 'Aircon_Survey_Database', pattern: /^Unit \d+ Type$/,
+        defaults: ['Wall Type', 'Hanging Type', 'Cassette Type', 'Floor Standing', 'Package Type']
+    },
+    ref_brand: {
+        sheet: 'Ref_Survey_Database', pattern: /Brand_\d+$/,
+        defaults: ['Themedez', 'Systemform', 'Carrier', 'Pattana Inter Cool', 'LG', 'ETSR', 'Panasonic', 'Sanden', 'The Cool', 'Haier', 'VSR']
+    },
+    ref_ice_cream_supplier: {
+        sheet: 'Ref_Survey_Database', pattern: /Supplier_\d+$/,
+        defaults: ["Wall's (Unilever)", 'Nestle', 'Chomthana', 'Magnolia', 'Selecta', 'Dairy Queen', "Swensen's"]
+    },
+    np_brand_SC: {
+        sheet: 'NewProduct_Survey_Database', pattern: /^NP SS Brand_\d+$/,
+        defaults: ['JM Softserve', 'Taylor', 'Carpigiani', 'Stoelting', 'Donper', 'Robot Coupe']
+    },
+    np_brand_JT: {
+        sheet: 'NewProduct_Survey_Database', pattern: /^NP JS Brand_\d+$/,
+        defaults: ['Nuss', 'Donper', 'SPM', 'Java', 'Ugolini']
+    },
+    np_brand_SH: {
+        sheet: 'NewProduct_Survey_Database', pattern: /^NP SL Brand_\d+$/,
+        defaults: ['Ugolini', 'SPM', 'Donper', 'Carpigiani', 'Java']
+    },
+    np_brand_MK: {
+        sheet: 'NewProduct_Survey_Database', pattern: /^NP IM Brand_\d+$/,
+        defaults: ['Hoshizaki', 'Manitowoc', 'Scotsman', 'Ice-O-Matic', 'Follett']
+    },
+    np_brand_WF: {
+        sheet: 'NewProduct_Survey_Database', pattern: /^NP WF Brand_\d+$/,
+        defaults: ['3M', 'Coway', 'Pentair', 'Amway', 'Samsung', 'LG']
+    },
+    np_plug: {
+        sheet: 'NewProduct_Survey_Database', pattern: /^NP \w+ Plug_\d+$/,
+        defaults: ['16A 1 เฟส', '20A 1 เฟส', '32A 1 เฟส', '3 เฟส 380V']
+    }
+};
+
+// Dedupe case-insensitively (free-typed "Other" entries drift in casing over
+// time, e.g. "Eminent"/"EMINENT"/"eminent"). Keyed by lowercased-trimmed value.
+// A default's exact casing always wins for its own key. Among data-only
+// variants, the most frequently-used casing wins (majority vote) — more
+// reliable than "first row wins", since row order is chronological, not
+// meaningful for picking a canonical spelling.
+// Operates on an already-fetched header row + data range (both read ONCE per
+// sheet by the caller — a survey sheet can have dozens of matching columns,
+// so re-reading per column here would mean dozens of separate getRange calls).
+// Returns { canonicalCasing: {lowerKey -> chosen casing}, colIdxs: [0-based column indices into `data` rows],
+//           frequency: {lowerKey -> total submission count, defaults not yet used get 0} }.
+function _computeEnumCanonicalCasing_(group, headers, data) {
+    var canonicalCasing = {};
+    var dataCounts = {};
+    var frequency = {};
+    var colIdxs = [];
+
+    group.defaults.forEach(function(d) { canonicalCasing[d.toLowerCase()] = d; });
+
+    headers.forEach(function(h, i) { if (group.pattern.test(String(h).trim())) colIdxs.push(i); });
+
+    colIdxs.forEach(function(ci) {
+        for (var r = 1; r < data.length; r++) {
+            var v = String(data[r][ci] || '').trim();
+            if (!v) continue;
+            var lower = v.toLowerCase();
+            frequency[lower] = (frequency[lower] || 0) + 1;
+            if (canonicalCasing[lower]) continue; // a default already owns this key
+            if (!dataCounts[lower]) dataCounts[lower] = {};
+            dataCounts[lower][v] = (dataCounts[lower][v] || 0) + 1;
+        }
+    });
+
+    Object.keys(dataCounts).forEach(function(lower) {
+        var casings = dataCounts[lower];
+        var best = null, bestCount = -1;
+        Object.keys(casings).forEach(function(casing) {
+            if (casings[casing] > bestCount) { best = casing; bestCount = casings[casing]; }
+        });
+        canonicalCasing[lower] = best;
+    });
+
+    return { canonicalCasing: canonicalCasing, colIdxs: colIdxs, frequency: frequency };
+}
+
+function getEnumFieldOptions(groupKey) {
+    try {
+        var group = ENUM_FIELD_GROUPS[groupKey];
+        if (!group) return { success: false, error: 'Unknown enum group: ' + groupKey };
+
+        var cache = CacheService.getScriptCache();
+        var cacheKey = 'ENUM_OPTS_V3_' + groupKey; // bumped: V3 sorts by usage frequency (most popular first)
+        var cached = cache.get(cacheKey);
+        if (cached) return { success: true, options: JSON.parse(cached) };
+
+        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(group.sheet);
+        var data = (sheet && sheet.getLastRow() > 1) ? sheet.getDataRange().getValues() : [[]];
+        var headers = data[0] || [];
+        var computed = _computeEnumCanonicalCasing_(group, headers, data);
+        // Most-submitted value first; ties (including unused defaults, all at 0) fall
+        // back to alphabetical so the order is still stable/predictable.
+        var options = Object.keys(computed.canonicalCasing).map(function(k) { return computed.canonicalCasing[k]; })
+            .sort(function(a, b) {
+                var freqA = computed.frequency[a.toLowerCase()] || 0;
+                var freqB = computed.frequency[b.toLowerCase()] || 0;
+                if (freqB !== freqA) return freqB - freqA;
+                return a.localeCompare(b);
+            });
+        cache.put(cacheKey, JSON.stringify(options), 21600); // 6h
+        return { success: true, options: options };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// Classic Levenshtein edit distance (case-insensitive), O(m*n) DP with a
+// rolling 2-row buffer — fine for the short brand/type strings these groups hold.
+function _levenshtein_(a, b) {
+    a = String(a).toLowerCase(); b = String(b).toLowerCase();
+    var m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    var prev = [], curr = [];
+    for (var j = 0; j <= n; j++) prev[j] = j;
+    for (var i = 1; i <= m; i++) {
+        curr[0] = i;
+        for (var j = 1; j <= n; j++) {
+            var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+            curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+        }
+        prev = curr.slice();
+    }
+    return prev[n];
+}
+
+// Union-Find clustering of `values` by edit-distance threshold. Deliberately
+// conservative: short strings need an exact-adjacent distance (<=1) to
+// cluster, since a 2-letter brand like "LG" is only distance 2 away from
+// plenty of unrelated short strings — clustering those would be a real
+// false-positive risk, not a typo. (Even this threshold isn't foolproof —
+// see ENUM_MERGE_EXCLUDE below for real false positives it produced, e.g.
+// "Amway"/"Coway" and "16A"/"20A"/"32A" plug ratings.)
+// Returns clusters with 2+ members, `suggested` = most-frequently-submitted
+// member (a reasonable default guess, NOT necessarily the "correct" spelling
+// — e.g. it picked "Train" over the real brand "Trane" since more people
+// typed the typo than the correct name).
+function _clusterEnumValues_(values, frequency) {
+    var parent = {};
+    values.forEach(function(v) { parent[v] = v; });
+    function find(x) { while (parent[x] !== x) { x = parent[x] = parent[parent[x]]; } return x; }
+    function union(a, b) { var ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
+
+    for (var i = 0; i < values.length; i++) {
+        for (var j = i + 1; j < values.length; j++) {
+            var a = values[i], b = values[j];
+            var minLen = Math.min(a.length, b.length);
+            var maxAllowed = minLen < 5 ? 1 : 2;
+            if (_levenshtein_(a, b) <= maxAllowed) union(a, b);
+        }
+    }
+
+    var clusters = {};
+    values.forEach(function(v) {
+        var root = find(v);
+        if (!clusters[root]) clusters[root] = [];
+        clusters[root].push(v);
+    });
+
+    return Object.keys(clusters)
+        .map(function(root) { return clusters[root]; })
+        .filter(function(members) { return members.length > 1; })
+        .map(function(members) {
+            members.sort(function(a, b) {
+                var fa = frequency[a.toLowerCase()] || 0;
+                var fb = frequency[b.toLowerCase()] || 0;
+                return fb - fa; // most-used first
+            });
+            return {
+                suggested: members[0],
+                members: members.map(function(m) { return { value: m, frequency: frequency[m.toLowerCase()] || 0 }; })
+            };
+        });
+}
+
+// ── Misspelling-cluster detection (read-only — does NOT write anything). ──
+// Groups the CURRENT (already casing-deduped) option list per enum group into
+// likely-same-value clusters by edit distance, e.g. "Miragf"/"Mirage" or
+// "Central Air"/"Centralair" (a space deletion is just one edit).
+// This never writes to a sheet — it's for review before calling
+// applyEnumSpellingMerges() with an explicit, human-approved merge list.
+function findEnumSpellingClusters() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var report = { groups: [] };
+
+    Object.keys(ENUM_FIELD_GROUPS).forEach(function(groupKey) {
+        var group = ENUM_FIELD_GROUPS[groupKey];
+        var sheet = ss.getSheetByName(group.sheet);
+        var data = (sheet && sheet.getLastRow() > 1) ? sheet.getDataRange().getValues() : [[]];
+        var headers = data[0] || [];
+        var computed = _computeEnumCanonicalCasing_(group, headers, data);
+        var values = Object.keys(computed.canonicalCasing).map(function(k) { return computed.canonicalCasing[k]; });
+        var groupClusters = _clusterEnumValues_(values, computed.frequency);
+
+        if (groupClusters.length > 0) {
+            report.groups.push({ groupKey: groupKey, sheet: group.sheet, clusters: groupClusters });
+        }
+    });
+
+    return report;
+}
+
+// ── Human-reviewed exclusion list — clusters confirmed via findEnumSpellingClusters ──
+// that must NOT be merged, keyed by groupKey -> array of `suggested` values to skip.
+// Reviewed 2026-08-18: "Amway"/"Coway" are different real water-filter brands;
+// "16A/20A/32A เฟส" are different real plug ratings, not spelling variants;
+// "Train"/"Sanden"/"FLAMNGO" clusters have an ambiguous "correct" spelling
+// (majority-vote frequency picked what looks like the wrong one, or a second
+// real brand might be involved — needs a human call, not an algorithm); the
+// "-"/"Q.C.PASSED"/"ไม่มีระบุ"/"ไม่ระบุยี่ห้อ" clusters are non-brand
+// placeholder/junk text, not typos of each other.
+var ENUM_MERGE_EXCLUDE = {
+    ref_brand: ['Train', 'Sanden', 'FLAMNGO', '-', 'Q.C.PASSED', 'ไม่มีระบุ', 'ไม่ระบุยี่ห้อ'],
+    np_brand_WF: ['Amway'],
+    np_plug: ['16A 1 เฟส']
+};
+
+// ── Apply the human-approved subset of spelling clusters (skips anything in ──
+// ── ENUM_MERGE_EXCLUDE). dryRun=true (default) only reports; dryRun=false   ──
+// writes. Same one-read/one-write-per-sheet batching as cleanupEnumFieldData.
+function applyEnumSpellingMerges(dryRun) {
+    dryRun = dryRun !== false;
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    var bySheet = {};
+    Object.keys(ENUM_FIELD_GROUPS).forEach(function(groupKey) {
+        var group = ENUM_FIELD_GROUPS[groupKey];
+        if (!bySheet[group.sheet]) bySheet[group.sheet] = [];
+        bySheet[group.sheet].push({ groupKey: groupKey, group: group });
+    });
+
+    var report = { dryRun: dryRun, groups: [] };
+
+    Object.keys(bySheet).forEach(function(sheetName) {
+        var sheet = ss.getSheetByName(sheetName);
+        var groupsForSheet = bySheet[sheetName];
+
+        if (!sheet || sheet.getLastRow() < 2) {
+            groupsForSheet.forEach(function(g) {
+                report.groups.push({ groupKey: g.groupKey, sheet: sheetName, cellsChanged: 0, merges: [] });
+            });
+            return;
+        }
+
+        var data = sheet.getDataRange().getValues();
+        var headers = data[0];
+        var modifiedCols = {};
+
+        groupsForSheet.forEach(function(g) {
+            var computed = _computeEnumCanonicalCasing_(g.group, headers, data);
+            var values = Object.keys(computed.canonicalCasing).map(function(k) { return computed.canonicalCasing[k]; });
+            var clusters = _clusterEnumValues_(values, computed.frequency);
+            var excludeList = ENUM_MERGE_EXCLUDE[g.groupKey] || [];
+
+            var valueToCanonical = {};
+            var merges = [];
+            clusters.forEach(function(c) {
+                if (excludeList.indexOf(c.suggested) !== -1) return; // human-reviewed skip
+                var others = c.members.filter(function(m) { return m.value !== c.suggested; });
+                if (others.length === 0) return;
+                others.forEach(function(m) { valueToCanonical[m.value] = c.suggested; });
+                merges.push(c.suggested + ' <= ' + others.map(function(m) { return m.value; }).join(', '));
+            });
+
+            var cellsChanged = 0;
+            computed.colIdxs.forEach(function(ci) {
+                for (var r = 1; r < data.length; r++) {
+                    var v = String(data[r][ci] || '').trim();
+                    if (!v) continue;
+                    var canonical = valueToCanonical[v];
+                    if (canonical && canonical !== v) {
+                        cellsChanged++;
+                        if (!dryRun) { data[r][ci] = canonical; modifiedCols[ci] = true; }
+                    }
+                }
+            });
+
+            report.groups.push({ groupKey: g.groupKey, sheet: sheetName, cellsChanged: cellsChanged, merges: merges });
+        });
+
+        if (!dryRun) {
+            var nRows = data.length - 1;
+            Object.keys(modifiedCols).forEach(function(ciStr) {
+                var ci = parseInt(ciStr, 10);
+                var colVals = [];
+                for (var r = 1; r < data.length; r++) colVals.push([data[r][ci]]);
+                sheet.getRange(2, ci + 1, nRows, 1).setValues(colVals);
+            });
+        }
+    });
+
+    if (!dryRun) {
+        var cache = CacheService.getScriptCache();
+        cache.removeAll(Object.keys(ENUM_FIELD_GROUPS).map(function(k) { return 'ENUM_OPTS_V3_' + k; }));
+    }
+
+    return report;
+}
+
+// ── One-off historical-data cleanup: rewrite existing sheet cells to match ──
+// ── the canonical casing above. dryRun=true (default) only reports what   ──
+// ── would change; call with dryRun=false to actually write.               ──
+// Temp diagnostic access via ?page=enum-cleanup-dryrun / ?page=enum-cleanup-run
+// (Code01.gs) — remove both routes once the cleanup is confirmed done, per
+// this project's established temp-diagnostic-route convention.
+// Processes one sheet read + (if writing) one write per modified column,
+// shared across every group that points at that sheet — e.g. all 6 NP groups
+// (5 brand pools + plug) hit NewProduct_Survey_Database exactly once, not once
+// per group, since that sheet alone can have 100+ matching columns.
+function cleanupEnumFieldData(dryRun) {
+    dryRun = dryRun !== false; // default true — safest
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    var bySheet = {};
+    Object.keys(ENUM_FIELD_GROUPS).forEach(function(groupKey) {
+        var group = ENUM_FIELD_GROUPS[groupKey];
+        if (!bySheet[group.sheet]) bySheet[group.sheet] = [];
+        bySheet[group.sheet].push({ groupKey: groupKey, group: group });
+    });
+
+    var report = { dryRun: dryRun, groups: [] };
+
+    Object.keys(bySheet).forEach(function(sheetName) {
+        var sheet = ss.getSheetByName(sheetName);
+        var groupsForSheet = bySheet[sheetName];
+
+        if (!sheet || sheet.getLastRow() < 2) {
+            groupsForSheet.forEach(function(g) {
+                report.groups.push({ groupKey: g.groupKey, sheet: sheetName, cellsScanned: 0, cellsChanged: 0, samples: [] });
+            });
+            return;
+        }
+
+        var data = sheet.getDataRange().getValues(); // ONE read for the whole sheet
+        var headers = data[0];
+        var modifiedCols = {}; // 0-based colIdx -> true
+
+        groupsForSheet.forEach(function(g) {
+            var computed = _computeEnumCanonicalCasing_(g.group, headers, data);
+            var canonicalCasing = computed.canonicalCasing;
+            var cellsScanned = 0, cellsChanged = 0, samples = [];
+
+            computed.colIdxs.forEach(function(ci) {
+                for (var r = 1; r < data.length; r++) {
+                    var v = String(data[r][ci] || '').trim();
+                    if (!v) continue;
+                    cellsScanned++;
+                    var canonical = canonicalCasing[v.toLowerCase()];
+                    // Compare against the stringified/trimmed form (v), not the raw cell —
+                    // a cell like the number 3 stringifies to "3" and must count as already
+                    // canonical, not perpetually "changed" against the string "3".
+                    if (canonical && canonical !== v) {
+                        if (samples.length < 25) samples.push({ row: r + 1, col: ci + 1, old: data[r][ci], new: canonical });
+                        cellsChanged++;
+                        if (!dryRun) { data[r][ci] = canonical; modifiedCols[ci] = true; }
+                    }
+                }
+            });
+
+            report.groups.push({ groupKey: g.groupKey, sheet: sheetName, cellsScanned: cellsScanned, cellsChanged: cellsChanged, samples: samples });
+        });
+
+        if (!dryRun) {
+            var nRows = data.length - 1;
+            Object.keys(modifiedCols).forEach(function(ciStr) {
+                var ci = parseInt(ciStr, 10);
+                var colVals = [];
+                for (var r = 1; r < data.length; r++) colVals.push([data[r][ci]]);
+                sheet.getRange(2, ci + 1, nRows, 1).setValues(colVals);
+            });
+        }
+    });
+
+    if (!dryRun) {
+        // Invalidate the enum options cache for every group so the dropdown
+        // immediately reflects the now-consistent data instead of a 6h-stale list.
+        var cache = CacheService.getScriptCache();
+        cache.removeAll(Object.keys(ENUM_FIELD_GROUPS).map(function(k) { return 'ENUM_OPTS_V2_' + k; }));
+    }
+
+    return report;
+}
+
 // Helper Functions (needed by getAllSurveysReport)
 function findEmployeeSheet() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -74,7 +475,7 @@ function checkSurveyAdminStatus(clientEmail) {
         var _uv = _uc.get(_uk);
         if (_uv) {
             var _uf = JSON.parse(_uv);
-            return { isAdmin: _uf.isAdmin, isSMF: _uf.isSMF, isScheduleAdmin: _uf.isScheduleAdmin, email: email };
+            return { isAdmin: _uf.isAdmin, isSMF: _uf.isSMF, isScheduleAdmin: _uf.isScheduleAdmin, smfEditAllowed: _uf.isSMF && _smfSurveyEditToggleOn_(), email: email };
         }
     } catch(_uce) {}
     // ─────────────────────────────────────────────────────────────────────
@@ -99,7 +500,7 @@ function checkSurveyAdminStatus(clientEmail) {
                 var userType = data[i][userTypeIdx];
                 if (userType) {
                     var role = userType.toString().trim().toLowerCase();
-                    if (role === 'admin') {
+                    if (role === 'admin' || role === 'super admin' || role === 'superadmin') {
                         isAdmin = true;
                     } else if (role === 'survey_admin' || role === 'schedule_admin' ||
                                role === 'surveyadmin'  || role === 'scheduleadmin') {
@@ -132,7 +533,19 @@ function checkSurveyAdminStatus(clientEmail) {
         _uc2.put(_uk2, JSON.stringify({ isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin }), 120);
     } catch(_uce2) {}
 
-    return { isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, email: email };
+    return { isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, smfEditAllowed: isSMF && _smfSurveyEditToggleOn_(), email: email };
+}
+
+// Independent of SMF_ADMIN_ENABLED (which elevates SMF to full Admin everywhere).
+// This narrower toggle controls only whether SMF team members can edit survey data
+// (Ref/EDMI report fields + photo reupload) — see setSmfSurveyEditSetting() in
+// UploadSchedule.gs. Defaults to true so existing SMF edit access (previously
+// hardcoded on) is preserved until a Super Admin explicitly turns it off.
+function _smfSurveyEditToggleOn_() {
+    try {
+        var v = PropertiesService.getScriptProperties().getProperty('SMF_SURVEY_EDIT_ENABLED_V1');
+        return v === null ? true : v === 'true';
+    } catch (e) { return true; }
 }
 
 // Called by the frontend after page load to get the real flags for the logged-in user.
@@ -575,7 +988,7 @@ function processSurveyForm(form) {
             Logger.log("Quantities: " + JSON.stringify(quantities));
 
             // Send Email
-            MailApp.sendEmail({
+            sendAppEmail_({
                 to: toEmail,
                 cc: ccString,
                 subject: "Site Visit Report - " + form.station + " (" + form.visitDate + ")",
@@ -630,6 +1043,7 @@ function processAirConSurveyForm(form) {
             "ID": id,
             "Reporter Email": form.reporterEmail || "",
             "Reporter Name": form.reporterName || "",
+            "Reporter Phone": form.reporterPhone || "",
             "Branch Code": form.branchCode || "",
             "Branch Name": form.branchName || "",
             "AC Quantity": form.acQuantity || "",
@@ -879,9 +1293,9 @@ function processAirConSurveyForm(form) {
         };
 
         // Dynamically capture measuring-tool fields (ControllerTemp, SupplyTemp, ReturnTemp, Amps)
-        // These are only submitted by SMF/MMS team members
+        // and the per-unit condition rating (CondRating, 0-5)
         for (var mi = 1; mi <= 20; mi++) {
-            ['ControllerTemp', 'SupplyTemp', 'ReturnTemp', 'Amps'].forEach(function(field) {
+            ['ControllerTemp', 'SupplyTemp', 'ReturnTemp', 'Amps', 'CondRating'].forEach(function(field) {
                 var formKey = 'AcUnit' + mi + '_' + field;
                 if (form[formKey] !== undefined && form[formKey] !== '') {
                     var sheetKey = 'Unit ' + mi + ' ' + field.replace(/([A-Z])/g, ' $1').trim();
@@ -894,6 +1308,7 @@ function processAirConSurveyForm(form) {
             "DM Area": form.dmArea || "",
             "CM Area": form.cmArea || "",
             "AMM MTN": form.ammMtn || "",
+            "Survey Round": form.surveyRound || "",
             "Comments": form.comments || "",
             "Status": form.isDraft ? "Draft" : "Pending",
             "Attachments_JSON": JSON.stringify(attachmentLinks)
@@ -973,7 +1388,7 @@ function processAirConSurveyForm(form) {
                 return html;
             }
 
-            var acTypeCodes = { 'Wall Type':'WT', 'Cassette Type':'CT', 'Floor Standing':'FS', 'Package Type':'PT' };
+            var acTypeCodes = { 'Wall Type':'WT', 'Hanging Type':'HT', 'Cassette Type':'CT', 'Floor Standing':'FS', 'Package Type':'PT' };
             var brokenList = form.brokenUnits ? form.brokenUnits.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
             var qty = parseInt(form.acQuantity) || 0;
 
@@ -1018,7 +1433,7 @@ function processAirConSurveyForm(form) {
                     // Combine inventory photo + symptom photo
                     var unitPhotos = [].concat(attachmentLinks['ac_inv_' + ui] || [], attachmentLinks['ac_unit_' + ui] || []);
 
-                    var typeNames = { 'Wall Type':'แอร์ติดผนัง','Cassette Type':'แอร์แขวน/ฝังฝ้า','Floor Standing':'แอร์ตั้งพื้น','Package Type':'แอร์ตู้ตั้งพื้น' };
+                    var typeNames = { 'Wall Type':'แอร์ติดผนัง','Hanging Type':'แอร์แขวน','Cassette Type':'แอร์ฝังฝ้า','Floor Standing':'แอร์ตั้งพื้น','Package Type':'แอร์ตู้ตั้งพื้น' };
                     var typeName  = typeNames[uType] || uType || '—';
 
                     htmlBody += '<div style="border:1px solid ' + cardBorder + ';border-radius:8px;overflow:hidden;margin-bottom:12px;">';
@@ -1121,7 +1536,7 @@ function processAirConSurveyForm(form) {
 
             Logger.log("Sending AirCon email to: " + toEmail + ", cc: " + ccString);
 
-            MailApp.sendEmail({
+            sendAppEmail_({
                 to: toEmail,
                 cc: ccString,
                 subject: "Air Conditioner Survey - " + form.branchName + " (" + form.branchCode + ")",
@@ -1194,8 +1609,15 @@ function findNameById(empId) {
 
 function getAllSurveysReport() {
     try {
+        // Cache 60s — full scan of Site_Visit_Database + Employee_Database on every
+        // call, fired on every SurveyReport.html load/refresh and after every
+        // update/delete. Short TTL keeps this safe without chasing every write site.
+        var _asrCache = CacheService.getScriptCache();
+        var _asrHit = _asrCache.get('ALL_SURVEYS_REPORT_V1');
+        if (_asrHit) return _asrHit;
+
         Logger.log("getAllSurveysReport called");
-        
+
         var userEmail = Session.getActiveUser().getEmail();
         Logger.log("User email: " + userEmail);
         
@@ -1381,7 +1803,9 @@ function getAllSurveysReport() {
         
         Logger.log("Returning JSON string with " + result.orders.length + " orders");
         // Return as JSON string to avoid google.script.run serialization issues
-        return JSON.stringify(result);
+        var _asrJson = JSON.stringify(result);
+        try { _asrCache.put('ALL_SURVEYS_REPORT_V1', _asrJson, 60); } catch (e) {}
+        return _asrJson;
 
     } catch (e) {
         Logger.log("FATAL ERROR in getAllSurveysReport: " + e.toString());
@@ -1530,6 +1954,7 @@ function getAirConSurveysReport() {
             obj.dm      = (getVal("DM Area")  || '').trim();
             obj.cluster = (getVal("CM Area")  || '').trim();
             obj.ammMtn  = (getVal("AMM MTN")  || '').trim();
+            obj.round   = (getVal("Survey Round") || '').trim();
             results.push(obj);
         }
         
@@ -1635,7 +2060,7 @@ function getAirconSurveyListSlim() {
         headers.forEach(function(hdr, i) { h[String(hdr).trim()] = i; });
 
         // Read only up to the furthest needed column (excludes Attachments_JSON and unit detail cols)
-        var NEED = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Broken Units','DM Area','CM Area','AMM MTN'];
+        var NEED = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Broken Units','DM Area','CM Area','AMM MTN','Survey Round'];
         var maxIdx = -1;
         NEED.forEach(function(k) { if (h[k] !== undefined && h[k] > maxIdx) maxIdx = h[k]; });
         if (maxIdx < 0) return { success: true, data: [], isAdmin: false, isSMF: false, isScheduleAdmin: false };
@@ -1657,6 +2082,7 @@ function getAirconSurveyListSlim() {
                 dm:          String(gv('DM Area')       || '').trim(),
                 cluster:     String(gv('CM Area')       || '').trim(),
                 ammMtn:      String(gv('AMM MTN')       || '').trim(),
+                round:       String(gv('Survey Round')  || '').trim(),
                 recorderName: String(gv('Reporter Name') || gv('Reporter Email') || ''),
                 status:      String(gv('Status')        || 'Pending'),
                 brokenUnits: String(gv('Broken Units')  || '')
@@ -1713,10 +2139,19 @@ function getAirconSurveyRecordById(id) {
             var gv = function(k) { return h[k] !== undefined ? row[h[k]] : ''; };
             var ts = gv('Timestamp');
             if (ts instanceof Date) ts = ts.toISOString();
+            var acQty = parseInt(gv('AC Quantity')) || 0;
             var units = [];
             for (var u = 1; u <= 20; u++) {
                 var uBrand = gv('Unit ' + u + ' Brand'), uType = gv('Unit ' + u + ' Type'), uAsset = gv('Unit ' + u + ' Asset No');
-                if (!uBrand && !uType && !uAsset) continue;
+                var uNote = gv('Unit ' + u + ' Note');
+                var uCtrlTemp = gv('Unit ' + u + ' Controller Temp'), uSupplyTemp = gv('Unit ' + u + ' Supply Temp'),
+                    uReturnTemp = gv('Unit ' + u + ' Return Temp'), uAmps = gv('Unit ' + u + ' Amps'), uCondRating = gv('Unit ' + u + ' Cond Rating');
+                // Include the unit if it's within the declared AC Quantity, OR if any field
+                // (brand/type/asset/note/temps/amps/rating) has data — a unit must never be
+                // dropped just because Brand/Type/Asset No happen to be blank, otherwise the
+                // edit form re-renders it empty and saving wipes out its real data.
+                var hasAnyData = uBrand || uType || uAsset || uNote || uCtrlTemp !== '' || uSupplyTemp !== '' || uReturnTemp !== '' || uAmps !== '' || uCondRating !== '';
+                if (u > acQty && !hasAnyData) continue;
                 units.push({ num: u, brand: uBrand, type: uType, assetNo: uAsset,
                     unitStatus: gv('Unit ' + u + ' Status') || 'ใช้งาน',
                     filter:    gv('Filter Cleanliness ' + u),
@@ -1724,7 +2159,12 @@ function getAirconSurveyRecordById(id) {
                     drainage:  gv('Drainage Leakage ' + u),
                     noise:     gv('Operational Noise ' + u),
                     condition: gv('Equipment Condition ' + u),
-                    note:      gv('Unit ' + u + ' Note')
+                    note:      uNote,
+                    controllerTemp: uCtrlTemp,
+                    supplyTemp:     uSupplyTemp,
+                    returnTemp:     uReturnTemp,
+                    amps:           uAmps,
+                    condRating:     uCondRating
                 });
             }
             var att = {};
@@ -1734,11 +2174,13 @@ function getAirconSurveyRecordById(id) {
             var dm      = String(gv('DM Area')  || '').trim();
             var cluster = String(gv('CM Area')  || '').trim();
             var ammMtn  = String(gv('AMM MTN')  || '').trim();
+            var round   = String(gv('Survey Round') || '').trim();
             var brokenUnits = String(gv('Broken Units') || '');
             return { success: true, data: {
                 id: String(id), timestamp: ts, station: station,
-                dm: dm, cluster: cluster, ammMtn: ammMtn,
+                dm: dm, cluster: cluster, ammMtn: ammMtn, round: round,
                 recorderName: String(gv('Reporter Name') || gv('Reporter Email') || ''),
+                recorderPhone: String(gv('Reporter Phone') || ''),
                 status: String(gv('Status') || 'Pending'),
                 brokenUnits: brokenUnits,
                 fullData: {
@@ -1764,9 +2206,9 @@ function updateSurvey(form) {
     // Updating Status for either Survey or Aircon and maybe follow-up fields
     try {
         var _wlock = _acquireWriteLock_();
-        // Permission check: only admins and SMF team members can update status
+        // Permission check: only admins and SMF team members (with the edit toggle on) can update status
         var authCheck = checkSurveyAdminStatus(form.clientEmail || Session.getActiveUser().getEmail());
-        if (!authCheck.isAdmin && !authCheck.isSMF) {
+        if (!authCheck.isAdmin && !authCheck.smfEditAllowed) {
             return { success: false, error: "Permission denied. Admin or SMF team required." };
         }
         var actionUser = authCheck.email || Session.getActiveUser().getEmail();
@@ -2111,7 +2553,7 @@ function resendSurveyEmail(reportId) {
                 var subject = "[Site Visit Report - RESEND] " + reportForm.station + " - " + reportForm.visitDate;
                 var htmlBody = generateEmailBody(reportForm, attachmentLinks, quantities);
                 
-                MailApp.sendEmail({
+                sendAppEmail_({
                     to: recipients.join(","),
                     subject: subject,
                     htmlBody: htmlBody
@@ -2429,6 +2871,11 @@ function getTeamWorkloadStats(clientEmail, startDate, endDate) {
  */
 function getSurveyConfig() {
     try {
+        // Cache 30 min — Survey_Config sheet is edited manually and rarely changes
+        var _cc = CacheService.getScriptCache();
+        var _ccHit = _cc.get('SURVEY_CONFIG_V1');
+        if (_ccHit) return JSON.parse(_ccHit);
+
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         var sheet = ss.getSheetByName("Survey_Config");
         
@@ -2484,9 +2931,10 @@ function getSurveyConfig() {
                 return a.sortOrder - b.sortOrder;
             });
         }
-        
+
+        try { _cc.put('SURVEY_CONFIG_V1', JSON.stringify(config), 1800); } catch (e) {}
         return config;
-        
+
     } catch (e) {
         Logger.log("getSurveyConfig error: " + e.toString());
         return {};
@@ -2499,6 +2947,11 @@ function getSurveyConfig() {
  */
 function getSurveyObjectives() {
     try {
+        // Cache 30 min — Survey_Objectives sheet is edited manually and rarely changes
+        var _oc = CacheService.getScriptCache();
+        var _ocHit = _oc.get('SURVEY_OBJECTIVES_V1');
+        if (_ocHit) return JSON.parse(_ocHit);
+
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         var sheet = ss.getSheetByName("Survey_Objectives");
         
@@ -2542,9 +2995,10 @@ function getSurveyObjectives() {
         objectives.sort(function(a, b) {
             return a.sortOrder - b.sortOrder;
         });
-        
+
+        try { _oc.put('SURVEY_OBJECTIVES_V1', JSON.stringify(objectives), 1800); } catch (e) {}
         return objectives;
-        
+
     } catch (e) {
         Logger.log("getSurveyObjectives error: " + e.toString());
         return [];
@@ -2685,6 +3139,7 @@ function processRefSurveyForm(form) {
             "ID":                  id,
             "Reporter Email":      form.reporterEmail || "",
             "Reporter Name":       form.reporterName || "",
+            "Reporter Phone":      form.reporterPhone || "",
             "Branch Code":         form.branchCode || "",
             "Branch Name":         form.branchName || "",
             // ชำรุด (new per-unit format)
@@ -2695,6 +3150,7 @@ function processRefSurveyForm(form) {
             "DM Area":             form.dmArea || "",
             "CM Area":             form.cmArea || "",
             "AMM MTN":             form.ammMtn || "",
+            "Survey Round":        form.surveyRound || "",
             "Status":              form.isDraft ? "Draft" : "Pending",
             "Attachments_JSON":    JSON.stringify(attachmentLinks)
         };
@@ -2924,7 +3380,7 @@ function processRefSurveyForm(form) {
 
             htmlBody += '</div></div></body></html>';
 
-            MailApp.sendEmail({
+            sendAppEmail_({
                 to: toEmail,
                 cc: ccEmails.join(","),
                 subject: "[Ref Survey] " + form.branchCode + " - " + form.branchName,
@@ -2971,7 +3427,7 @@ function debugRefSlim() {
         var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
         Logger.log('headers read: ' + (Date.now()-t0) + 'ms | colCount=' + headers.length);
 
-        var LIST_KEYS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Has Broken Ref','Broken Units','DM Area','CM Area','AMM MTN'];
+        var LIST_KEYS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Has Broken Ref','Broken Units','DM Area','CM Area','AMM MTN','Survey Round'];
         var keyIdx = {};
         LIST_KEYS.forEach(function(k){ keyIdx[k] = headers.indexOf(k); });
         Logger.log('keyIdx: ' + JSON.stringify(keyIdx));
@@ -3026,7 +3482,7 @@ function getRefSurveyListSlim() {
         var lastRow  = sheet.getLastRow();
         var headers  = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 
-        var LIST_KEYS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Has Broken Ref','Broken Units','DM Area','CM Area','AMM MTN'];
+        var LIST_KEYS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Has Broken Ref','Broken Units','DM Area','CM Area','AMM MTN','Survey Round'];
         var keyIdx = {};
         LIST_KEYS.forEach(function(k) { keyIdx[k] = headers.indexOf(k); });
 
@@ -3106,6 +3562,12 @@ function getRefSurveyRecordById(id) {
 
 function getRefSurveyReport() {
     try {
+        // Cache 60s — full Ref_Survey_Database scan on every call (used by
+        // ai-prediction.html analytics, which tends to get re-run repeatedly).
+        var _rsrCache = CacheService.getScriptCache();
+        var _rsrHit = _rsrCache.get('REF_SURVEY_REPORT_V1');
+        if (_rsrHit) return JSON.parse(_rsrHit);
+
         var userEmail = Session.getActiveUser().getEmail();
         var authStatus = checkSurveyAdminStatus(userEmail);
 
@@ -3147,7 +3609,9 @@ function getRefSurveyReport() {
 
         // Return latest first
         results.reverse();
-        return { success: true, data: results, isAdmin: authStatus.isAdmin, isSMF: authStatus.isSMF, isScheduleAdmin: authStatus.isScheduleAdmin || false };
+        var _rsrResult = { success: true, data: results, isAdmin: authStatus.isAdmin, isSMF: authStatus.isSMF, isScheduleAdmin: authStatus.isScheduleAdmin || false };
+        try { _rsrCache.put('REF_SURVEY_REPORT_V1', JSON.stringify(_rsrResult), 60); } catch (e) { Logger.log('Ref survey report cache put skipped: ' + e); }
+        return _rsrResult;
 
     } catch (e) {
         return { success: false, error: e.toString() };
@@ -3407,7 +3871,7 @@ function updateRefSurveyRecord(form) {
         // Prefer clientEmail from browser — Session.getActiveUser() returns empty in web app context
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin) return { success: false, error: "Administrator privileges required." };
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) return { success: false, error: "Administrator privileges required." };
 
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found" };
@@ -3551,7 +4015,7 @@ function _logAcBrokenHistory(rowData, headers, brokenUnitsStr, closedBy, closedA
         var reporter   = getField('Reporter Name') || getField('Reporter Email');
 
         var acTypeCodes = {
-            'Wall Type': 'WT', 'Cassette Type': 'CT',
+            'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT',
             'Floor Standing': 'FS', 'Package Type': 'PT'
         };
 
@@ -3636,7 +4100,7 @@ function updateAcSurveyRecord(form) {
         // Prefer clientEmail from browser — Session.getActiveUser() returns empty in web app context
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin) return { success: false, error: "Administrator privileges required." };
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) return { success: false, error: "Administrator privileges required." };
 
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found" };
@@ -3778,8 +4242,12 @@ function saveAcUnitControllerTemp(form) {
 // files: [{ name, mimeType, data (base64) }, ...]
 // unitKey: attachment key to append into, e.g. "ref_open_1"
 // ─────────────────────────────────────────────────────────────────────────────
-function addRefSurveyPhotos(id, unitKey, files) {
+function addRefSurveyPhotos(id, unitKey, files, clientEmail) {
     try {
+        var adminCheck = checkSurveyAdminStatus(clientEmail);
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+            return { success: false, error: "Administrator privileges required." };
+        }
         var folderName = "Survey_Photos_Added";
         var folder;
         var folders = DriveApp.getFoldersByName(folderName);
@@ -3834,8 +4302,12 @@ function addRefSurveyPhotos(id, unitKey, files) {
 // Add extra photos to an existing Aircon Survey record (admin only)
 // unitKey: attachment key to append into, e.g. "ac_inv_1"
 // ─────────────────────────────────────────────────────────────────────────────
-function addAcSurveyPhotos(id, unitKey, files) {
+function addAcSurveyPhotos(id, unitKey, files, clientEmail) {
     try {
+        var adminCheck = checkSurveyAdminStatus(clientEmail);
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+            return { success: false, error: "Administrator privileges required." };
+        }
         var folderName = "Survey_Photos_Added";
         var folder;
         var folders = DriveApp.getFoldersByName(folderName);
@@ -3890,9 +4362,13 @@ function addAcSurveyPhotos(id, unitKey, files) {
 // Delete a single photo from an existing Ref Survey record
 // unitKey: e.g. "ref_open_1", url: the thumbnail URL to remove
 // ─────────────────────────────────────────────────────────────────────────────
-function deleteRefSurveyPhoto(id, unitKey, url) {
+function deleteRefSurveyPhoto(id, unitKey, url, clientEmail) {
     try {
         var _wlock = _acquireWriteLock_();
+        var adminCheck = checkSurveyAdminStatus(clientEmail);
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+            return { success: false, error: "Administrator privileges required." };
+        }
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found." };
         var data = sheet.getDataRange().getValues();
@@ -3924,9 +4400,13 @@ function deleteRefSurveyPhoto(id, unitKey, url) {
 // Delete a single photo from an existing Aircon Survey record
 // unitKey: e.g. "ac_inv_1", url: the thumbnail URL to remove
 // ─────────────────────────────────────────────────────────────────────────────
-function deleteAcSurveyPhoto(id, unitKey, url) {
+function deleteAcSurveyPhoto(id, unitKey, url, clientEmail) {
     try {
         var _wlock = _acquireWriteLock_();
+        var adminCheck = checkSurveyAdminStatus(clientEmail);
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+            return { success: false, error: "Administrator privileges required." };
+        }
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found." };
         var data = sheet.getDataRange().getValues();
@@ -4206,6 +4686,92 @@ function getCombinedSurveyMonthlyTrend() {
     }
 }
 
+// ─── Broken Unit Summary by Category (SMF Dashboard) ─────────────────────────
+// Aggregates "broken unit" requests (Has Broken AC/Ref/NP = "Yes") across the
+// three survey databases, grouped by category, status and area.
+function getBrokenUnitSummary(clientEmail) {
+    try {
+        var auth = checkSurveyAdminStatus(clientEmail);
+        if (!auth.isAdmin && !auth.isSMF) {
+            return { success: false, error: "Permission denied. SMF team or Admin only." };
+        }
+
+        var _sc = CacheService.getScriptCache();
+        var _cached = _sc.get('BROKEN_SUMMARY_V1');
+        if (_cached) {
+            var _r = JSON.parse(_cached);
+            _r.isAdmin = auth.isAdmin;
+            _r.isSMF = auth.isSMF;
+            return _r;
+        }
+
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var CATEGORY_DEFS = [
+            { key: 'ac',  label: 'เครื่องปรับอากาศ (Air Conditioner)',  sheet: 'Aircon_Survey_Database',     brokenFlagCol: 'Has Broken AC'  },
+            { key: 'ref', label: 'ตู้แช่ / ตู้เย็น (Refrigerator)',        sheet: 'Ref_Survey_Database',        brokenFlagCol: 'Has Broken Ref' },
+            { key: 'np',  label: 'New Product Line',                     sheet: 'NewProduct_Survey_Database', brokenFlagCol: 'Has Broken NP'  }
+        ];
+
+        var categories = CATEGORY_DEFS.map(function(def) {
+            var cat = { key: def.key, label: def.label, requestCount: 0, unitCount: 0, byStatus: {}, byArea: {} };
+
+            var sheet = ss.getSheetByName(def.sheet);
+            if (!sheet || sheet.getLastRow() < 2) return cat;
+
+            var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+            var idx = {};
+            ['Status', def.brokenFlagCol, 'Broken Units', 'DM Area', 'CM Area'].forEach(function(k) {
+                idx[k] = headers.indexOf(k);
+            });
+            if (idx[def.brokenFlagCol] < 0) return cat;
+
+            var maxNeeded = Math.max(idx['Status'], idx[def.brokenFlagCol], idx['Broken Units'], idx['DM Area'], idx['CM Area']) + 1;
+            var nRows = sheet.getLastRow() - 1;
+            var data = sheet.getRange(2, 1, nRows, maxNeeded).getValues();
+
+            for (var i = 0; i < data.length; i++) {
+                var row = data[i];
+                var flag = idx[def.brokenFlagCol] > -1 ? String(row[idx[def.brokenFlagCol]] || '').trim() : '';
+                if (flag !== 'Yes') continue;
+
+                var status = idx['Status'] > -1 ? (String(row[idx['Status']] || '').trim() || 'Unknown') : 'Unknown';
+                if (status === 'Draft') continue;
+
+                var area = idx['DM Area'] > -1 ? String(row[idx['DM Area']] || '').trim() : '';
+                if (!area && idx['CM Area'] > -1) area = String(row[idx['CM Area']] || '').trim();
+                if (!area) area = 'ไม่ระบุพื้นที่';
+
+                var unitsRaw = idx['Broken Units'] > -1 ? String(row[idx['Broken Units']] || '') : '';
+                var unitList = unitsRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+
+                cat.requestCount++;
+                cat.unitCount += unitList.length;
+                cat.byStatus[status] = (cat.byStatus[status] || 0) + 1;
+                cat.byArea[area] = (cat.byArea[area] || 0) + 1;
+            }
+
+            return cat;
+        });
+
+        var totals = categories.reduce(function(acc, c) {
+            acc.requestCount += c.requestCount;
+            acc.unitCount += c.unitCount;
+            return acc;
+        }, { requestCount: 0, unitCount: 0 });
+
+        var result = { success: true, categories: categories, totals: totals, generatedAt: new Date().toISOString() };
+        try { _sc.put('BROKEN_SUMMARY_V1', JSON.stringify(result), 600); } catch (_ce) {}
+
+        result.isAdmin = auth.isAdmin;
+        result.isSMF = auth.isSMF;
+        return result;
+
+    } catch (e) {
+        Logger.log('getBrokenUnitSummary Error: ' + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
 // =============================================================================
 //  NEW PRODUCT Survey Functions
 //  Sheet: NewProduct_Survey_Database
@@ -4392,7 +4958,7 @@ function updateNpSurveyRecord(form) {
         var _wlock = _acquireWriteLock_();
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin) return { success: false, error: 'Administrator privileges required.' };
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) return { success: false, error: 'Administrator privileges required.' };
 
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
         if (!sheet) return { success: false, error: 'Sheet not found' };
@@ -4458,8 +5024,12 @@ function updateNpSurveyRecord(form) {
 }
 
 // ── Add Photos ────────────────────────────────────────────────────────────────
-function addNpSurveyPhotos(id, unitKey, files) {
+function addNpSurveyPhotos(id, unitKey, files, clientEmail) {
     try {
+        var adminCheck = checkSurveyAdminStatus(clientEmail);
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+            return { success: false, error: 'Administrator privileges required.' };
+        }
         var folderName = 'Survey_Photos_Added';
         var folders = DriveApp.getFoldersByName(folderName);
         var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
@@ -4509,9 +5079,13 @@ function addNpSurveyPhotos(id, unitKey, files) {
 }
 
 // ── Delete Photo ──────────────────────────────────────────────────────────────
-function deleteNpSurveyPhoto(id, unitKey, url) {
+function deleteNpSurveyPhoto(id, unitKey, url, clientEmail) {
     try {
         var _wlock = _acquireWriteLock_();
+        var adminCheck = checkSurveyAdminStatus(clientEmail);
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+            return { success: false, error: 'Administrator privileges required.' };
+        }
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
         if (!sheet) return { success: false, error: 'Sheet not found.' };
         var data = sheet.getDataRange().getValues();
@@ -4559,7 +5133,7 @@ function submitNpSurvey(form) {
         var MAX_UNITS = 20;
 
         // Build the full column list
-        var COLUMNS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email',
+        var COLUMNS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Phone','Reporter Email',
             'DM Area','CM Area','AMM MTN','Status','Has Broken NP','Broken Units','Broken Units Detail','Comments','Attachments_JSON'];
         // Add qty columns
         NP_PRODUCTS.forEach(function(p) { COLUMNS.push(p.code + ' Qty'); });
@@ -4604,6 +5178,7 @@ function submitNpSurvey(form) {
         setField('Branch Code',   form.branchCode || '');
         setField('Branch Name',   form.branchName || '');
         setField('Reporter Name', form.reporterName || '');
+        setField('Reporter Phone',form.reporterPhone || '');
         setField('Reporter Email',form.reporterEmail || '');
         setField('DM Area',       form.dmArea || '');
         setField('CM Area',       form.cmArea || '');

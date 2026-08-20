@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Hours Survey Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #7c3aed; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: 0.75rem; font-weight: 600; color: #64748b; min-width: 160px; }
+        .detail-value { font-size: 0.85rem; color: #1e293b; }
+        #detailModal { transition: opacity 0.28s ease; }
+        #detailModal.modal-open { opacity: 1; }
+        #detailModal:not(.modal-open) { opacity: 0; }
+        #modalContent { transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1); will-change: transform; }
+        #detailModal:not(.modal-open) #modalContent { transform: translateY(100%); }
+        #detailModal.modal-open #modalContent { transform: translateY(0); }
+        @media (min-width: 768px) {
+            #modalContent { transition: transform 0.28s ease, opacity 0.28s ease; }
+            #detailModal:not(.modal-open) #modalContent { transform: scale(0.95); opacity: 0; }
+            #detailModal.modal-open #modalContent { transform: scale(1); opacity: 1; }
+        }
+        @media (max-width: 767px) {
+            #detailModal { background: #f1f5f9 !important; backdrop-filter: none !important; }
+            #detailModal #modalContent { max-height: 100dvh !important; height: 100dvh; border-radius: 0 !important; }
+        }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+
+    <!-- Top Navigation Bar -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-sm bg-opacity-95">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-4">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>"
+                        class="text-slate-500 hover:text-violet-600 transition-colors p-2 rounded-lg hover:bg-slate-50 relative group">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                            </path>
+                        </svg>
+                        <span class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none">กลับหน้าหลัก</span>
+                    </a>
+                    <div class="h-8 w-1 bg-violet-500 rounded-full"></div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">⏰ รายงาน Trading Hours Survey</h1>
+                        <p class="text-xs text-slate-500 font-medium">24hr → Non-24hr Conversion Readiness — Dashboard</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="loader" id="mainLoader"></div>
+                    <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                    <button id="exportExcelBtn" onclick="downloadHoursExcel(this)"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16">
+                            </path>
+                        </svg>
+                        <span class="hidden sm:inline">Export Excel</span>
+                    </button>
+                    <button onclick="window.location.reload()"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-violet-600 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                        <span class="hidden sm:inline">Refresh</span>
+                    </button>
+                    <button id="manageTargetStoresBtn" onclick="openTargetStoresModal()" class="hidden flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        <span class="hidden sm:inline">จัดการสาขาเป้าหมาย</span>
+                    </button>
+                    <button id="amCoverageBtn" onclick="toggleAmCoveragePanel()" class="hidden flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-4-4 4 4 0 014 4zm6 3a4 4 0 10-4-4"></path>
+                        </svg>
+                        <span class="hidden sm:inline">ดูตาม AM (By AM)</span>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200"></div>
+                    <div class="flex flex-col items-end">
+                        <span id="nav-user-name" class="text-xs font-bold text-slate-700"></span>
+                        <span id="access-level-display" class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide">User Access</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Stat Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-violet-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">รายการทั้งหมด</p>
+                <h3 class="text-3xl font-bold text-slate-800" id="statTotal">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">⚠️ ยังไม่พร้อม / พบปัญหา</p>
+                <h3 class="text-3xl font-bold text-red-600" id="statNotReady">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-amber-500 cursor-pointer hover:shadow-md transition-shadow" onclick="toggleGapPanel()">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">🚫 ยังไม่ได้สำรวจ</p>
+                <h3 class="text-3xl font-bold text-amber-600" id="statNotSurveyed">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-sky-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Phase 1 Coverage</p>
+                <h3 class="text-3xl font-bold text-slate-800" id="statPhase1Coverage">0/0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-emerald-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">ส่งใน 7 วันล่าสุด</p>
+                <h3 class="text-3xl font-bold text-slate-800" id="statThisWeek">0</h3>
+            </div>
+        </div>
+
+        <!-- Gap Panel: target stores with no submission yet -->
+        <div id="gapPanel" class="hidden glass-panel rounded-xl p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-amber-700">🚫 สาขาที่ยังไม่ได้สำรวจ (<span id="gapCount">0</span>)</h3>
+                <button onclick="toggleGapPanel()" class="text-xs text-slate-400 hover:text-slate-600">ซ่อน</button>
+            </div>
+            <div id="gapList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs"></div>
+        </div>
+
+        <!-- By AM Coverage Panel: SMF/Admin-only oversight, stores grouped by AMM MTN -->
+        <div id="amCoveragePanel" class="hidden glass-panel rounded-xl p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-indigo-700">👤 ความครอบคลุมตาม AM (<span id="amCoverageCount">0</span> AM)</h3>
+                <button onclick="toggleAmCoveragePanel()" class="text-xs text-slate-400 hover:text-slate-600">ซ่อน</button>
+            </div>
+            <div id="amCoverageList" class="space-y-2"></div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="glass-panel p-4 rounded-xl">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div class="md:col-span-2">
+                    <input type="text" id="searchInput" placeholder="ค้นหา รหัสสาขา / ชื่อสาขา / ผู้แจ้ง..."
+                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400"
+                        oninput="_debouncedApplyFilters()">
+                </div>
+                <div>
+                    <select id="stageFilter" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400" onchange="applyFilters()">
+                        <option value="">-- ทุกประเภท --</option>
+                        <option value="Pre-Conversion">ก่อนปรับเปลี่ยน (Pre)</option>
+                        <option value="Post-Conversion">หลังปรับเปลี่ยน (Post)</option>
+                    </select>
+                </div>
+                <div>
+                    <select id="phaseFilter" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400" onchange="applyFilters()">
+                        <option value="">-- ทุกเฟส --</option>
+                        <option value="Phase 1">Phase 1</option>
+                        <option value="Phase 2">Phase 2</option>
+                    </select>
+                </div>
+                <div>
+                    <select id="statusFilter" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400" onchange="applyFilters()">
+                        <option value="">-- ทุกสถานะ --</option>
+                        <option value="ready">พร้อม / ตรวจผ่าน (OK)</option>
+                        <option value="not-ready">ยังไม่พร้อม / พบปัญหา (Not OK)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Card List -->
+        <div id="cardList" class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden"></div>
+
+        <!-- Desktop Table -->
+        <div class="glass-panel rounded-xl overflow-hidden hidden md:block">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3 text-left">สาขา</th>
+                            <th class="px-4 py-3 text-left">เฟส</th>
+                            <th class="px-4 py-3 text-left">เป้าหมาย</th>
+                            <th class="px-4 py-3 text-center">กุญแจล็อก / ผลตรวจ Post</th>
+                            <th class="px-4 py-3 text-center">ถอดสติกเกอร์</th>
+                            <th class="px-4 py-3 text-left">สถานะรวม</th>
+                            <th class="px-4 py-3 text-left">ผู้แจ้ง</th>
+                            <th class="px-4 py-3 text-left">วันที่สำรวจ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="emptyState" class="hidden text-center py-16 text-slate-400">
+            <p class="text-lg font-semibold">ไม่พบข้อมูล</p>
+        </div>
+
+        <div id="loadErrorBanner" class="hidden max-w-lg mx-auto mt-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl text-center">
+            <p class="text-sm font-bold text-red-700" id="loadErrorTitle">โหลดข้อมูลไม่สำเร็จหลังลองหลายครั้ง</p>
+            <p class="text-xs text-red-500 mt-1">กรุณากดปุ่ม Refresh ด้านบน หรือโหลดหน้านี้ใหม่อีกครั้ง</p>
+        </div>
+
+        <!-- Pagination -->
+        <div class="flex justify-center items-center gap-3 pb-8" id="paginationBar"></div>
+    </div>
+
+    <!-- Detail / Edit Modal -->
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div id="modalContent" class="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl max-h-[92dvh] overflow-y-auto shadow-2xl">
+            <div class="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex justify-between items-center z-10">
+                <h3 class="text-lg font-bold text-slate-800">รายละเอียด Trading Hours Survey</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700 p-1">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5" id="modalBody"></div>
+            <div class="sticky bottom-0 bg-white border-t border-slate-100 px-5 py-3 flex justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ (Delete)</button>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="px-4 py-2 text-sm font-bold text-white bg-violet-600 rounded-lg hover:bg-violet-700 shadow">บันทึก (Save)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Hidden file input for per-photo-category reupload (Admin/SMF) -->
+    <input type="file" id="hoursPhotoUploadInput" multiple accept="image/*" style="display:none">
+
+    <!-- Manage Target Stores Modal (Admin) — add/edit Phase 1/2 store list -->
+    <div id="targetStoresModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div class="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex justify-between items-center z-10">
+                <h3 class="text-lg font-bold text-slate-800">🛠️ จัดการสาขาเป้าหมาย (Phase 1 / Phase 2)</h3>
+                <button onclick="closeTargetStoresModal()" class="text-slate-400 hover:text-slate-700 p-1">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5">
+                <div class="bg-violet-50 border border-violet-200 rounded-lg p-4 mb-4">
+                    <p class="text-xs font-semibold text-violet-700 mb-2">เพิ่มสาขาใหม่ / แก้ไขสาขาเดิม (เช่น เพิ่มรายชื่อ Phase 2 เมื่อได้รับมา)</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="text" id="tsCodeInput" placeholder="รหัสสาขา เช่น 22087" maxlength="6"
+                            class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-32 focus:ring-2 focus:ring-violet-400">
+                        <input type="text" id="tsNameInput" placeholder="ชื่อสาขา"
+                            class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-48 focus:ring-2 focus:ring-violet-400">
+                        <select id="tsPhaseInput" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400">
+                            <option value="Phase 1">Phase 1</option>
+                            <option value="Phase 2">Phase 2</option>
+                        </select>
+                        <input type="date" id="tsDateInput"
+                            class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-violet-400">
+                        <button onclick="saveTargetStore()" class="text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 px-3 py-2 rounded-lg transition-colors">💾 บันทึก</button>
+                    </div>
+                    <p id="tsSaveStatus" class="text-xs text-slate-500 mt-2"></p>
+                </div>
+
+                <p class="text-xs font-semibold text-slate-500 mb-2">สาขาในรายการเป้าหมายปัจจุบัน (<span id="tsCount">0</span>)</p>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                            <tr>
+                                <th class="px-3 py-2 text-left">รหัสสาขา</th>
+                                <th class="px-3 py-2 text-left">ชื่อสาขา</th>
+                                <th class="px-3 py-2 text-center">เฟส</th>
+                                <th class="px-3 py-2 text-center">เป้าหมาย</th>
+                                <th class="px-3 py-2 text-right">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tsTableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        let currentId = null;
+        let isAdmin = false;
+        let isSMF = false;
+        let smfCanEdit = false;
+        let hoursTargetStoresList = []; // [{code, name, phase, targetDate}] — loaded via getTradingHoursTargetStores()
+        let hoursTargetStoresMap = {}; // { branchCode: {code,name,phase,targetDate} }
+        const PAGE_SIZE = 25;
+        let currentPage = 1;
+        let _currentFiltered = [];
+
+        let _filterDebounceTimer = null;
+        function _debouncedApplyFilters() {
+            clearTimeout(_filterDebounceTimer);
+            _filterDebounceTimer = setTimeout(applyFilters, 220);
+        }
+
+        function htmlEscape(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+        function fmtDateOnly(v) {
+            if (!v) return '-';
+            const d = new Date(v);
+            if (isNaN(d)) return String(v);
+            return d.toLocaleDateString('en-GB', { timeZone: 'Asia/Bangkok', year: 'numeric', month: 'short', day: '2-digit' });
+        }
+        // <input type="date"> requires "YYYY-MM-DD" exactly — feeding it the raw ISO
+        // string leaves it blank, and saving the (unedited, now-blank) modal would
+        // silently wipe the real survey date on the record (same quirk as EDMI Reading Date).
+        function toDateInputValue(v) {
+            if (!v) return '';
+            const d = new Date(v);
+            if (isNaN(d)) return '';
+            const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+            const p = {}; parts.forEach(x => p[x.type] = x.value);
+            return p.year + '-' + p.month + '-' + p.day;
+        }
+        function formatRecordDate(ts) {
+            if (!ts) return '-';
+            const d = new Date(ts);
+            if (isNaN(d)) return String(ts);
+            return d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        function applyAdminUI() {
+            document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+            var mgBtn = document.getElementById('manageTargetStoresBtn');
+            if (mgBtn) mgBtn.classList.toggle('hidden', !isAdmin);
+            var amBtn = document.getElementById('amCoverageBtn');
+            if (amBtn) amBtn.classList.toggle('hidden', !(isAdmin || isSMF));
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                var _lsUser = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                if (_lsUser && localStorage.getItem('app_auth_token')) {
+                    var navName = document.getElementById('nav-user-name');
+                    if (navName) navName.textContent = _lsUser.name || _lsUser.email || '';
+                }
+            } catch(e) {}
+            applyAdminUI();
+            // Load the main data FIRST — firing two google.script.run calls back-to-back
+            // on first page load can silently drop the second call's callback (a known
+            // Apps Script sandboxed-iframe quirk) — same handling as Layout Survey Report.
+            loadData();
+            try {
+                var _lsEmail = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                var _userEmail = (_lsEmail && _lsEmail.email) ? _lsEmail.email : '';
+                if (_userEmail) {
+                    google.script.run
+                        .withSuccessHandler(function(flags) {
+                            if (!flags) return;
+                            isAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
+                            isSMF = !!flags.isSMF;
+                            smfCanEdit = !!flags.smfEditAllowed;
+                            var ad = document.getElementById('access-level-display');
+                            if (ad) {
+                                ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
+                                ad.className = isAdmin
+                                    ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
+                                    : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
+                            }
+                            applyAdminUI();
+                            // Default to the "By AM" coverage view for Admin/SMF viewers —
+                            // the button is only visible to them anyway (see applyAdminUI).
+                            if ((isAdmin || isSMF) && document.getElementById('amCoveragePanel').classList.contains('hidden')) {
+                                toggleAmCoveragePanel();
+                            }
+                        })
+                        .getUserFlags(_userEmail);
+                }
+            } catch(e) {}
+
+            // Target store list (Phase 1/2) — lowest priority, so it goes last with a
+            // small delay to avoid the back-to-back google.script.run callback-drop quirk.
+            setTimeout(function() {
+                _loadTargetStoresList(true);
+            }, 400);
+        });
+
+        let _loadDataAttempt = 0;
+        const _HOURS_MAX_ATTEMPTS = 3;
+        function loadData() {
+            document.getElementById('mainLoader').classList.remove('hidden');
+            var myAttempt = ++_loadDataAttempt;
+
+            function _retryOrFail(reason) {
+                if (myAttempt < _HOURS_MAX_ATTEMPTS) {
+                    console.warn('Hours report: ' + reason + ' — retrying (' + myAttempt + '/' + _HOURS_MAX_ATTEMPTS + ')');
+                    setTimeout(loadData, 1500);
+                    return;
+                }
+                document.getElementById('mainLoader').classList.add('hidden');
+                var t = document.getElementById('loadErrorTitle');
+                if (t) t.textContent = 'โหลดข้อมูลไม่สำเร็จหลังลองหลายครั้ง';
+                document.getElementById('loadErrorBanner').classList.remove('hidden');
+                console.error('Hours report: gave up after ' + _HOURS_MAX_ATTEMPTS + ' attempts — ' + reason);
+            }
+
+            // Safety net: 15s not 8s — a cold start has to load the script AND do a full
+            // uncached sheet read; firing the retry while that's still running just
+            // doubles the server work and makes the timeout more likely, not less.
+            var watchdog = setTimeout(function() {
+                if (myAttempt !== _loadDataAttempt) return;
+                _retryOrFail('no response after 15s');
+            }, 15000);
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    clearTimeout(watchdog);
+                    if (myAttempt !== _loadDataAttempt) return;
+                    if (!res) {
+                        _retryOrFail('null response (cold start)');
+                        return;
+                    }
+                    document.getElementById('mainLoader').classList.add('hidden');
+                    document.getElementById('loadErrorBanner').classList.add('hidden');
+                    if (res.success) {
+                        allData = res.data || [];
+                        renderStats();
+                        applyFilters();
+                    } else {
+                        console.error('Load failed', res.error);
+                        var errTitle = document.getElementById('loadErrorTitle');
+                        if (errTitle) errTitle.textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (res.error || 'Unknown error');
+                        document.getElementById('loadErrorBanner').classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    clearTimeout(watchdog);
+                    if (myAttempt !== _loadDataAttempt) return;
+                    document.getElementById('mainLoader').classList.add('hidden');
+                    var errTitle = document.getElementById('loadErrorTitle');
+                    if (errTitle) errTitle.textContent = 'เกิดข้อผิดพลาด: ' + (err.message || err);
+                    document.getElementById('loadErrorBanner').classList.remove('hidden');
+                })
+                .getTradingHoursSurveyListSlim();
+        }
+
+        // "Ready" (Pre-Conversion) and "Verified OK" (Post-Conversion) are both the
+        // "good" outcome for their respective stage — treated the same for the
+        // stat-card/badge/filter "OK vs not-OK" grouping.
+        function _isReady(r) {
+            return r['Overall Status'] === 'พร้อม (Ready)' || r['Overall Status'] === 'ตรวจสอบผ่าน (Verified OK)';
+        }
+        function _isPostStage(r) {
+            return r['Survey Stage'] === 'Post-Conversion';
+        }
+
+        function renderStats() {
+            document.getElementById('statTotal').textContent = allData.length;
+            var notReadyCount = allData.filter(function(r) { return !_isReady(r); }).length;
+            document.getElementById('statNotReady').textContent = notReadyCount;
+            var weekAgo = Date.now() - 7 * 86400000;
+            var thisWeek = allData.filter(function(r) { var t = new Date(r['Timestamp']).getTime(); return t >= weekAgo; });
+            document.getElementById('statThisWeek').textContent = thisWeek.length;
+            _renderCoverageStats();
+        }
+
+        function _renderCoverageStats() {
+            var surveyedCodes = new Set(allData.map(function(r) { return String(r['Branch Code']).trim(); }));
+            var phase1Targets = hoursTargetStoresList.filter(function(t) { return t.phase === 'Phase 1'; });
+            var phase1Surveyed = phase1Targets.filter(function(t) { return surveyedCodes.has(t.code); }).length;
+            document.getElementById('statPhase1Coverage').textContent = phase1Surveyed + '/' + phase1Targets.length;
+
+            var notSurveyed = hoursTargetStoresList.filter(function(t) { return !surveyedCodes.has(t.code); });
+            document.getElementById('statNotSurveyed').textContent = notSurveyed.length;
+            _renderGapPanel(notSurveyed);
+        }
+
+        function _renderGapPanel(notSurveyed) {
+            document.getElementById('gapCount').textContent = notSurveyed.length;
+            var list = document.getElementById('gapList');
+            if (notSurveyed.length === 0) {
+                list.innerHTML = '<p class="text-slate-400 col-span-full">สำรวจครบทุกสาขาในรายการแล้ว 🎉</p>';
+                return;
+            }
+            var sorted = notSurveyed.slice().sort(function(a, b) { return a.code.localeCompare(b.code); });
+            list.innerHTML = sorted.map(function(t) {
+                return '<div class="bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">' +
+                    '<span class="font-semibold text-amber-800">' + htmlEscape(t.code) + '</span> ' +
+                    '<span class="text-amber-700">' + htmlEscape(t.name) + '</span>' +
+                    '<span class="text-amber-400 ml-1">(' + htmlEscape(t.phase) + ')</span></div>';
+            }).join('');
+        }
+
+        function toggleGapPanel() {
+            document.getElementById('gapPanel').classList.toggle('hidden');
+        }
+
+        // ─── By AM Coverage (SMF/Admin) — stores grouped by AMM MTN, collapsible ──────
+        // _amCoverageData starts null (never loaded) and is [] on a genuinely-empty
+        // result — both are falsy-ish for our purposes, but [] is truthy in JS, so we
+        // must check .length too or a transient empty first response (cold-start /
+        // the documented google.script.run back-to-back callback quirk — this button
+        // fires while loadData()/getUserFlags()/_loadTargetStoresList() may still be
+        // in flight from page load) permanently "sticks" as empty until a full page
+        // reload, since toggling the panel closed/open again wouldn't re-fetch.
+        let _amCoverageData = null;
+        let _amCoverageOpenIdx = null;
+        let _amCoverageAttempt = 0;
+        const _AM_COVERAGE_MAX_ATTEMPTS = 3;
+
+        function toggleAmCoveragePanel() {
+            var panel = document.getElementById('amCoveragePanel');
+            var wasHidden = panel.classList.contains('hidden');
+            panel.classList.toggle('hidden');
+            if (wasHidden && (!_amCoverageData || _amCoverageData.length === 0)) {
+                _amCoverageAttempt = 0;
+                _loadAmCoverage();
+            }
+        }
+
+        function _pctClass(pct) {
+            if (pct >= 80) return 'bg-emerald-500';
+            if (pct >= 40) return 'bg-amber-500';
+            return 'bg-red-500';
+        }
+
+        function _loadAmCoverage() {
+            _amCoverageAttempt++;
+            document.getElementById('amCoverageList').innerHTML = '<p class="text-xs text-slate-400 text-center py-4">กำลังโหลด...</p>';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res || !res.success) {
+                        document.getElementById('amCoverageList').innerHTML = '<p class="text-xs text-red-500 text-center py-4">โหลดไม่สำเร็จ: ' + htmlEscape(res && res.error) + ' <button onclick="_loadAmCoverage()" class="underline ml-1">ลองใหม่</button></p>';
+                        return;
+                    }
+                    _amCoverageData = res.data || [];
+                    // A truly-empty result (0 AM groups) is suspicious this early — there
+                    // are always target stores once the module is seeded — so retry a
+                    // couple times before trusting it, same reasoning as the main table's
+                    // loadData() retry loop above.
+                    if (_amCoverageData.length === 0 && _amCoverageAttempt < _AM_COVERAGE_MAX_ATTEMPTS) {
+                        setTimeout(_loadAmCoverage, 1200);
+                        return;
+                    }
+                    _renderAmCoverage();
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('amCoverageList').innerHTML = '<p class="text-xs text-red-500 text-center py-4">' + htmlEscape(err.message) + ' <button onclick="_loadAmCoverage()" class="underline ml-1">ลองใหม่</button></p>';
+                })
+                .getTradingHoursCoverageByAM();
+        }
+
+        function _statusBadge(status) {
+            if (status === 'ready') return '<span class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">พร้อม</span>';
+            if (status === 'not-ready') return '<span class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">ยังไม่พร้อม</span>';
+            return '<span class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">ยังไม่สำรวจ</span>';
+        }
+
+        function _renderAmCoverage() {
+            document.getElementById('amCoverageCount').textContent = _amCoverageData.length;
+            var list = document.getElementById('amCoverageList');
+            if (_amCoverageData.length === 0) {
+                list.innerHTML = '<p class="text-slate-400 text-center py-4">ไม่มีข้อมูล <button onclick="_amCoverageAttempt=0;_loadAmCoverage()" class="underline text-indigo-500 ml-1">ลองใหม่</button></p>';
+                return;
+            }
+            list.innerHTML = _amCoverageData.map(function(g, idx) {
+                var isOpen = _amCoverageOpenIdx === idx;
+                var storesHtml = g.stores.map(function(s) {
+                    return '<div class="flex items-center justify-between py-1.5 px-2 text-xs border-b border-slate-100 last:border-0">' +
+                        '<span><span class="font-semibold text-slate-700">' + htmlEscape(s.code) + '</span> <span class="text-slate-500">' + htmlEscape(s.name) + '</span> <span class="text-slate-400">(' + htmlEscape(s.phase) + ')</span></span>' +
+                        _statusBadge(s.status) +
+                    '</div>';
+                }).join('');
+                return '' +
+                    '<div class="border border-slate-200 rounded-lg overflow-hidden">' +
+                        '<button onclick="_toggleAmRow(' + idx + ')" class="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 hover:bg-indigo-50 transition-colors text-left">' +
+                            '<div class="flex-1 min-w-0">' +
+                                '<p class="text-sm font-semibold text-slate-800 truncate">' + htmlEscape(g.amm) + '</p>' +
+                                '<div class="flex items-center gap-2 mt-1">' +
+                                    '<div class="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden max-w-[160px]"><div class="h-full ' + _pctClass(g.pct) + '" style="width:' + g.pct + '%"></div></div>' +
+                                    '<span class="text-[11px] text-slate-500">' + g.ready + '/' + g.total + ' พร้อม</span>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="flex items-center gap-3 ml-3 flex-shrink-0">' +
+                                (g.notSurveyed > 0 ? '<span class="text-[11px] font-semibold text-slate-500">🚫 ' + g.notSurveyed + '</span>' : '') +
+                                (g.notReady > 0 ? '<span class="text-[11px] font-semibold text-red-600">⚠️ ' + g.notReady + '</span>' : '') +
+                                '<svg class="w-4 h-4 text-slate-400 transition-transform ' + (isOpen ? 'rotate-180' : '') + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>' +
+                            '</div>' +
+                        '</button>' +
+                        (isOpen ? '<div class="px-2 py-1 bg-white">' + storesHtml + '</div>' : '') +
+                    '</div>';
+            }).join('');
+        }
+
+        function _toggleAmRow(idx) {
+            _amCoverageOpenIdx = (_amCoverageOpenIdx === idx) ? null : idx;
+            _renderAmCoverage();
+        }
+
+        function applyFilters() {
+            var q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+            var stage = document.getElementById('stageFilter').value;
+            var phase = document.getElementById('phaseFilter').value;
+            var statusMode = document.getElementById('statusFilter').value;
+
+            _currentFiltered = allData.filter(function(r) {
+                if (stage) {
+                    var rStage = r['Survey Stage'] || 'Pre-Conversion';
+                    if (rStage !== stage) return false;
+                }
+                if (phase && r['Phase'] !== phase) return false;
+                if (statusMode === 'ready' && !_isReady(r)) return false;
+                if (statusMode === 'not-ready' && _isReady(r)) return false;
+                if (q) {
+                    var hay = [r['Branch Code'], r['Branch Name'], r['Reporter Name'], r['Reporter Email']].join(' ').toLowerCase();
+                    if (hay.indexOf(q) === -1) return false;
+                }
+                return true;
+            });
+            currentPage = 1;
+            renderList();
+        }
+
+        function renderList() {
+            var totalPages = Math.max(1, Math.ceil(_currentFiltered.length / PAGE_SIZE));
+            if (currentPage > totalPages) currentPage = totalPages;
+            var start = (currentPage - 1) * PAGE_SIZE;
+            var pageItems = _currentFiltered.slice(start, start + PAGE_SIZE);
+
+            document.getElementById('recordCount').textContent = _currentFiltered.length + ' รายการ';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', _currentFiltered.length > 0);
+
+            var cardList = document.getElementById('cardList');
+            var tbody = document.getElementById('tableBody');
+            cardList.innerHTML = '';
+            tbody.innerHTML = '';
+
+            function badge(yes) {
+                return yes
+                    ? '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Yes</span>'
+                    : '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">✗ No</span>';
+            }
+
+            pageItems.forEach(function(r) {
+                var branchLabel = htmlEscape(r['Branch Code']) + ' - ' + htmlEscape(r['Branch Name']);
+                var isPost = _isPostStage(r);
+                var ready = _isReady(r);
+                var stageBadge = isPost
+                    ? '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 mr-1">🔁 Post</span>'
+                    : '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 mr-1">📋 Pre</span>';
+                // Pre-Conversion checklist columns don't apply to Post-Conversion rows —
+                // show the two checklist badges only for Pre; Post uses a 5-item OK count.
+                var col1, col2;
+                if (isPost) {
+                    var postFlags = ['Lock Used At Closing','Alarm Rearmed','Refrig Temp Stable','Lighting/AC Schedule OK','After-Hours Access OK'];
+                    var postOkCount = postFlags.filter(function(k) { return r[k] === 'Yes'; }).length;
+                    col1 = '<span class="text-xs text-slate-500">' + postOkCount + '/5 ผ่าน</span>';
+                    col2 = '';
+                } else {
+                    col1 = badge(r['Lock Installed'] === 'Yes');
+                    col2 = badge(r['Sticker Removed'] === 'Yes');
+                }
+                cardList.innerHTML += '' +
+                    '<div class="glass-panel rounded-xl p-4 cursor-pointer hover:shadow-md transition-all" onclick="openModal(\'' + r['ID'] + '\')">' +
+                        '<div class="flex justify-between items-start mb-2">' +
+                            '<p class="font-bold text-slate-800 text-sm">' + branchLabel + '</p>' +
+                            (ready
+                                ? '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">✓ ' + (isPost ? 'ตรวจผ่าน' : 'พร้อม') + '</span>'
+                                : '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">⚠️ ' + (isPost ? 'พบปัญหา' : 'ยังไม่พร้อม') + '</span>') +
+                        '</div>' +
+                        '<p class="text-xs text-slate-500 mb-2">' + stageBadge + htmlEscape(r['Phase'] || '-') + ' · ' + fmtDateOnly(r['Survey Date']) + '</p>' +
+                        (isPost
+                            ? '<div class="text-xs text-slate-600 mb-1">' + col1 + '</div>'
+                            : '<div class="grid grid-cols-2 gap-1 text-xs text-slate-600 mb-1">' +
+                                '<span>กุญแจล็อก: ' + col1 + '</span>' +
+                                '<span>ถอดสติกเกอร์: ' + col2 + '</span>' +
+                              '</div>') +
+                        (r['Other Notes'] ? '<p class="text-xs text-amber-700 italic mt-1">' + htmlEscape(r['Other Notes']) + '</p>' : '') +
+                        '<p class="text-xs text-slate-400 mt-2">โดย ' + htmlEscape(r['Reporter Name'] || '-') + '</p>' +
+                    '</div>';
+
+                tbody.innerHTML += '' +
+                    '<tr class="hover:bg-violet-50 cursor-pointer transition-colors" onclick="openModal(\'' + r['ID'] + '\')">' +
+                        '<td class="px-4 py-3"><div class="font-semibold text-slate-800">' + stageBadge + htmlEscape(r['Branch Code']) + '</div><div class="text-xs text-slate-500">' + htmlEscape(r['Branch Name']) + '</div></td>' +
+                        '<td class="px-4 py-3 text-xs">' + htmlEscape(r['Phase'] || '-') + '</td>' +
+                        '<td class="px-4 py-3 text-xs">' + htmlEscape(r['Target Date'] || '-') + '</td>' +
+                        '<td class="px-4 py-3 text-center">' + col1 + '</td>' +
+                        '<td class="px-4 py-3 text-center">' + col2 + '</td>' +
+                        '<td class="px-4 py-3 text-xs">' + (ready
+                            ? '<span class="text-emerald-700 font-semibold">' + (isPost ? 'ตรวจผ่าน' : 'พร้อม') + '</span>'
+                            : '<span class="text-red-600 font-semibold">' + (isPost ? 'พบปัญหา' : 'ยังไม่พร้อม') + '</span>') + '</td>' +
+                        '<td class="px-4 py-3 text-xs">' + htmlEscape(r['Reporter Name'] || '-') + '</td>' +
+                        '<td class="px-4 py-3 text-xs">' + fmtDateOnly(r['Survey Date']) + '</td>' +
+                    '</tr>';
+            });
+
+            renderPagination(totalPages);
+        }
+
+        function renderPagination(totalPages) {
+            var bar = document.getElementById('paginationBar');
+            if (totalPages <= 1) { bar.innerHTML = ''; return; }
+            var html = '';
+            html += '<button ' + (currentPage <= 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')" class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 disabled:opacity-40 hover:bg-slate-50">ก่อนหน้า</button>';
+            html += '<span class="text-sm text-slate-500">หน้า ' + currentPage + ' / ' + totalPages + '</span>';
+            html += '<button ' + (currentPage >= totalPages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')" class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 disabled:opacity-40 hover:bg-slate-50">ถัดไป</button>';
+            bar.innerHTML = html;
+        }
+        function goPage(p) { currentPage = p; renderList(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+        function downloadHoursExcel(btn) {
+            if (!_currentFiltered || _currentFiltered.length === 0) { alert('ไม่มีข้อมูลที่จะดาวน์โหลด'); return; }
+            if (typeof XLSX === 'undefined') { alert('ไลบรารียังไม่โหลด กรุณารอแล้วลองใหม่'); return; }
+
+            var origHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ...'; }
+
+            try {
+                var header = ['วันเวลาที่ส่ง', 'ประเภท', 'รหัสสาขา', 'ชื่อสาขา', 'Format', 'เฟส', 'เป้าหมายเริ่ม', 'วันที่สำรวจ',
+                    'เวลาทำการปัจจุบัน', 'เวลาทำการใหม่', 'กุญแจล็อก', 'ถอดสติกเกอร์ 24hr', 'ไฟส่องสว่าง', 'CCTV',
+                    'ล็อกจริงตอนปิด', 'ตั้งเวลาสัญญาณกันขโมย', 'อุณหภูมิตู้แช่ปกติ', 'ไฟ/แอร์ตัดตามตาราง', 'ช่องทางแจ้งเหตุฉุกเฉิน',
+                    'สถานะรวม', 'หมายเหตุอื่นๆ', 'ผู้แจ้ง', 'อีเมลผู้แจ้ง', 'DM Area', 'CM Area', 'AMM MTN'];
+
+                var aoa = [header].concat(_currentFiltered.map(function(r) {
+                    return [
+                        formatRecordDate(r['Timestamp']),
+                        _isPostStage(r) ? 'Post-Conversion' : 'Pre-Conversion',
+                        r['Branch Code'] || '',
+                        r['Branch Name'] || '',
+                        r['Store Format'] || '',
+                        r['Phase'] || '',
+                        r['Target Date'] || '',
+                        fmtDateOnly(r['Survey Date']),
+                        r['Current Hours'] || '',
+                        r['New Hours'] || '',
+                        r['Lock Installed'] || '',
+                        r['Sticker Removed'] || '',
+                        r['Exterior Lighting OK'] || '',
+                        r['CCTV OK'] || '',
+                        r['Lock Used At Closing'] || '',
+                        r['Alarm Rearmed'] || '',
+                        r['Refrig Temp Stable'] || '',
+                        r['Lighting/AC Schedule OK'] || '',
+                        r['After-Hours Access OK'] || '',
+                        r['Overall Status'] || '',
+                        r['Other Notes'] || '',
+                        r['Reporter Name'] || '',
+                        r['Reporter Email'] || '',
+                        r['DM Area'] || '',
+                        r['CM Area'] || '',
+                        r['AMM MTN'] || ''
+                    ];
+                }));
+
+                var ws = XLSX.utils.aoa_to_sheet(aoa);
+                ws['!cols'] = [
+                    {wch: 18}, {wch: 14}, {wch: 12}, {wch: 30}, {wch: 18}, {wch: 10}, {wch: 12}, {wch: 12},
+                    {wch: 14}, {wch: 14}, {wch: 10}, {wch: 16}, {wch: 12}, {wch: 10},
+                    {wch: 14}, {wch: 18}, {wch: 16}, {wch: 16}, {wch: 18},
+                    {wch: 18}, {wch: 30}, {wch: 20}, {wch: 26}, {wch: 16}, {wch: 16}, {wch: 12}
+                ];
+                ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+                var wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Trading Hours Survey');
+                var filename = 'trading_hours_survey_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+                XLSX.writeFile(wb, filename);
+            } catch (e) {
+                alert('Excel error: ' + e.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+            }
+        }
+
+        function openModal(id) {
+            currentId = id;
+            document.getElementById('modalBody').innerHTML = '<div class="text-center py-10 text-slate-400">กำลังโหลด...</div>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            requestAnimationFrame(function() { document.getElementById('detailModal').classList.add('modal-open'); });
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-500 text-sm">โหลดรายการไม่สำเร็จ</p>'; return; }
+                    renderModalBody(res.data);
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('modalBody').innerHTML = '<p class="text-red-500 text-sm">' + htmlEscape(err.message) + '</p>';
+                })
+                .getTradingHoursSurveyRecordById(id);
+        }
+
+        // Same as Layout Survey's _photoEditBlockHtml — adds delete (per photo) and
+        // reupload buttons, gated to Admin / SMF (when the Super Admin edit toggle is on).
+        function _photoEditBlockHtml(photos, unitKey, blockId, canEdit) {
+            var thumbs = (photos || []).map(function(url) {
+                var esc = htmlEscape(url);
+                var delBtn = canEdit
+                    ? '<button onclick="deleteHoursPhoto(this,\'' + unitKey + '\',\'' + blockId + '\')" data-url="' + esc + '" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button>'
+                    : '';
+                return '<div class="relative group inline-block"><a href="' + url + '" target="_blank"><img src="' + url + '" class="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm"></a>' + delBtn + '</div>';
+            }).join('');
+            var emptyMsg = (!photos || photos.length === 0)
+                ? '<p class="text-xs text-slate-400 mt-2" data-empty-msg>ไม่มีภาพถ่าย</p>' : '';
+            var addBtn = canEdit
+                ? '<button onclick="pickHoursUnitPhoto(\'' + unitKey + '\',\'' + blockId + '\')" class="text-[11px] text-sky-600 hover:text-sky-800 border border-sky-200 hover:bg-sky-50 px-2 py-0.5 rounded-lg transition mt-2 inline-flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>เพิ่ม/อัปโหลดรูปใหม่</button>'
+                : '';
+            return '<div id="' + blockId + '"><div class="flex gap-2 flex-wrap mt-2">' + thumbs + '</div>' + emptyMsg + addBtn + '</div>';
+        }
+
+        function renderModalBody(r) {
+            var att = {};
+            try { att = r['Attachments_JSON'] || {}; } catch(e) {}
+            var photosLock = att.hoursLockPhoto || [];
+            var photosSticker = att.hoursStickerPhoto || [];
+            var photosPostVerify = att.hoursPostVerifyPhoto || [];
+            var photosObstacle = att.hoursObstaclePhoto || [];
+            var canEdit = isAdmin || smfCanEdit;
+            var isPost = r['Survey Stage'] === 'Post-Conversion';
+
+            var html =
+                '<div class="detail-row"><span class="detail-label">รหัสสาขา</span><span class="detail-value">' + htmlEscape(r['Branch Code']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ชื่อสาขา</span><span class="detail-value">' + htmlEscape(r['Branch Name']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">เฟส / เป้าหมาย</span><span class="detail-value">' + htmlEscape(r['Phase'] || '-') + ' — ' + htmlEscape(r['Target Date'] || '-') + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ประเภทการตรวจสอบ</span><span class="detail-value">' + (isPost ? '🔁 หลังปรับเปลี่ยน (Post-Conversion)' : '📋 ก่อนปรับเปลี่ยน (Pre-Conversion)') + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ผู้แจ้ง</span><span class="detail-value">' + htmlEscape(r['Reporter Name']) + ' (' + htmlEscape(r['Reporter Email']) + ')</span></div>' +
+                '<div class="detail-row"><span class="detail-label">เบอร์โทร</span><span class="detail-value">' + htmlEscape(r['Reporter Phone'] || '-') + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">วันเวลาที่ส่ง</span><span class="detail-value">' + formatRecordDate(r['Timestamp']) + '</span></div>';
+
+            html += '<div class="grid grid-cols-2 gap-3 mt-4">' +
+                    '<div><label class="text-xs font-semibold text-slate-500 mb-1 block">เวลาทำการปัจจุบัน</label>' +
+                        '<input id="editCurrentHours" type="text" value="' + htmlEscape(r['Current Hours']) + '" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                    '<div><label class="text-xs font-semibold text-slate-500 mb-1 block">เวลาทำการใหม่</label>' +
+                        '<input id="editNewHours" type="text" value="' + htmlEscape(r['New Hours']) + '" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                    '<div class="col-span-2"><label class="text-xs font-semibold text-slate-500 mb-1 block">วันที่สำรวจ</label>' +
+                        '<input id="editDate" type="date" value="' + toDateInputValue(r['Survey Date']) + '" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>' +
+                '</div>';
+
+            if (isPost) {
+                html += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">' +
+                        '<label class="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 cursor-pointer">' +
+                            '<input type="checkbox" id="editLockUsed" ' + (r['Lock Used At Closing']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                            'ล็อกประตูจริงตอนปิดร้าน' +
+                        '</label>' +
+                        '<label class="flex items-center gap-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg p-3 cursor-pointer">' +
+                            '<input type="checkbox" id="editAlarmRearmed" ' + (r['Alarm Rearmed']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                            'ตั้งเวลาสัญญาณกันขโมยใหม่แล้ว' +
+                        '</label>' +
+                        '<label class="flex items-center gap-2 text-sm text-cyan-700 bg-cyan-50 border border-cyan-200 rounded-lg p-3 cursor-pointer">' +
+                            '<input type="checkbox" id="editRefrigStable" ' + (r['Refrig Temp Stable']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                            'อุณหภูมิตู้แช่/ห้องเย็นปกติช่วงปิดร้าน' +
+                        '</label>' +
+                        '<label class="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3 cursor-pointer">' +
+                            '<input type="checkbox" id="editLightingAcSched" ' + (r['Lighting/AC Schedule OK']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                            'ไฟ/แอร์ทั่วไปตัดตามตารางใหม่ถูกต้อง' +
+                        '</label>' +
+                        '<label class="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-3 cursor-pointer sm:col-span-2">' +
+                            '<input type="checkbox" id="editAfterHoursAccess" ' + (r['After-Hours Access OK']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                            'ช่องทางแจ้งเหตุฉุกเฉิน/ซ่อมบำรุงนอกเวลาทำการ ใช้งานได้' +
+                        '</label>' +
+                    '</div>' +
+                    '<div class="mt-3">' + _photoEditBlockHtml(photosPostVerify, 'hoursPostVerifyPhoto', 'hours-photos-postverify', canEdit) + '</div>';
+            } else {
+                html += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">' +
+                        '<div class="bg-red-50 border border-red-200 rounded-lg p-3">' +
+                            '<label class="flex items-center gap-2 text-sm font-semibold text-red-700 cursor-pointer">' +
+                                '<input type="checkbox" id="editLock" ' + (r['Lock Installed']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                                'กุญแจล็อกประตูหน้าร้าน ใช้งานได้' +
+                            '</label>' +
+                            _photoEditBlockHtml(photosLock, 'hoursLockPhoto', 'hours-photos-lock', canEdit) +
+                        '</div>' +
+                        '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">' +
+                            '<label class="flex items-center gap-2 text-sm font-semibold text-orange-700 cursor-pointer">' +
+                                '<input type="checkbox" id="editSticker" ' + (r['Sticker Removed']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                                'ถอดสติกเกอร์ 24 ชม. ออกแล้ว' +
+                            '</label>' +
+                            _photoEditBlockHtml(photosSticker, 'hoursStickerPhoto', 'hours-photos-sticker', canEdit) +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">' +
+                        '<label class="flex items-center gap-2 text-sm text-sky-700 bg-sky-50 border border-sky-200 rounded-lg p-3 cursor-pointer">' +
+                            '<input type="checkbox" id="editLighting" ' + (r['Exterior Lighting OK']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                            'ไฟส่องสว่างหน้าร้าน/ลานจอด ปกติ' +
+                        '</label>' +
+                        '<label class="flex items-center gap-2 text-sm text-sky-700 bg-sky-50 border border-sky-200 rounded-lg p-3 cursor-pointer">' +
+                            '<input type="checkbox" id="editCctv" ' + (r['CCTV OK']==='Yes'?'checked':'') + ' class="w-4 h-4">' +
+                            'กล้องวงจรปิด ทำงานปกติ' +
+                        '</label>' +
+                    '</div>';
+            }
+
+            html += '<div class="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">' +
+                    '<label class="text-xs font-semibold text-slate-600 mb-1 block">หมายเหตุอื่นๆ (Other Notes)</label>' +
+                    '<textarea id="editOtherNotes" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm">' + htmlEscape(r['Other Notes']) + '</textarea>' +
+                    _photoEditBlockHtml(photosObstacle, 'hoursObstaclePhoto', 'hours-photos-obstacle', canEdit) +
+                '</div>';
+
+            document.getElementById('modalBody').innerHTML = html;
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('modal-open');
+            setTimeout(function() { document.getElementById('detailModal').classList.add('hidden'); }, 280);
+            currentId = null;
+        }
+
+        function saveRecord() {
+            if (!currentId) return;
+            var _lsU = null; try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+
+            var form = {
+                id: currentId,
+                clientEmail: clientEmail,
+                currentHours: document.getElementById('editCurrentHours').value,
+                newHours: document.getElementById('editNewHours').value,
+                surveyDate: document.getElementById('editDate').value,
+                otherNotes: document.getElementById('editOtherNotes').value
+            };
+
+            // Only send the checklist fields the modal actually rendered for this record's
+            // stage — see renderModalBody(); the backend's updateTradingHoursSurveyRecord
+            // fixes Survey Stage from the record itself and only writes that stage's columns.
+            var lockUsedEl = document.getElementById('editLockUsed');
+            if (lockUsedEl) {
+                form.lockUsedAtClosing = lockUsedEl.checked;
+                form.alarmRearmed = document.getElementById('editAlarmRearmed').checked;
+                form.refrigTempStable = document.getElementById('editRefrigStable').checked;
+                form.lightingAcScheduleOk = document.getElementById('editLightingAcSched').checked;
+                form.afterHoursAccessOk = document.getElementById('editAfterHoursAccess').checked;
+            } else {
+                form.lockInstalled = document.getElementById('editLock').checked;
+                form.stickerRemoved = document.getElementById('editSticker').checked;
+                form.exteriorLightingOk = document.getElementById('editLighting').checked;
+                form.cctvOk = document.getElementById('editCctv').checked;
+            }
+
+            document.getElementById('saveBtn').textContent = 'กำลังบันทึก...';
+            document.getElementById('saveBtn').disabled = true;
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    document.getElementById('saveBtn').textContent = 'บันทึก (Save)';
+                    document.getElementById('saveBtn').disabled = false;
+                    if (res && res.success) {
+                        closeModal();
+                        loadData();
+                    } else {
+                        alert('บันทึกไม่สำเร็จ: ' + (res && res.error));
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('saveBtn').textContent = 'บันทึก (Save)';
+                    document.getElementById('saveBtn').disabled = false;
+                    alert('Server Error: ' + err.message);
+                })
+                .updateTradingHoursSurveyRecord(form);
+        }
+
+        function deleteRecord() {
+            if (!currentId) return;
+            if (!confirm('ยืนยันการลบรายการนี้? การลบไม่สามารถย้อนกลับได้')) return;
+            var _lsU = null; try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        closeModal();
+                        loadData();
+                    } else {
+                        alert('ลบไม่สำเร็จ: ' + (res && res.error));
+                    }
+                })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); })
+                .deleteTradingHoursSurveyRecord(currentId, clientEmail);
+        }
+
+        // ─── Per-photo-category Upload (Admin / SMF, same pattern as Layout Survey) ────
+        var _hoursPhotoTarget = null; // { unitKey, photoBlockId }
+
+        function pickHoursUnitPhoto(unitKey, photoBlockId) {
+            _hoursPhotoTarget = { unitKey: unitKey, photoBlockId: photoBlockId };
+            var inp = document.getElementById('hoursPhotoUploadInput');
+            inp.value = '';
+            inp.click();
+        }
+
+        document.getElementById('hoursPhotoUploadInput').addEventListener('change', function() {
+            if (!_hoursPhotoTarget || !currentId) return;
+            const files = Array.from(this.files);
+            if (!files.length) return;
+            const { unitKey, photoBlockId } = _hoursPhotoTarget;
+            _hoursPhotoTarget = null;
+            const capturedId = currentId; // capture before any async — prevents cross-record contamination
+            var _lsUpl = null;
+            try { _lsUpl = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsUpl && _lsUpl.email) ? _lsUpl.email : '';
+
+            const photoBlockEl = document.getElementById(photoBlockId);
+
+            const loadingId = 'hours-ul-' + Date.now();
+            const loadingHtml = `<div id="${loadingId}" class="mt-2 flex items-center gap-2 text-xs text-violet-600 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">` +
+                `<svg class="w-4 h-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>` +
+                `กำลังอัปโหลด ${files.length} รูป...</div>`;
+            if (photoBlockEl) photoBlockEl.insertAdjacentHTML('beforeend', loadingHtml);
+
+            Promise.all(files.map(function(file) {
+                return new Promise(function(resolve, reject) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        resolve({ name: file.name, mimeType: file.type || 'image/jpeg', data: e.target.result.split(',')[1] });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            })).then(function(fileData) {
+                google.script.run
+                    .withSuccessHandler(function(res) {
+                        const loadingEl = document.getElementById(loadingId);
+                        if (loadingEl) loadingEl.remove();
+                        if (!res.success) { alert('อัปโหลดรูปไม่สำเร็จ: ' + res.error); return; }
+
+                        if (photoBlockEl) {
+                            const emptyMsg = photoBlockEl.querySelector('[data-empty-msg]');
+                            if (emptyMsg) emptyMsg.remove();
+                            const thumbHtml = res.newUrls.map(function(url) {
+                                const _esc = htmlEscape(url);
+                                return `<div class="relative group inline-block"><a href="${url}" target="_blank"><img src="${url}" class="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm"></a><button onclick="deleteHoursPhoto(this,'${unitKey}','${photoBlockId}')" data-url="${_esc}" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button></div>`;
+                            }).join('');
+                            const grid = photoBlockEl.querySelector('.flex.gap-2.flex-wrap');
+                            if (grid) grid.insertAdjacentHTML('beforeend', thumbHtml);
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        const loadingEl = document.getElementById(loadingId);
+                        if (loadingEl) loadingEl.remove();
+                        alert('Error: ' + err.message);
+                    })
+                    .addTradingHoursSurveyPhotos(capturedId, unitKey, fileData, clientEmail);
+            });
+        });
+
+        function deleteHoursPhoto(btn, unitKey, photoBlockId) {
+            if (!currentId) return;
+            const capturedId = currentId; // capture before confirm() dialog — user may open another record
+            if (!confirm('ลบรูปภาพนี้?')) return;
+            var _lsDel = null;
+            try { _lsDel = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsDel && _lsDel.email) ? _lsDel.email : '';
+            const url = btn.dataset.url;
+            const wrapper = btn.parentElement;
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '…';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) { alert('ลบรูปไม่สำเร็จ: ' + res.error); btn.disabled = false; btn.textContent = origText; return; }
+                    wrapper.remove();
+                    const photoBlockEl = document.getElementById(photoBlockId);
+                    if (photoBlockEl && photoBlockEl.querySelectorAll('img').length === 0 && !photoBlockEl.querySelector('[data-empty-msg]')) {
+                        const grid = photoBlockEl.querySelector('.flex.gap-2.flex-wrap');
+                        if (grid) grid.insertAdjacentHTML('afterend', '<p class="text-xs text-slate-400 mt-2" data-empty-msg>ไม่มีภาพถ่าย</p>');
+                    }
+                })
+                .withFailureHandler(function(err) { alert('Error: ' + err.message); btn.disabled = false; btn.textContent = origText; })
+                .deleteTradingHoursSurveyPhoto(capturedId, unitKey, url, clientEmail);
+        }
+
+        // ─── Manage Target Stores (Admin) — add/edit Phase 1/2 store list ─────────────
+        function openTargetStoresModal() {
+            document.getElementById('tsCodeInput').value = '';
+            document.getElementById('tsNameInput').value = '';
+            document.getElementById('tsDateInput').value = '';
+            document.getElementById('tsSaveStatus').textContent = '';
+            document.getElementById('targetStoresModal').classList.remove('hidden');
+            _loadTargetStoresList(false);
+        }
+        function closeTargetStoresModal() {
+            document.getElementById('targetStoresModal').classList.add('hidden');
+        }
+
+        function _loadTargetStoresList(isInitialLoad) {
+            if (!isInitialLoad) document.getElementById('tsTableBody').innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-slate-400 text-xs">กำลังโหลด...</td></tr>';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res || !res.success) {
+                        if (!isInitialLoad) document.getElementById('tsTableBody').innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-red-500 text-xs">โหลดไม่สำเร็จ</td></tr>';
+                        console.error('Failed to load trading hours target stores:', res && res.error);
+                        return;
+                    }
+                    hoursTargetStoresList = res.data || [];
+                    hoursTargetStoresMap = {};
+                    hoursTargetStoresList.forEach(function(r) { hoursTargetStoresMap[r.code] = r; });
+                    if (!isInitialLoad) _renderTargetStoresTable();
+                    _renderCoverageStats();
+                })
+                .withFailureHandler(function(err) {
+                    if (!isInitialLoad) document.getElementById('tsTableBody').innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-red-500 text-xs">' + htmlEscape(err.message) + '</td></tr>';
+                    console.error('Failed to load trading hours target stores:', err);
+                })
+                .getTradingHoursTargetStores();
+        }
+
+        function _renderTargetStoresTable() {
+            document.getElementById('tsCount').textContent = hoursTargetStoresList.length;
+            var body = document.getElementById('tsTableBody');
+            if (hoursTargetStoresList.length === 0) {
+                body.innerHTML = '<tr><td colspan="5" class="px-3 py-4 text-center text-slate-400 text-xs">ยังไม่มีสาขาในรายการ</td></tr>';
+                return;
+            }
+            var sorted = hoursTargetStoresList.slice().sort(function(a, b) { return a.code.localeCompare(b.code); });
+            body.innerHTML = sorted.map(function(r) {
+                return '<tr>' +
+                    '<td class="px-3 py-2 font-semibold text-slate-700">' + htmlEscape(r.code) + '</td>' +
+                    '<td class="px-3 py-2 text-slate-600">' + htmlEscape(r.name) + '</td>' +
+                    '<td class="px-3 py-2 text-center">' + htmlEscape(r.phase) + '</td>' +
+                    '<td class="px-3 py-2 text-center">' + htmlEscape(r.targetDate) + '</td>' +
+                    '<td class="px-3 py-2 text-right">' +
+                        '<button onclick="editTargetStore(\'' + r.code + '\')" class="text-xs text-violet-600 hover:underline mr-2">แก้ไข</button>' +
+                        '<button onclick="removeTargetStore(\'' + r.code + '\')" class="text-xs text-red-600 hover:underline">ลบ</button>' +
+                    '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        function editTargetStore(code) {
+            var r = hoursTargetStoresMap[code];
+            if (!r) return;
+            document.getElementById('tsCodeInput').value = r.code;
+            document.getElementById('tsNameInput').value = r.name;
+            document.getElementById('tsPhaseInput').value = r.phase;
+            document.getElementById('tsDateInput').value = r.targetDate;
+        }
+
+        function saveTargetStore() {
+            var code = document.getElementById('tsCodeInput').value.trim();
+            var name = document.getElementById('tsNameInput').value.trim();
+            var phase = document.getElementById('tsPhaseInput').value;
+            var targetDate = document.getElementById('tsDateInput').value;
+            if (!/^\d{4,6}$/.test(code)) { alert('กรุณาระบุรหัสสาขาให้ถูกต้อง (4-6 หลัก)'); return; }
+            if (!name) { alert('กรุณาระบุชื่อสาขา'); return; }
+
+            var _lsU = null; try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+            var statusEl = document.getElementById('tsSaveStatus');
+            statusEl.textContent = 'กำลังบันทึก...';
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) { statusEl.textContent = ''; alert('บันทึกไม่สำเร็จ: ' + res.error); return; }
+                    statusEl.textContent = 'บันทึกสำเร็จ: ' + code;
+                    document.getElementById('tsCodeInput').value = '';
+                    document.getElementById('tsNameInput').value = '';
+                    document.getElementById('tsDateInput').value = '';
+                    _loadTargetStoresList(false);
+                })
+                .withFailureHandler(function(err) { statusEl.textContent = ''; alert('Server Error: ' + err.message); })
+                .upsertTradingHoursTargetStore(code, name, phase, targetDate, clientEmail);
+        }
+
+        function removeTargetStore(code) {
+            if (!confirm('ลบสาขา ' + code + ' ออกจากรายการเป้าหมาย? (จะค้นหาในแบบฟอร์ม Trading Hours Survey ไม่ได้อีก แต่ข้อมูลที่เคยสำรวจแล้วยังอยู่)')) return;
+            var _lsU = null; try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res.success) { alert('ลบไม่สำเร็จ: ' + res.error); return; }
+                    _loadTargetStoresList(false);
+                })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); })
+                .removeTradingHoursTargetStore(code, clientEmail);
+        }
+    </script>
+</body>
+
+</html>

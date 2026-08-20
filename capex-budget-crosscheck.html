@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAPEX Budget Cross-Check</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 12px;
+        }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #1565C0; width: 32px; height: 32px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .pulse-wave { box-shadow: 0 0 0 0 rgba(21, 101, 192, 0.7); animation: pulse-border 2s infinite cubic-bezier(0.66, 0, 0, 1); }
+        @keyframes pulse-border { to { box-shadow: 0 0 0 15px rgba(21, 101, 192, 0); } }
+
+        .badge { padding: 3px 10px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
+        .match-ok   { color: #15803d; background-color: #dcfce7; border: 1px solid #bbf7d0; }
+        .match-warn { color: #b45309; background-color: #fef3c7; border: 1px solid #fde68a; }
+        .match-none { color: #475569; background-color: #f1f5f9; border: 1px solid #e2e8f0; }
+        .match-bad  { color: #b91c1c; background-color: #fee2e2; border: 1px solid #fecaca; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="hidden fixed inset-0 bg-slate-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8">
+            <div class="text-center mb-6">
+                <div class="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                </div>
+                <h2 class="text-xl font-bold text-slate-800">Sign In Required</h2>
+                <p class="text-slate-500 text-sm mt-1">กรุณาเข้าสู่ระบบก่อนใช้งาน</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Email</label>
+                    <input type="email" id="loginEmail" required placeholder="your.name@example.com"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Password</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••"
+                        class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
+                </div>
+                <div id="loginError" class="hidden text-red-600 text-xs text-center bg-red-50 border border-red-200 rounded-lg p-2"></div>
+                <button type="submit" id="loginBtn"
+                    class="w-full bg-blue-700 hover:bg-blue-800 text-white font-semibold py-2.5 rounded-lg transition flex items-center justify-center gap-2 text-sm">
+                    <svg id="loginSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span id="loginBtnText">เข้าสู่ระบบ</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white bg-opacity-95 backdrop-blur-sm transition-opacity duration-500">
+        <div class="relative mb-6">
+            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center pulse-wave">
+                <svg class="w-8 h-8 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3v-6m-3 6v-9m-2 9h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            </div>
+        </div>
+        <h2 class="text-xl font-bold text-slate-800 mb-2">CAPEX Budget Cross-Check</h2>
+        <p id="loadingStatusText" class="text-sm text-slate-500 font-medium">Checking authorization...</p>
+        <div class="mt-6 w-64 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+            <div id="loadingProgress" class="bg-blue-700 h-1.5 rounded-full" style="width: 10%; transition: width 0.3s ease;"></div>
+        </div>
+    </div>
+
+    <!-- Error Screen -->
+    <div id="errorScreen" class="hidden min-h-screen flex items-center justify-center bg-slate-50">
+        <div class="text-center p-8 glass-panel max-w-md w-full mx-4">
+            <div class="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h2 id="errorTitle" class="text-2xl font-bold text-slate-800 mb-2">Access Denied</h2>
+            <p id="errorMessage" class="text-slate-500 mb-6 text-sm">สิทธิ์หน้านี้จำกัดเฉพาะ <span class="font-semibold text-slate-700">ทีม MTN (SMF) / Admin</span> เท่านั้น</p>
+            <div id="errorActions" class="flex flex-col sm:flex-row gap-3 justify-center">
+                <a id="errorBackBtn" href="<?= ScriptApp.getService().getUrl() ?>" class="inline-block px-6 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition">กลับหน้าหลัก</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboardContainer" class="hidden min-h-screen flex flex-col">
+
+        <!-- Header -->
+        <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-4">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-slate-400 hover:text-blue-700 transition-colors p-2 rounded-lg hover:bg-slate-50">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                        </a>
+                        <div class="h-8 w-1 border-l-2 border-slate-200"></div>
+                        <div>
+                            <h1 class="text-xl font-bold text-slate-900 leading-tight">
+                                CAPEX Budget Cross-Check <span class="text-blue-700">BCM 2027-2033</span>
+                            </h1>
+                            <p class="text-xs text-slate-500 font-medium">ตรวจสอบอุปกรณ์จริง (สำรวจล่าสุด) เทียบแผนงบลงทุน ก่อนยืนยันใช้งบประมาณ</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right hidden sm:block">
+                            <p id="userEmailDisplay" class="text-xs font-bold text-slate-700"></p>
+                            <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full uppercase">MTN (SMF) Dashboard</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Content -->
+        <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
+
+            <!-- Store Search + Year / AMM MTN Filter -->
+            <div class="glass-panel p-5">
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="sm:w-48 shrink-0">
+                        <label class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">ปีงบประมาณ (Target Year)</label>
+                        <select id="yearFilterSelect"
+                            class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition bg-white">
+                            <option value="2027" selected>2027 (ปีที่เสนอขออนุมัติ)</option>
+                            <option value="2028">2028</option>
+                            <option value="2029">2029</option>
+                            <option value="2030">2030</option>
+                            <option value="2031">2031</option>
+                            <option value="2032">2032</option>
+                            <option value="2033">2033</option>
+                            <option value="0">ทุกปี (All years)</option>
+                        </select>
+                    </div>
+                    <div class="sm:w-56 shrink-0">
+                        <label class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">AMM MTN (Master Store)</label>
+                        <select id="ammMtnFilterSelect"
+                            class="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition bg-white">
+                            <option value="">ทั้งหมด (All AMM MTN)</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">ค้นหาสาขา (Search Store)</label>
+                        <div class="relative">
+                            <input id="storeSearchInput" type="text" placeholder="พิมพ์รหัสสาขา หรือ ชื่อสาขา เช่น 21002 หรือ Udomsuk"
+                                list="storeSearchList" autocomplete="off"
+                                class="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition">
+                            <datalist id="storeSearchList"></datalist>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between mt-2">
+                    <p id="storeCountHint" class="text-[11px] text-slate-400"></p>
+                    <button id="refreshSeedBtn" onclick="doRefreshSeed()"
+                        class="hidden text-[11px] px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-blue-700 transition font-medium">
+                        ♻️ รีเฟรชแผนงบจาก Seed (Admin)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtered Store List (shown whenever no single store is open) -->
+            <div id="noStoreSelected" class="glass-panel p-5 overflow-x-auto">
+                <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider border-b border-slate-100 pb-2">
+                    รายชื่อสาขาตามตัวกรอง (คลิกแถวเพื่อดูรายละเอียด)
+                </h3>
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                            <th class="py-2 pr-3">รหัสสาขา</th>
+                            <th class="py-2 pr-3">ชื่อสาขา</th>
+                            <th class="py-2 pr-3">ภูมิภาค/เขต</th>
+                            <th class="py-2 pr-3">AMM MTN</th>
+                            <th class="py-2 pr-3">ตู้แช่เย็น Open Display (แผน)</th>
+                            <th class="py-2 pr-3">เครื่องปรับอากาศ (แผน)</th>
+                            <th class="py-2 pr-3">สัญญาเช่า (Lease)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="storeListTableBody"></tbody>
+                </table>
+                <p id="storeListEmptyHint" class="hidden text-center text-slate-400 py-6">ไม่พบสาขาตามตัวกรองที่เลือก</p>
+            </div>
+
+            <!-- Store Detail Panel -->
+            <div id="storeDetail" class="hidden space-y-6">
+
+                <div class="glass-panel p-5 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <button onclick="backToStoreList()" class="text-xs text-blue-600 hover:text-blue-800 font-medium mb-1 flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                            กลับไปที่รายชื่อสาขา
+                        </button>
+                        <h2 id="storeTitle" class="text-lg font-bold text-slate-900">—</h2>
+                        <p id="storeSubtitle" class="text-xs text-slate-500"></p>
+                    </div>
+                    <div id="storeTotalBudgetBadge" class="badge match-none text-sm px-4 py-2"></div>
+                </div>
+
+                <!-- Lease Status (Site Acquisition weekly follow-up) -->
+                <div class="glass-panel p-5 border-l-4 border-violet-500">
+                    <h3 class="text-sm font-bold text-violet-700 uppercase tracking-wider mb-3">📄 สัญญาเช่าสาขา (Lease) — ข้อมูลติดตามต่อสัญญา Site Acquisition</h3>
+                    <div id="leaseInfoBox" class="text-sm text-slate-600">—</div>
+                </div>
+
+                <!-- Latest Survey Snapshot -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="glass-panel p-5 border-l-4 border-blue-600">
+                        <h3 class="text-sm font-bold text-blue-700 uppercase tracking-wider mb-3">🧊 ตู้แช่เย็น Open Display — สำรวจล่าสุด</h3>
+                        <div id="refSurveyBox" class="text-sm text-slate-600">—</div>
+                    </div>
+                    <div class="glass-panel p-5 border-l-4 border-orange-500">
+                        <h3 class="text-sm font-bold text-orange-600 uppercase tracking-wider mb-3">❄️ เครื่องปรับอากาศ — สำรวจล่าสุด</h3>
+                        <div id="acSurveyBox" class="text-sm text-slate-600">—</div>
+                    </div>
+                </div>
+
+                <!-- Budget vs Survey Table -->
+                <div class="glass-panel p-5 overflow-x-auto">
+                    <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider border-b border-slate-100 pb-2">
+                        แผนงบประมาณ 7 ปี เทียบ ข้อมูลสำรวจ (Plan vs Survey)
+                    </h3>
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-2 pr-3">ปี</th>
+                                <th class="py-2 pr-3">งบตู้แช่เย็น (฿)</th>
+                                <th class="py-2 pr-3">จำนวนแผน / สำรวจ</th>
+                                <th class="py-2 pr-3">งบ AC (฿)</th>
+                                <th class="py-2 pr-3">จำนวนแผน / สำรวจ</th>
+                                <th class="py-2 pr-3">รวม (฿)</th>
+                                <th class="py-2 pr-3 text-center">ยืนยันใช้งบ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="budgetTableBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- Confirmation History -->
+                <div class="glass-panel p-5 overflow-x-auto">
+                    <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider border-b border-slate-100 pb-2">
+                        ประวัติการยืนยันใช้งบประมาณ (Confirmation History)
+                    </h3>
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-2 pr-3">วันที่ยืนยัน</th>
+                                <th class="py-2 pr-3">ปี</th>
+                                <th class="py-2 pr-3">ประเภท</th>
+                                <th class="py-2 pr-3">งบที่วางแผน</th>
+                                <th class="py-2 pr-3">แผน / สำรวจ (จำนวน)</th>
+                                <th class="py-2 pr-3">อายุ (ปี)</th>
+                                <th class="py-2 pr-3">สภาพเฉลี่ย</th>
+                                <th class="py-2 pr-3">ผู้ยืนยัน</th>
+                                <th class="py-2 pr-3">หมายเหตุ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="confirmHistoryBody">
+                            <tr><td colspan="9" class="py-4 text-center text-slate-400">ยังไม่มีการยืนยัน</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-60 z-[110] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-1">ยืนยันใช้งบประมาณ</h3>
+            <p id="confirmModalSubtitle" class="text-xs text-slate-500 mb-4"></p>
+
+            <div class="bg-slate-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+                <div class="flex justify-between"><span class="text-slate-500">งบที่วางแผน</span><span id="cmPlannedBudget" class="font-semibold">—</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">จำนวนแผน</span><span id="cmPlannedQty" class="font-semibold">—</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">จำนวนสำรวจล่าสุด</span><span id="cmSurveyedQty" class="font-semibold">—</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">วันที่สำรวจ</span><span id="cmSurveyedDate" class="font-semibold">—</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">อายุ / อายุใช้งานตามแผน</span><span id="cmStoreAge" class="font-semibold">—</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">สภาพเฉลี่ย (สำรวจล่าสุด)</span><span id="cmCondition" class="font-semibold">—</span></div>
+                <div class="flex justify-between items-center"><span class="text-slate-500">สัญญาเช่า (ปีนี้)</span><span id="cmLease">—</span></div>
+            </div>
+
+            <label class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">หมายเหตุ (Notes)</label>
+            <textarea id="cmNotes" rows="3" placeholder="เช่น ตรวจสอบแล้วตรงตามแผน พร้อมเบิกใช้งบ"
+                class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition mb-4"></textarea>
+
+            <div id="confirmModalError" class="hidden text-red-600 text-xs text-center bg-red-50 border border-red-200 rounded-lg p-2 mb-3"></div>
+
+            <div class="flex gap-3">
+                <button onclick="closeConfirmModal()" class="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 transition">ยกเลิก</button>
+                <button id="confirmModalSubmitBtn" onclick="submitConfirmation()" class="flex-1 px-4 py-2.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold transition flex items-center justify-center gap-2">
+                    <svg id="confirmModalSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span>ยืนยัน</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        let STORE_LIST = [];          // full list for the current year filter (from server)
+        let FILTERED_STORE_LIST = []; // STORE_LIST further narrowed by the AMM MTN filter
+        let CURRENT_STORE = null;
+        let CURRENT_CROSSCHECK = null;
+        let PENDING_CONFIRM = null; // { year, equipType, plannedBudget, plannedQty, surveyedQty, surveyedDate }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkLoginAndStart();
+            document.getElementById('storeSearchInput').addEventListener('change', onStoreSearchChange);
+            document.getElementById('storeSearchInput').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') onStoreSearchChange();
+            });
+            document.getElementById('yearFilterSelect').addEventListener('change', onYearFilterChange);
+            document.getElementById('ammMtnFilterSelect').addEventListener('change', onAmmMtnFilterChange);
+        });
+
+        // ==========================================
+        // 0. Login Gate
+        // ==========================================
+        function checkLoginAndStart() {
+            const cachedUserStr = localStorage.getItem('app_user_data');
+            if (cachedUserStr) {
+                try {
+                    const usr = JSON.parse(cachedUserStr);
+                    if (usr && usr.email) { initAuthAndData(usr.email, usr.name); return; }
+                } catch (e) {}
+            }
+            document.getElementById('loadingScreen').classList.add('hidden');
+            document.getElementById('loginOverlay').classList.remove('hidden');
+        }
+
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const spinner = document.getElementById('loginSpinner');
+            const btnText = document.getElementById('loginBtnText');
+            const errorDiv = document.getElementById('loginError');
+            const email = document.getElementById('loginEmail').value.trim();
+            const pwd = document.getElementById('loginPassword').value;
+
+            btn.disabled = true; spinner.classList.remove('hidden'); btnText.textContent = 'กำลังตรวจสอบ...'; errorDiv.classList.add('hidden');
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.disabled = false; spinner.classList.add('hidden'); btnText.textContent = 'เข้าสู่ระบบ';
+                    if (res && res.success) {
+                        localStorage.setItem('app_user_data', JSON.stringify(res.user));
+                        document.getElementById('loginOverlay').classList.add('hidden');
+                        document.getElementById('loadingScreen').classList.remove('hidden');
+                        initAuthAndData(res.user.email, res.user.name);
+                    } else {
+                        errorDiv.textContent = (res && res.error) || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+                        errorDiv.classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    btn.disabled = false; spinner.classList.add('hidden'); btnText.textContent = 'เข้าสู่ระบบ';
+                    errorDiv.textContent = 'ระบบขัดข้อง: ' + (err.message || err);
+                    errorDiv.classList.remove('hidden');
+                })
+                .loginUser(email, pwd);
+        }
+
+        // ==========================================
+        // 1. Auth + Store List Fetch
+        // ==========================================
+        let CURRENT_EMAIL = '';
+        let CURRENT_YEAR_FILTER = 2027; // default: target 2027 (the year up for budget approval) first
+        let DASHBOARD_READY = false;
+
+        function initAuthAndData(email, displayName) {
+            CURRENT_EMAIL = email;
+            updateLoading('ตรวจสอบสิทธิ์การเข้าถึง...', 25);
+            if (displayName || email) document.getElementById('userEmailDisplay').textContent = displayName || email;
+
+            const fetchTimeout = setTimeout(function() {
+                showDataError('หมดเวลาเชื่อมต่อ (Timeout) กรุณา Reload หน้าเว็บแล้วลองใหม่');
+            }, 45000);
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    clearTimeout(fetchTimeout);
+                    handleStoreListResult(res);
+                })
+                .withFailureHandler(function(err) {
+                    clearTimeout(fetchTimeout);
+                    showDataError(err.message || 'เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาลองใหม่');
+                })
+                .getCapexBudgetStoreList(email || '', CURRENT_YEAR_FILTER);
+        }
+
+        // Re-fetch the store list when the year filter changes (after initial load)
+        function onYearFilterChange() {
+            CURRENT_YEAR_FILTER = Number(document.getElementById('yearFilterSelect').value) || 0;
+            document.getElementById('storeSearchInput').value = '';
+            document.getElementById('noStoreSelected').classList.remove('hidden');
+            document.getElementById('storeDetail').classList.add('hidden');
+            document.getElementById('storeCountHint').textContent = 'กำลังโหลดรายชื่อสาขา...';
+
+            google.script.run
+                .withSuccessHandler(handleStoreListResult)
+                .withFailureHandler(function(err) {
+                    document.getElementById('storeCountHint').textContent = 'โหลดรายชื่อสาขาไม่สำเร็จ: ' + (err.message || err);
+                })
+                .getCapexBudgetStoreList(CURRENT_EMAIL, CURRENT_YEAR_FILTER);
+        }
+
+        function handleStoreListResult(res) {
+            if (!DASHBOARD_READY) updateLoading('กำลังเตรียมรายชื่อสาขา...', 70);
+            if (!res) { showDataError('Server ไม่ตอบสนอง — โปรดลองใหม่อีกครั้ง'); return; }
+            if (res.success === false) {
+                if (/permission denied/i.test(res.error || '')) showAccessDenied();
+                else showDataError(res.error || 'เกิดข้อผิดพลาดในการดึงข้อมูล');
+                return;
+            }
+
+            STORE_LIST = res.stores || [];
+            if (res.isAdmin) document.getElementById('refreshSeedBtn').classList.remove('hidden');
+            populateAmmMtnFilterOptions();
+            applyAmmMtnFilterAndRenderList();
+
+            if (!DASHBOARD_READY) {
+                DASHBOARD_READY = true;
+                updateLoading('เตรียมข้อมูลแสดงผลเรียบร้อย', 100);
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').classList.add('opacity-0');
+                    setTimeout(() => {
+                        document.getElementById('loadingScreen').classList.add('hidden');
+                        document.getElementById('dashboardContainer').classList.remove('hidden');
+                    }, 500);
+                }, 300);
+            }
+        }
+
+        // Rebuilds the AMM MTN dropdown options from the currently loaded STORE_LIST
+        // (per Master Store data via _buildStoreEnrichMap on the server), preserving
+        // the current selection if it's still valid for this year filter.
+        function populateAmmMtnFilterOptions() {
+            const sel = document.getElementById('ammMtnFilterSelect');
+            const prevValue = sel.value;
+            const names = Array.from(new Set(STORE_LIST.map(function(s) { return (s.ammMtn || '').trim(); }).filter(Boolean)))
+                .sort(function(a, b) { return a.localeCompare(b, 'th'); });
+
+            sel.innerHTML = '<option value="">ทั้งหมด (All AMM MTN)</option>' +
+                names.map(function(n) { return '<option value="' + htmlEscape(n) + '">' + htmlEscape(n) + '</option>'; }).join('');
+
+            sel.value = names.indexOf(prevValue) > -1 ? prevValue : '';
+        }
+
+        function onAmmMtnFilterChange() {
+            document.getElementById('storeSearchInput').value = '';
+            document.getElementById('noStoreSelected').classList.remove('hidden');
+            document.getElementById('storeDetail').classList.add('hidden');
+            applyAmmMtnFilterAndRenderList();
+        }
+
+        // Narrows STORE_LIST by the selected AMM MTN into FILTERED_STORE_LIST, then
+        // (re)builds the search datalist + hint text from that filtered set.
+        function applyAmmMtnFilterAndRenderList() {
+            const ammMtn = document.getElementById('ammMtnFilterSelect').value;
+            FILTERED_STORE_LIST = ammMtn
+                ? STORE_LIST.filter(function(s) { return (s.ammMtn || '').trim() === ammMtn; })
+                : STORE_LIST;
+
+            const list = document.getElementById('storeSearchList');
+            list.innerHTML = FILTERED_STORE_LIST.map(function(s) {
+                return '<option value="' + htmlEscape(s.code + ' - ' + s.name) + '">';
+            }).join('');
+
+            const yearNote = CURRENT_YEAR_FILTER ? ' ที่มีแผนงบประมาณปี ' + CURRENT_YEAR_FILTER : ' ในแผน CAPEX 7 ปี (2027-2033)';
+            const ammNote = ammMtn ? ' | AMM MTN: ' + ammMtn : '';
+            document.getElementById('storeCountHint').textContent = FILTERED_STORE_LIST.length + ' สาขา' + yearNote + ammNote;
+
+            renderStoreListTable();
+        }
+
+        // Shows every store matching the current year/AMM MTN filters as a clickable
+        // table — so selecting a filter surfaces results immediately, without having
+        // to search for one store first.
+        function renderStoreListTable() {
+            const tbody = document.getElementById('storeListTableBody');
+            const emptyHint = document.getElementById('storeListEmptyHint');
+            // Sort by planned quantity (not budget) — this table is for equipment
+            // identification/confirmation, budget figures live in the detail view.
+            const sorted = FILTERED_STORE_LIST.slice().sort(function(a, b) {
+                const aQty = CURRENT_YEAR_FILTER ? (a.refrigQtyYear + a.acQtyYear) : (a.refrigQtyTotal + a.acQtyTotal);
+                const bQty = CURRENT_YEAR_FILTER ? (b.refrigQtyYear + b.acQtyYear) : (b.refrigQtyTotal + b.acQtyTotal);
+                return bQty - aQty;
+            });
+
+            if (!sorted.length) {
+                tbody.innerHTML = '';
+                emptyHint.classList.remove('hidden');
+                return;
+            }
+            emptyHint.classList.add('hidden');
+
+            tbody.innerHTML = sorted.map(function(s) {
+                const refrigQty = CURRENT_YEAR_FILTER ? s.refrigQtyYear : s.refrigQtyTotal;
+                const acQty = CURRENT_YEAR_FILTER ? s.acQtyYear : s.acQtyTotal;
+                return '<tr class="border-b border-slate-100 hover:bg-blue-50 cursor-pointer transition" onclick="loadStoreCrossCheck(\'' + s.code + '\')">' +
+                    '<td class="py-2 pr-3 font-semibold text-blue-700">' + htmlEscape(s.code) + '</td>' +
+                    '<td class="py-2 pr-3">' + htmlEscape(s.name) + '</td>' +
+                    '<td class="py-2 pr-3 text-slate-500">' + htmlEscape(s.region || '—') + '</td>' +
+                    '<td class="py-2 pr-3 text-slate-500">' + htmlEscape(s.ammMtn || '—') + '</td>' +
+                    '<td class="py-2 pr-3">' + (refrigQty > 0 ? refrigQty + ' ตู้' : '—') + '</td>' +
+                    '<td class="py-2 pr-3">' + (acQty > 0 ? acQty + ' เครื่อง' : '—') + '</td>' +
+                    '<td class="py-2 pr-3">' + leaseBadge(s.leaseStatusCode, s.leaseStatusText, true) + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        // Admin only: force-rewrite the CAPEX_Budget_Store sheet from the pushed
+        // CAPEX_BUDGET_SEED, then reload the list. Needed after the seed .gs file
+        // is regenerated (ensureCapexBudgetSheet_ never overwrites existing data).
+        function doRefreshSeed() {
+            if (!confirm('เขียนทับข้อมูลชีต CAPEX_Budget_Store ด้วย Seed ล่าสุดที่ deploy ไว้?')) return;
+            const btn = document.getElementById('refreshSeedBtn');
+            btn.disabled = true; btn.textContent = 'กำลังรีเฟรช...';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.disabled = false; btn.textContent = '♻️ รีเฟรชแผนงบจาก Seed (Admin)';
+                    if (!res || res.success === false) {
+                        alert('รีเฟรชไม่สำเร็จ: ' + ((res && res.error) || 'unknown error'));
+                        return;
+                    }
+                    alert('รีเฟรชแล้ว ' + res.rows + ' แถว — กำลังโหลดรายชื่อใหม่');
+                    onYearFilterChange();
+                })
+                .withFailureHandler(function(err) {
+                    btn.disabled = false; btn.textContent = '♻️ รีเฟรชแผนงบจาก Seed (Admin)';
+                    alert('ระบบขัดข้อง: ' + (err.message || err));
+                })
+                .refreshCapexBudgetSheet(CURRENT_EMAIL);
+        }
+
+        function backToStoreList() {
+            document.getElementById('storeDetail').classList.add('hidden');
+            document.getElementById('noStoreSelected').classList.remove('hidden');
+            document.getElementById('storeSearchInput').value = '';
+            CURRENT_CROSSCHECK = null;
+        }
+
+        function showAccessDenied() {
+            document.getElementById('errorTitle').textContent = 'Access Denied';
+            document.getElementById('errorMessage').innerHTML = 'สิทธิ์หน้านี้จำกัดเฉพาะ <span class="font-semibold text-slate-700">ทีม MTN (SMF) / Admin</span> เท่านั้น<br>กรุณาเข้าสู่ระบบด้วยบัญชีที่ถูกต้อง';
+            document.getElementById('errorActions').innerHTML =
+                '<a href="<?= ScriptApp.getService().getUrl() ?>" class="inline-block px-6 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition">กลับหน้าหลัก</a>';
+            localStorage.removeItem('app_user_data');
+            showErrorScreen();
+        }
+
+        function showDataError(msg) {
+            document.getElementById('errorTitle').textContent = 'เกิดข้อผิดพลาด (Error)';
+            document.getElementById('errorMessage').innerHTML = '<span class="font-semibold text-red-600">' + htmlEscape(msg || 'ไม่สามารถโหลดข้อมูลได้') + '</span>';
+            document.getElementById('errorActions').innerHTML =
+                '<button onclick="location.reload()" class="inline-block px-6 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition">โหลดใหม่ (Retry)</button>' +
+                '<a href="<?= ScriptApp.getService().getUrl() ?>" class="inline-block px-6 py-2 bg-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-300 transition">กลับหน้าหลัก</a>';
+            showErrorScreen();
+        }
+
+        function showErrorScreen() {
+            document.getElementById('loadingScreen').classList.add('hidden');
+            document.getElementById('dashboardContainer').classList.add('hidden');
+            document.getElementById('errorScreen').classList.remove('hidden');
+        }
+
+        function updateLoading(msg, pct) {
+            const t = document.getElementById('loadingStatusText');
+            const p = document.getElementById('loadingProgress');
+            if (t) t.textContent = msg;
+            if (p) p.style.width = pct + '%';
+        }
+
+        // ==========================================
+        // 2. Store Search + Cross-Check Fetch
+        // ==========================================
+        function onStoreSearchChange() {
+            const raw = document.getElementById('storeSearchInput').value.trim();
+            if (!raw) return;
+            const codeGuess = raw.split(' - ')[0].trim();
+            const match = FILTERED_STORE_LIST.find(function(s) {
+                return s.code === codeGuess || s.code.toLowerCase() === raw.toLowerCase() ||
+                       (s.name || '').toLowerCase() === raw.toLowerCase();
+            }) || FILTERED_STORE_LIST.find(function(s) {
+                return (s.name || '').toLowerCase().indexOf(raw.toLowerCase()) > -1;
+            });
+            if (!match) return;
+            loadStoreCrossCheck(match.code);
+        }
+
+        function loadStoreCrossCheck(storeCode) {
+            document.getElementById('noStoreSelected').classList.add('hidden');
+            document.getElementById('storeDetail').classList.add('hidden');
+            document.getElementById('storeTitle').textContent = 'กำลังโหลด...';
+
+            google.script.run
+                .withSuccessHandler(handleCrossCheckResult)
+                .withFailureHandler(function(err) {
+                    alert('เกิดข้อผิดพลาด: ' + (err.message || err));
+                })
+                .getCapexCrossCheck(storeCode, CURRENT_EMAIL);
+        }
+
+        function handleCrossCheckResult(res) {
+            if (!res || res.success === false) {
+                alert((res && res.error) || 'ไม่พบข้อมูลสาขานี้ในแผน CAPEX');
+                return;
+            }
+            CURRENT_CROSSCHECK = res;
+            renderStoreDetail(res);
+        }
+
+        // ==========================================
+        // 3. Render
+        // ==========================================
+        function renderStoreDetail(res) {
+            document.getElementById('noStoreSelected').classList.add('hidden');
+            document.getElementById('storeDetail').classList.remove('hidden');
+
+            document.getElementById('storeTitle').textContent = res.storeCode + ' — ' + res.storeName;
+            const ageNote = (res.storeOpenYear && res.storeAgeYears !== null)
+                ? ' | เปิดสาขาปี ' + res.storeOpenYear + ' (อายุปัจจุบัน ~' + res.storeAgeYears + ' ปี)'
+                : '';
+            const storeMeta = STORE_LIST.find(function(s) { return s.code === res.storeCode; });
+            const ammNote = (storeMeta && storeMeta.ammMtn) ? ' | AMM MTN: ' + storeMeta.ammMtn : '';
+            document.getElementById('storeSubtitle').textContent =
+                'แผนงบประมาณ CAPEX 7 ปี (2027-2033) เทียบข้อมูลสำรวจล่าสุดในระบบ' + ageNote + ammNote;
+
+            const grandTotal = (res.budget || []).reduce(function(s, r) { return s + r.refrigBudget + r.acBudget; }, 0);
+            document.getElementById('storeTotalBudgetBadge').className = 'badge match-none text-sm px-4 py-2';
+            document.getElementById('storeTotalBudgetBadge').textContent = 'รวม 7 ปี: ' + formatBaht(grandTotal);
+
+            renderLeaseInfo(res);
+            renderSurveyBox('refSurveyBox', res.survey && res.survey.refrig, 'ตู้ Open Display', res.storeAgeYears, res.refrigUsefulLifeYears);
+            renderSurveyBox('acSurveyBox', res.survey && res.survey.ac, 'เครื่อง', res.storeAgeYears, res.acUsefulLifeYears);
+
+            renderBudgetTable(res);
+            renderConfirmHistory(res.confirmations || []);
+        }
+
+        // 0-5 scale matches AirconSurveyReport.html / RefSurveyReport.html:
+        // 0 ชำรุด/หมดสภาพ, 1 แย่มาก, 2 แย่ ควรซ่อม, 3 พอใช้, 4 ดี, 5 ใหม่/สมบูรณ์
+        const CONDITION_LABELS = ['0 – ชำรุด/หมดสภาพ', '1 – แย่มาก', '2 – แย่ ควรซ่อม', '3 – พอใช้', '4 – ดี', '5 – ใหม่/สมบูรณ์'];
+        const POOR_CONDITION_RATING_JS = 2;
+        function conditionBadge(avgRating, worstRating, poorCount) {
+            if (avgRating === null || avgRating === undefined) return '<span class="badge match-none">ไม่มีข้อมูลสภาพเครื่อง</span>';
+            const cls = avgRating <= POOR_CONDITION_RATING_JS ? 'match-warn' : 'match-ok';
+            let txt = 'สภาพเฉลี่ย ' + avgRating + '/5';
+            if (worstRating !== null && worstRating <= POOR_CONDITION_RATING_JS) txt += ' (แย่สุด ' + worstRating + ', ' + poorCount + ' ตัวสภาพไม่ดี)';
+            return '<span class="badge ' + cls + '">' + txt + '</span>';
+        }
+
+        function ageDueBadge(storeAgeYears, usefulLifeYears) {
+            if (storeAgeYears === null || storeAgeYears === undefined || !usefulLifeYears) return '';
+            if (storeAgeYears >= usefulLifeYears) {
+                return '<span class="badge match-warn">ครบอายุใช้งาน (' + storeAgeYears + '/' + usefulLifeYears + ' ปี) — ควรพิจารณาเปลี่ยน</span>';
+            }
+            return '<span class="badge match-ok">ยังไม่ครบอายุใช้งาน (' + storeAgeYears + '/' + usefulLifeYears + ' ปี)</span>';
+        }
+
+        function renderSurveyBox(elId, snap, unitWord, storeAgeYears, usefulLifeYears) {
+            const el = document.getElementById(elId);
+            const ageBadge = ageDueBadge(storeAgeYears, usefulLifeYears);
+            if (!snap) {
+                el.innerHTML = '<span class="text-slate-400">ไม่พบข้อมูลสำรวจสำหรับสาขานี้</span>' +
+                    (ageBadge ? '<div class="mt-2">' + ageBadge + '</div>' : '');
+                return;
+            }
+            const dateStr = snap.timestamp ? new Date(snap.timestamp).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+            const brokenBadge = snap.hasBroken === 'Yes'
+                ? '<span class="badge match-warn">ชำรุด: ' + htmlEscape(snap.brokenUnits || '') + '</span>'
+                : '<span class="badge match-ok">ไม่พบรายการชำรุด</span>';
+
+            const otherTypes = snap.otherQuantities || {};
+            const otherTypeKeys = Object.keys(otherTypes);
+            const otherTypesHtml = otherTypeKeys.length
+                ? '<div class="mt-2 pt-2 border-t border-slate-100">' +
+                    '<p class="text-[11px] text-slate-400 mb-1">ตู้แช่เย็นประเภทอื่นในสาขานี้ (ไม่อยู่ในแผน CAPEX นี้)</p>' +
+                    '<div class="flex flex-wrap gap-1.5">' +
+                    otherTypeKeys.map(function(label) {
+                        return '<span class="badge match-none">' + htmlEscape(label) + ': ' + otherTypes[label] + '</span>';
+                    }).join('') +
+                    '</div></div>'
+                : '';
+
+            el.innerHTML =
+                '<div class="flex items-center justify-between mb-2"><span class="text-2xl font-extrabold text-slate-800">' + (snap.qty !== null ? snap.qty : '—') + '</span><span class="text-xs text-slate-400">' + unitWord + ' (สำรวจล่าสุด)</span></div>' +
+                '<div class="flex flex-wrap gap-2 mb-2">' + brokenBadge + '<span class="badge match-none">สถานะ: ' + htmlEscape(snap.status || '-') + '</span></div>' +
+                '<div class="flex flex-wrap gap-2 mb-2">' + conditionBadge(snap.avgRating, snap.worstRating, snap.poorConditionCount) + (ageBadge ? ageBadge : '') + '</div>' +
+                '<p class="text-xs text-slate-400">สำรวจเมื่อ ' + dateStr + (snap.reporter ? ' โดย ' + htmlEscape(String(snap.reporter)) : '') + '</p>' +
+                otherTypesHtml;
+        }
+
+        // Lease card in the store detail view. The overall badge is judged against
+        // the store's FIRST budgeted year (the year its lease must cover first);
+        // per-year flags live in the budget table rows.
+        function renderLeaseInfo(res) {
+            const el = document.getElementById('leaseInfoBox');
+            const lease = res.lease || {};
+            const firstBudgeted = (res.budget || []).find(function(b) { return (b.refrigBudget + b.acBudget) > 0; });
+            const overallBadge = firstBudgeted
+                ? leaseBadge(firstBudgeted.leaseStatusCode, firstBudgeted.leaseStatusText, false)
+                : leaseBadge(lease.statusCode, lease.statusText, false);
+
+            const items = [];
+            items.push('<div><p class="text-[11px] text-slate-400 uppercase">สถานะเทียบปีแรกที่ลงทุน' + (firstBudgeted ? ' (' + firstBudgeted.year + ')' : '') + '</p><div class="mt-0.5">' + overallBadge + '</div></div>');
+            items.push('<div><p class="text-[11px] text-slate-400 uppercase">สิ้นสุดสัญญาล่าสุด</p><p class="font-semibold">' + (lease.leaseEnd ? htmlEscape(lease.leaseEnd) : '—') + '</p></div>');
+            items.push('<div><p class="text-[11px] text-slate-400 uppercase">Tier (EBITDA/SC3)</p><p class="font-semibold">' + (lease.tier ? htmlEscape(lease.tier) : '—') + '</p></div>');
+            items.push('<div><p class="text-[11px] text-slate-400 uppercase">ช่วงสัญญา</p><p class="font-semibold">' + (lease.phase ? htmlEscape(lease.phase) : '—') + '</p></div>');
+            el.innerHTML = '<div class="grid grid-cols-2 md:grid-cols-4 gap-4">' + items.join('') + '</div>' +
+                (lease.progress
+                    ? '<p class="text-xs text-slate-500 mt-3 pt-2 border-t border-slate-100">ความคืบหน้าต่อสัญญา: ' + htmlEscape(lease.progress) + '</p>'
+                    : '');
+        }
+
+        function qtyMatchBadge(planned, surveyed) {
+            if (surveyed === null || surveyed === undefined) return '<span class="badge match-none">' + planned + ' / ไม่มีข้อมูล</span>';
+            if (Number(surveyed) === Number(planned)) return '<span class="badge match-ok">' + planned + ' / ' + surveyed + '</span>';
+            return '<span class="badge match-warn">' + planned + ' / ' + surveyed + '</span>';
+        }
+
+        function renderBudgetTable(res) {
+            const tbody = document.getElementById('budgetTableBody');
+            const refSnap = res.survey && res.survey.refrig;
+            const acSnap  = res.survey && res.survey.ac;
+            const storeAgeYears = res.storeAgeYears;
+
+            tbody.innerHTML = (res.budget || []).map(function(row) {
+                const total = row.refrigBudget + row.acBudget;
+                if (total <= 0) return '';
+                let btns = '';
+                if (row.refrigBudget > 0) {
+                    btns += '<button class="text-[11px] px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 mr-1 mb-1" ' +
+                        'onclick=\'openConfirmModal(' + row.year + ',"Refrigeration",' + row.refrigBudget + ',' + row.refrigQtyPlanned + ',' +
+                        JSON.stringify(refSnap ? refSnap.qty : null) + ',' + JSON.stringify(refSnap ? refSnap.timestamp : null) + ',' +
+                        JSON.stringify(storeAgeYears) + ',' + JSON.stringify(refSnap ? refSnap.avgRating : null) + ',' + (res.refrigUsefulLifeYears || 7) +
+                        ')\'>ยืนยันตู้แช่</button>';
+                }
+                if (row.acBudget > 0) {
+                    btns += '<button class="text-[11px] px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 mb-1" ' +
+                        'onclick=\'openConfirmModal(' + row.year + ',"Air Conditioning",' + row.acBudget + ',' + row.acQtyPlanned + ',' +
+                        JSON.stringify(acSnap ? acSnap.qty : null) + ',' + JSON.stringify(acSnap ? acSnap.timestamp : null) + ',' +
+                        JSON.stringify(storeAgeYears) + ',' + JSON.stringify(acSnap ? acSnap.avgRating : null) + ',' + (res.acUsefulLifeYears || 12) +
+                        ')\'>ยืนยัน AC</button>';
+                }
+                const isTargetYear = CURRENT_YEAR_FILTER && row.year === CURRENT_YEAR_FILTER;
+                const rowClass = isTargetYear ? 'border-b border-slate-100 bg-blue-50/60 ring-1 ring-inset ring-blue-200' : 'border-b border-slate-100';
+                let yearCell = isTargetYear
+                    ? '<span class="inline-flex items-center gap-1">' + row.year + '<span class="badge match-none" style="background:#1565C0;color:#fff;border-color:#1565C0;">เป้าหมาย</span></span>'
+                    : String(row.year);
+                if (row.leaseStatusCode === 'hold' || row.leaseStatusCode === 'renew' || row.leaseStatusCode === 'closed') {
+                    yearCell += '<div class="mt-1">' + leaseBadge(row.leaseStatusCode, row.leaseStatusText, true) + '</div>';
+                }
+                return '<tr class="' + rowClass + '">' +
+                    '<td class="py-2 pr-3 font-semibold">' + yearCell + '</td>' +
+                    '<td class="py-2 pr-3">' + (row.refrigBudget > 0 ? formatBaht(row.refrigBudget) : '—') + '</td>' +
+                    '<td class="py-2 pr-3">' + (row.refrigBudget > 0 ? qtyMatchBadge(row.refrigQtyPlanned, refSnap ? refSnap.qty : null) : '—') + '</td>' +
+                    '<td class="py-2 pr-3">' + (row.acBudget > 0 ? formatBaht(row.acBudget) : '—') + '</td>' +
+                    '<td class="py-2 pr-3">' + (row.acBudget > 0 ? qtyMatchBadge(row.acQtyPlanned, acSnap ? acSnap.qty : null) : '—') + '</td>' +
+                    '<td class="py-2 pr-3 font-bold">' + formatBaht(total) + '</td>' +
+                    '<td class="py-2 pr-3 text-center whitespace-nowrap">' + (btns || '—') + '</td>' +
+                    '</tr>';
+            }).join('') || '<tr><td colspan="7" class="py-4 text-center text-slate-400">ไม่มีงบประมาณสำหรับสาขานี้</td></tr>';
+        }
+
+        function renderConfirmHistory(list) {
+            const tbody = document.getElementById('confirmHistoryBody');
+            if (!list.length) {
+                tbody.innerHTML = '<tr><td colspan="9" class="py-4 text-center text-slate-400">ยังไม่มีการยืนยัน</td></tr>';
+                return;
+            }
+            tbody.innerHTML = list.map(function(c) {
+                const dateStr = c.timestamp ? new Date(c.timestamp).toLocaleString('th-TH') : '-';
+                return '<tr class="border-b border-slate-100">' +
+                    '<td class="py-2 pr-3">' + dateStr + '</td>' +
+                    '<td class="py-2 pr-3">' + c.year + '</td>' +
+                    '<td class="py-2 pr-3">' + htmlEscape(c.equipType) + '</td>' +
+                    '<td class="py-2 pr-3">' + formatBaht(c.plannedBudget) + '</td>' +
+                    '<td class="py-2 pr-3">' + c.plannedQty + ' / ' + (c.surveyedQty === '' ? '—' : c.surveyedQty) + '</td>' +
+                    '<td class="py-2 pr-3">' + (c.storeAgeYears === '' || c.storeAgeYears === null || c.storeAgeYears === undefined ? '—' : c.storeAgeYears) + '</td>' +
+                    '<td class="py-2 pr-3">' + (c.avgConditionRating === '' || c.avgConditionRating === null || c.avgConditionRating === undefined ? '—' : c.avgConditionRating + '/5') + '</td>' +
+                    '<td class="py-2 pr-3">' + htmlEscape(c.confirmedBy || '') + '</td>' +
+                    '<td class="py-2 pr-3">' + htmlEscape(c.notes || '') + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        // ==========================================
+        // 4. Confirm Modal
+        // ==========================================
+        function openConfirmModal(year, equipType, plannedBudget, plannedQty, surveyedQty, surveyedDate, storeAgeYears, avgConditionRating, usefulLifeYears) {
+            PENDING_CONFIRM = {
+                year: year, equipType: equipType, plannedBudget: plannedBudget, plannedQty: plannedQty,
+                surveyedQty: surveyedQty, surveyedDate: surveyedDate,
+                storeAgeYears: storeAgeYears, avgConditionRating: avgConditionRating
+            };
+            document.getElementById('confirmModalSubtitle').textContent =
+                (CURRENT_CROSSCHECK ? CURRENT_CROSSCHECK.storeCode + ' - ' + CURRENT_CROSSCHECK.storeName : '') + ' | ปี ' + year + ' | ' + equipType;
+            document.getElementById('cmPlannedBudget').textContent = formatBaht(plannedBudget);
+            document.getElementById('cmPlannedQty').textContent = plannedQty;
+            document.getElementById('cmSurveyedQty').textContent = (surveyedQty === null || surveyedQty === undefined) ? 'ไม่มีข้อมูล' : surveyedQty;
+            document.getElementById('cmSurveyedDate').textContent = surveyedDate ? new Date(surveyedDate).toLocaleDateString('th-TH') : '—';
+            document.getElementById('cmStoreAge').textContent = (storeAgeYears === null || storeAgeYears === undefined) ? 'ไม่มีข้อมูล' : (storeAgeYears + ' / ' + usefulLifeYears + ' ปี' + (storeAgeYears >= usefulLifeYears ? ' (ครบอายุ)' : ''));
+            document.getElementById('cmCondition').textContent = (avgConditionRating === null || avgConditionRating === undefined) ? 'ไม่มีข้อมูล' : (avgConditionRating + '/5' + (avgConditionRating <= 2 ? ' (สภาพไม่ดี)' : ''));
+            const bRow = CURRENT_CROSSCHECK ? (CURRENT_CROSSCHECK.budget || []).find(function(b) { return b.year === year; }) : null;
+            document.getElementById('cmLease').innerHTML = bRow ? leaseBadge(bRow.leaseStatusCode, bRow.leaseStatusText, false) : '—';
+            document.getElementById('cmNotes').value = '';
+            document.getElementById('confirmModalError').classList.add('hidden');
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+            PENDING_CONFIRM = null;
+        }
+
+        function submitConfirmation() {
+            if (!PENDING_CONFIRM || !CURRENT_CROSSCHECK) return;
+            const btn = document.getElementById('confirmModalSubmitBtn');
+            const spinner = document.getElementById('confirmModalSpinner');
+            btn.disabled = true; spinner.classList.remove('hidden');
+
+            const payload = {
+                storeCode: CURRENT_CROSSCHECK.storeCode,
+                storeName: CURRENT_CROSSCHECK.storeName,
+                year: PENDING_CONFIRM.year,
+                equipType: PENDING_CONFIRM.equipType,
+                plannedBudget: PENDING_CONFIRM.plannedBudget,
+                plannedQty: PENDING_CONFIRM.plannedQty,
+                surveyedQty: PENDING_CONFIRM.surveyedQty,
+                surveyedDate: PENDING_CONFIRM.surveyedDate,
+                storeAgeYears: PENDING_CONFIRM.storeAgeYears,
+                avgConditionRating: PENDING_CONFIRM.avgConditionRating,
+                notes: document.getElementById('cmNotes').value.trim()
+            };
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.disabled = false; spinner.classList.add('hidden');
+                    if (!res || res.success === false) {
+                        const errDiv = document.getElementById('confirmModalError');
+                        errDiv.textContent = (res && res.error) || 'บันทึกไม่สำเร็จ กรุณาลองใหม่';
+                        errDiv.classList.remove('hidden');
+                        return;
+                    }
+                    closeConfirmModal();
+                    loadStoreCrossCheck(CURRENT_CROSSCHECK.storeCode);
+                })
+                .withFailureHandler(function(err) {
+                    btn.disabled = false; spinner.classList.add('hidden');
+                    const errDiv = document.getElementById('confirmModalError');
+                    errDiv.textContent = 'ระบบขัดข้อง: ' + (err.message || err);
+                    errDiv.classList.remove('hidden');
+                })
+                .confirmCapexBudgetUse(payload, CURRENT_EMAIL);
+        }
+
+        // ==========================================
+        // 5. Helpers
+        // ==========================================
+        function formatBaht(n) {
+            n = Number(n) || 0;
+            return '฿' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        }
+        // Lease status badge — statusCode from _leaseInfoFor_ on the server:
+        // hold = หมดคำมั่นต่อสัญญา (do not invest), renew = lease ends before the
+        // invest year (renew first), ok = covered, tracked/none = informational.
+        function leaseBadge(statusCode, statusText, compact) {
+            if (statusCode === 'closed') return '<span class="badge match-bad">⛔ ' + (compact ? 'สาขาปิดแล้ว' : htmlEscape(statusText)) + '</span>';
+            if (statusCode === 'hold')  return '<span class="badge match-bad">🔴 ' + (compact ? 'หมดคำมั่นต่อสัญญา' : htmlEscape(statusText)) + '</span>';
+            if (statusCode === 'renew') return '<span class="badge match-warn">🟠 ' + htmlEscape(compact ? 'ต่อสัญญาก่อนลงทุน' : statusText) + '</span>';
+            if (statusCode === 'ok')    return '<span class="badge match-ok">🟢 ' + (compact ? 'สัญญาครอบคลุม' : htmlEscape(statusText)) + '</span>';
+            if (statusCode === 'tracked') return '<span class="badge match-none">' + htmlEscape(statusText) + '</span>';
+            return '<span class="badge match-none">ไม่อยู่ในรอบติดตามต่อสัญญา</span>';
+        }
+
+        function htmlEscape(str) {
+            return String(str == null ? '' : str).replace(/[&<>"']/g, function(c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+    </script>
+</body>
+</html>

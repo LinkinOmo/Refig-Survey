@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>คู่มือกรอกแบบฟอร์ม EDMI Solar Meter</title>
+<style>
+  :root {
+    --paper: #fffbf5;
+    --paper-raised: #ffffff;
+    --ink: #241c14;
+    --ink-soft: #6b5f4f;
+    --line: #e7dcc9;
+    --amber: #b45309;
+    --amber-deep: #7c3410;
+    --amber-fill: #fef3c7;
+    --amber-fill-strong: #fde68a;
+    --callout: #0369a1;
+    --callout-fill: #e0f2fe;
+    --good: #15803d;
+    --good-fill: #dcfce7;
+    --danger: #b91c1c;
+    --danger-deep: #7f1d1d;
+    --danger-fill: #fef2f2;
+    --danger-fill-strong: #fecaca;
+    --shadow: 0 1px 2px rgba(36,28,20,.06), 0 6px 20px rgba(36,28,20,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #1b1712;
+      --paper-raised: #241f18;
+      --ink: #f3ead9;
+      --ink-soft: #b9ab93;
+      --line: #3c342650;
+      --amber: #f0b354;
+      --amber-deep: #f7cd85;
+      --amber-fill: #3a2c12;
+      --amber-fill-strong: #4a3616;
+      --callout: #7dd3fc;
+      --callout-fill: #103548;
+      --good: #86efac;
+      --good-fill: #113322;
+      --danger: #fca5a5;
+      --danger-deep: #fecaca;
+      --danger-fill: #3a1414;
+      --danger-fill-strong: #5c1f1f;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 24px rgba(0,0,0,.35);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Noto Sans Thai", "Leelawadee UI", sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 28px 64px;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .masthead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    border-bottom: 3px solid var(--amber);
+    padding-bottom: 18px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .masthead .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--amber-deep);
+    margin: 0 0 6px;
+  }
+  .masthead h1 {
+    font-family: Georgia, "Noto Serif Thai", serif;
+    font-size: 30px;
+    line-height: 1.25;
+    font-weight: 700;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .masthead .meta {
+    text-align: right;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    min-width: 150px;
+  }
+  .masthead .meta b { color: var(--ink); }
+
+  .subline {
+    color: var(--ink-soft);
+    font-size: 14.5px;
+    margin: 10px 0 26px;
+  }
+
+  .backlink {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    text-decoration: none;
+    margin-bottom: 18px;
+  }
+  .backlink:hover { color: var(--amber-deep); }
+
+  .schedule-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 30px;
+  }
+  .schedule-strip .cell {
+    background: var(--paper-raised);
+    padding: 14px 16px;
+  }
+  .schedule-strip .cell .k {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+  .schedule-strip .cell .v {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--amber-deep);
+  }
+  .schedule-strip .cell .v small {
+    font-weight: 500;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    display: block;
+  }
+
+  h2.section {
+    font-family: Georgia, "Noto Serif Thai", serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 40px 0 4px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  h2.section .tag {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--amber);
+    border: 1px solid var(--amber-fill-strong);
+    background: var(--amber-fill);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  p.section-note { color: var(--ink-soft); font-size: 14px; margin: 6px 0 18px; }
+
+  .meter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .meter-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: var(--shadow);
+  }
+  .meter-card .model {
+    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--amber-deep);
+  }
+  .meter-card .store {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 3px;
+  }
+
+  .code-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0 8px;
+    font-size: 14px;
+  }
+  .code-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--line);
+    padding: 6px 10px 8px 0;
+  }
+  .code-table td {
+    padding: 9px 10px 9px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  .code-table tr:last-child td { border-bottom: none; }
+  .code-pill {
+    display: inline-block;
+    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    font-size: 12.5px;
+    background: var(--amber-fill);
+    color: var(--amber-deep);
+    border: 1px solid var(--amber-fill-strong);
+    border-radius: 6px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+
+  .annotated {
+    display: grid;
+    grid-template-columns: minmax(0, 480px) 1fr;
+    gap: 22px;
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .annotated { grid-template-columns: 1fr; }
+  }
+
+  .mock-form {
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .mock-titlebar {
+    background: linear-gradient(135deg, var(--amber) 0%, var(--amber-deep) 100%);
+    color: #fff9ec;
+    padding: 13px 16px;
+    font-weight: 700;
+    font-size: 14.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mock-body { padding: 14px 16px 18px; }
+
+  .mock-card {
+    position: relative;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 13px;
+    margin-bottom: 12px;
+  }
+  .mock-card .mc-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin-bottom: 9px;
+  }
+  .mock-field { margin-bottom: 9px; position: relative; }
+  .mock-field:last-child { margin-bottom: 0; }
+  .mock-field label {
+    display: block;
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-bottom: 3px;
+  }
+  .mock-input {
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    border-radius: 7px;
+    padding: 7px 9px;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+  .mock-input.filled { border-color: var(--amber-fill-strong); background: var(--amber-fill); font-weight: 600; }
+  .mock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+  .badge {
+    position: absolute;
+    top: -9px;
+    right: -9px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--callout);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 3px var(--paper-raised);
+  }
+
+  .photo-slot {
+    display: flex;
+    gap: 6px;
+    margin-top: 7px;
+  }
+  .photo-thumb {
+    width: 52px;
+    height: 52px;
+    border-radius: 7px;
+    border: 1.5px dashed var(--amber-fill-strong);
+    background: var(--amber-fill);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--amber);
+  }
+
+  .mock-submit {
+    margin-top: 4px;
+    text-align: right;
+  }
+  .mock-submit .btn {
+    display: inline-block;
+    background: var(--amber);
+    color: #fff9ec;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 8px 20px;
+    border-radius: 8px;
+  }
+
+  .legend { display: flex; flex-direction: column; gap: 10px; }
+  .legend-item {
+    display: flex;
+    gap: 10px;
+    background: var(--callout-fill);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .legend-item .num {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--callout);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .legend-item .txt { font-size: 13.5px; color: var(--ink); }
+  .legend-item .txt b { color: var(--callout); }
+
+  .tips {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  @media (max-width: 640px) { .tips { grid-template-columns: 1fr; } }
+  .tip-card {
+    border-radius: 10px;
+    padding: 13px 14px;
+    font-size: 13.5px;
+  }
+  .tip-good { background: var(--good-fill); border: 1px solid var(--line); }
+  .tip-bad { background: var(--amber-fill); border: 1px solid var(--amber-fill-strong); }
+  .tip-card .tt { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .tip-good .tt { color: var(--good); }
+  .tip-bad .tt { color: var(--amber-deep); }
+  .tip-card ul { margin: 0; padding-left: 18px; }
+  .tip-card li { margin-bottom: 4px; }
+
+  .steps-box {
+    background: var(--amber-fill);
+    border: 2px solid var(--amber-fill-strong);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 26px;
+  }
+  .steps-box .st-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--amber-deep);
+    margin: 0 0 10px;
+  }
+  .steps-box ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .steps-box li { display: flex; gap: 10px; font-size: 13.5px; color: var(--ink); }
+  .steps-box .st-num {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--amber);
+    color: #fff9ec;
+    font-size: 11.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .danger-box {
+    background: var(--danger-fill);
+    border: 2px solid var(--danger-fill-strong);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 10px 0 20px;
+  }
+  .danger-box .db-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--danger-deep);
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .danger-box p { font-size: 13.5px; margin: 6px 0; color: var(--ink); }
+  .danger-box ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }
+  .danger-box li { margin-bottom: 4px; }
+  .req-note {
+    background: var(--danger-fill);
+    border: 1px solid var(--danger-fill-strong);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--danger-deep);
+    font-weight: 600;
+    margin: 10px 0 18px;
+  }
+
+  footer.colophon {
+    margin-top: 46px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .print-btn-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px 28px 0;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .print-btn {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 999px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  .print-btn:hover { opacity: .9; }
+
+  @media print {
+    .print-btn-wrap { display: none; }
+    body { background: #fff; }
+    .sheet { max-width: none; padding: 6mm 8mm; }
+    .meter-card, .mock-form, .legend-item, .tip-card { box-shadow: none; }
+    h2.section { break-after: avoid; }
+    .mock-card { break-inside: avoid; }
+    .annotated { break-inside: avoid; }
+  }
+</style>
+</head>
+
+<body>
+
+<div class="print-btn-wrap">
+  <button class="print-btn" onclick="window.print()">🖨️ พิมพ์คู่มือนี้</button>
+</div>
+
+<div class="sheet">
+
+  <a class="backlink" href="<?= ScriptApp.getService().getUrl() ?>">← กลับหน้าหลัก (Back to App)</a>
+
+  <div class="masthead">
+    <div>
+      <p class="eyebrow">Mini Big C Maintenance · คู่มือปฏิบัติงาน</p>
+      <h1>วิธีกรอกแบบฟอร์ม อ่านค่า EDMI Meter (Solar)</h1>
+    </div>
+    <div class="meta">
+      สำหรับ<br><b>ผู้จัดการสาขา / Operation</b>
+    </div>
+  </div>
+  <p class="subline">แบบฟอร์มนี้ใช้บันทึกหน่วยการใช้ไฟฟ้าจากมิเตอร์ EDMI ของระบบ Solar Rooftop ประจำสาขา — กรอกผ่านแอป Mini Big C Maintenance แท็บ <b>“☀️ EDMI Solar Meter”</b></p>
+
+  <div class="steps-box">
+    <p class="st-title">📋 ขั้นตอนการเก็บข้อมูลหน้างาน</p>
+    <ol>
+      <li><span class="st-num">1</span><span><b>ถ่ายภาพนิ่ง</b> หน้าจอมิเตอร์ด้วยมือถือ ให้เห็น Code และตัวเลขชัดเจน ครบทั้ง 4 Code (000-003)</span></li>
+      <li><span class="st-num">2</span><span><b>อัดวิดีโอ</b> กดวนดูครบทุก Code ตั้งแต่ 000 ถึง 003 ในคลิปเดียว (ใช้เป็นหลักฐานสำรอง หากภาพนิ่งไม่ชัดหรือมีข้อโต้แย้งภายหลัง) — เก็บคลิปไว้ที่เครื่อง ไม่ต้องอัปโหลดเข้าแอป</span></li>
+      <li><span class="st-num">3</span><span><b>กรอกตัวเลข</b> ที่อ่านได้ลงในแบบฟอร์ม และ<b>อัปโหลดภาพถ่าย</b> (จากข้อ 1) แนบทุก Code แล้วกด Submit</span></li>
+    </ol>
+  </div>
+
+  <div class="schedule-strip">
+    <div class="cell">
+      <div class="k">วันที่อ่านค่า</div>
+      <div class="v">ตามที่กำหนด <small>As Announced</small></div>
+    </div>
+    <div class="cell">
+      <div class="k">เวลาอ่านค่า</div>
+      <div class="v">11:00 – 12:00 น. <small>ถ่ายภาพหน้าจอมิเตอร์</small></div>
+    </div>
+    <div class="cell">
+      <div class="k">กำหนดส่งข้อมูล</div>
+      <div class="v">ภายใน 15:00 น. <small>วันเดียวกัน</small></div>
+    </div>
+  </div>
+
+  <h2 class="section">1. รู้จักมิเตอร์ของสาขาคุณ <span class="tag">ก่อนเริ่ม</span></h2>
+  <p class="section-note">มิเตอร์ EDMI มี 3 รุ่น ปุ่มกดเลื่อนหา Code จะอยู่ตำแหน่งเดียวกันในทุกรุ่น — สาขาส่วนใหญ่ใช้รุ่นตามขนาดร้านดังนี้</p>
+  <div class="meter-grid">
+    <div class="meter-card">
+      <div class="model">Mk6E</div>
+      <div class="store">ร้านขนาดใหญ่ (HYP, BMK, FP, Depot)</div>
+    </div>
+    <div class="meter-card">
+      <div class="model">Mk10A</div>
+      <div class="store">ร้านขนาดเล็ก (BCM)</div>
+    </div>
+    <div class="meter-card">
+      <div class="model">Mk10H</div>
+      <div class="store">ร้านขนาดเล็ก (BCM)</div>
+    </div>
+  </div>
+
+  <table class="code-table">
+    <thead>
+      <tr><th style="width:110px">Code บนมิเตอร์</th><th>หมายถึง</th><th style="width:170px">ช่วงเวลาที่สะสมค่านี้</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="code-pill">000</span></td>
+        <td>kWh Total — หน่วยไฟฟ้ารวมทั้งหมด</td>
+        <td class="mono">ทุกช่วงเวลา</td>
+      </tr>
+      <tr>
+        <td><span class="code-pill">001</span></td>
+        <td>kWh Rate A — ช่วง Peak</td>
+        <td class="mono">09:00 – 22:00</td>
+      </tr>
+      <tr>
+        <td><span class="code-pill">002</span></td>
+        <td>kWh Rate B — ช่วง Off Peak</td>
+        <td class="mono">22:00 – 09:00</td>
+      </tr>
+      <tr>
+        <td><span class="code-pill">003</span></td>
+        <td>kWh Rate C — วันหยุด</td>
+        <td class="mono">00:00–24:00 เสาร์-อาทิตย์และวันหยุด</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="section-note"><b style="color:var(--amber-deep)">⚠️ ช่วงเวลาในตารางด้านบนคือช่วงที่มิเตอร์ใช้ "สะสม" ค่าไฟของ Code นั้นๆ ไว้ ไม่ใช่เวลาที่ต้องไปอ่านค่า</b> — สามารถกดดูและถ่ายภาพทั้ง 4 Code ได้ทุกเมื่อในช่วงเวลาที่กำหนด (11.00-12.00 น.) โดยไม่ต้องรอให้ถึงช่วงเวลาที่ระบุในตาราง</p>
+  <p class="section-note">กดปุ่มเลื่อนบนมิเตอร์ให้ตัวเลข Code ที่มุมจอตรงกับตารางด้านบน แล้วอ่านตัวเลขหน่วย (kWh) ที่แสดงอยู่ — ถ่ายภาพหน้าจอให้เห็น <b>ทั้ง Code และตัวเลข</b> ในภาพเดียวกันเสมอ</p>
+
+  <p class="req-note">🔴 บังคับกรอก: ต้องใส่ทั้ง<b>ตัวเลข</b>และ<b>รูปถ่าย</b>ให้ครบทั้ง 4 Code ระบบจะไม่ให้กด Submit ผ่านหากขาดรายการใดรายการหนึ่ง — ยกเว้นกรณีเข้าถึงมิเตอร์ไม่ได้ (ดูหัวข้อที่ 3)</p>
+
+  <h2 class="section">2. ตัวอย่างการกรอกแบบฟอร์ม <span class="tag">Mockup</span></h2>
+  <p class="section-note">ด้านล่างคือหน้าจอจริงของแบบฟอร์ม พร้อมข้อมูล<b>ตัวอย่าง</b>สมมติ — เทียบหมายเลขในวงกลมกับคำอธิบายด้านขวา</p>
+
+  <div class="annotated">
+    <div class="mock-form">
+      <div class="mock-titlebar">☀️ อ่านค่า EDMI Meter (Solar)</div>
+      <div class="mock-body">
+
+        <div class="mock-card">
+          <div class="mc-title">1. ข้อมูลสาขา (Branch Information)</div>
+          <div class="mock-row">
+            <div class="mock-field">
+              <span class="badge">1</span>
+              <label>ผู้แจ้ง (Reporter)</label>
+              <div class="mock-input filled">สมชาย ใจดี</div>
+            </div>
+            <div class="mock-field">
+              <span class="badge">2</span>
+              <label>ค้นหาสาขา (Search Branch)</label>
+              <div class="mock-input filled">21092 MBC ตัวอย่าง รามอินทรา</div>
+            </div>
+          </div>
+          <div class="mock-row" style="margin-top:9px">
+            <div class="mock-field">
+              <label>รหัสสาขา (Auto-fill)</label>
+              <div class="mock-input">21092</div>
+            </div>
+            <div class="mock-field">
+              <label>ชื่อสาขา (Auto-fill)</label>
+              <div class="mock-input">MBC ตัวอย่าง รามอินทรา</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mock-card">
+          <div class="mc-title">2. ข้อมูลระบบ Solar</div>
+          <div class="mock-row">
+            <div class="mock-field">
+              <span class="badge">3</span>
+              <label>รูปแบบสาขา (Format)</label>
+              <div class="mock-input filled">Small Format (BCM)</div>
+            </div>
+            <div class="mock-field">
+              <label>Solar Phase</label>
+              <div class="mock-input">7</div>
+            </div>
+          </div>
+          <div class="mock-row" style="margin-top:9px">
+            <div class="mock-field">
+              <span class="badge">4</span>
+              <label>วันที่อ่านค่า</label>
+              <div class="mock-input filled num">2026-08-07</div>
+            </div>
+            <div class="mock-field">
+              <label>เวลาที่อ่านค่า</label>
+              <div class="mock-input filled num">11:30</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mock-card">
+          <div class="mc-title">3. หน่วยไฟฟ้าจาก EDMI Meter (kWh)</div>
+          <div class="mock-row">
+            <div class="mock-field">
+              <span class="badge">5</span>
+              <label>Code 000 — kWh Total</label>
+              <div class="mock-input filled mono">12345.67</div>
+              <div class="photo-slot"><div class="photo-thumb">📷</div></div>
+            </div>
+            <div class="mock-field">
+              <label>Code 001 — Rate A (Peak)</label>
+              <div class="mock-input filled mono">5000.00</div>
+              <div class="photo-slot"><div class="photo-thumb">📷</div></div>
+            </div>
+          </div>
+          <div class="mock-row" style="margin-top:9px">
+            <div class="mock-field">
+              <label>Code 002 — Rate B (Off Peak)</label>
+              <div class="mock-input filled mono">4000.00</div>
+              <div class="photo-slot"><div class="photo-thumb">📷</div></div>
+            </div>
+            <div class="mock-field">
+              <span class="badge">6</span>
+              <label>Code 003 — Rate C (Holiday)</label>
+              <div class="mock-input filled mono">3345.67</div>
+              <div class="photo-slot"><div class="photo-thumb">📷</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mock-card">
+          <div class="mc-title">4. หมายเหตุ (Comments)</div>
+          <div class="mock-field">
+            <span class="badge">7</span>
+            <div class="mock-input filled" style="min-height:34px">ไม่มีปัญหา อ่านค่าปกติ</div>
+          </div>
+        </div>
+
+        <div class="mock-submit">
+          <span class="badge" style="position:static;display:inline-flex;margin-right:6px;vertical-align:middle;">8</span>
+          <span class="btn">Submit</span>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="num">1</div><div class="txt"><b>ผู้แจ้ง</b> — ใส่ชื่อ-นามสกุลของผู้กรอกจริง (ผู้จัดการ/พนักงานที่อ่านค่า) ไม่ใช่ชื่อสาขา</div></div>
+      <div class="legend-item"><div class="num">2</div><div class="txt"><b>ค้นหาสาขา</b> — พิมพ์รหัส 5 หลัก หรือชื่อสาขาบางส่วน แล้วเลือกจากรายการที่ขึ้นมา ระบบจะกรอกรหัส/ชื่อสาขาให้อัตโนมัติ</div></div>
+      <div class="legend-item"><div class="num">3</div><div class="txt"><b>รูปแบบสาขา</b> — เลือก Small Format (BCM) หรือ Big Format ให้ตรงกับประเภทร้านจริง</div></div>
+      <div class="legend-item"><div class="num">4</div><div class="txt"><b>วันเวลาที่อ่านค่า</b> — ให้ตรงกับเวลาที่ถ่ายภาพจริง ช่วง 11:00-12:00 น. ของวันที่อ่านค่า</div></div>
+      <div class="legend-item"><div class="num">5</div><div class="txt"><b>ค่า Code + รูปถ่าย (บังคับกรอกทุก Code)</b> — กรอกตัวเลขที่อ่านได้จากมิเตอร์ และถ่ายภาพหน้าจอ<b>แนบทุก Code</b> เป็นหลักฐาน (แต่ละ Code มีช่องถ่ายรูปของตัวเอง) — ระบบจะบล็อกไม่ให้ Submit หากมี Code ใดขาดตัวเลขหรือรูปถ่าย</div></div>
+      <div class="legend-item"><div class="num">6</div><div class="txt"><b>Code 003 (Holiday)</b> — หลายสาขามักลืมกรอกช่องนี้ เพราะตัวเลขจะโตขึ้นเฉพาะวันเสาร์-อาทิตย์/วันหยุด อย่าปล่อยว่าง ให้กรอกค่าที่มิเตอร์แสดงจริงแม้จะใกล้เคียงกับค่าครั้งก่อนก็ตาม</div></div>
+      <div class="legend-item"><div class="num">7</div><div class="txt"><b>หมายเหตุ</b> — ใส่ข้อมูลเพิ่มเติมถ้ามี เช่น มิเตอร์เสีย, เข้าถึงไม่ได้, ตัวเลขผิดปกติ ฯลฯ ปล่อยว่างได้หากไม่มีปัญหา</div></div>
+      <div class="legend-item"><div class="num">8</div><div class="txt"><b>Submit</b> — กดครั้งเดียวหลังตรวจสอบข้อมูลครบถ้วน ระบบจะส่งอีเมลยืนยันพร้อมภาพถ่ายกลับไปยังผู้แจ้งทันที</div></div>
+    </div>
+  </div>
+
+  <h2 class="section">3. กรณีตู้ควบคุมมิเตอร์ถูกล็อค <span class="tag">Access Blocked</span></h2>
+  <p class="section-note">ถ้าไปถึงหน้างานแล้วเปิดตู้ควบคุมมิเตอร์ไม่ได้จริงๆ (ถูกล็อคกุญแจ ไม่มีผู้ถือกุญแจ ตู้ชำรุด หรือช่างไฟฟ้ายังไม่มาเปิดให้) ระบบมีทางเลือกให้ส่งข้อมูลได้โดยไม่ต้องมีตัวเลข Code — อยู่ใน<b>ส่วนที่ 3 ของฟอร์ม</b> เหนือช่องกรอก Code ทั้ง 4</p>
+
+  <div class="danger-box">
+    <p class="db-title">🔒 ไม่สามารถอ่านค่าได้ (ตู้ควบคุมมิเตอร์ถูกล็อค / เข้าถึงไม่ได้)</p>
+    <p>ติ๊กช่องนี้เมื่อเข้าถึงมิเตอร์ไม่ได้จริงเท่านั้น — เมื่อติ๊กแล้วระบบจะทำงานดังนี้:</p>
+    <ul>
+      <li>ช่องกรอกตัวเลข Code 000-003 จะถูกปิดใช้งานและ<b>ไม่บังคับกรอก</b>อีกต่อไป</li>
+      <li>ต้องกรอก<b>รายละเอียดปัญหา</b> (เช่น ตู้ล็อคกุญแจ ไม่มีผู้ถือกุญแจ / ตู้ชำรุดเปิดไม่ได้ / ช่างไฟฟ้ายังไม่มาเปิด) — เป็นข้อความบังคับ</li>
+      <li>ต้องแนบ<b>ภาพถ่ายหลักฐาน</b>ของตู้ที่ล็อคหรือเข้าถึงไม่ได้ — เป็นภาพบังคับ</li>
+      <li>อีเมลยืนยันที่ส่งออกจะแสดงกรอบสีแดง "🔒 ไม่สามารถอ่านค่าได้" พร้อมเหตุผลและภาพแทนตารางตัวเลข Code</li>
+    </ul>
+  </div>
+  <p class="section-note">ใช้เฉพาะกรณีจำเป็นจริงๆ — ไม่ใช่ทางลัดเพื่อข้ามการอ่านค่า หากเปิดตู้ได้ในภายหลัง ให้กลับมาอ่านค่าและส่งฟอร์มใหม่อีกครั้ง พร้อมแจ้งผู้เกี่ยวข้องให้มาเปิดตู้สำหรับรอบถัดไป</p>
+
+  <h2 class="section">4. ข้อควรระวัง</h2>
+  <div class="tips">
+    <div class="tip-card tip-good">
+      <div class="tt">✅ ทำแบบนี้</div>
+      <ul>
+        <li>ถ่ายภาพให้เห็น Code และตัวเลขชัดเจนในภาพเดียว</li>
+        <li>กรอกครบทั้ง 4 Code ทุกครั้งที่อ่านค่า แม้ตัวเลขจะใกล้เคียงกับครั้งก่อน</li>
+        <li>ส่งข้อมูลภายใน 15:00 น. ของวันเดียวกัน</li>
+        <li>ตรวจสอบชื่อ-รหัสสาขาที่ระบบเลือกให้ก่อนกด Submit</li>
+        <li>ถ้าตู้ควบคุมล็อคจริง ให้ใช้ช่อง "🔒 ไม่สามารถอ่านค่าได้" แทนการปล่อยว่างหรือกรอกตัวเลขมั่ว</li>
+      </ul>
+    </div>
+    <div class="tip-card tip-bad">
+      <div class="tt">⚠️ อย่าทำแบบนี้</div>
+      <ul>
+        <li>อย่าประมาณตัวเลขจากความจำ ต้องอ่านจากหน้าจอมิเตอร์จริงเท่านั้น</li>
+        <li>อย่าข้าม Code 003 (Holiday) เพียงเพราะตัวเลขเปลี่ยนน้อย</li>
+        <li>อย่าใช้ภาพถ่ายเก่าจากครั้งก่อน</li>
+        <li>อย่าปล่อยชื่อผู้แจ้งเป็นชื่อสาขาแทนชื่อคน</li>
+        <li>อย่าติ๊ก "เข้าถึงไม่ได้" เพื่อความสะดวก ทั้งที่จริงเปิดตู้ได้</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer class="colophon">
+    <span>Mini Big C Maintenance — ระบบสำรวจ EDMI Solar Meter</span>
+    <span>คู่มือฉบับปฏิบัติงาน · จัดทำโดยฝ่ายซ่อมบำรุง</span>
+  </footer>
+
+</div>
+</body>
+</html>

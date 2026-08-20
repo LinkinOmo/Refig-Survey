@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>คู่มือแบบสำรวจ New Product - Mini Big C Maintenance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .step-num {
+            flex: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto">
+
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="text-3xl">🍦</span>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">คู่มือการกรอกแบบสำรวจ<br class="sm:hidden">New Product</h1>
+            </div>
+            <p class="text-gray-500 text-sm sm:text-base">คู่มือฉบับเต็มสำหรับ <b>แบบสำรวจ New Product</b> — เครื่อง Ice Cream Soft Serve, Jet Spray,
+                Slushy, Ice Maker และเครื่องกรองน้ำ ในระบบ Mini Big C Maintenance</p>
+            <p class="text-xs text-gray-400 mt-2">เมนู: <b>สำรวจ New Product</b></p>
+        </div>
+
+        <!-- Before You Start -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-emerald-600 mb-4 flex items-center gap-2">🧰 ก่อนเริ่มสำรวจ</h2>
+            <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
+                <li>เตรียมชื่อ-นามสกุล และเบอร์โทรศัพท์ของผู้สำรวจ และทราบรหัสสาขา (5 หลัก) หรือชื่อสาขาที่จะเข้าไปสำรวจ</li>
+                <li>เดินนับเครื่องแต่ละประเภทให้ครบก่อน แล้วค่อยกลับมากรอกจำนวนในระบบ</li>
+                <li><b>ถ่ายรูป 3 อย่างต่อเครื่อง</b> เตรียมไว้ล่วงหน้า: 📷 ตัวเครื่องจักร, 🔌 ปลั๊กไฟ, 📍 บริเวณที่ติดตั้ง</li>
+                <li>สัญญาณอินเทอร์เน็ตควรเสถียร หากสัญญาณไม่ดีให้ใช้ปุ่ม <b>💾 Save Draft</b> บันทึกร่างไว้ก่อน</li>
+            </ul>
+        </div>
+
+        <!-- STEP 1 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex gap-3">
+                <div class="step-num bg-emerald-500">1</div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-gray-800">ข้อมูลผู้สำรวจและสาขา</h3>
+                    <p class="text-sm text-gray-600 mt-2">กรอก <b>ชื่อผู้สำรวจ (Reporter)</b> และ <b>เบอร์โทรศัพท์ (Phone)</b> — ทั้งสองช่องบังคับกรอก
+                        ต่างจากแบบสำรวจแอร์/ตู้แช่ที่ไม่บังคับกรอกเบอร์โทร</p>
+                    <p class="text-sm text-gray-600 mt-2">จากนั้นพิมพ์ <b>รหัสสาขา 5 หลัก</b> หรือ <b>ชื่อสาขา</b> ในช่อง "ค้นหาสาขา"
+                        แล้วเลือกสาขาจากรายการที่แสดงขึ้นมา — ระบบจะเติมรหัส/ชื่อสาขาให้อัตโนมัติ</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2-6 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex gap-3">
+                <div class="step-num bg-emerald-500">2–6</div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-gray-800">อุปกรณ์แต่ละประเภท (5 หมวด)</h3>
+                    <p class="text-sm text-gray-600 mt-2 mb-3">กรอก <b>จำนวนเครื่อง</b> ของแต่ละหมวดต่อไปนี้ — <b>ใส่ 0 หากสาขานั้นไม่มี</b>
+                        เมื่อกรอกจำนวนแล้ว ระบบจะสร้างการ์ดรายละเอียดของเครื่องแต่ละตัวให้อัตโนมัติ</p>
+
+                    <div class="space-y-2.5">
+                        <div class="bg-pink-50 border border-pink-100 rounded-lg p-3">
+                            <p class="font-semibold text-pink-700 text-sm">🍦 2) เครื่องไอศกรีม Soft Serve</p>
+                        </div>
+                        <div class="bg-sky-50 border border-sky-100 rounded-lg p-3">
+                            <p class="font-semibold text-sky-700 text-sm">💧 3) Jet Spray</p>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                            <p class="font-semibold text-blue-700 text-sm">🧊 4) Slushy Machine</p>
+                        </div>
+                        <div class="bg-cyan-50 border border-cyan-100 rounded-lg p-3">
+                            <p class="font-semibold text-cyan-700 text-sm">❄️ 5) Ice Maker Machine</p>
+                        </div>
+                        <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
+                            <p class="font-semibold text-emerald-700 text-sm">💧 6) เครื่องกรองน้ำ (Water Filter)</p>
+                        </div>
+                    </div>
+
+                    <p class="text-sm font-semibold text-gray-700 mt-4 mb-2">ในการ์ดของเครื่องแต่ละตัว ต้องกรอก:</p>
+                    <div class="space-y-2.5">
+                        <div class="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                            <p class="font-semibold text-blue-700 text-sm">ยี่ห้อ (Brand)</p>
+                            <p class="text-xs text-blue-700/80 mt-1">ช่องพิมพ์ค้นหา — พิมพ์บางส่วนของชื่อยี่ห้อเพื่อเลือกจากรายการที่มีอยู่แล้ว
+                                (แต่ละหมวดมีรายชื่อยี่ห้อของตัวเอง เช่น Soft Serve: JM Softserve, Taylor, Carpigiani …)
+                                หรือพิมพ์ยี่ห้อใหม่ได้เลยหากไม่พบในรายการ</p>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            <p class="font-semibold text-slate-700 text-sm">Asset No. / Serial No.</p>
+                            <p class="text-xs text-slate-700/80 mt-1">เลขทะเบียนทรัพย์สิน และ/หรือ เลข Serial ที่ติดอยู่บนตัวเครื่อง (ถ้ามี ไม่บังคับ)</p>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                            <p class="font-semibold text-amber-700 text-sm">ประเภทปลั๊กไฟ</p>
+                            <p class="text-xs text-amber-700/80 mt-1">ช่องพิมพ์ค้นหา — เลือกหรือพิมพ์ระบุประเภทปลั๊กที่ใช้จริงกับเครื่อง เช่น
+                                16A 1 เฟส, 20A 1 เฟส, 32A 1 เฟส, 3 เฟส 380V หรือพิมพ์ระบุแบบอื่นได้หากไม่ตรงกับรายการ</p>
+                        </div>
+                        <div class="bg-green-50 border border-green-100 rounded-lg p-3">
+                            <p class="font-semibold text-green-700 text-sm">สถานะการใช้งาน</p>
+                            <p class="text-xs text-green-700/80 mt-1">เลือก <b>ใช้งาน</b> หรือ <b>ไม่ใช้งาน</b> ตามสภาพจริงของเครื่องขณะสำรวจ</p>
+                        </div>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                            <p class="font-semibold text-gray-700 text-sm">หมายเหตุ</p>
+                            <p class="text-xs text-gray-700/80 mt-1">ข้อความอิสระอธิบายอาการหรือรายละเอียดเพิ่มเติมของเครื่องนั้น (ไม่บังคับ)</p>
+                        </div>
+                        <div class="bg-rose-50 border border-rose-100 rounded-lg p-3">
+                            <p class="font-semibold text-rose-700 text-sm">📷 รูปภาพ 3 ประเภท</p>
+                            <p class="text-xs text-rose-700/80 mt-1">ต้องถ่ายรูปแนบ 3 อย่างต่อเครื่อง:</p>
+                            <ul class="text-xs text-rose-700/80 mt-1 space-y-0.5 list-disc list-inside">
+                                <li><b>📷 รูปเครื่อง</b> — บันทึกทะเบียนเครื่องจักร</li>
+                                <li><b>🔌 รูปปลั๊กไฟ</b> — แสดงปลั๊กและตำแหน่งต่อใช้งาน</li>
+                                <li><b>📍 รูปบริเวณที่ติดตั้ง</b> — แสดงพื้นที่โดยรอบจุดติดตั้ง</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-800">
+                        💡 ระบบจะสร้าง <b>รหัสอุปกรณ์ (Equipment ID)</b> ให้อัตโนมัติจากรหัสสาขา + รหัสประเภทเครื่อง + ลำดับ
+                        แสดงอยู่มุมขวาบนของแต่ละการ์ด กดปุ่ม <b>QR</b> เพื่อพิมพ์/แสดง QR Code ติดเครื่องได้
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 7 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex gap-3">
+                <div class="step-num bg-emerald-500">7</div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-gray-800">อุปกรณ์ชำรุด</h3>
+                    <p class="text-sm text-gray-600 mt-2">เลือก <b>มี (Yes)</b> หรือ <b>ไม่มี (No)</b> ว่าพบอุปกรณ์ชำรุดหรือไม่
+                        หากเลือก "มี" ระบบจะแสดงรหัสอุปกรณ์ทั้งหมดที่กรอกไว้ในขั้นตอนที่ 2–6 ให้เลือกได้หลายเครื่อง
+                        (ต้องกรอกจำนวนเครื่องในขั้นตอนก่อนหน้าก่อน ไม่เช่นนั้นจะยังไม่มีรายการให้เลือก)</p>
+                    <p class="text-sm text-gray-600 mt-2">จากนั้นอธิบาย <b>รายละเอียดอาการชำรุด</b> เป็นข้อความอิสระในช่องเดียว
+                        (ต่างจากแบบสำรวจแอร์/ตู้แช่ที่มี Checklist แยกทีละหัวข้อ — ของ New Product ใช้ช่องบรรยายรวมช่องเดียว)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 8 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex gap-3">
+                <div class="step-num bg-emerald-500">8</div>
+                <div>
+                    <h3 class="font-semibold text-gray-800">สรุปปัญหาเพิ่มเติม</h3>
+                    <p class="text-sm text-gray-600 mt-1">ช่องข้อความอิสระสำหรับระบุปัญหาอื่น ๆ ที่ไม่เกี่ยวกับอุปกรณ์ชำรุดโดยตรง (ไม่บังคับกรอก)</p>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-emerald-50 border border-emerald-100 rounded-lg p-4 text-sm text-emerald-800">
+                <b>เมื่อกรอกครบแล้ว:</b> กด <b>Submit</b> เพื่อส่งข้อมูลเข้าระบบ หรือกด <b>💾 Save Draft</b> เพื่อบันทึกร่างไว้กรอกต่อภายหลัง
+                กด <b>Clear form</b> หากต้องการล้างข้อมูลทั้งหมดแล้วเริ่มใหม่
+            </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-amber-600 mb-4 flex items-center gap-2">💡 เคล็ดลับ &amp; ข้อควรระวัง</h2>
+            <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
+                <li>ให้กรอกรายละเอียดเครื่องทุกตัวในขั้นตอนที่ 2–6 ก่อนเสมอ แล้วจึงค่อยไปเลือก "อุปกรณ์ชำรุด" ในขั้นตอนที่ 7
+                    เพราะระบบจะดึงรายชื่อเครื่องให้เลือกจากข้อมูลที่กรอกไว้ก่อนหน้าเท่านั้น</li>
+                <li>อย่าลืมถ่ายรูป <b>ทั้ง 3 ประเภท</b> (เครื่อง/ปลั๊กไฟ/บริเวณที่ติดตั้ง) ให้ครบทุกเครื่อง — ใช้ตรวจสอบความปลอดภัยทางไฟฟ้าและตำแหน่งติดตั้งประกอบกัน</li>
+                <li>ช่อง <b>ยี่ห้อ</b> และ <b>ประเภทปลั๊กไฟ</b> พิมพ์ค้นหาได้ — หากพิมพ์คำใหม่ที่สะกดใกล้เคียงกับที่มีอยู่แล้ว ระบบจะถามยืนยันก่อนบันทึกเพื่อลดข้อมูลสะกดผิด</li>
+                <li>หากเน็ตหลุดหรือทำสำรวจไม่เสร็จ ให้กด <b>Save Draft</b> ทันที สามารถกลับมากรอกต่อได้</li>
+                <li>สามารถดูรายงานสรุปแบบสำรวจที่เคยส่งแล้วได้ผ่านลิงก์ <b>"View All Reports"</b> ที่มุมขวาบนของฟอร์ม</li>
+            </ul>
+        </div>
+
+        <!-- FAQ -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center gap-2">❓ คำถามที่พบบ่อย</h2>
+            <div class="space-y-4 text-sm">
+                <div>
+                    <p class="font-semibold text-gray-800">กด Submit ไม่ได้ ทำอย่างไร?</p>
+                    <p class="text-gray-600">ตรวจสอบว่ากรอกชื่อผู้สำรวจ เบอร์โทรศัพท์ และเลือกสาขาถูกต้องครบถ้วน</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">สาขาไม่มีเครื่องประเภทใดเลย ต้องกรอกอย่างไร?</p>
+                    <p class="text-gray-600">ใส่ 0 ในช่องจำนวนของหมวดนั้น ระบบจะไม่สร้างการ์ดให้กรอกเพิ่ม</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">หาสาขาที่ต้องการสำรวจในช่องค้นหาไม่เจอ ทำอย่างไร?</p>
+                    <p class="text-gray-600">ลองพิมพ์เฉพาะรหัสสาขา 5 หลัก หรือพิมพ์ชื่อสาขาบางส่วน หากยังหาไม่เจอ ให้แจ้งผู้ดูแลระบบเพื่อตรวจสอบข้อมูลสาขาในฐานข้อมูล</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer / Contact -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 text-center">
+            <p class="text-sm text-gray-500">หากพบปัญหาการใช้งานที่ไม่ได้อยู่ในคู่มือนี้ กรุณาติดต่อผู้ดูแลระบบ (Admin)
+                หรือทีมงานฝ่ายซ่อมบำรุง (Maintenance) ของท่าน</p>
+            <a href="<?= ScriptApp.getService().getUrl() ?>"
+                class="inline-block mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors text-sm">
+                &larr; กลับสู่หน้าแรก
+            </a>
+        </div>
+
+    </div>
+</body>
+
+</html>

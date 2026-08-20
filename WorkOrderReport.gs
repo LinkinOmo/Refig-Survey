@@ -192,7 +192,7 @@ function approveWorkOrder(workOrderId, approverName, rating) {
                        emailOptions.cc = uniqueCC.join(",");
                    }
                    
-                   MailApp.sendEmail(emailOptions);
+                   sendAppEmail_(emailOptions);
                    console.log("Approval Email sent to: " + toEmail + (uniqueCC.length > 0 ? ", CC: " + uniqueCC.join(", ") : ""));
                    emailSent = true;
                 }
@@ -247,9 +247,17 @@ function getAllWorkOrdersReport(email) {
 
         // ---------------------------------------
 
+        // Cache 60s — full Work_Orders + Employee_Database scan on every call, fired
+        // on every report/dashboard load and after every save/delete/approve. Cache
+        // key includes admin/empId since confidential rows are filtered per-caller.
+        var _worCache = CacheService.getScriptCache();
+        var _worKey = 'WO_REPORT_V1_' + (isAdmin ? 'ADMIN' : String(currentUserEmpId || userEmail || '').toLowerCase());
+        var _worHit = _worCache.get(_worKey);
+        if (_worHit) return JSON.parse(_worHit);
+
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
         if (!sheet) return { orders: [], isAdmin: isAdmin };
-        
+
         var data = sheet.getDataRange().getValues();
         var orders = [];
         
@@ -338,11 +346,13 @@ function getAllWorkOrdersReport(email) {
         }
 
         // Sort by newest
-        return { 
-            orders: orders.reverse(), 
+        var _worResult = {
+            orders: orders.reverse(),
             isAdmin: isAdmin,
             employeeList: employeeList
         };
+        try { _worCache.put(_worKey, JSON.stringify(_worResult), 60); } catch (e) {}
+        return _worResult;
 
     } catch (e) {
         return { orders: [], error: e.toString() };

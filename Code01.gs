@@ -18,6 +18,13 @@ function doGet(e) {
         .setTitle('Mini Big C - Staff Org Chart')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "reset-password") {
+    var resetTemplate = HtmlService.createTemplateFromFile('reset-password');
+    resetTemplate.token = e.parameter.token || '';
+    return resetTemplate.evaluate()
+        .setTitle('Reset Password - Mini Big C Maintenance')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "admin-activity-dashboard") {
      return HtmlService.createTemplateFromFile('admin-activity-dashboard')
         .evaluate()
@@ -89,6 +96,24 @@ function doGet(e) {
         .setTitle('New Product Survey Report')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "edmi_solar_survey_report") {
+    return HtmlService.createTemplateFromFile('EdmiSolarSurveyReport')
+        .evaluate()
+        .setTitle('EDMI Solar Meter Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "layout_survey_report") {
+    return HtmlService.createTemplateFromFile('LayoutSurveyReport')
+        .evaluate()
+        .setTitle('Layout Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "trading_hours_survey_report") {
+    return HtmlService.createTemplateFromFile('TradingHoursSurveyReport')
+        .evaluate()
+        .setTitle('Trading Hours Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "np_survey") {
     return HtmlService.createTemplateFromFile('np_survey')
         .evaluate()
@@ -143,10 +168,70 @@ function doGet(e) {
         .setTitle('AI Prediction Analysis')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "broken-unit-summary") {
+    return HtmlService.createTemplateFromFile('broken-unit-summary')
+        .evaluate()
+        .setTitle('Broken Unit Summary')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "capex-budget-crosscheck") {
+    return HtmlService.createTemplateFromFile('capex-budget-crosscheck')
+        .evaluate()
+        .setTitle('CAPEX Budget Cross-Check')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "admin-password-reset") {
     return HtmlService.createTemplateFromFile('admin-password-reset')
         .evaluate()
         .setTitle('Admin - Password Reset')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "email-config") {
+    return HtmlService.createTemplateFromFile('email-config')
+        .evaluate()
+        .setTitle('Email Delivery Config')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "survey-manual") {
+    return HtmlService.createTemplateFromFile('survey-manual')
+        .evaluate()
+        .setTitle('คู่มือแบบสำรวจแอร์ & ตู้แช่')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "aircon-manual") {
+    return HtmlService.createTemplateFromFile('aircon-manual')
+        .evaluate()
+        .setTitle('คู่มือแบบสำรวจเครื่องปรับอากาศ')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "ref-manual") {
+    return HtmlService.createTemplateFromFile('ref-manual')
+        .evaluate()
+        .setTitle('คู่มือแบบสำรวจตู้แช่')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "np-manual") {
+    return HtmlService.createTemplateFromFile('np-manual')
+        .evaluate()
+        .setTitle('คู่มือแบบสำรวจ New Product')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "layout-manual") {
+    return HtmlService.createTemplateFromFile('layout-manual')
+        .evaluate()
+        .setTitle('คู่มือแบบสำรวจพื้นที่ก่อนติดตั้ง')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hours-manual") {
+    return HtmlService.createTemplateFromFile('hours-manual')
+        .evaluate()
+        .setTitle('คู่มือแบบสำรวจความพร้อมปรับลดเวลาทำการ')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "edmi-manual") {
+    return HtmlService.createTemplateFromFile('edmi-manual')
+        .evaluate()
+        .setTitle('คู่มือกรอกแบบฟอร์ม EDMI Solar Meter')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page && page.trim().toLowerCase() == "survey-config") {
@@ -190,6 +275,12 @@ function findEmployeeSheet() {
 }
 
 function getOrgChartData() {
+  // Cache 60s — full Employee_Database scan on every call, fired on every
+  // org-chart page load.
+  var _ocdCache = CacheService.getScriptCache();
+  var _ocdHit = _ocdCache.get('ORG_CHART_DATA_V1');
+  if (_ocdHit) return JSON.parse(_ocdHit);
+
   var sheet = findEmployeeSheet();
   var data = sheet.getDataRange().getValues();
   // Remove header
@@ -329,10 +420,12 @@ function getOrgChartData() {
   }
   
   var currentUserEmail = Session.getActiveUser().getEmail();
-  return {
+  var _ocdResult = {
     nodes: nodes,
     currentUserEmail: currentUserEmail
   };
+  try { _ocdCache.put('ORG_CHART_DATA_V1', JSON.stringify(_ocdResult), 60); } catch (e) {}
+  return _ocdResult;
 }
 
 function updateEmployee(form) {
@@ -606,26 +699,33 @@ function getEmployeeExtendedData(empId) {
 
 function getEmployeeListV2(targetEmail) {
   try {
+  // Cache 5 min — this scans Employee_Database on every call and is fired on
+  // every main-app page load (index.html) plus trip-plan-calendar.html.
+  // Admins get the full list (one shared cache key); non-admins only see
+  // their own entry (cache key includes their email).
+  var userEmail = targetEmail || Session.getActiveUser().getEmail();
+  var check = checkAdminStatus(userEmail);
+  var isAdmin = check.isAdmin;
+  var _elCache = CacheService.getScriptCache();
+  var _elKey = isAdmin ? 'EMP_LIST_V2_ALL' : ('EMP_LIST_V2_' + String(userEmail).trim().toLowerCase());
+  var _elHit = _elCache.get(_elKey);
+  if (_elHit) return JSON.parse(_elHit);
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Employee_Database");
   if (!sheet) {
       sheet = ss.getSheets()[0]; // Fallback to first sheet
   }
-  
+
   var data = sheet.getDataRange().getValues();
   if (data.length <= 1) return []; // Empty or just header
-  
+
   data.shift(); // Remove header
-  
+
   // Return list of {id, name}
   // Check Admin Status
-  var userEmail = targetEmail || Session.getActiveUser().getEmail();
   Logger.log("=== getEmployeeList Debug ===");
   Logger.log("User Email: " + userEmail);
-  
-  var check = checkAdminStatus(userEmail);
-  var isAdmin = check.isAdmin;
-  
   Logger.log("Is Admin: " + isAdmin);
   Logger.log("Admin Check Logs: " + JSON.stringify(check.logs));
 
@@ -704,11 +804,13 @@ function getEmployeeListV2(targetEmail) {
      return item != null;
   });
   
-  // Final Safety Check: If empty, return specific debug item
+  // Final Safety Check: If empty, return specific debug item (not cached —
+  // could be a transient lookup miss, don't want to pin a confusing message)
   if (result.length === 0) {
        return [{id: "", name: "⚠️ No Match found for: " + userEmail + (isAdmin ? " (Admin)" : "")}];
   }
-  
+
+  try { _elCache.put(_elKey, JSON.stringify(result), 300); } catch (e) {}
   return result;
 
   } catch (e) {
@@ -725,11 +827,21 @@ function checkAdminStatus(clientEmail) {
     // If clientEmail is provided (from frontend after login), trust it (or validate token if we had one).
     // Otherwise, callback to Session (e.g. direct run).
     var effectiveEmail = clientEmail ? String(clientEmail).trim().toLowerCase() : String(Session.getActiveUser().getEmail()).trim().toLowerCase();
-    
+
+    // Cache per-email (5 min): this is called 3x per page load (checkAuth, initApp,
+    // getEmployeeListV2) — each call was a full Employee_Database scan.
+    if (effectiveEmail) {
+        try {
+            var _acHit = CacheService.getScriptCache().get('ADMIN_STATUS_' + effectiveEmail);
+            if (_acHit) return JSON.parse(_acHit);
+        } catch (e) {}
+    }
+
     var isAdmin = false;
     var isSMF = false;
     var isMMS = false;
     var isScheduleAdmin = false;
+    var isSysAdmin = false;
     var logs = [];
     
     logs.push("Auth Check Start");
@@ -811,10 +923,13 @@ function checkAdminStatus(clientEmail) {
                         }
                     }
 
-                    if (role === 'admin') {
+                    if (role === 'admin' || role === 'super admin' || role === 'superadmin') {
                         isAdmin = true;
                         logs.push("SUCCESS: Admin privs granted.");
                         break; // Stop scanning only if we found an Admin entry
+                    } else if (role === 'system_admin' || role === 'sysadmin') {
+                        isSysAdmin = true;
+                        logs.push("SUCCESS: System Admin privs granted.");
                     } else if (['survey_admin', 'schedule_admin', 'surveyAdmin', 'scheduleAdmin'].indexOf(role) !== -1) {
                         isScheduleAdmin = true;
                         logs.push("SUCCESS: Schedule/Survey Admin privs granted.");
@@ -841,8 +956,12 @@ function checkAdminStatus(clientEmail) {
         console.error("Admin Check Error", e);
     }
 
-    console.log("Admin Check Result:", { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isScheduleAdmin: isScheduleAdmin, email: effectiveEmail, logs: logs });
-    return { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isScheduleAdmin: isScheduleAdmin, email: effectiveEmail, logs: logs };
+    console.log("Admin Check Result:", { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, email: effectiveEmail, logs: logs });
+    var _acResult = { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, email: effectiveEmail, logs: logs };
+    if (effectiveEmail) {
+        try { CacheService.getScriptCache().put('ADMIN_STATUS_' + effectiveEmail, JSON.stringify(_acResult), 300); } catch (e) {}
+    }
+    return _acResult;
 }
 
 // Deprecated: checkAdminStatusById - Use checkAdminStatus(email) instead
@@ -920,59 +1039,11 @@ function processAssignmentForm(form) {
     }
 }
 
-function getAssignmentReport() {
-    try {
-        var ss = SpreadsheetApp.getActiveSpreadsheet();
-        var assignmentSheet = ss.getSheetByName("Assignments");
-        var employeeSheet = ss.getSheetByName("Employee_Database");
-        
-        if (!assignmentSheet) {
-            return { error: "Assignments sheet not found" };
-        }
-        
-        var assignmentData = assignmentSheet.getDataRange().getValues();
-        if (assignmentData.length <= 1) {
-            return { assignments: [] }; // Empty or just header
-        }
-        
-        // Build employee lookup map
-        var empMap = {};
-        if (employeeSheet) {
-            var empData = employeeSheet.getDataRange().getValues();
-            for (var i = 1; i < empData.length; i++) {
-                var empId = empData[i][1]; // Column B (index 1)
-                var empName = empData[i][2]; // Column C (index 2)
-                if (empId && empName) {
-                    empMap[empId] = empName;
-                }
-            }
-        }
-        
-        // Process assignments
-        var assignments = [];
-        for (var i = 1; i < assignmentData.length; i++) {
-            var row = assignmentData[i];
-            var empId = row[0];
-            var empName = empMap[empId] || empId;
-            
-            assignments.push({
-                empId: empId,
-                empName: empName,
-                project: row[1] || '',
-                role: row[2] || '',
-                status: row[3] || '',
-                start: row[4] || '',
-                end: row[5] || '',
-                achievements: row[6] || '',
-                department: row[7] || ''
-            });
-        }
-        
-        return { assignments: assignments };
-    } catch (e) {
-        return { error: e.toString() };
-    }
-}
+// NOTE: getAssignmentReport() lived here as a duplicate of the version in
+// Assignment.gs (Apps Script silently used whichever file loaded last, which
+// meant this weaker copy — hardcoded sheet name, no date formatting, no
+// newest-first sort — was actually the one running). Removed; Assignment.gs
+// is now the single source of truth and has its own caching.
 
 
 // --- Work Order Feature ---
@@ -1187,7 +1258,7 @@ function processWorkOrderForm(form) {
                     emailOptions.attachments = emailAttachments;
                 }
 
-                MailApp.sendEmail(emailOptions);
+                sendAppEmail_(emailOptions);
                 console.log("Work Order Email sent to: " + toEmail + (uniqueCC.length > 0 ? ", CC: " + uniqueCC.join(", ") : ""));
                 emailSent = true;
                 emailLog = "Sent to assignee" + (uniqueCC.length > 0 ? " + " + uniqueCC.length + " CC" : "");
@@ -1396,7 +1467,16 @@ function loginUser(emailOrId, password) {
         if (!userRow) {
              return { success: false, error: "User not found (Check Email or Employee ID)." };
         }
-        
+
+        // 2b. Blocked if a Super Admin has deactivated this account
+        var statusColIndex = headers.indexOf("Status");
+        if (statusColIndex !== -1) {
+            var statusVal = String(userRow[statusColIndex]).trim().toLowerCase();
+            if (statusVal === "inactive") {
+                return { success: false, error: "This account has been deactivated. Please contact your administrator." };
+            }
+        }
+
         // 3. Check Password (Hash or Legacy)
         var storedPwd = String(userRow[pwdColIndex]);
         var inputHash = hashPassword(password);
@@ -1428,17 +1508,27 @@ function loginUser(emailOrId, password) {
                 console.error("Login Log Error", e);
              }
              
+             // Phone is looked up by header (not a fixed index) because this sheet has
+             // gained columns over time. Registration stores it as "'0812..." so Sheets
+             // keeps the leading zero — strip that marker if getValues() hands it back.
+             var phoneColIndex = headers.indexOf("Phone");
+             var userPhone = phoneColIndex !== -1
+                 ? String(userRow[phoneColIndex] || '').replace(/^'/, '').trim()
+                 : '';
+
              // Success - RETURN THE REAL EMAIL
-             return { 
-                 success: true, 
+             return {
+                 success: true,
                  user: {
                      email: userRow[emailColIndex], // Always return the DB email
                      name: userRow[2], // Name
+                     phone: userPhone, // Pre-fills the survey forms' reporterPhone field
                      empId: userRow[1], // ID
                      role: 'User', // Basic role for now
                      isAdmin: adminCheck.isAdmin, // Admin flag
                      isSMF: adminCheck.isSMF || false, // SMF team flag
-                     isScheduleAdmin: adminCheck.isScheduleAdmin || false // Schedule/Survey Admin flag
+                     isScheduleAdmin: adminCheck.isScheduleAdmin || false, // Schedule/Survey Admin flag
+                     isSysAdmin: adminCheck.isSysAdmin || false // System Admin flag
                  }
              };
         } else {
@@ -1498,7 +1588,7 @@ function adminResetPassword(adminEmail, targetEmail, newPassword) {
         if (!adminEmail) return { success: false, error: "Admin email is missing." };
         
         var adminCheck = checkAdminStatus(adminEmail);
-        if (!adminCheck.isAdmin) {
+        if (!adminCheck.isAdmin && !adminCheck.isSysAdmin) {
             return { success: false, error: "Access denied — admins only. (Checked: " + adminEmail + ")" };
         }
 
@@ -1537,6 +1627,317 @@ function adminResetPassword(adminEmail, targetEmail, newPassword) {
     } catch (e) {
         console.error("Error in adminResetPassword: " + e.toString());
         return { success: false, error: "System Error: " + e.toString() };
+    }
+}
+
+// ─── Super Admin: Manage Users (edit profile / deactivate) ───────────────────
+// Gated to isAdmin (Super Admin) only — one tier above the Admin/System Admin
+// gate on password reset above, since editing identity/role or locking an
+// account out is more sensitive than resetting a password.
+
+// Column headers checkAdminStatus() also recognizes as the "Role" column.
+var ROLE_COLUMN_ALIASES_ = ['user type', 'role', 'usertype', 'access level', 'admin', 'permission'];
+
+function _findRoleColIndex_(headers) {
+    for (var h = 0; h < headers.length; h++) {
+        if (ROLE_COLUMN_ALIASES_.indexOf(String(headers[h]).trim().toLowerCase()) !== -1) return h;
+    }
+    return -1;
+}
+
+// Returns full editable profile (incl. Role/Status) for the Manage Users table.
+// Super Admin only — deliberately a stricter gate than getEmployeeListForReset().
+function getEmployeeListForAdminEdit(callerEmail) {
+    try {
+        var adminCheck = checkAdminStatus(callerEmail);
+        if (!adminCheck.isAdmin) return { success: false, error: "Access denied — Super Admins only." };
+
+        var sheet = findEmployeeSheet();
+        if (!sheet) return { success: false, error: "Employee database sheet not found." };
+        var data = sheet.getDataRange().getValues();
+        if (data.length < 2) return { success: true, users: [] };
+        var headers = data[0];
+
+        var emailIdx = headers.indexOf("Email"); if (emailIdx === -1) emailIdx = 6;
+        var empIdIdx = headers.indexOf("Employee ID"); if (empIdIdx === -1) empIdIdx = 1;
+        var nameIdx = headers.indexOf("Full Name"); if (nameIdx === -1) nameIdx = 2;
+        var roleIdx = _findRoleColIndex_(headers);
+        var statusIdx = headers.indexOf("Status");
+
+        var result = [];
+        for (var i = 1; i < data.length; i++) {
+            var email = String(data[i][emailIdx] || "").trim();
+            var name = String(data[i][nameIdx] || "").trim();
+            if (!email && !name) continue;
+            result.push({
+                email: email,
+                name: name,
+                empId: String(data[i][empIdIdx] || "").trim(),
+                role: roleIdx > -1 ? String(data[i][roleIdx] || "").trim() : "",
+                status: statusIdx > -1 ? (String(data[i][statusIdx] || "").trim() || "Active") : "Active"
+            });
+        }
+        result.sort(function (a, b) { return a.name.localeCompare(b.name); });
+        return { success: true, users: result };
+    } catch (e) {
+        console.error("Error in getEmployeeListForAdminEdit: " + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
+// updates: { name, email, empId, role }. Super Admin only.
+function adminEditUser(adminEmail, targetEmailOriginal, updates) {
+    try {
+        if (!adminEmail) return { success: false, error: "Admin email is missing." };
+        var adminCheck = checkAdminStatus(adminEmail);
+        if (!adminCheck.isAdmin) return { success: false, error: "Access denied — Super Admins only." };
+
+        if (!targetEmailOriginal) return { success: false, error: "Target user is required." };
+        updates = updates || {};
+        var newName = String(updates.name || "").trim();
+        var newEmail = String(updates.email || "").trim();
+        var newEmpId = String(updates.empId || "").trim();
+        var newRole = String(updates.role || "").trim();
+
+        if (!newName || !newEmail) return { success: false, error: "Name and Email are required." };
+
+        var sheet = findEmployeeSheet();
+        if (!sheet) return { success: false, error: "Employee database sheet not found." };
+        var data = sheet.getDataRange().getValues();
+        var headers = data[0];
+
+        var emailIdx = headers.indexOf("Email"); if (emailIdx === -1) emailIdx = 6;
+        var nameIdx = headers.indexOf("Full Name"); if (nameIdx === -1) nameIdx = 2;
+        var empIdIdx = headers.indexOf("Employee ID"); if (empIdIdx === -1) empIdIdx = 1;
+        var roleIdx = _findRoleColIndex_(headers);
+        if (roleIdx === -1) return { success: false, error: "Role column not found in Employee Database." };
+
+        var origTarget = String(targetEmailOriginal).trim().toLowerCase();
+        var newTarget = newEmail.trim().toLowerCase();
+        var rowIndex = -1;
+        for (var i = 1; i < data.length; i++) {
+            var rowEmail = String(data[i][emailIdx]).trim().toLowerCase();
+            if (rowEmail === origTarget) rowIndex = i;
+            else if (rowEmail === newTarget) {
+                return { success: false, error: "Another user already uses that email: " + newEmail };
+            }
+        }
+        if (rowIndex === -1) return { success: false, error: "User not found: " + targetEmailOriginal };
+
+        sheet.getRange(rowIndex + 1, nameIdx + 1).setValue(newName);
+        sheet.getRange(rowIndex + 1, empIdIdx + 1).setValue(newEmpId);
+        sheet.getRange(rowIndex + 1, emailIdx + 1).setValue(newEmail);
+        sheet.getRange(rowIndex + 1, roleIdx + 1).setValue(newRole);
+
+        try {
+            var cache = CacheService.getScriptCache();
+            cache.remove('ADMIN_STATUS_' + origTarget);
+            if (newTarget !== origTarget) cache.remove('ADMIN_STATUS_' + newTarget);
+        } catch (e) {}
+
+        try {
+            logUserActivity(adminEmail, "AdminEditUser", "Edited " + targetEmailOriginal + " -> " + newEmail + " (Role: " + newRole + ")");
+        } catch (e) {
+            console.error("Logging failed for AdminEditUser", e);
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error("Error in adminEditUser: " + e.toString());
+        return { success: false, error: "System Error: " + e.toString() };
+    }
+}
+
+// Soft delete: flips a "Status" column (created lazily, defaults existing rows
+// to "Active") rather than removing the row — surveys/work orders/trip plans
+// elsewhere key off this email and would otherwise break. Super Admin only.
+function adminSetUserStatus(adminEmail, targetEmail, active) {
+    try {
+        if (!adminEmail) return { success: false, error: "Admin email is missing." };
+        var adminCheck = checkAdminStatus(adminEmail);
+        if (!adminCheck.isAdmin) return { success: false, error: "Access denied — Super Admins only." };
+
+        if (!targetEmail) return { success: false, error: "Target user is required." };
+        var target = String(targetEmail).trim().toLowerCase();
+        if (!active && target === String(adminEmail).trim().toLowerCase()) {
+            return { success: false, error: "You cannot deactivate your own account." };
+        }
+
+        var sheet = findEmployeeSheet();
+        if (!sheet) return { success: false, error: "Employee database sheet not found." };
+        var data = sheet.getDataRange().getValues();
+        var headers = data[0];
+        var emailIdx = headers.indexOf("Email"); if (emailIdx === -1) emailIdx = 6;
+
+        var statusIdx = headers.indexOf("Status");
+        if (statusIdx === -1) {
+            statusIdx = headers.length;
+            sheet.getRange(1, statusIdx + 1).setValue("Status");
+            sheet.getRange(1, statusIdx + 1).setFontWeight("bold");
+            sheet.getRange(1, statusIdx + 1).setBackground("#d9ead3");
+            if (data.length > 1) {
+                sheet.getRange(2, statusIdx + 1, data.length - 1, 1).setValue("Active");
+            }
+            data = sheet.getDataRange().getValues();
+        }
+
+        var rowIndex = -1;
+        for (var i = 1; i < data.length; i++) {
+            if (String(data[i][emailIdx]).trim().toLowerCase() === target) { rowIndex = i; break; }
+        }
+        if (rowIndex === -1) return { success: false, error: "User not found: " + targetEmail };
+
+        sheet.getRange(rowIndex + 1, statusIdx + 1).setValue(active ? "Active" : "Inactive");
+
+        try { CacheService.getScriptCache().remove('ADMIN_STATUS_' + target); } catch (e) {}
+        try {
+            logUserActivity(adminEmail, active ? "AdminReactivateUser" : "AdminDeactivateUser", targetEmail);
+        } catch (e) {
+            console.error("Logging failed for AdminSetUserStatus", e);
+        }
+
+        return { success: true };
+    } catch (e) {
+        console.error("Error in adminSetUserStatus: " + e.toString());
+        return { success: false, error: "System Error: " + e.toString() };
+    }
+}
+
+// ─── Self-service "Forgot Password" (email reset link) ───────────────────────
+// No admin needed: user enters their email, gets a time-limited (30 min)
+// one-time link, sets a new password themselves. Tokens live in a
+// Password_Reset_Tokens sheet (created lazily on first use).
+
+var PASSWORD_RESET_TOKEN_SHEET = "Password_Reset_Tokens";
+var PASSWORD_RESET_TTL_MIN = 30;
+
+function requestPasswordReset(emailOrId) {
+    try {
+        var sheet = findEmployeeSheet();
+        if (!sheet) return { success: false, error: "Employee database sheet not found." };
+        var data = sheet.getDataRange().getValues();
+        var headers = data[0];
+        var emailIdx = headers.indexOf("Email"); if (emailIdx === -1) emailIdx = 6;
+        var empIdIdx = headers.indexOf("Employee ID"); if (empIdIdx === -1) empIdIdx = 1;
+        var nameIdx = headers.indexOf("Full Name"); if (nameIdx === -1) nameIdx = 2;
+
+        var input = String(emailOrId || "").trim().toLowerCase();
+        var targetEmail = "", targetName = "";
+        for (var i = 1; i < data.length; i++) {
+            var rowEmail = String(data[i][emailIdx] || "").trim().toLowerCase();
+            var rowId = String(data[i][empIdIdx] || "").trim().toLowerCase();
+            if (rowEmail === input || (input && rowId === input)) {
+                targetEmail = String(data[i][emailIdx] || "").trim();
+                targetName = String(data[i][nameIdx] || "").trim();
+                break;
+            }
+        }
+
+        // Always return success even if not found — don't let this endpoint be used
+        // to enumerate which emails have accounts. Only an actual match gets an email.
+        if (!targetEmail) return { success: true };
+
+        var token = Utilities.getUuid();
+        var now = new Date();
+        var expiresAt = new Date(now.getTime() + PASSWORD_RESET_TTL_MIN * 60000);
+
+        var tokenSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(PASSWORD_RESET_TOKEN_SHEET);
+        if (!tokenSheet) {
+            tokenSheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(PASSWORD_RESET_TOKEN_SHEET);
+            tokenSheet.appendRow(["Token", "Email", "CreatedAt", "ExpiresAt", "Used"]);
+            tokenSheet.setFrozenRows(1);
+        }
+        tokenSheet.appendRow([token, targetEmail, now, expiresAt, "No"]);
+
+        var resetUrl = ScriptApp.getService().getUrl() + "?page=reset-password&token=" + encodeURIComponent(token);
+        var htmlBody = '<div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1f2937;">'
+            + '<h2 style="color:#1e40af;">รีเซ็ตรหัสผ่าน (Password Reset)</h2>'
+            + '<p>สวัสดีคุณ ' + (targetName || targetEmail) + ',</p>'
+            + '<p>มีการร้องขอรีเซ็ตรหัสผ่านสำหรับบัญชี Mini Big C Maintenance ของคุณ คลิกปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่ '
+            + '(ลิงก์นี้ใช้ได้ภายใน ' + PASSWORD_RESET_TTL_MIN + ' นาที และใช้ได้เพียงครั้งเดียว):</p>'
+            + '<p><a href="' + resetUrl + '" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:bold;">ตั้งรหัสผ่านใหม่</a></p>'
+            + '<p style="color:#9ca3af;font-size:12px;margin-top:20px;">หากคุณไม่ได้ร้องขอ กรุณาเพิกเฉยต่ออีเมลนี้ — รหัสผ่านของคุณจะไม่มีการเปลี่ยนแปลง</p>'
+            + '</div>';
+
+        try {
+            sendAppEmail_({ to: targetEmail, subject: "รีเซ็ตรหัสผ่าน - Mini Big C Maintenance", htmlBody: htmlBody });
+        } catch (mailErr) {
+            return { success: false, error: "ส่งอีเมลไม่สำเร็จ: " + mailErr };
+        }
+
+        try { logUserActivity(targetEmail, "RequestPasswordReset", "Self-service reset link sent"); } catch (e) {}
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function validateResetToken(token) {
+    try {
+        if (!token) return { valid: false, error: "ลิงก์ไม่ถูกต้อง" };
+        var tokenSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(PASSWORD_RESET_TOKEN_SHEET);
+        if (!tokenSheet) return { valid: false, error: "ลิงก์ไม่ถูกต้อง" };
+        var data = tokenSheet.getDataRange().getValues();
+        for (var i = 1; i < data.length; i++) {
+            if (String(data[i][0]) === String(token)) {
+                var used = String(data[i][4]).trim().toLowerCase() === "yes";
+                var expiresAt = data[i][3];
+                if (used) return { valid: false, error: "ลิงก์นี้ถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่" };
+                if (expiresAt instanceof Date && expiresAt.getTime() < Date.now()) {
+                    return { valid: false, error: "ลิงก์หมดอายุแล้ว กรุณาขอลิงก์ใหม่" };
+                }
+                return { valid: true, email: data[i][1] };
+            }
+        }
+        return { valid: false, error: "ลิงก์ไม่ถูกต้อง" };
+    } catch (e) {
+        return { valid: false, error: e.toString() };
+    }
+}
+
+function completePasswordReset(token, newPassword) {
+    try {
+        var _wlock = _acquireWriteLock_();
+        var check = validateResetToken(token);
+        if (!check.valid) return { success: false, error: check.error };
+        if (!newPassword || String(newPassword).length < 4) {
+            return { success: false, error: "รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร" };
+        }
+
+        var sheet = findEmployeeSheet();
+        if (!sheet) return { success: false, error: "Employee database sheet not found." };
+        var data = sheet.getDataRange().getValues();
+        var headers = data[0];
+        var emailIdx = headers.indexOf("Email"); if (emailIdx === -1) emailIdx = 6;
+        var pwdIdx = headers.indexOf("Password");
+        if (pwdIdx === -1) return { success: false, error: "Password column not found in Employee Database." };
+
+        var target = String(check.email).trim().toLowerCase();
+        var found = false;
+        for (var i = 1; i < data.length; i++) {
+            if (String(data[i][emailIdx]).trim().toLowerCase() === target) {
+                sheet.getRange(i + 1, pwdIdx + 1).setValue(hashPassword(newPassword));
+                found = true;
+                break;
+            }
+        }
+        if (!found) return { success: false, error: "User not found." };
+
+        // Mark token used so the link can't be replayed.
+        var tokenSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(PASSWORD_RESET_TOKEN_SHEET);
+        if (tokenSheet) {
+            var tdata = tokenSheet.getDataRange().getValues();
+            for (var j = 1; j < tdata.length; j++) {
+                if (String(tdata[j][0]) === String(token)) {
+                    tokenSheet.getRange(j + 1, 5).setValue("Yes");
+                    break;
+                }
+            }
+        }
+        try { logUserActivity(check.email, "SelfResetPassword", "Password reset via emailed link"); } catch (e) {}
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.toString() };
     }
 }
 

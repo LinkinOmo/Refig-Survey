@@ -285,7 +285,7 @@ function processBigCWorkOrderForm(form) {
                     emailOptions.attachments = emailAttachments;
                 }
 
-                MailApp.sendEmail(emailOptions);
+                sendAppEmail_(emailOptions);
                 console.log("BigC Email sent to: " + toEmail + (uniqueCC.length > 0 ? ", CC: " + uniqueCC.join(", ") : ""));
                 emailSent = true;
                 emailLog = "Sent to assignee" + (uniqueCC.length > 0 ? " + " + uniqueCC.length + " CC" : "");
@@ -472,7 +472,7 @@ function approveBigCWorkOrder(workOrderId, approverName, rating) {
                          emailOptions.cc = uniqueCC.join(",");
                      }
                      
-                     MailApp.sendEmail(emailOptions);
+                     sendAppEmail_(emailOptions);
                      console.log("BigC Approval Email sent to: " + toEmail + (uniqueCC.length > 0 ? ", CC: " + uniqueCC.join(", ") : ""));
                      emailSent = true;
                  }
@@ -495,10 +495,17 @@ function getAllBigCWorkOrdersReport(userEmail) {
             userEmail = Session.getActiveUser().getEmail();
         }
         var isAdmin = (userEmail === ADMIN_EMAIL);
-        
+
+        // Cache 60s — full BigC_Work_Orders + Employee_Database scan on every call,
+        // fired on every report load and after every save/delete/approve.
+        var _bwoCache = CacheService.getScriptCache();
+        var _bwoKey = 'BWO_REPORT_V1_' + String(userEmail || '').trim().toLowerCase();
+        var _bwoHit = _bwoCache.get(_bwoKey);
+        if (_bwoHit) return JSON.parse(_bwoHit);
+
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BigC_Work_Orders");
         if (!sheet) return { orders: [], isAdmin: isAdmin };
-        
+
         var data = sheet.getDataRange().getValues();
         var orders = [];
         
@@ -577,7 +584,9 @@ function getAllBigCWorkOrdersReport(userEmail) {
         });
 
         // Sort by newest
-        return { orders: orders.reverse(), isAdmin: isAdmin, user: userEmail };
+        var _bwoResult = { orders: orders.reverse(), isAdmin: isAdmin, user: userEmail };
+        try { _bwoCache.put(_bwoKey, JSON.stringify(_bwoResult), 60); } catch (e) {}
+        return _bwoResult;
 
     } catch (e) {
         return { orders: [], isAdmin: false, error: e.toString() };
@@ -949,7 +958,7 @@ function resendBigCWorkOrderEmail(workOrderId) {
                 emailOptions.attachments = emailAttachments;
             }
 
-            MailApp.sendEmail(emailOptions);
+            sendAppEmail_(emailOptions);
             
             return { success: true, recipientCount: 1 + uniqueCC.length };
         } else {
@@ -963,6 +972,11 @@ function resendBigCWorkOrderEmail(workOrderId) {
 
 function getVendorList() {
     try {
+        // Cache 30 min — vendor sheet is edited manually and rarely changes
+        var _vc = CacheService.getScriptCache();
+        var _vcHit = _vc.get('VENDOR_LIST_V1');
+        if (_vcHit) return JSON.parse(_vcHit);
+
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         var sheet = ss.getSheetByName("Vender");
         if (!sheet) sheet = ss.getSheetByName("Vendor");
@@ -1004,8 +1018,9 @@ function getVendorList() {
             }
         }
         
+        try { _vc.put('VENDOR_LIST_V1', JSON.stringify(vendors), 1800); } catch (e) {}
         return vendors;
-        
+
     } catch (e) {
         console.error("Error getting vendor list: " + e.toString());
         return [];

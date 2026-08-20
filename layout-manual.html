@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>คู่มือแบบสำรวจพื้นที่ก่อนติดตั้ง - Mini Big C Maintenance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .step-num {
+            flex: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: white;
+        }
+    </style>
+</head>
+
+<body class="py-8 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-4xl mx-auto">
+
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="text-3xl">📐</span>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800">คู่มือการกรอกแบบสำรวจ<br class="sm:hidden">พื้นที่ก่อนติดตั้ง</h1>
+            </div>
+            <p class="text-gray-500 text-sm sm:text-base">คู่มือฉบับเต็มสำหรับ <b>แบบสำรวจพื้นที่ก่อนติดตั้ง (Layout Survey)</b> —
+                ใช้สำรวจหน้างานก่อนติดตั้งอุปกรณ์ตาม Layout ใหม่ของแต่ละโครงการ (เช่นโครงการ Add Chill Bev) ในระบบ Mini Big C Maintenance</p>
+            <p class="text-xs text-gray-400 mt-2">เมนู: <b>สำรวจพื้นที่ก่อนติดตั้ง</b></p>
+        </div>
+
+        <!-- Before You Start -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-violet-600 mb-4 flex items-center gap-2">🧰 ก่อนเริ่มสำรวจ</h2>
+            <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
+                <li>แบบสำรวจนี้ใช้เฉพาะ <b>สาขาที่อยู่ในโครงการ</b> เท่านั้น — ช่องค้นหาสาขาจะจำกัดรายการให้เฉพาะสาขาเป้าหมายของโครงการที่กำลังทำอยู่</li>
+                <li>เตรียมชื่อ-นามสกุล และเบอร์โทรศัพท์ของผู้สำรวจ</li>
+                <li>ไปสำรวจหน้างานจริงก่อนกรอกฟอร์ม — ยืนดูบริเวณที่จะติดตั้งอุปกรณ์ตาม Layout ใหม่ แล้วถ่ายภาพมุมกว้างเก็บไว้</li>
+                <li>สัญญาณอินเทอร์เน็ตควรเสถียร เนื่องจากฟอร์มนี้ไม่มีปุ่ม Save Draft ควรกรอกและ Submit ให้เสร็จในครั้งเดียว</li>
+            </ul>
+        </div>
+
+        <!-- STEP 1 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex gap-3">
+                <div class="step-num bg-violet-500">1</div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-gray-800">ข้อมูลสาขา (Branch Information)</h3>
+                    <p class="text-sm text-gray-600 mt-2">กรอก <b>ผู้แจ้ง (Reporter)</b> และ <b>เบอร์โทรศัพท์ผู้แจ้ง (Phone)</b> — ทั้งสองช่องบังคับกรอก</p>
+                    <p class="text-sm text-gray-600 mt-2">พิมพ์ <b>รหัสสาขา 5 หลัก</b> หรือ <b>ชื่อสาขา</b> ในช่อง "ค้นหาสาขา" แล้วเลือกจากรายการ —
+                        <b>รายการจะแสดงเฉพาะสาขาเป้าหมายของโครงการเท่านั้น</b> หากไม่พบสาขาที่ต้องการ แปลว่าสาขานั้นยังไม่อยู่ในรายการโครงการปัจจุบัน
+                        ให้ติดต่อผู้ดูแลระบบเพื่อตรวจสอบ</p>
+                    <div class="mt-3 bg-violet-50 border border-violet-100 rounded-lg p-3 text-xs text-violet-800">
+                        💡 หากสาขานั้นมีเอกสารแบบแปลนอ้างอิง (ASIS/To-Be) ผูกไว้ ระบบจะแสดงลิงก์เอกสารให้ทันทีที่เลือกสาขา
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex gap-3">
+                <div class="step-num bg-violet-500">2</div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-gray-800">ข้อมูลโครงการ (Project Info)</h3>
+                    <div class="space-y-2.5 mt-3">
+                        <div class="bg-violet-50 border border-violet-100 rounded-lg p-3">
+                            <p class="font-semibold text-violet-700 text-sm">รูปแบบสาขา (Format) *</p>
+                            <p class="text-xs text-violet-700/80 mt-1">เลือก <b>Big Format</b> หรือ <b>Small Format (BCM)</b> ตามประเภทสาขาจริง
+                                (ค่าเริ่มต้นคือ Small Format (BCM))</p>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            <p class="font-semibold text-slate-700 text-sm">ชื่อโครงการ (Project Name) *</p>
+                            <p class="text-xs text-slate-700/80 mt-1">ค่าเริ่มต้นคือ "Add Chill Bev" — แก้ไขได้หากสำรวจให้โครงการอื่น</p>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            <p class="font-semibold text-slate-700 text-sm">วันที่สำรวจ (Survey Date) *</p>
+                            <p class="text-xs text-slate-700/80 mt-1">วันที่ลงพื้นที่สำรวจจริง</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex gap-3">
+                <div class="step-num bg-violet-500">3</div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-gray-800">ตรวจสอบพื้นที่หน้างาน (Site Checks)</h3>
+                    <p class="text-sm text-gray-600 mt-2 mb-3">ตรวจ 3 ประเด็นหลักที่มีผลต่อการติดตั้งอุปกรณ์ใหม่ตาม Layout — ตอบตามสภาพจริงที่เห็นหน้างาน:</p>
+
+                    <div class="space-y-3">
+                        <div class="bg-red-50 border-2 border-red-200 rounded-lg p-3">
+                            <p class="font-semibold text-red-700 text-sm">☑ บริเวณพื้นที่ติดตั้งตู้แช่ ติดคานหรือไม่</p>
+                            <p class="text-xs text-red-700/80 mt-1">ติ๊กช่องนี้ <b>หากมีคาน</b> (สิ่งกีดขวางโครงสร้างด้านบน) อยู่ตรงตำแหน่งที่จะติดตั้งตู้แช่ใหม่ —
+                                ปล่อยว่างไว้หากไม่มีคานกีดขวาง</p>
+                            <p class="text-xs text-red-700/80 mt-1">📷 แนบ <b>ภาพบริเวณที่จะติดตั้ง (มุมกว้าง)</b> ให้เห็นทั้งพื้นที่และคาน/โครงสร้างด้านบนชัดเจน</p>
+                        </div>
+                        <div class="bg-orange-50 border-2 border-orange-200 rounded-lg p-3">
+                            <p class="font-semibold text-orange-700 text-sm">☑ บริเวณพื้นที่ติดตั้งตู้แช่ มีแอร์อยู่เหนือบริเวณที่จะติดตั้งหรือไม่</p>
+                            <p class="text-xs text-orange-700/80 mt-1">ติ๊กช่องนี้ <b>หากมีเครื่องปรับอากาศ</b> ติดตั้งอยู่เหนือบริเวณที่จะวางตู้แช่ใหม่
+                                (มีผลต่อการควบแน่นน้ำหยดใส่ตู้/สินค้า) — ปล่อยว่างไว้หากไม่มี</p>
+                            <p class="text-xs text-orange-700/80 mt-1">📷 แนบ <b>ภาพแอร์เหนือบริเวณที่จะติดตั้ง</b></p>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            <p class="font-semibold text-slate-700 text-sm">หากเจออุปสรรคอื่น ๆ รบกวนระบุกลับมาด้วยครับ</p>
+                            <p class="text-xs text-slate-700/80 mt-1">ช่องข้อความอิสระ — ระบุอุปสรรคอื่นนอกเหนือจาก 2 ข้อข้างต้นที่พบหน้างาน
+                                เช่น ปลั๊กไฟไม่เพียงพอ พื้นไม่เรียบ ทางเดินแคบเกินไป ฯลฯ (ไม่บังคับกรอก)</p>
+                            <p class="text-xs text-slate-700/80 mt-1">📷 แนบ <b>ภาพอุปสรรคอื่นๆ</b> ประกอบ (ถ้ามี)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 bg-violet-50 border border-violet-100 rounded-lg p-4 text-sm text-violet-800">
+                <b>เมื่อกรอกครบแล้ว:</b> กด <b>Submit</b> เพื่อส่งข้อมูลเข้าระบบ กด <b>Clear form</b> หากต้องการล้างข้อมูลทั้งหมดแล้วเริ่มใหม่
+                (แบบสำรวจนี้ไม่มีปุ่ม Save Draft — ควรกรอกให้เสร็จในครั้งเดียว)
+            </div>
+        </div>
+
+        <!-- Tips -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-amber-600 mb-4 flex items-center gap-2">💡 เคล็ดลับ &amp; ข้อควรระวัง</h2>
+            <ul class="list-disc list-inside space-y-2 text-sm text-gray-700">
+                <li>ถ่ายภาพให้เห็น <b>มุมกว้าง</b> ของบริเวณที่จะติดตั้งจริง ไม่ใช่ภาพระยะใกล้ — ทีมออกแบบต้องใช้ภาพนี้ประเมินโครงสร้างและสิ่งกีดขวาง</li>
+                <li>ช่องที่มีเครื่องหมาย <span class="text-red-500 font-semibold">*</span> เป็นช่องบังคับกรอก</li>
+                <li>ช่องค้นหาสาขาจำกัดเฉพาะสาขาในโครงการ — หากพิมพ์แล้วไม่เจอสาขาที่ต้องการ ไม่ต้องพยายามกรอกรหัส/ชื่อสาขาเอง เพราะจะ Submit ไม่ผ่าน
+                    ให้ติดต่อผู้ดูแลระบบเพื่อเพิ่มสาขานั้นเข้าโครงการก่อน</li>
+                <li>แบบสำรวจนี้ไม่มีปุ่ม Save Draft จึงควรสำรวจหน้างานและถ่ายภาพให้ครบก่อน แล้วค่อยกรอกและ Submit ให้เสร็จในครั้งเดียว</li>
+                <li>สามารถดูรายงานสรุปแบบสำรวจที่เคยส่งแล้วได้ผ่านลิงก์ <b>"View All Reports"</b> ที่มุมขวาบนของฟอร์ม</li>
+            </ul>
+        </div>
+
+        <!-- FAQ -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <h2 class="text-xl font-bold text-gray-700 mb-4 flex items-center gap-2">❓ คำถามที่พบบ่อย</h2>
+            <div class="space-y-4 text-sm">
+                <div>
+                    <p class="font-semibold text-gray-800">หาสาขาที่ต้องการสำรวจในช่องค้นหาไม่เจอ ทำอย่างไร?</p>
+                    <p class="text-gray-600">แบบฟอร์มนี้จำกัดเฉพาะสาขาที่อยู่ในโครงการปัจจุบัน หากไม่พบสาขา แสดงว่ายังไม่ถูกเพิ่มเข้าโครงการ — ติดต่อผู้ดูแลระบบเพื่อตรวจสอบ</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">ไม่มีคานและไม่มีแอร์เหนือพื้นที่ติดตั้ง ต้องติ๊กอะไรไหม?</p>
+                    <p class="text-gray-600">ไม่ต้องติ๊กช่องใดเลย — ปล่อยว่างไว้แปลว่าไม่พบปัญหานั้น</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">ส่งข้อมูลผิดหรือกรอกผิดหลังจาก Submit แล้ว ต้องทำอย่างไร?</p>
+                    <p class="text-gray-600">ติดต่อผู้ดูแลระบบ (Admin) หรือทีมงานฝ่ายซ่อมบำรุง เพื่อขอแก้ไขข้อมูลในระบบ ไม่สามารถแก้ไขข้อมูลที่ส่งแล้วได้ด้วยตนเอง</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer / Contact -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 text-center">
+            <p class="text-sm text-gray-500">หากพบปัญหาการใช้งานที่ไม่ได้อยู่ในคู่มือนี้ กรุณาติดต่อผู้ดูแลระบบ (Admin)
+                หรือทีมงานฝ่ายซ่อมบำรุง (Maintenance) ของท่าน</p>
+            <a href="<?= ScriptApp.getService().getUrl() ?>"
+                class="inline-block mt-4 bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors text-sm">
+                &larr; กลับสู่หน้าแรก
+            </a>
+        </div>
+
+    </div>
+</body>
+
+</html>
