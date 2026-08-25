@@ -186,6 +186,12 @@ function doGet(e) {
         .setTitle('Admin - Password Reset')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "access-console") {
+    return HtmlService.createTemplateFromFile('access-console')
+        .evaluate()
+        .setTitle('Access Console - Super Admin')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "email-config") {
     return HtmlService.createTemplateFromFile('email-config')
         .evaluate()

@@ -254,6 +254,10 @@
         let isAdmin = false;
         let isSMF = false;
         let smfCanEdit = false;
+        // General/"Operation" users, when a Super Admin turns on the Admin Console's
+        // "ผู้ใช้ทั่วไป (Operation) แก้ไขข้อมูลแบบสำรวจได้เหมือน SMF" toggle — same edit
+        // surface as smfCanEdit above, just not limited to the SMF team.
+        let opsCanEdit = false;
         let layoutTargetDocsMap = {}; // { branchCode: { asisUrl, tobeUrl } } — loaded via getLayoutTargetDocs()
         const PAGE_SIZE = 25;
         let currentPage = 1;
@@ -321,6 +325,7 @@
                             isAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
                             isSMF = !!flags.isSMF;
                             smfCanEdit = !!flags.smfEditAllowed;
+                            opsCanEdit = !!flags.opsEditAllowed;
                             var ad = document.getElementById('access-level-display');
                             if (ad) {
                                 ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
@@ -329,6 +334,7 @@
                                     : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
                             }
                             applyAdminUI();
+                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed));
                         })
                         .getUserFlags(_userEmail);
                 }
@@ -600,7 +606,7 @@
             var photosBeam = att.layoutBeamPhoto || [];
             var photosAircon = att.layoutAirconPhoto || [];
             var photosObstacle = att.layoutObstaclePhoto || [];
-            var canEdit = isAdmin || smfCanEdit;
+            var canEdit = isAdmin || smfCanEdit || opsCanEdit;
 
             var html =
                 '<div class="detail-row"><span class="detail-label">รหัสสาขา</span><span class="detail-value">' + htmlEscape(r['Branch Code']) + '</span></div>' +
@@ -906,5 +912,8 @@
                 .removeLayoutTargetStore(code, clientEmail);
         }
     </script>
+
+    <script>var DUP_TYPE_KEY = 'layout'; var DUP_TYPE_LABEL = 'Layout Survey';</script>
+    <?!= include('DupCleanupWidget') ?>
 </body>
 </html>

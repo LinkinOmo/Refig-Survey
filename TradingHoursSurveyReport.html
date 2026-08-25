@@ -298,6 +298,10 @@
         let isAdmin = false;
         let isSMF = false;
         let smfCanEdit = false;
+        // General/"Operation" users, when a Super Admin turns on the Admin Console's
+        // "ผู้ใช้ทั่วไป (Operation) แก้ไขข้อมูลแบบสำรวจได้เหมือน SMF" toggle — same edit
+        // surface as smfCanEdit above, just not limited to the SMF team.
+        let opsCanEdit = false;
         let hoursTargetStoresList = []; // [{code, name, phase, targetDate}] — loaded via getTradingHoursTargetStores()
         let hoursTargetStoresMap = {}; // { branchCode: {code,name,phase,targetDate} }
         const PAGE_SIZE = 25;
@@ -368,6 +372,7 @@
                             isAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
                             isSMF = !!flags.isSMF;
                             smfCanEdit = !!flags.smfEditAllowed;
+                            opsCanEdit = !!flags.opsEditAllowed;
                             var ad = document.getElementById('access-level-display');
                             if (ad) {
                                 ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
@@ -376,10 +381,22 @@
                                     : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
                             }
                             applyAdminUI();
+                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed));
                             // Default to the "By AM" coverage view for Admin/SMF viewers —
                             // the button is only visible to them anyway (see applyAdminUI).
+                            // Delayed: firing getTradingHoursCoverageByAM() immediately here
+                            // would be a 3rd google.script.run call stacked right behind the
+                            // still-in-flight loadData()/getUserFlags() calls from page load,
+                            // which can silently drop this callback (the same back-to-back
+                            // quirk noted at _loadAmCoverage below) — the panel would then
+                            // hang on "กำลังโหลด..." forever since the old click-triggered
+                            // flow never hit this early in the page lifecycle.
                             if ((isAdmin || isSMF) && document.getElementById('amCoveragePanel').classList.contains('hidden')) {
-                                toggleAmCoveragePanel();
+                                setTimeout(function() {
+                                    if (document.getElementById('amCoveragePanel').classList.contains('hidden')) {
+                                        toggleAmCoveragePanel();
+                                    }
+                                }, 900);
                             }
                         })
                         .getUserFlags(_userEmail);
@@ -534,9 +551,27 @@
 
         function _loadAmCoverage() {
             _amCoverageAttempt++;
+            var myAttempt = _amCoverageAttempt;
             document.getElementById('amCoverageList').innerHTML = '<p class="text-xs text-slate-400 text-center py-4">กำลังโหลด...</p>';
+
+            // Watchdog: if this call was fired right after page load (auto-open for
+            // Admin/SMF) it can land back-to-back with loadData()/getUserFlags() and have
+            // its callback silently dropped by the documented google.script.run quirk —
+            // neither withSuccessHandler nor withFailureHandler ever fires in that case,
+            // so without this the panel hangs on "กำลังโหลด..." forever.
+            var watchdog = setTimeout(function() {
+                if (myAttempt !== _amCoverageAttempt) return;
+                if (myAttempt < _AM_COVERAGE_MAX_ATTEMPTS) {
+                    _loadAmCoverage();
+                } else {
+                    document.getElementById('amCoverageList').innerHTML = '<p class="text-xs text-red-500 text-center py-4">โหลดไม่สำเร็จ (ไม่มีการตอบกลับ) <button onclick="_amCoverageAttempt=0;_loadAmCoverage()" class="underline ml-1">ลองใหม่</button></p>';
+                }
+            }, 12000);
+
             google.script.run
                 .withSuccessHandler(function(res) {
+                    clearTimeout(watchdog);
+                    if (myAttempt !== _amCoverageAttempt) return;
                     if (!res || !res.success) {
                         document.getElementById('amCoverageList').innerHTML = '<p class="text-xs text-red-500 text-center py-4">โหลดไม่สำเร็จ: ' + htmlEscape(res && res.error) + ' <button onclick="_loadAmCoverage()" class="underline ml-1">ลองใหม่</button></p>';
                         return;
@@ -553,6 +588,8 @@
                     _renderAmCoverage();
                 })
                 .withFailureHandler(function(err) {
+                    clearTimeout(watchdog);
+                    if (myAttempt !== _amCoverageAttempt) return;
                     document.getElementById('amCoverageList').innerHTML = '<p class="text-xs text-red-500 text-center py-4">' + htmlEscape(err.message) + ' <button onclick="_loadAmCoverage()" class="underline ml-1">ลองใหม่</button></p>';
                 })
                 .getTradingHoursCoverageByAM();
@@ -823,7 +860,7 @@
             var photosSticker = att.hoursStickerPhoto || [];
             var photosPostVerify = att.hoursPostVerifyPhoto || [];
             var photosObstacle = att.hoursObstaclePhoto || [];
-            var canEdit = isAdmin || smfCanEdit;
+            var canEdit = isAdmin || smfCanEdit || opsCanEdit;
             var isPost = r['Survey Stage'] === 'Post-Conversion';
 
             var html =
@@ -1180,6 +1217,9 @@
                 .removeTradingHoursTargetStore(code, clientEmail);
         }
     </script>
+
+    <script>var DUP_TYPE_KEY = 'hours'; var DUP_TYPE_LABEL = 'Trading Hours Survey';</script>
+    <?!= include('DupCleanupWidget') ?>
 </body>
 
 </html>

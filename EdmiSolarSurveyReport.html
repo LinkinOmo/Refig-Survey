@@ -216,6 +216,10 @@
         // separate from isSMF itself, which is also used by unrelated features (e.g.
         // Capex Budget Cross-Check) that must keep working regardless of this toggle.
         let smfCanEdit = false;
+        // General/"Operation" users, when a Super Admin turns on the Admin Console's
+        // "ผู้ใช้ทั่วไป (Operation) แก้ไขข้อมูลแบบสำรวจได้เหมือน SMF" toggle — same edit
+        // surface as smfCanEdit above, just not limited to the SMF team.
+        let opsCanEdit = false;
         const PAGE_SIZE = 25;
         let currentPage = 1;
         let _currentFiltered = [];
@@ -307,6 +311,7 @@
                             isAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
                             isSMF = !!flags.isSMF;
                             smfCanEdit = !!flags.smfEditAllowed;
+                            opsCanEdit = !!flags.opsEditAllowed;
                             var ad = document.getElementById('access-level-display');
                             if (ad) {
                                 ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
@@ -315,6 +320,7 @@
                                     : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
                             }
                             applyAdminUI();
+                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed));
                         })
                         .getUserFlags(_userEmail);
                 }
@@ -608,7 +614,7 @@
             var legacyPhotos = att.edmiMeter || att.EdmiMeter || [];
             // Admin, or SMF team when the Super Admin "SMF Survey Edit" toggle is on, may
             // edit/reupload EDMI meter photos — same permission model as Ref Survey Report.
-            var canEdit = isAdmin || smfCanEdit;
+            var canEdit = isAdmin || smfCanEdit || opsCanEdit;
 
             var html =
                 '<div class="detail-row"><span class="detail-label">รหัสสาขา</span><span class="detail-value">' + htmlEscape(r['Branch Code']) + '</span></div>' +
@@ -842,5 +848,8 @@
                 .deleteEdmiSurveyPhoto(capturedId, unitKey, url, clientEmail);
         }
     </script>
+
+    <script>var DUP_TYPE_KEY = 'edmi'; var DUP_TYPE_LABEL = 'EDMI Solar Survey';</script>
+    <?!= include('DupCleanupWidget') ?>
 </body>
 </html>

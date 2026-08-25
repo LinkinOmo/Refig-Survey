@@ -1,0 +1,185 @@
+<!-- Duplicate Cleanup Widget (Super Admin only) — shared partial included via
+     the include() helper (Code01.gs) on every survey report page. IMPORTANT:
+     never write a literal include-scriptlet example in this comment — GAS's
+     template parser scans raw text for scriptlet tags even inside HTML
+     comments, so a literal example here would make this file recursively
+     include itself when evaluated. Injects its own trigger button next to
+     #access-level-display; stays hidden until the host page calls
+     window.__dupSetSuperAdmin(true) — Super Admin (isAdmin) always, plus
+     System Admin (isSysAdmin) only when a Super Admin has turned on the
+     SYSADMIN_DUP_CLEANUP_ENABLED_V1 toggle (flags.sysAdminDedupAllowed).
+     Never isScheduleAdmin — this is a destructive action. Host page must
+     define DUP_TYPE_KEY ('ref'|'aircon'|'edmi'|'layout'|'hours') and
+     DUP_TYPE_LABEL (display name) before this include. Backend: DuplicateCleanup.gs
+     (getDuplicateSurveyDataForType / mergeDuplicateSurveysForSite). -->
+<div id="dupCleanupModal" class="hidden fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+    <div class="px-5 py-4 border-b flex items-center justify-between">
+      <h3 class="text-base font-bold text-slate-800">🗑️ ตรวจสอบข้อมูลซ้ำ — <span id="dupCleanupTypeLabel"></span></h3>
+      <button type="button" onclick="_dupCloseModal()" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+    </div>
+    <div class="px-5 py-3 text-xs text-slate-500 border-b bg-slate-50">
+      ระบบจะสำรองข้อมูลทุกแถวไว้ก่อน (Backup) แล้วรวมข้อมูลและรูปถ่ายอุปกรณ์จากทุกแถว (Merge) ให้ได้ข้อมูลครบถ้วนที่สุดในแถวล่าสุด ก่อนลบแถวที่ซ้ำ
+    </div>
+    <div id="dupCleanupBody" class="flex-1 overflow-y-auto px-5 py-3 text-sm text-slate-600">Loading...</div>
+  </div>
+</div>
+<div id="dupCleanupToast" class="hidden fixed bottom-5 right-5 z-[110] px-4 py-3 rounded-lg shadow-lg text-sm font-semibold text-white"></div>
+
+<script>
+(function(){
+    var _isSuperAdmin = false;
+    var _btn = null;
+
+    function _ensureButton() {
+        if (_btn) return _btn;
+        var anchor = document.getElementById('access-level-display');
+        if (!anchor || !anchor.parentNode) return null;
+        // access-level-display sits inside a narrow "flex flex-col items-end"
+        // column (just the username + badge, stacked, in a fixed h-16 nav row)
+        // shared across all 5 report pages — inserting a 3rd element directly
+        // into that column broke the row layout and covered the pre-existing
+        // Refresh button next to it (reported live). Go one level up instead,
+        // to the outer button row ("flex items-center gap-4" — Export/Refresh/
+        // divider/name-badge), and append there so it sits as its own row item.
+        var row = anchor.parentNode.parentNode || anchor.parentNode;
+        _btn = document.createElement('button');
+        _btn.id = 'dupCleanupTriggerBtn';
+        _btn.type = 'button';
+        _btn.textContent = '🗑️ ตรวจสอบข้อมูลซ้ำ';
+        _btn.className = 'hidden text-xs font-semibold text-red-600 border border-red-300 px-2.5 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-colors whitespace-nowrap';
+        _btn.onclick = _dupOpenModal;
+        row.appendChild(_btn);
+        return _btn;
+    }
+
+    // Host page calls this from its getUserFlags() success handler.
+    window.__dupSetSuperAdmin = function(v) {
+        _isSuperAdmin = !!v;
+        var b = _ensureButton();
+        if (b) b.classList.toggle('hidden', !_isSuperAdmin);
+    };
+
+    function _dupClientEmail() {
+        try {
+            var u = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+            return (u && u.email) ? u.email : '';
+        } catch(e) { return ''; }
+    }
+
+    function _dupToast(msg, kind) {
+        var t = document.getElementById('dupCleanupToast');
+        if (!t) { alert(msg); return; }
+        t.textContent = msg;
+        t.className = 'fixed bottom-5 right-5 z-[110] px-4 py-3 rounded-lg shadow-lg text-sm font-semibold text-white ' +
+            (kind === 'error' ? 'bg-red-600' : 'bg-emerald-600');
+        t.classList.remove('hidden');
+        clearTimeout(t._hideTimer);
+        t._hideTimer = setTimeout(function(){ t.classList.add('hidden'); }, 4000);
+    }
+
+    function _dupEsc(s) {
+        return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    window._dupOpenModal = function() {
+        if (!_isSuperAdmin) return;
+        document.getElementById('dupCleanupTypeLabel').textContent = (typeof DUP_TYPE_LABEL !== 'undefined') ? DUP_TYPE_LABEL : '';
+        document.getElementById('dupCleanupModal').classList.remove('hidden');
+        _dupLoad();
+    };
+    window._dupCloseModal = function() {
+        document.getElementById('dupCleanupModal').classList.add('hidden');
+    };
+
+    function _dupLoad() {
+        var body = document.getElementById('dupCleanupBody');
+        body.innerHTML = 'กำลังโหลด...';
+        google.script.run
+            .withSuccessHandler(function(res) {
+                if (!res || !res.success) {
+                    body.innerHTML = '<div class="text-red-600">โหลดข้อมูลไม่สำเร็จ: ' + _dupEsc(res ? res.error : 'Unknown error') + '</div>';
+                    return;
+                }
+                if (!res.sites || res.sites.length === 0) {
+                    body.innerHTML = '<div class="text-slate-500 text-center py-8">ไม่พบข้อมูลซ้ำ ✅</div>';
+                    return;
+                }
+                var scopeLabel = res.scopeLabel || '';
+                body.innerHTML = res.sites.map(function(s) {
+                    var subsHtml = s.subs.map(function(x) {
+                        return '<span class="inline-block bg-slate-100 rounded px-2 py-0.5 mr-1 mb-1">' + _dupEsc(x.ts) + '</span>';
+                    }).join('');
+                    // data-* attributes (not inline onclick with JSON.stringify) — a
+                    // double-quoted JSON string embedded inside a double-quoted onclick
+                    // attribute prematurely closes the attribute at its first inner
+                    // quote, silently corrupting the click handler. _dupEsc HTML-escapes
+                    // quotes properly for attribute context; a delegated listener below
+                    // reads these back via dataset.
+                    return '<div class="border border-slate-200 rounded-lg p-3 mb-2">' +
+                        '<div class="flex items-start justify-between gap-3">' +
+                          '<div>' +
+                            '<div class="font-semibold text-slate-800">' + _dupEsc(s.code) + (s.name ? (' — ' + _dupEsc(s.name)) : '') + '</div>' +
+                            (scopeLabel ? '<div class="text-xs text-slate-500">' + _dupEsc(scopeLabel) + ': ' + (s.scope ? _dupEsc(s.scope) : '(ไม่มีข้อมูล)') + '</div>' : '') +
+                            '<div class="mt-1">' + subsHtml + '</div>' +
+                          '</div>' +
+                          '<button type="button" class="dup-merge-btn shrink-0 text-xs font-semibold text-red-600 border border-red-300 px-2.5 py-1 rounded-lg hover:bg-red-600 hover:text-white transition-colors whitespace-nowrap" ' +
+                            'data-code="' + _dupEsc(s.code) + '" data-scope="' + _dupEsc(s.scope || '') + '" data-count="' + s.count + '">🗑️ เก็บล่าสุด (รวมข้อมูล)</button>' +
+                        '</div>' +
+                      '</div>';
+                }).join('');
+            })
+            .withFailureHandler(function(err) {
+                body.innerHTML = '<div class="text-red-600">Error: ' + _dupEsc((err && err.message) || err) + '</div>';
+            })
+            .getDuplicateSurveyDataForType(DUP_TYPE_KEY);
+    }
+
+    // Delegated click listener — set up once — instead of inline onclick per
+    // row (see the data-* comment above for why). #dupCleanupBody is defined
+    // earlier in this same file, so it already exists in the DOM by the time
+    // this script tag runs.
+    (function() {
+        var body = document.getElementById('dupCleanupBody');
+        if (!body) return;
+        body.addEventListener('click', function(e) {
+            var btn = e.target.closest('.dup-merge-btn');
+            if (!btn) return;
+            _dupMergeClick(btn.dataset.code, btn.dataset.scope, parseInt(btn.dataset.count, 10) || 0, btn);
+        });
+    })();
+
+    function _dupMergeClick(code, scope, count, btn) {
+        if (!_isSuperAdmin) return;
+        var msg = 'สาขา ' + code + (scope ? (' (' + scope + ')') : '') + ' มี ' + count + ' รายการซ้ำ\n\n' +
+            'ระบบจะสำรองข้อมูลทั้งหมดไว้ก่อน แล้วรวมข้อมูลที่กรอกไว้จากทุกรายการเข้าด้วยกัน ' +
+            '(ข้อมูลจากรายการใหม่กว่ามีสิทธิ์เหนือกว่าเมื่อชนกัน ส่วนช่องที่ว่างจะถูกเติมจากรายการเก่ากว่า ' +
+            'รวมถึงรูปถ่ายอุปกรณ์จากทุกรายการจะถูกรวมเข้าด้วยกันด้วย ไม่ทิ้งรูปจากรายการเก่า) ' +
+            'เก็บผลลัพธ์ไว้ในรายการล่าสุดเพียงรายการเดียว รายการอื่นจะถูกลบ\n\n' +
+            'การลบนี้ไม่สามารถย้อนกลับได้ในหน้าจอ (แต่มีข้อมูลสำรองไว้ในชีท _DupBackup) ต้องการดำเนินการต่อหรือไม่?';
+        if (!confirm(msg)) return;
+        var orig = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ...'; }
+        google.script.run
+            .withSuccessHandler(function(res) {
+                if (res && res.success) {
+                    _dupToast('สำเร็จ — ลบ ' + (res.deleted || 0) + ' รายการซ้ำ (รีเฟรชหน้าเพื่อดูข้อมูลล่าสุดในตาราง)', 'success');
+                    // Refresh the in-modal list only — no location.reload() here.
+                    // A scripted reload of a GAS web app page can land on a blank
+                    // page (reported live); the underlying report table just needs
+                    // a manual refresh (existing header reload button) to pick up
+                    // the change, same as any other edit made through these reports.
+                    _dupLoad();
+                } else {
+                    _dupToast('ไม่สำเร็จ: ' + (res ? res.error : 'Unknown error'), 'error');
+                    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                }
+            })
+            .withFailureHandler(function(err) {
+                _dupToast('Error: ' + ((err && err.message) || err), 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+            })
+            .mergeDuplicateSurveysForSite(DUP_TYPE_KEY, code, scope, _dupClientEmail());
+    }
+})();
+</script>

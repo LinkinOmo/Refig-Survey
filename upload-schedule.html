@@ -148,6 +148,38 @@
         </button>
       </div>
     </div>
+    <hr class="my-3 border-gray-100">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm font-semibold text-gray-700">ผู้ใช้ทั่วไป (Operation) แก้ไขข้อมูลแบบสำรวจได้เหมือน SMF</p>
+        <p class="text-xs text-gray-400 mt-0.5">เมื่อเปิด: ผู้ใช้ที่ล็อกอินทุกคนแก้ไขข้อมูล/อัปโหลดรูปใหม่/เลือก Asset No. จากทะเบียนทรัพย์สินได้ — เหมือนสวิตช์ SMF ด้านบนแต่ไม่จำกัดทีม</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="ops-edit-status-label" class="text-xs font-semibold text-gray-500">โหลด...</span>
+        <button id="ops-edit-toggle"
+                onclick="toggleOpsSurveyEdit()"
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none bg-gray-300"
+                aria-label="toggle Operation survey edit">
+          <span id="ops-edit-thumb" class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform translate-x-1"></span>
+        </button>
+      </div>
+    </div>
+    <hr class="my-3 border-gray-100">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm font-semibold text-gray-700">System Admin ลบข้อมูลซ้ำ (Duplicate Cleanup) ได้เหมือน Super Admin</p>
+        <p class="text-xs text-gray-400 mt-0.5">เมื่อเปิด: ผู้ใช้ System Admin สามารถกดปุ่ม "เก็บล่าสุด" (สำรอง+รวม+ลบรายการซ้ำ) ได้ทุกหน้ารายงาน — ปกติจำกัดเฉพาะ Super Admin เท่านั้น เพราะเป็นการลบข้อมูลจริง</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="sysadmin-dedup-status-label" class="text-xs font-semibold text-gray-500">โหลด...</span>
+        <button id="sysadmin-dedup-toggle"
+                onclick="toggleSysAdminDupCleanup()"
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none bg-gray-300"
+                aria-label="toggle System Admin duplicate cleanup">
+          <span id="sysadmin-dedup-thumb" class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform translate-x-1"></span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Setup form -->
@@ -681,6 +713,7 @@
               <th class="px-3 py-2.5 text-center w-52">🌀 Aircon</th>
               <th class="px-3 py-2.5 text-center w-52">❄️ Ref</th>
               <th class="px-3 py-2.5 text-center w-20">Extra Rows</th>
+              <th class="px-3 py-2.5 text-center w-28">Action</th>
             </tr>
           </thead>
           <tbody id="dup-table-body"></tbody>
@@ -705,6 +738,8 @@ var storeSearchCache = null;
 var summaryData = null;
 var IS_ADMIN = false;       // true for Admin + ScheduleAdmin + SMF (general admin features)
 var IS_SETUP_ADMIN = false; // true for Admin + ScheduleAdmin ONLY (Setup tab access)
+var IS_SUPER_ADMIN = false; // true for Admin (isAdmin) ONLY — gates the settings toggles themselves (e.g. the System Admin dedup toggle below), never self-escalatable
+var CAN_DEDUP = false;      // true for Admin, OR System Admin when a Super Admin has turned the toggle on — gates the actual duplicate-cleanup action
 
 // ──────────────────────────────────────────────
 // Auth / Role
@@ -718,8 +753,10 @@ function _initAuth() {
             IS_ADMIN = !!(user && (user.isAdmin || user.isScheduleAdmin || user.isSMF));
             // IS_SETUP_ADMIN: Setup tab restricted to Admin + Schedule Admin only (not SMF)
             IS_SETUP_ADMIN = !!(user && (user.isAdmin || user.isScheduleAdmin));
+            IS_SUPER_ADMIN = !!(user && user.isAdmin);
+            CAN_DEDUP = IS_SUPER_ADMIN; // sysAdminDedupAllowed isn't in localStorage — server re-check below adds it for System Admins
         }
-    } catch(e) { IS_ADMIN = false; IS_SETUP_ADMIN = false; }
+    } catch(e) { IS_ADMIN = false; IS_SETUP_ADMIN = false; IS_SUPER_ADMIN = false; CAN_DEDUP = false; }
 
     // Hide setup tab button for non-setup-admins
     if (!IS_SETUP_ADMIN) {
@@ -795,6 +832,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!flags) return;
                     var becomeAdmin = !!(flags.isAdmin || flags.isScheduleAdmin || flags.isSMF);
                     var becomeSetupAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
+                    // CAN_DEDUP (System Admin + toggle) is independent of the other
+                    // admin tiers above — set it before the becomeAdmin early-return
+                    // so a pure System Admin (no isScheduleAdmin/isSMF) still gets it.
+                    if (flags.isAdmin || flags.sysAdminDedupAllowed) CAN_DEDUP = true;
                     if (!becomeAdmin) return;
                     IS_ADMIN = true;
                     if (becomeSetupAdmin) IS_SETUP_ADMIN = true;
@@ -827,6 +868,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadGuestButtonSetting();
                     loadSMFAdminSetting();
                     loadSmfSurveyEditSetting();
+                    loadOpsSurveyEditSetting();
+                    loadSysAdminDupCleanupSetting();
                 })
                 .withFailureHandler(function() {}) // silent fail
                 .getUserFlags(_email);
@@ -1696,6 +1739,139 @@ function toggleSmfSurveyEdit() {
             _renderSmfEditToggle(!newVal);
         })
         .setSmfSurveyEditSetting(newVal, clientEmail);
+}
+// ──────────────────────────────────────────────
+// General/Operation Survey Data Edit Toggle — same edit surface as the SMF
+// toggle above, but for any logged-in user (not just the SMF team).
+// ──────────────────────────────────────────────
+var _opsEditEnabled = false;
+
+function loadOpsSurveyEditSetting() {
+    google.script.run
+        .withSuccessHandler(function(enabled) {
+            _opsEditEnabled = !!enabled;
+            _renderOpsEditToggle(!!enabled);
+        })
+        .withFailureHandler(function() {
+            var lbl = document.getElementById('ops-edit-status-label');
+            if (lbl) lbl.textContent = 'Error';
+        })
+        .getOpsSurveyEditSetting();
+}
+
+function _renderOpsEditToggle(enabled) {
+    var toggle = document.getElementById('ops-edit-toggle');
+    var thumb  = document.getElementById('ops-edit-thumb');
+    var label  = document.getElementById('ops-edit-status-label');
+    if (!toggle) return;
+    if (enabled) {
+        toggle.classList.remove('bg-gray-300');
+        toggle.classList.add('bg-indigo-500');
+        thumb.classList.remove('translate-x-1');
+        thumb.classList.add('translate-x-6');
+        label.textContent = 'เปิดอยู่';
+        label.className = 'text-xs font-semibold text-indigo-600';
+    } else {
+        toggle.classList.remove('bg-indigo-500');
+        toggle.classList.add('bg-gray-300');
+        thumb.classList.remove('translate-x-6');
+        thumb.classList.add('translate-x-1');
+        label.textContent = 'ปิดอยู่';
+        label.className = 'text-xs font-semibold text-red-500';
+    }
+}
+
+function toggleOpsSurveyEdit() {
+    if (!IS_ADMIN) return;
+    var newVal = !_opsEditEnabled;
+    var _lsU2 = null;
+    try { _lsU2 = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+    var clientEmail = (_lsU2 && _lsU2.email) ? _lsU2.email : '';
+    _opsEditEnabled = newVal;
+    _renderOpsEditToggle(newVal);
+    google.script.run
+        .withSuccessHandler(function(res) {
+            if (res.success) {
+                showToast(newVal ? '✅ เปิดสิทธิ์ผู้ใช้ทั่วไปแก้ไขข้อมูลแล้ว' : '🔒 ปิดสิทธิ์ผู้ใช้ทั่วไปแก้ไขข้อมูลแล้ว');
+            } else {
+                showToast('Error: ' + res.error, 'error');
+                _opsEditEnabled = !newVal;
+                _renderOpsEditToggle(!newVal);
+            }
+        })
+        .withFailureHandler(function(e) {
+            showToast('Error: ' + e.message, 'error');
+            _opsEditEnabled = !newVal;
+            _renderOpsEditToggle(!newVal);
+        })
+        .setOpsSurveyEditSetting(newVal, clientEmail);
+}
+// ──────────────────────────────────────────────
+// System Admin Duplicate-Cleanup Toggle — off by default; only a Super Admin
+// (isAdmin) may flip it, unlike the two edit toggles above which isSysAdmin
+// can also flip. See setSysAdminDupCleanupSetting() in DuplicateCleanup.gs.
+// ──────────────────────────────────────────────
+var _sysAdminDedupEnabled = false;
+
+function loadSysAdminDupCleanupSetting() {
+    google.script.run
+        .withSuccessHandler(function(enabled) {
+            _sysAdminDedupEnabled = !!enabled;
+            _renderSysAdminDedupToggle(!!enabled);
+        })
+        .withFailureHandler(function() {
+            var lbl = document.getElementById('sysadmin-dedup-status-label');
+            if (lbl) lbl.textContent = 'Error';
+        })
+        .getSysAdminDupCleanupSetting();
+}
+
+function _renderSysAdminDedupToggle(enabled) {
+    var toggle = document.getElementById('sysadmin-dedup-toggle');
+    var thumb  = document.getElementById('sysadmin-dedup-thumb');
+    var label  = document.getElementById('sysadmin-dedup-status-label');
+    if (!toggle) return;
+    if (enabled) {
+        toggle.classList.remove('bg-gray-300');
+        toggle.classList.add('bg-indigo-500');
+        thumb.classList.remove('translate-x-1');
+        thumb.classList.add('translate-x-6');
+        label.textContent = 'เปิดอยู่';
+        label.className = 'text-xs font-semibold text-indigo-600';
+    } else {
+        toggle.classList.remove('bg-indigo-500');
+        toggle.classList.add('bg-gray-300');
+        thumb.classList.remove('translate-x-6');
+        thumb.classList.add('translate-x-1');
+        label.textContent = 'ปิดอยู่';
+        label.className = 'text-xs font-semibold text-red-500';
+    }
+}
+
+function toggleSysAdminDupCleanup() {
+    if (!IS_SUPER_ADMIN) { showToast('Super Admin only', 'error'); return; }
+    var newVal = !_sysAdminDedupEnabled;
+    var _lsU3 = null;
+    try { _lsU3 = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+    var clientEmail = (_lsU3 && _lsU3.email) ? _lsU3.email : '';
+    _sysAdminDedupEnabled = newVal;
+    _renderSysAdminDedupToggle(newVal);
+    google.script.run
+        .withSuccessHandler(function(res) {
+            if (res.success) {
+                showToast(newVal ? '✅ เปิดสิทธิ์ System Admin ลบข้อมูลซ้ำแล้ว' : '🔒 ปิดสิทธิ์ System Admin ลบข้อมูลซ้ำแล้ว');
+            } else {
+                showToast('Error: ' + res.error, 'error');
+                _sysAdminDedupEnabled = !newVal;
+                _renderSysAdminDedupToggle(!newVal);
+            }
+        })
+        .withFailureHandler(function(e) {
+            showToast('Error: ' + e.message, 'error');
+            _sysAdminDedupEnabled = !newVal;
+            _renderSysAdminDedupToggle(!newVal);
+        })
+        .setSysAdminDupCleanupSetting(newVal, clientEmail);
 }
 // ──────────────────────────────────────────────
 function initDailyView() {
@@ -3006,7 +3182,7 @@ function _renderDuplicate(data) {
 
     if (filtered.length === 0) {
         document.getElementById('dup-table-body').innerHTML =
-            '<tr><td colspan="6" class="py-12 text-center text-gray-400">' +
+            '<tr><td colspan="7" class="py-12 text-center text-gray-400">' +
             (s.totalSites === 0 ? '✅ ไม่พบข้อมูลซ้ำ' : 'ไม่พบข้อมูลที่ตรงกับเงื่อนไข') + '</td></tr>';
         return;
     }
@@ -3027,6 +3203,11 @@ function _renderDuplicate(data) {
 
     var html = filtered.map(function(r) {
         var extra = Math.max(0, r.airconCount - 1) + Math.max(0, r.refCount - 1);
+        var actionCell = extra === 0
+            ? '<span class="text-gray-300">—</span>'
+            : (CAN_DEDUP
+                ? '<button onclick="_confirmDeleteDuplicates(\'' + encodeURIComponent(r.code) + '\',\'' + encodeURIComponent(r.round || '') + '\',' + r.airconCount + ',' + r.refCount + ',this)" class="text-xs text-red-600 hover:text-white hover:bg-red-600 border border-red-300 px-2.5 py-1 rounded-lg transition-colors font-semibold whitespace-nowrap">🗑️ เก็บล่าสุด</button>'
+                : '<span class="text-gray-300 text-[10px]">Super Admin only</span>');
         return '<tr class="border-b border-gray-100 hover:bg-orange-50/40">' +
                '<td class="px-3 py-2.5 font-mono font-semibold text-gray-800 align-top">' + r.code + '</td>' +
                '<td class="px-3 py-2.5 text-gray-700 align-top">' + (r.name || '') + '</td>' +
@@ -3034,9 +3215,52 @@ function _renderDuplicate(data) {
                '<td class="px-3 py-2.5 text-center align-top">' + subCell(r.airconSubs, r.airconCount) + '</td>' +
                '<td class="px-3 py-2.5 text-center align-top">' + subCell(r.refSubs, r.refCount) + '</td>' +
                '<td class="px-3 py-2.5 text-center align-top"><span class="font-bold text-orange-700 text-sm">+' + extra + '</span></td>' +
+               '<td class="px-3 py-2.5 text-center align-top">' + actionCell + '</td>' +
                '</tr>';
     }).join('');
     document.getElementById('dup-table-body').innerHTML = html;
+}
+
+// Super Admin, or System Admin when the toggle is on — deletes every
+// non-latest submission for this exact site+round (Aircon and/or Ref),
+// keeping just the most recent one (merged). Backend
+// (deleteDuplicateSurveysForSite in UploadSchedule.gs -> mergeDuplicateSurveysForSite
+// in DuplicateCleanup.gs) re-checks isAdmin/sysAdminDedupAllowed itself.
+function _confirmDeleteDuplicates(codeEnc, roundEnc, airconCount, refCount, btn) {
+    if (!CAN_DEDUP) { showToast('Super Admin only', 'error'); return; }
+    var code  = decodeURIComponent(codeEnc);
+    var round = decodeURIComponent(roundEnc);
+    var extraAircon = Math.max(0, (airconCount || 0) - 1);
+    var extraRef    = Math.max(0, (refCount || 0) - 1);
+    var msg = 'ลบรายการซ้ำของสาขา ' + code + (round ? (' (รอบ ' + round + ')') : ' (ไม่มีข้อมูลรอบ)') + ' ?\n\n' +
+        (extraAircon > 0 ? 'Aircon: ลบ ' + extraAircon + ' รายการ (เก็บฉบับล่าสุด)\n' : '') +
+        (extraRef    > 0 ? 'Ref: ลบ '    + extraRef    + ' รายการ (เก็บฉบับล่าสุด)\n' : '') +
+        '\nการลบนี้ไม่สามารถย้อนกลับได้ ต้องการดำเนินการต่อหรือไม่?';
+    if (!confirm(msg)) return;
+
+    var origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ...'; }
+    var _lsU = null;
+    try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+    var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+
+    google.script.run
+        .withSuccessHandler(function(res) {
+            if (res && res.success) {
+                var d = res.deleted || {};
+                showToast('ลบสำเร็จ — Aircon ' + (d.aircon || 0) + ', Ref ' + (d.ref || 0) + ' รายการ', 'success');
+                _dupData = null;
+                loadDuplicateView();
+            } else {
+                showToast('ลบไม่สำเร็จ: ' + (res ? res.error : 'Unknown error'), 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+            }
+        })
+        .withFailureHandler(function(err) {
+            showToast('Error: ' + ((err && err.message) || err), 'error');
+            if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+        })
+        .deleteDuplicateSurveysForSite(code, round, clientEmail);
 }
 
 function _downloadDuplicateExcel(btn) {

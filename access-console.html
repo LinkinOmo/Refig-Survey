@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Console - Super Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background-color: #f3f4f6; }
+        .ac-card { background: #fff; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .ac-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; color: #6b7280; padding: 0.4rem 0.6rem; border-bottom: 1px solid #e5e7eb; }
+        .ac-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .ac-badge-on { background:#dcfce7; color:#15803d; font-size:0.7rem; font-weight:600; padding:0.15rem 0.5rem; border-radius:9999px; }
+        .ac-badge-off { background:#f3f4f6; color:#9ca3af; font-size:0.7rem; font-weight:600; padding:0.15rem 0.5rem; border-radius:9999px; }
+        .ac-save-btn { background:#4f46e5; color:#fff; font-size:0.8rem; font-weight:600; padding:0.45rem 1rem; border-radius:0.5rem; }
+        .ac-save-btn:hover { background:#4338ca; }
+        .ac-save-btn:disabled { opacity:0.6; cursor:default; }
+    </style>
+</head>
+
+<body>
+
+    <?!= include('auth') ?>
+
+    <!-- Access Denied (shown if not Super Admin) -->
+    <div id="access-denied" class="hidden min-h-screen flex items-center justify-center">
+        <div class="text-center bg-white rounded-xl shadow-lg p-10 max-w-sm">
+            <div class="text-6xl mb-4">🔒</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
+            <p class="text-gray-500 mb-6">This page is restricted to Super Admin only.</p>
+            <a href="<?= ScriptApp.getService().getUrl() ?>" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Back to App</a>
+        </div>
+    </div>
+
+    <!-- Main Page -->
+    <div id="main-page" class="hidden min-h-screen">
+
+        <header class="bg-fuchsia-800 text-white shadow-md">
+            <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+                <div>
+                    <h1 class="text-xl font-bold">🔐 Access Console</h1>
+                    <p class="text-fuchsia-200 text-xs mt-0.5">Role access matrix + every permission toggle, in one place — Super Admin only</p>
+                </div>
+                <a href="<?= ScriptApp.getService().getUrl() ?>"
+                    class="bg-fuchsia-900 hover:bg-fuchsia-950 px-4 py-2 rounded text-sm transition">Back to App</a>
+            </div>
+        </header>
+
+        <main class="container mx-auto px-4 py-8 max-w-5xl">
+
+            <!-- Role hierarchy note -->
+            <div class="ac-card bg-fuchsia-50 border border-fuchsia-100">
+                <p class="text-sm text-fuchsia-900"><b>How roles work here:</b> "Admin" and "Super Admin" are the same underlying flag (both grant full access everywhere, always). "System Admin" is a separate, narrower tier that can open the config pages below but does not get survey-edit rights automatically. "SMF" and "Operation" are not roles stored per-user — they are audiences the toggles below apply to (SMF = tagged "SMF" in Employee_Database's Note column; Operation = everyone else who's logged in).</p>
+            </div>
+
+            <!-- ═══ Role Access Matrix ═══ -->
+            <div class="ac-card">
+                <div class="flex items-center justify-between mb-1">
+                    <h2 class="text-base font-bold text-gray-800">📊 Role Access Matrix</h2>
+                    <button id="matrixSaveBtn" class="ac-save-btn" onclick="saveMatrix()">Save Changes</button>
+                </div>
+                <p class="text-xs text-gray-400 mb-4">Controls Full Admin elevation and survey-edit access (Ref/NP/Aircon/EDMI/Layout/Trading Hours reports, including the Asset No. register-mapping picker).</p>
+                <div class="overflow-x-auto">
+                    <table class="ac-table w-full">
+                        <thead>
+                            <tr><th>Role</th><th>Full Admin Access (everywhere)</th><th>Edit Survey Data</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="font-semibold text-gray-700">Admin / Super Admin</td>
+                                <td><span class="ac-badge-on">✓ Built-in</span></td>
+                                <td><span class="ac-badge-on">✓ Built-in</span></td>
+                            </tr>
+                            <tr>
+                                <td class="font-semibold text-gray-700">Survey / Schedule Admin</td>
+                                <td><span class="ac-badge-off">— Not offered</span></td>
+                                <td><span class="ac-badge-on">✓ Built-in</span></td>
+                            </tr>
+                            <tr>
+                                <td class="font-semibold text-gray-700">SMF Team</td>
+                                <td><label class="inline-flex items-center gap-2 cursor-pointer"><input type="checkbox" id="mx-smf-admin" class="w-4 h-4 text-fuchsia-600 rounded"><span class="text-xs text-gray-500">SMF_ADMIN_ENABLED</span></label></td>
+                                <td><label class="inline-flex items-center gap-2 cursor-pointer"><input type="checkbox" id="mx-smf-edit" class="w-4 h-4 text-fuchsia-600 rounded"><span class="text-xs text-gray-500">SMF_SURVEY_EDIT_ENABLED_V1</span></label></td>
+                            </tr>
+                            <tr>
+                                <td class="font-semibold text-gray-700">Operation (Everyone)</td>
+                                <td><span class="ac-badge-off">— Not offered</span></td>
+                                <td><label class="inline-flex items-center gap-2 cursor-pointer"><input type="checkbox" id="mx-ops-edit" class="w-4 h-4 text-fuchsia-600 rounded"><span class="text-xs text-gray-500">OPS_SURVEY_EDIT_ENABLED_V1</span></label></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p id="matrixStatus" class="text-xs mt-3"></p>
+            </div>
+
+            <!-- ═══ General Tab Visibility + Team Restriction ═══ -->
+            <div class="ac-card">
+                <div class="flex items-center justify-between mb-1">
+                    <h2 class="text-base font-bold text-gray-800">👁️ Tab Visibility &amp; Team Restriction</h2>
+                    <button id="tabsSaveBtn" class="ac-save-btn" onclick="saveTabs()">Save Changes</button>
+                </div>
+                <p class="text-xs text-gray-400 mb-4">Which of the general survey tabs a non-admin user sees, which one opens by default, and whether a tab is locked to one team.</p>
+                <div class="mb-3">
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Default landing tab</label>
+                    <select id="defaultTabSel" class="border border-gray-300 rounded-lg p-2 text-sm"></select>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="ac-table w-full">
+                        <thead><tr><th>Tab</th><th>Visible to general users</th><th>Restricted to team</th></tr></thead>
+                        <tbody id="tabsTableBody"></tbody>
+                    </table>
+                </div>
+                <p id="tabsStatus" class="text-xs mt-3"></p>
+            </div>
+
+            <!-- ═══ Equipment Photo Required ═══ -->
+            <div class="ac-card">
+                <div class="flex items-center justify-between mb-1">
+                    <h2 class="text-base font-bold text-gray-800">📷 Equipment Photo Required</h2>
+                    <button id="photoSaveBtn" class="ac-save-btn" onclick="savePhotoRequired()">Save Changes</button>
+                </div>
+                <p class="text-xs text-gray-400 mb-4">Whether at least one photo per equipment unit is required to submit each survey type.</p>
+                <div id="photoTableBody" class="space-y-2"></div>
+                <p id="photoStatus" class="text-xs mt-3"></p>
+            </div>
+
+            <!-- ═══ Other Toggles ═══ -->
+            <div class="ac-card">
+                <h2 class="text-base font-bold text-gray-800 mb-1">⚙️ Other Toggles</h2>
+                <p class="text-xs text-gray-400 mb-4">Feature flags that aren't role-specific.</p>
+                <div class="flex items-center justify-between border border-gray-200 rounded-lg px-3 py-2.5">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-700">"Continue as Guest" login button</p>
+                        <p class="text-xs text-gray-400">When off: users must log in, guest access is disabled.</p>
+                    </div>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="guestToggle" class="w-4 h-4 text-fuchsia-600 rounded" onchange="toggleGuest(this.checked)">
+                        <span id="guestStatus" class="text-xs font-semibold text-gray-400">loading…</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- ═══ User & Role Management + related consoles ═══ -->
+            <div class="ac-card">
+                <h2 class="text-base font-bold text-gray-800 mb-1">🔗 Related Consoles</h2>
+                <p class="text-xs text-gray-400 mb-4">Full pages, kept separate rather than re-embedded here.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin-password-reset" target="_blank"
+                        class="border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition">
+                        <p class="font-semibold text-sm text-gray-800">👤 Manage Users</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Edit role/status, reset passwords</p>
+                    </a>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=email-config" target="_blank"
+                        class="border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition">
+                        <p class="font-semibold text-sm text-gray-800">📧 Email Delivery</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Brevo fallback config</p>
+                    </a>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin-activity-dashboard" target="_blank"
+                        class="border border-gray-200 rounded-lg px-4 py-3 hover:bg-gray-50 transition">
+                        <p class="font-semibold text-sm text-gray-800">📜 Activity Log</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Login / dashboard-view history</p>
+                    </a>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Mirrors the tab id/label/default constants in index.html (kept in sync by
+        // hand — this page has no shared include with index.html's inline script).
+        var GENERAL_USER_TABS = ['tab-register', 'tab-aircon-survey', 'tab-ref-survey', 'tab-np-survey', 'tab-edmi-survey', 'tab-layout-survey'];
+        var TEAM_RESTRICTED_TABS = GENERAL_USER_TABS.concat(['tab-hours-survey']);
+        var TAB_LABELS = {
+            'tab-register': 'Register Profile',
+            'tab-aircon-survey': 'แบบสำรวจแอร์ (Aircon Survey)',
+            'tab-ref-survey': 'แบบสำรวจตู้แช่ (Ref Survey)',
+            'tab-np-survey': '🍦 New Product',
+            'tab-edmi-survey': '☀️ EDMI Solar Meter',
+            'tab-layout-survey': '📐 Layout Survey',
+            'tab-hours-survey': '⏰ Trading Hours Survey (24hr→Non-24hr)'
+        };
+        var TEAM_TAB_DEFAULTS = { 'tab-hours-survey': 'SMF' };
+        var TEAM_ROLE_OPTIONS = [
+            { value: 'ALL', label: 'ทุกคน (Everyone)' },
+            { value: 'SMF', label: 'SMF เท่านั้น' },
+            { value: 'MMS', label: 'MMS เท่านั้น' }
+        ];
+        var PHOTO_REQUIRED_LABELS = {
+            aircon: '❄️ แบบสำรวจแอร์ (Aircon Survey)',
+            ref: '🧊 แบบสำรวจตู้แช่ (Ref Survey)',
+            np: '🍦 New Product'
+        };
+
+        var _clientEmail = '';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) {
+                updateUserUI(CURRENT_USER);
+            }
+        });
+
+        // Called by auth.html after successful login OR by our DOMContentLoaded listener
+        function updateUserUI(user) {
+            var mainPage = document.getElementById('main-page');
+            var accessDenied = document.getElementById('access-denied');
+            if (!user || !user.isAdmin) {
+                if (accessDenied) accessDenied.classList.remove('hidden');
+                if (mainPage) mainPage.classList.add('hidden');
+                return;
+            }
+            _clientEmail = user.email || '';
+            if (mainPage) mainPage.classList.remove('hidden');
+            if (accessDenied) accessDenied.classList.add('hidden');
+            loadMatrix();
+            loadTabs();
+            loadPhotoRequired();
+            loadGuest();
+        }
+
+        // ── Role Access Matrix ──────────────────────────────────────────────
+        function loadMatrix() {
+            google.script.run.withSuccessHandler(function(v) { document.getElementById('mx-smf-admin').checked = !!v; }).getSMFAdminSetting();
+            google.script.run.withSuccessHandler(function(v) { document.getElementById('mx-smf-edit').checked = !!v; }).getSmfSurveyEditSetting();
+            google.script.run.withSuccessHandler(function(v) { document.getElementById('mx-ops-edit').checked = !!v; }).getOpsSurveyEditSetting();
+        }
+
+        function saveMatrix() {
+            var btn = document.getElementById('matrixSaveBtn');
+            var statusEl = document.getElementById('matrixStatus');
+            btn.disabled = true; btn.textContent = 'Saving...';
+            var smfAdmin = document.getElementById('mx-smf-admin').checked;
+            var smfEdit = document.getElementById('mx-smf-edit').checked;
+            var opsEdit = document.getElementById('mx-ops-edit').checked;
+            var pending = 3, failed = [];
+            function done(label, ok) {
+                pending--;
+                if (!ok) failed.push(label);
+                if (pending === 0) {
+                    btn.disabled = false; btn.textContent = 'Save Changes';
+                    statusEl.textContent = failed.length ? ('บันทึกไม่สำเร็จ: ' + failed.join(', ')) : '✓ บันทึกแล้ว';
+                    statusEl.className = 'text-xs mt-3 ' + (failed.length ? 'text-rose-600' : 'text-green-600');
+                }
+            }
+            google.script.run.withSuccessHandler(function(res) { done('Full Admin (SMF)', res && res.success); }).withFailureHandler(function() { done('Full Admin (SMF)', false); }).setSMFAdminSetting(smfAdmin);
+            google.script.run.withSuccessHandler(function(res) { done('Edit Surveys (SMF)', res && res.success); }).withFailureHandler(function() { done('Edit Surveys (SMF)', false); }).setSmfSurveyEditSetting(smfEdit, _clientEmail);
+            google.script.run.withSuccessHandler(function(res) { done('Edit Surveys (Operation)', res && res.success); }).withFailureHandler(function() { done('Edit Surveys (Operation)', false); }).setOpsSurveyEditSetting(opsEdit, _clientEmail);
+        }
+
+        // ── Tab Visibility & Team Restriction ───────────────────────────────
+        var _teamTabCurrent = Object.assign({}, TEAM_TAB_DEFAULTS);
+
+        function loadTabs() {
+            google.script.run.withSuccessHandler(function(res) {
+                var visMap = (res && res.success) ? (res.data || {}) : {};
+                var defaultTab = (res && res.defaultTab) || 'tab-aircon-survey';
+                google.script.run.withSuccessHandler(function(res2) {
+                    _teamTabCurrent = Object.assign({}, TEAM_TAB_DEFAULTS, (res2 && res2.success) ? (res2.data || {}) : {});
+                    _renderTabsTable(visMap, defaultTab);
+                }).getTeamTabAccess();
+            }).getGeneralTabVisibility();
+        }
+
+        function _teamSelectHtml(id, current) {
+            return '<select data-team-id="' + id + '" class="text-xs border border-gray-300 rounded-lg px-2 py-1">' +
+                TEAM_ROLE_OPTIONS.map(function(o) {
+                    return '<option value="' + o.value + '"' + (o.value === current ? ' selected' : '') + '>' + o.label + '</option>';
+                }).join('') + '</select>';
+        }
+
+        function _renderTabsTable(visMap, defaultTab) {
+            var defSel = document.getElementById('defaultTabSel');
+            defSel.innerHTML = GENERAL_USER_TABS.map(function(id) {
+                return '<option value="' + id + '"' + (id === defaultTab ? ' selected' : '') + '>' + (TAB_LABELS[id] || id) + '</option>';
+            }).join('');
+
+            var body = document.getElementById('tabsTableBody');
+            var rows = '';
+            GENERAL_USER_TABS.forEach(function(id) {
+                var visible = visMap.hasOwnProperty(id) ? visMap[id] : true;
+                var role = _teamTabCurrent.hasOwnProperty(id) ? _teamTabCurrent[id] : (TEAM_TAB_DEFAULTS[id] || 'ALL');
+                rows += '<tr><td class="text-gray-700">' + (TAB_LABELS[id] || id) + '</td>' +
+                    '<td><input type="checkbox" data-vis-id="' + id + '" ' + (visible ? 'checked' : '') + ' class="w-4 h-4 text-fuchsia-600 rounded"></td>' +
+                    '<td>' + _teamSelectHtml(id, role) + '</td></tr>';
+            });
+            // Team-restricted tabs that aren't part of the general set (e.g. Trading Hours) —
+            // no visibility checkbox, only a team-restriction select.
+            TEAM_RESTRICTED_TABS.filter(function(id) { return GENERAL_USER_TABS.indexOf(id) === -1; }).forEach(function(id) {
+                var role = _teamTabCurrent.hasOwnProperty(id) ? _teamTabCurrent[id] : (TEAM_TAB_DEFAULTS[id] || 'ALL');
+                rows += '<tr><td class="text-gray-700">' + (TAB_LABELS[id] || id) + '</td>' +
+                    '<td class="text-gray-300 text-xs">team-gated, not part of the general tab set</td>' +
+                    '<td>' + _teamSelectHtml(id, role) + '</td></tr>';
+            });
+            body.innerHTML = rows;
+        }
+
+        function saveTabs() {
+            var btn = document.getElementById('tabsSaveBtn');
+            var statusEl = document.getElementById('tabsStatus');
+            btn.disabled = true; btn.textContent = 'Saving...';
+
+            var visConfig = {};
+            document.querySelectorAll('#tabsTableBody input[data-vis-id]').forEach(function(cb) {
+                visConfig[cb.dataset.visId] = cb.checked;
+            });
+            var teamConfig = {};
+            document.querySelectorAll('#tabsTableBody select[data-team-id]').forEach(function(sel) {
+                teamConfig[sel.dataset.teamId] = sel.value;
+            });
+            var defaultTab = document.getElementById('defaultTabSel').value;
+
+            var pending = 2, failed = [];
+            function done(label, ok) {
+                pending--;
+                if (!ok) failed.push(label);
+                if (pending === 0) {
+                    btn.disabled = false; btn.textContent = 'Save Changes';
+                    statusEl.textContent = failed.length ? ('บันทึกไม่สำเร็จ: ' + failed.join(', ')) : '✓ บันทึกแล้ว';
+                    statusEl.className = 'text-xs mt-3 ' + (failed.length ? 'text-rose-600' : 'text-green-600');
+                    if (!failed.length) loadTabs();
+                }
+            }
+            google.script.run.withSuccessHandler(function(res) { done('Tab Visibility', res && res.success); }).withFailureHandler(function() { done('Tab Visibility', false); }).setGeneralTabVisibility(visConfig, defaultTab, _clientEmail);
+            google.script.run.withSuccessHandler(function(res) { done('Team Access', res && res.success); }).withFailureHandler(function() { done('Team Access', false); }).setTeamTabAccess(teamConfig, _clientEmail);
+        }
+
+        // ── Equipment Photo Required ─────────────────────────────────────────
+        function loadPhotoRequired() {
+            google.script.run.withSuccessHandler(function(res) {
+                var data = (res && res.success) ? (res.data || {}) : {};
+                var body = document.getElementById('photoTableBody');
+                body.innerHTML = Object.keys(PHOTO_REQUIRED_LABELS).map(function(key) {
+                    var on = data.hasOwnProperty(key) ? !!data[key] : true;
+                    return '<label class="flex items-center justify-between gap-2 text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50">' +
+                        '<span>' + PHOTO_REQUIRED_LABELS[key] + '</span>' +
+                        '<input type="checkbox" data-photo-type="' + key + '" ' + (on ? 'checked' : '') + ' class="w-4 h-4 text-fuchsia-600 rounded"></label>';
+                }).join('');
+            }).getEquipmentPhotoRequired();
+        }
+
+        function savePhotoRequired() {
+            var btn = document.getElementById('photoSaveBtn');
+            var statusEl = document.getElementById('photoStatus');
+            btn.disabled = true; btn.textContent = 'Saving...';
+            var config = {};
+            document.querySelectorAll('#photoTableBody input[data-photo-type]').forEach(function(cb) {
+                config[cb.dataset.photoType] = cb.checked;
+            });
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.disabled = false; btn.textContent = 'Save Changes';
+                    statusEl.textContent = (res && res.success) ? '✓ บันทึกแล้ว' : ('บันทึกไม่สำเร็จ: ' + (res && res.error));
+                    statusEl.className = 'text-xs mt-3 ' + ((res && res.success) ? 'text-green-600' : 'text-rose-600');
+                })
+                .withFailureHandler(function(err) {
+                    btn.disabled = false; btn.textContent = 'Save Changes';
+                    statusEl.textContent = 'บันทึกไม่สำเร็จ: ' + err.message;
+                    statusEl.className = 'text-xs mt-3 text-rose-600';
+                })
+                .setEquipmentPhotoRequired(config, _clientEmail);
+        }
+
+        // ── Guest Login Toggle ───────────────────────────────────────────────
+        function loadGuest() {
+            google.script.run.withSuccessHandler(function(v) {
+                document.getElementById('guestToggle').checked = !!v;
+                document.getElementById('guestStatus').textContent = v ? 'เปิดอยู่' : 'ปิดอยู่';
+            }).getGuestButtonSetting();
+        }
+
+        function toggleGuest(checked) {
+            var statusEl = document.getElementById('guestStatus');
+            statusEl.textContent = 'saving…';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        statusEl.textContent = res.enabled ? 'เปิดอยู่' : 'ปิดอยู่';
+                    } else {
+                        statusEl.textContent = 'error';
+                        document.getElementById('guestToggle').checked = !checked;
+                    }
+                })
+                .withFailureHandler(function() {
+                    statusEl.textContent = 'error';
+                    document.getElementById('guestToggle').checked = !checked;
+                })
+                .setGuestButtonSetting(checked);
+        }
+    </script>
+
+</body>
+
+</html>

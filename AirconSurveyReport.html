@@ -487,6 +487,7 @@
                                     Status <span class="sort-indicator"></span>
                                 </th>
                                 <th class="p-4">ชำรุด</th>
+                                <th class="p-4" title="WT = Wall Type, HT = Hanging Type, CT = Cassette Type, FS = Floor Standing, PT = Package Type">ประเภทแอร์</th>
                                 <th class="p-4 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -547,7 +548,7 @@
                         </button>
                         <!-- Admin Edit Button -->
                         <button id="editBtn"
-                            class="admin-only-link hidden text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 p-2 rounded-lg transition-colors"
+                            class="hidden text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 p-2 rounded-lg transition-colors"
                             title="แก้ไขข้อมูล" onclick="toggleAcEditPanel()">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -766,6 +767,10 @@
         // separate from isSMF itself, which is also used by unrelated features (e.g.
         // Capex Budget Cross-Check) that must keep working regardless of this toggle.
         let smfCanEdit = false;
+        // General/"Operation" users, when a Super Admin turns on the Admin Console's
+        // "ผู้ใช้ทั่วไป (Operation) แก้ไขข้อมูลแบบสำรวจได้เหมือน SMF" toggle — same edit
+        // surface as smfCanEdit above, just not limited to the SMF team.
+        let opsCanEdit = false;
 
         let filters = {
             search: '',
@@ -849,19 +854,22 @@
                             if (!flags) return;
                             // Use server as ground truth — prevents stale localStorage from granting admin
                             var serverAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
-                            if (serverAdmin !== isAdmin) {
-                                isAdmin = serverAdmin;
-                                const ad = document.getElementById('access-level-display');
-                                if (ad) {
-                                    ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
-                                    ad.className = isAdmin
-                                        ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
-                                        : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
-                                }
-                                applyAdminUI();
+                            isAdmin = serverAdmin;
+                            const ad = document.getElementById('access-level-display');
+                            if (ad) {
+                                ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
+                                ad.className = isAdmin
+                                    ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
+                                    : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
                             }
                             isSMF = !!flags.isSMF;
                             smfCanEdit = !!flags.smfEditAllowed;
+                            opsCanEdit = !!flags.opsEditAllowed;
+                            // Always re-apply — isAdmin/smfCanEdit/opsCanEdit may each have
+                            // flipped independently (previously only ran on an isAdmin flip,
+                            // which left SMF/Operation-only users' UI stale after this call).
+                            applyAdminUI();
+                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed));
                         })
                         .getUserFlags(_acUserEmail);
                 }
@@ -1121,6 +1129,19 @@
                 tbody.parentElement.parentElement.classList.remove('hidden');
             }
 
+            // AC type badge sourced from the branch's latest submission — same pattern as
+            // RefSurveyReport.html's Ref/NP tabs (_latestBevByBranch / _latestNpByBranch).
+            const _latestAcByBranch = {};
+            allReports.forEach(function(rec) {
+                const code = (rec.station || '').split(' - ')[0].trim();
+                if (!code) return;
+                const existing = _latestAcByBranch[code];
+                if (!existing || new Date(rec.timestamp) > new Date(existing.timestamp)) {
+                    _latestAcByBranch[code] = rec;
+                }
+            });
+            const _acChip = (label, qty, color) => '<span class="' + (qty > 0 ? color + ' font-bold' : 'text-slate-300') + '">' + label + qty + '</span>';
+
             // Use DocumentFragments to batch all DOM insertions in one go (avoids per-row reflow)
             const tableFragment  = document.createDocumentFragment();
             const mobileFragment = document.createDocumentFragment();
@@ -1134,6 +1155,23 @@
                 const g = d.general || {};
 
                 const _rBroken = String(r.brokenUnits || '').trim();
+                const _acSrc = _latestAcByBranch[(r.station || '').split(' - ')[0].trim()] || r;
+                const wtQty = parseInt(_acSrc.wtQty) || 0;
+                const htQty = parseInt(_acSrc.htQty) || 0;
+                const ctQty = parseInt(_acSrc.ctQty) || 0;
+                const fsQty = parseInt(_acSrc.fsQty) || 0;
+                const ptQty = parseInt(_acSrc.ptQty) || 0;
+                const acTotalQty = wtQty + htQty + ctQty + fsQty + ptQty;
+                const acBadge = '<div class="flex flex-col gap-0.5">' +
+                      '<span class="text-xs font-bold text-slate-700">รวม ' + acTotalQty + ' เครื่อง</span>' +
+                      '<span class="text-[11px] font-mono leading-tight flex flex-wrap gap-x-1.5 gap-y-0.5">' +
+                        _acChip('WT', wtQty, 'text-sky-700') +
+                        _acChip('HT', htQty, 'text-indigo-700') +
+                        _acChip('CT', ctQty, 'text-violet-700') +
+                        _acChip('FS', fsQty, 'text-emerald-700') +
+                        _acChip('PT', ptQty, 'text-amber-700') +
+                      '</span>' +
+                      '</div>';
                 tr.innerHTML = `
                     <td class="p-4 text-slate-500">${htmlEscape(formatRecordDate(r.timestamp))}</td>
                     <td class="p-4">
@@ -1147,6 +1185,7 @@
                         </span>
                     </td>
                     <td class="p-4">${_rBroken ? '<span class="inline-block bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full border border-red-200">มีแอร์ชำรุด</span>' : '<span class="text-slate-300 text-xs">—</span>'}</td>
+                    <td class="p-4">${acBadge}</td>
                     <td class="p-4 text-right">
                          <button onclick="openModalById('${htmlEscape(r.id)}')" class="text-blue-600 hover:text-blue-800 font-medium text-sm hover:bg-blue-50 px-3 py-1.5 rounded-lg transition border border-transparent hover:border-blue-100 shadow-sm">
                             View Details
@@ -1168,6 +1207,7 @@
                             ${htmlEscape(r.status || 'Pending')}
                         </span>
                     </div>
+                    <div class="mb-2">${acBadge}</div>
                     <div class="flex justify-between items-center text-xs text-slate-500 pt-3 border-t border-slate-100 mt-2">
                         <span>Reporter: ${htmlEscape(r.recorderName)}</span>
                         <button onclick="openModalById('${htmlEscape(r.id)}')" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm border border-transparent">
@@ -2114,7 +2154,10 @@
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1">Asset No</label>
-                            <input data-ac-edit-field="Unit ${n} Asset No" type="text" value="${htmlEscape(u.assetNo || '')}" class="w-full border border-slate-300 rounded p-1.5 text-sm">
+                            <div class="flex gap-1">
+                                <input id="aiAc_${n}" data-ac-edit-field="Unit ${n} Asset No" type="text" value="${htmlEscape(u.assetNo || '')}" class="w-full border border-slate-300 rounded p-1.5 text-sm">
+                                ${branchCode ? `<button type="button" onclick="openAssetMapPicker('${branchCode}','aiAc_${n}')" class="shrink-0 px-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>` : ''}
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1">สถานะ</label>
@@ -2167,11 +2210,20 @@
                 if (isAdmin) el.classList.remove('hidden');
                 else el.classList.add('hidden');
             });
-            // Status Management section — visible only to Admin or SMF
+            var canEdit = isAdmin || smfCanEdit || opsCanEdit;
+            // Status Management section — visible to Admin, SMF, or Operation (if enabled)
             var statusSection = document.getElementById('statusMgmtSection');
             if (statusSection) {
-                if (isAdmin || smfCanEdit) statusSection.classList.remove('hidden');
+                if (canEdit) statusSection.classList.remove('hidden');
                 else statusSection.classList.add('hidden');
+            }
+            // Full Edit panel button (Asset No. mapping, brand/type, etc.) — same audience
+            // as Status Management, NOT tied to admin-only-link (that stays isAdmin-only
+            // for deleteBtn).
+            var editBtnEl = document.getElementById('editBtn');
+            if (editBtnEl) {
+                if (canEdit) editBtnEl.classList.remove('hidden');
+                else editBtnEl.classList.add('hidden');
             }
         }
 
@@ -2369,7 +2421,7 @@
 
         // Save Status (Similar to Survey App)
         document.getElementById('saveStatusBtn').addEventListener('click', function () {
-            if (!isAdmin && !smfCanEdit) return alert("You must be an Administrator or SMF team member to update the status.");
+            if (!isAdmin && !smfCanEdit && !opsCanEdit) return alert("You must be an Administrator, SMF team member, or have edit access enabled to update the status.");
             const newStatus = document.getElementById('statusSelect').value;
             const btn = this;
             var _lsUserAc = null;
@@ -2456,10 +2508,99 @@
             a.click();
         }
 
+        // ── Asset register mapping picker (edit mode) ───────────────────────
+        // Lets an editor pick a unit's Asset No. from the store's real
+        // fixed-asset ledger (getStoreAssetRegisterForMapping, Survey.gs)
+        // instead of free-typing it. Results are cached per branch code for
+        // the life of the page since the ledger doesn't change mid-session.
+        let _assetMapCache = {};
+        let _assetMapCurrentTarget = null;
+        let _assetMapCurrentItems = [];
+
+        function openAssetMapPicker(branchCode, targetInputId) {
+            const code = String(branchCode || '').trim();
+            if (!code) return;
+            _assetMapCurrentTarget = targetInputId;
+            const modal = document.getElementById('assetMapModal');
+            const listEl = document.getElementById('assetMapList');
+            const searchEl = document.getElementById('assetMapSearch');
+            if (searchEl) searchEl.value = '';
+            modal.classList.remove('hidden');
+            if (_assetMapCache[code]) {
+                _assetMapCurrentItems = _assetMapCache[code];
+                _renderAssetMapList();
+                return;
+            }
+            listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">กำลังโหลด...</p>';
+            google.script.run.withSuccessHandler(function(res) {
+                if (!res || !res.success) {
+                    listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ: ' + htmlEscape(res && res.error || '') + '</p>';
+                    return;
+                }
+                _assetMapCache[code] = res.items || [];
+                _assetMapCurrentItems = _assetMapCache[code];
+                if (!res.prebuilt || !_assetMapCurrentItems.length) {
+                    listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลทะเบียนทรัพย์สินสำหรับสาขานี้</p>';
+                    return;
+                }
+                _renderAssetMapList();
+            }).withFailureHandler(function(err) {
+                listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ</p>';
+            }).getStoreAssetRegisterForMapping(code);
+        }
+
+        function _renderAssetMapList() {
+            const listEl = document.getElementById('assetMapList');
+            const searchEl = document.getElementById('assetMapSearch');
+            const q = (searchEl && searchEl.value || '').trim().toLowerCase();
+            const items = _assetMapCurrentItems.filter(function(it) {
+                return !q || String(it.assetNo).toLowerCase().indexOf(q) > -1 ||
+                    String(it.name).toLowerCase().indexOf(q) > -1 ||
+                    String(it.category).toLowerCase().indexOf(q) > -1;
+            });
+            if (!items.length) { listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ไม่พบรายการ</p>'; return; }
+            listEl.innerHTML = items.slice(0, 200).map(function(it) {
+                return '<button type="button" onclick="_pickAssetForMapping(\'' + htmlEscape(it.assetNo) + '\')" class="w-full text-left border border-slate-200 hover:border-amber-400 hover:bg-amber-50 rounded-lg px-2.5 py-1.5 mb-1.5 transition">' +
+                    '<p class="font-mono font-semibold text-amber-700 text-xs">' + htmlEscape(it.assetNo) + '</p>' +
+                    '<p class="text-slate-600 text-xs truncate">' + htmlEscape(it.name || '-') + '</p>' +
+                    '<p class="text-slate-400 text-[10px]">' + htmlEscape(it.category || '') + '</p>' +
+                    '</button>';
+            }).join('');
+        }
+
+        function _pickAssetForMapping(assetNo) {
+            if (_assetMapCurrentTarget) {
+                const input = document.getElementById(_assetMapCurrentTarget);
+                if (input) input.value = assetNo;
+            }
+            _closeAssetMapPicker();
+        }
+
+        function _closeAssetMapPicker() {
+            document.getElementById('assetMapModal').classList.add('hidden');
+            _assetMapCurrentTarget = null;
+        }
     </script>
+
+    <!-- Asset register mapping picker modal -->
+    <div id="assetMapModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+            <div class="p-3 border-b border-slate-200 flex items-center justify-between">
+                <p class="text-sm font-semibold text-slate-700">เลือก Asset จากทะเบียนทรัพย์สิน</p>
+                <button onclick="_closeAssetMapPicker()" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div class="p-3 border-b border-slate-100">
+                <input id="assetMapSearch" type="text" placeholder="ค้นหาชื่อ/หมวด/เลข Asset..." oninput="_renderAssetMapList()" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+            </div>
+            <div id="assetMapList" class="flex-1 overflow-y-auto p-2 text-sm"></div>
+        </div>
+    </div>
 
     <!-- Print target — populated by printAcModal() and hidden otherwise -->
     <div id="printArea"></div>
+
+    <script>var DUP_TYPE_KEY = 'aircon'; var DUP_TYPE_LABEL = 'Aircon Survey';</script>
+    <?!= include('DupCleanupWidget') ?>
 </body>
 
 </html>

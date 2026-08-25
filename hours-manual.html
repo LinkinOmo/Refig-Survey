@@ -75,6 +75,27 @@
             <div class="flex gap-3">
                 <div class="step-num bg-violet-500">2</div>
                 <div class="flex-1">
+                    <h3 class="text-lg font-bold text-gray-800">ประเภทการตรวจสอบ (Survey Stage)</h3>
+                    <p class="text-sm text-gray-600 mt-2">เลือกให้ตรงกับรอบที่ลงพื้นที่ — ฟอร์มจะสลับคำถามในขั้นตอนที่ 4 ตามที่เลือกไว้ที่นี่:</p>
+                    <div class="space-y-2.5 mt-3">
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            <p class="font-semibold text-slate-700 text-sm">📋 ก่อนปรับเปลี่ยนเวลาทำการ (Pre-Conversion)</p>
+                            <p class="text-xs text-slate-700/80 mt-1">ค่าเริ่มต้น — ใช้ตอนสำรวจความพร้อม<b>ก่อน</b>สาขาจะเริ่มใช้เวลาทำการใหม่ (ตรวจกุญแจล็อก/ถอดสติกเกอร์)</p>
+                        </div>
+                        <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                            <p class="font-semibold text-indigo-700 text-sm">🔁 หลังปรับเปลี่ยนเวลาทำการ (Post-Conversion)</p>
+                            <p class="text-xs text-indigo-700/80 mt-1">ใช้ตอนกลับไปตรวจยืนยัน<b>หลัง</b>สาขาเริ่มใช้เวลาทำการใหม่จริงแล้ว — ยืนยันว่าทุกระบบทำงานถูกต้องตามเวลาปิดร้านใหม่</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
+            <div class="flex gap-3">
+                <div class="step-num bg-violet-500">3</div>
+                <div class="flex-1">
                     <h3 class="text-lg font-bold text-gray-800">ข้อมูลการปรับเปลี่ยนเวลาทำการ (Conversion Info)</h3>
                     <div class="space-y-2.5 mt-3">
                         <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
@@ -94,45 +115,83 @@
             </div>
         </div>
 
-        <!-- STEP 3 -->
+        <!-- STEP 4 -->
         <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 mb-6">
             <div class="flex gap-3">
-                <div class="step-num bg-violet-500">3</div>
+                <div class="step-num bg-violet-500">4</div>
                 <div class="flex-1">
-                    <h3 class="text-lg font-bold text-gray-800">ตรวจสอบความพร้อมหน้าร้าน (Site Readiness Checklist)</h3>
-                    <p class="text-sm text-gray-600 mt-2 mb-3">ตรวจ 2 ประเด็นหลักที่ต้องดำเนินการก่อนสาขาเปลี่ยนเวลาทำการ — ตอบตามสภาพจริงที่เห็นหน้างาน:</p>
-
-                    <div class="space-y-3">
-                        <div class="bg-red-50 border-2 border-red-200 rounded-lg p-3">
-                            <p class="font-semibold text-red-700 text-sm">☑ มีกุญแจล็อกประตูหน้าร้านที่ใช้งานได้แล้วหรือไม่</p>
-                            <p class="text-xs text-red-700/80 mt-1">ติ๊กช่องนี้ <b>เฉพาะเมื่อสาขามีกุญแจล็อกประตูหน้าร้านที่ใช้งานได้จริงแล้ว</b> —
-                                ถ้ายังไม่มีหรือใช้งานไม่ได้ ปล่อยว่างไว้ และประสานทีมติดตั้ง/ซ่อมแซมต่อไป</p>
-                            <p class="text-xs text-red-700/80 mt-1">📷 แนบ <b>ภาพประตู/กุญแจล็อกหน้าร้าน</b> ให้เห็นสภาพจริงชัดเจน</p>
-                        </div>
-                        <div class="bg-orange-50 border-2 border-orange-200 rounded-lg p-3">
-                            <p class="font-semibold text-orange-700 text-sm">☑ ถอดสติกเกอร์/ป้ายแจ้ง 24 ชม. เดิมออกจากหน้าร้านแล้วหรือไม่</p>
-                            <p class="text-xs text-orange-700/80 mt-1"><b>งานนี้คือการ "ถอดออก" ไม่ใช่ "เปลี่ยนป้ายใหม่"</b> — เมื่อสาขาเลิกเปิด 24 ชม.
-                                ต้องถอดสติกเกอร์/ป้าย 24 ชม. เดิมออกจากหน้าร้านให้เรียบร้อย ติ๊กช่องนี้เมื่อถอดออกแล้วเท่านั้น</p>
-                            <p class="text-xs text-orange-700/80 mt-1">📷 แนบ <b>ภาพหน้าร้านหลังถอดสติกเกอร์ 24 ชม.</b></p>
-                        </div>
-                        <div class="bg-sky-50 border border-sky-200 rounded-lg p-3">
-                            <p class="font-semibold text-sky-700 text-sm">ความปลอดภัยช่วงปิดร้าน (เช็คเพิ่มเติม ไม่บังคับแนบภาพ)</p>
-                            <p class="text-xs text-sky-700/80 mt-1">ตรวจสอบว่า <b>ไฟส่องสว่างหน้าร้าน/ลานจอด</b> และ <b>กล้องวงจรปิด</b> ทำงานปกติหรือไม่
-                                — สำคัญเพราะร้านจะไม่มีพนักงานดูแลในช่วงที่ปิด</p>
-                        </div>
-                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                            <p class="font-semibold text-slate-700 text-sm">หากเจออุปสรรคอื่น ๆ รบกวนระบุกลับมาด้วยครับ</p>
-                            <p class="text-xs text-slate-700/80 mt-1">ช่องข้อความอิสระ — ระบุอุปสรรคอื่นนอกเหนือจากข้างต้นที่พบหน้างาน (ไม่บังคับกรอก)</p>
-                            <p class="text-xs text-slate-700/80 mt-1">📷 แนบ <b>ภาพอุปสรรคอื่นๆ</b> ประกอบ (ถ้ามี)</p>
-                        </div>
-                    </div>
+                    <h3 class="text-lg font-bold text-gray-800">ตรวจสอบความพร้อม / ยืนยันหลังปรับเปลี่ยน (Checklist)</h3>
+                    <p class="text-sm text-gray-600 mt-2 mb-3">คำถามในขั้นตอนนี้จะสลับตามที่เลือกไว้ในขั้นตอนที่ 2 (ประเภทการตรวจสอบ):</p>
                 </div>
             </div>
 
-            <div class="mt-6 bg-violet-50 border border-violet-100 rounded-lg p-4 text-sm text-violet-800">
-                <b>สถานะโดยรวม (Overall Status)</b> คำนวณอัตโนมัติจาก 2 ข้อหลัก — <b>"พร้อม (Ready)"</b> เมื่อมีกุญแจล็อกใช้งานได้ <u>และ</u> ถอดสติกเกอร์ 24 ชม. ออกแล้วเท่านั้น
-                มิฉะนั้นจะขึ้น <b>"ยังไม่พร้อม (Not Ready)"</b> ในหน้ารายงาน
+            <!-- Pre-Conversion sub-block -->
+            <div class="mt-2 border-2 border-slate-200 rounded-xl p-4">
+                <p class="font-bold text-slate-700 text-sm mb-3">📋 กรณีเลือก "ก่อนปรับเปลี่ยน (Pre-Conversion)" — ตรวจ 2 ประเด็นหลักที่ต้องดำเนินการก่อนสาขาเปลี่ยนเวลาทำการ ตอบตามสภาพจริงที่เห็นหน้างาน:</p>
+                <div class="space-y-3">
+                    <div class="bg-red-50 border-2 border-red-200 rounded-lg p-3">
+                        <p class="font-semibold text-red-700 text-sm">☑ มีกุญแจล็อกประตูหน้าร้านที่ใช้งานได้แล้วหรือไม่</p>
+                        <p class="text-xs text-red-700/80 mt-1">ติ๊กช่องนี้ <b>เฉพาะเมื่อสาขามีกุญแจล็อกประตูหน้าร้านที่ใช้งานได้จริงแล้ว</b> —
+                            ถ้ายังไม่มีหรือใช้งานไม่ได้ ปล่อยว่างไว้ และประสานทีมติดตั้ง/ซ่อมแซมต่อไป</p>
+                        <p class="text-xs text-red-700/80 mt-1">📷 แนบ <b>ภาพประตู/กุญแจล็อกหน้าร้าน</b> ให้เห็นสภาพจริงชัดเจน</p>
+                    </div>
+                    <div class="bg-orange-50 border-2 border-orange-200 rounded-lg p-3">
+                        <p class="font-semibold text-orange-700 text-sm">☑ ถอดสติกเกอร์/ป้ายแจ้ง 24 ชม. เดิมออกจากหน้าร้านแล้วหรือไม่</p>
+                        <p class="text-xs text-orange-700/80 mt-1"><b>งานนี้คือการ "ถอดออก" ไม่ใช่ "เปลี่ยนป้ายใหม่"</b> — เมื่อสาขาเลิกเปิด 24 ชม.
+                            ต้องถอดสติกเกอร์/ป้าย 24 ชม. เดิมออกจากหน้าร้านให้เรียบร้อย ติ๊กช่องนี้เมื่อถอดออกแล้วเท่านั้น</p>
+                        <p class="text-xs text-orange-700/80 mt-1">📷 แนบ <b>ภาพหน้าร้านหลังถอดสติกเกอร์ 24 ชม.</b></p>
+                    </div>
+                    <div class="bg-sky-50 border border-sky-200 rounded-lg p-3">
+                        <p class="font-semibold text-sky-700 text-sm">ความปลอดภัยช่วงปิดร้าน (เช็คเพิ่มเติม ไม่บังคับแนบภาพ)</p>
+                        <p class="text-xs text-sky-700/80 mt-1">ตรวจสอบว่า <b>ไฟส่องสว่างหน้าร้าน/ลานจอด</b> และ <b>กล้องวงจรปิด</b> ทำงานปกติหรือไม่
+                            — สำคัญเพราะร้านจะไม่มีพนักงานดูแลในช่วงที่ปิด</p>
+                    </div>
+                </div>
+                <div class="mt-3 bg-violet-50 border border-violet-100 rounded-lg p-3 text-xs text-violet-800">
+                    <b>สถานะโดยรวม (Overall Status):</b> <b>"พร้อม (Ready)"</b> เมื่อมีกุญแจล็อกใช้งานได้ <u>และ</u> ถอดสติกเกอร์ 24 ชม. ออกแล้วเท่านั้น
+                    มิฉะนั้นจะขึ้น <b>"ยังไม่พร้อม (Not Ready)"</b> ในหน้ารายงาน
+                </div>
             </div>
+
+            <!-- Post-Conversion sub-block -->
+            <div class="mt-4 border-2 border-indigo-200 rounded-xl p-4">
+                <p class="font-bold text-indigo-700 text-sm mb-3">🔁 กรณีเลือก "หลังปรับเปลี่ยน (Post-Conversion)" — ใช้เมื่อสาขาเริ่มใช้เวลาทำการใหม่จริงแล้ว เพื่อยืนยันว่าทุกระบบทำงานถูกต้องตามเวลาปิดร้านใหม่ ตรวจ 5 ข้อ:</p>
+                <div class="space-y-3">
+                    <div class="bg-red-50 border-2 border-red-200 rounded-lg p-3">
+                        <p class="font-semibold text-red-700 text-sm">☑ ล็อกประตูจริงตอนปิดร้านตามเวลาใหม่</p>
+                        <p class="text-xs text-red-700/80 mt-1">สอบถาม/สังเกตพนักงานหน้าร้านว่ามีการล็อกประตูจริงเมื่อถึงเวลาปิดร้านใหม่หรือไม่ — ไม่ใช่แค่ "มีกุญแจ" แต่ต้อง "ใช้งานจริง"</p>
+                    </div>
+                    <div class="bg-indigo-50 border-2 border-indigo-200 rounded-lg p-3">
+                        <p class="font-semibold text-indigo-700 text-sm">☑ ตั้งเวลาระบบสัญญาณกันขโมย/รักษาความปลอดภัยให้ตรงกับเวลาปิดร้านใหม่แล้ว</p>
+                        <p class="text-xs text-indigo-700/80 mt-1">ตรวจสอบกับทีมรักษาความปลอดภัย/Security ว่าเวลาตั้งสัญญาณกันขโมย (Arm) ปรับให้ตรงกับเวลาปิดร้านใหม่แล้ว</p>
+                    </div>
+                    <div class="bg-cyan-50 border-2 border-cyan-200 rounded-lg p-3">
+                        <p class="font-semibold text-cyan-700 text-sm">☑ อุณหภูมิตู้แช่/ห้องเย็นปกติช่วงปิดร้าน ไม่มีเหตุของเสีย</p>
+                        <p class="text-xs text-cyan-700/80 mt-1">ตู้แช่/ห้องเย็นต้องทำงาน 24 ชม. เหมือนเดิมแม้ร้านจะปิด — ตรวจว่าไม่มีการตัดไฟผิดวงจรและไม่มีของเสียหายจากอุณหภูมิผิดปกติ</p>
+                    </div>
+                    <div class="bg-amber-50 border-2 border-amber-200 rounded-lg p-3">
+                        <p class="font-semibold text-amber-700 text-sm">☑ ไฟ/แอร์ทั่วไปตัด-ต่อตามตารางเวลาทำการใหม่ถูกต้อง</p>
+                        <p class="text-xs text-amber-700/80 mt-1"><b>เฉพาะไฟ/แอร์ทั่วไป ไม่รวมตู้แช่</b> — ตรวจว่าระบบตั้งเวลา (BMS/Timer) ตัดไฟส่วนที่ไม่จำเป็นช่วงปิดร้าน และเปิดตรงเวลาเปิดร้านใหม่</p>
+                    </div>
+                    <div class="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-3">
+                        <p class="font-semibold text-emerald-700 text-sm">☑ ช่องทางแจ้งเหตุฉุกเฉิน/ขอเข้าซ่อมบำรุงนอกเวลาทำการ ทดสอบแล้วใช้งานได้</p>
+                        <p class="text-xs text-emerald-700/80 mt-1">ทดสอบว่าช่องทางติดต่อ Maintenance/Security กรณีฉุกเฉินหรือขอเข้าซ่อมบำรุงนอกเวลาทำการ (ที่ร้านปิดยาวนานขึ้น) ยังใช้งานได้จริง</p>
+                    </div>
+                </div>
+                <p class="text-xs text-indigo-700/80 mt-3">📷 แนบ <b>ภาพหลักฐานการตรวจยืนยันหลังปรับเปลี่ยน</b> อย่างน้อย 1 ภาพ (บังคับ)</p>
+                <div class="mt-3 bg-violet-50 border border-violet-100 rounded-lg p-3 text-xs text-violet-800">
+                    <b>สถานะโดยรวม (Overall Status):</b> <b>"ตรวจสอบผ่าน (Verified OK)"</b> เมื่อผ่านครบทั้ง 5 ข้อเท่านั้น
+                    มิฉะนั้นจะขึ้น <b>"พบปัญหา (Issue Found)"</b> ในหน้ารายงาน — ให้ประสานทีมที่เกี่ยวข้องแก้ไขข้อที่ยังไม่ผ่าน
+                </div>
+            </div>
+
+            <!-- Shared: Other Notes (both stages) -->
+            <div class="mt-4 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <p class="font-semibold text-slate-700 text-sm">หากเจออุปสรรคอื่น ๆ รบกวนระบุกลับมาด้วยครับ</p>
+                <p class="text-xs text-slate-700/80 mt-1">ช่องข้อความอิสระ ใช้ได้ทั้ง 2 ประเภทการตรวจสอบ — ระบุอุปสรรคอื่นนอกเหนือจากข้างต้นที่พบหน้างาน (ไม่บังคับกรอก)</p>
+                <p class="text-xs text-slate-700/80 mt-1">📷 แนบ <b>ภาพอุปสรรคอื่นๆ</b> ประกอบ (ถ้ามี)</p>
+            </div>
+
             <div class="mt-3 bg-violet-50 border border-violet-100 rounded-lg p-4 text-sm text-violet-800">
                 <b>เมื่อกรอกครบแล้ว:</b> กด <b>Submit</b> เพื่อส่งข้อมูลเข้าระบบ กด <b>Clear form</b> หากต้องการล้างข้อมูลทั้งหมดแล้วเริ่มใหม่
                 (แบบสำรวจนี้ไม่มีปุ่ม Save Draft — ควรกรอกให้เสร็จในครั้งเดียว)
@@ -167,6 +226,16 @@
                 <div>
                     <p class="font-semibold text-gray-800">ส่งข้อมูลผิดหรือกรอกผิดหลังจาก Submit แล้ว ต้องทำอย่างไร?</p>
                     <p class="text-gray-600">ติดต่อผู้ดูแลระบบ (Admin) หรือทีมงาน SMF เพื่อขอแก้ไขข้อมูลในระบบ ไม่สามารถแก้ไขข้อมูลที่ส่งแล้วได้ด้วยตนเอง</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">ควรเลือก "ก่อนปรับเปลี่ยน" หรือ "หลังปรับเปลี่ยน" (Survey Stage) เมื่อไหร่?</p>
+                    <p class="text-gray-600">เลือก <b>"ก่อนปรับเปลี่ยน (Pre-Conversion)"</b> เมื่อสาขายังไม่ถึงวันเปลี่ยนเวลาทำการ (ตรวจกุญแจล็อก/ถอดสติกเกอร์)
+                        และเลือก <b>"หลังปรับเปลี่ยน (Post-Conversion)"</b> เมื่อกลับไปตรวจซ้ำ<b>หลังจาก</b>สาขาเริ่มใช้เวลาทำการใหม่จริงแล้วเท่านั้น — ทั้งสองประเภทกรอกได้จากฟอร์มเดียวกัน แค่เลือกในขั้นตอนที่ 2</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">ตรวจแบบ "หลังปรับเปลี่ยน (Post-Conversion)" ไม่ผ่านบางข้อ ต้องทำอย่างไร?</p>
+                    <p class="text-gray-600">Submit ตามสภาพจริง — สถานะจะขึ้น "พบปัญหา (Issue Found)" ในรายงาน แล้วประสานทีมที่เกี่ยวข้องตามข้อที่ไม่ผ่าน
+                        เช่น ทีม Security สำหรับสัญญาณกันขโมย หรือทีม Maintenance สำหรับอุณหภูมิตู้แช่/ระบบไฟ-แอร์</p>
                 </div>
             </div>
         </div>

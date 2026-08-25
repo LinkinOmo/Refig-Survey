@@ -211,7 +211,7 @@
                     <h4 class="font-bold text-cyan-700 mb-1">🧊 แบบสำรวจตู้แช่ — สรุปย่อ</h4>
                     <ol class="list-decimal list-inside space-y-1">
                         <li>กรอกชื่อผู้แจ้ง แล้วค้นหา/เลือกสาขา เช่นเดียวกับแบบสำรวจแอร์</li>
-                        <li>กรอกจำนวนตู้แต่ละประเภท: ตู้ OPEN, ตู้บานกระจก (Plugin/Walk-in/Remote), ตู้แช่แข็ง (1/2/3 ประตู), ตู้ไอศกรีม, ตู้น้ำแข็ง, ตู้ 4 ประตู Stainless — <b>ใส่ 0 หากไม่มี</b></li>
+                        <li>กรอกจำนวนตู้แต่ละประเภท: ตู้ OPEN, ตู้บานกระจก (Plugin/Walk-in/Remote), ตู้แช่แข็ง (Plugin/Remote/Walk-in), ตู้ไอศกรีม, ตู้น้ำแข็ง, ตู้ 4 ประตู Stainless — <b>ใส่ 0 หากไม่มี</b></li>
                         <li>ระบุว่ามีตู้ชำรุดหรือไม่ หากมี ให้เลือกตู้ที่ชำรุดและติ๊ก Checklist 10 หัวข้อ</li>
                         <li>สรุปปัญหาเพิ่มเติม (ถ้ามี) แล้วกด Submit หรือ Save Draft</li>
                     </ol>
@@ -406,14 +406,16 @@
         // historical default so there's no flash before the server responds.
         let _generalDefaultTab = 'tab-aircon-survey';
 
-        // Tabs restricted to a specific team rather than all general/Operation users —
-        // opt-in list (unlike GENERAL_USER_TABS, missing here means "not restricted").
-        // Generalizes the Trading Hours Survey's SMF-only requirement so any future tab
-        // can be locked to a team via admin config instead of a hardcoded check.
+        // Tabs an Admin can lock to a specific team rather than all general/Operation
+        // users — every GENERAL_USER_TABS tab plus any tab that only ever exists in
+        // team-restricted form (e.g. Trading Hours Survey, which isn't in
+        // GENERAL_USER_TABS at all since it's never shown to general Operation users).
+        // Generalizes the Trading Hours Survey's original SMF-only requirement so any
+        // tab can be locked to a team via admin config instead of a hardcoded check.
         // {tabId: 'SMF'|'MMS'|'ALL'} — TEAM_TAB_DEFAULTS is the secure fallback used both
         // client-side (before the server responds) and server-side (getTeamTabAccess in
         // UploadSchedule.gs) so a newly added restricted tab never flashes open to everyone.
-        const TEAM_RESTRICTED_TABS = ['tab-hours-survey'];
+        const TEAM_RESTRICTED_TABS = GENERAL_USER_TABS.concat(['tab-hours-survey']);
         const TEAM_TAB_DEFAULTS = { 'tab-hours-survey': 'SMF' };
         const TEAM_TAB_LABELS = { 'tab-hours-survey': '⏰ Trading Hours Survey (24hr→Non-24hr)' };
         const TEAM_TAB_ROLE_OPTIONS = [
@@ -528,20 +530,28 @@
                 if (!tab) return;
                 if (showAdminExtras) {
                     tab.classList.remove('hidden');
-                } else {
-                    const visible = _generalTabVisibility.hasOwnProperty(id) ? _generalTabVisibility[id] : true;
-                    tab.classList.toggle('hidden', !visible);
+                    return;
                 }
+                let visible = _generalTabVisibility.hasOwnProperty(id) ? _generalTabVisibility[id] : true;
+                if (visible) {
+                    const role = _teamTabAccess.hasOwnProperty(id) ? _teamTabAccess[id] : (TEAM_TAB_DEFAULTS[id] || 'ALL');
+                    if (role === 'SMF') visible = _userIsSMF;
+                    else if (role === 'MMS') visible = _userIsMMS;
+                }
+                tab.classList.toggle('hidden', !visible);
             });
             ADMIN_ONLY_TABS.forEach(id => {
                 const tab = document.getElementById(id);
                 if (tab) tab.classList.toggle('hidden', !showAdminExtras);
             });
 
-            // Team-restricted tabs (e.g. Trading Hours Survey — SMF team only): an
-            // unlocked Admin View always sees everything, same as GENERAL_USER_TABS;
-            // otherwise gated by the admin-configurable _teamTabAccess role per tab.
+            // Team-restricted tabs that aren't part of GENERAL_USER_TABS at all (e.g.
+            // Trading Hours Survey, which is never shown to general Operation users):
+            // an unlocked Admin View always sees everything; otherwise gated purely by
+            // the admin-configurable _teamTabAccess role. Tabs already handled above
+            // (combined with general visibility) are skipped here.
             TEAM_RESTRICTED_TABS.forEach(id => {
+                if (GENERAL_USER_TABS.indexOf(id) !== -1) return;
                 const tab = document.getElementById(id);
                 if (!tab) return;
                 if (showAdminExtras) {
@@ -559,6 +569,14 @@
             const tabVisBtn = document.getElementById('tab-visibility-btn');
             if (tabVisBtn) tabVisBtn.classList.toggle('hidden', !showAdminExtras);
 
+            // Brand Chip Count config button — same gate as Tab Visibility above
+            const brandChipBtn = document.getElementById('brand-chip-config-btn');
+            if (brandChipBtn) brandChipBtn.classList.toggle('hidden', !showAdminExtras);
+
+            // Equipment Photo Required config button — same gate as Tab Visibility above
+            const photoReqBtn = document.getElementById('photo-required-config-btn');
+            if (photoReqBtn) photoReqBtn.classList.toggle('hidden', !showAdminExtras);
+
             // Top links row (Dashboard / Map / admin-only-link items)
             const topLinksContainer = document.querySelector('.mb-6 > .flex.flex-wrap.items-center.justify-between.gap-2.mb-4');
             if (topLinksContainer) topLinksContainer.classList.toggle('hidden', !showAdminExtras);
@@ -569,6 +587,10 @@
             if (adminBtn) adminBtn.classList.toggle('hidden', !showAdminExtras);
             const pwdResetBtn = document.getElementById('admin-pwd-reset-btn');
             if (pwdResetBtn) pwdResetBtn.classList.toggle('hidden', !showAdminExtras);
+
+            // Access Console (consolidated permission toggles + role matrix) — same gate
+            const accessConsoleBtn = document.getElementById('access-console-btn');
+            if (accessConsoleBtn) accessConsoleBtn.classList.toggle('hidden', !showAdminExtras);
 
             // Email Delivery (Brevo config) — Admin/System Admin, same gate as the page itself
             const emailConfigBtn = document.getElementById('email-config-btn');
@@ -844,6 +866,15 @@
             </svg>
             Reset Password
         </a>
+        <a href="<?= ScriptApp.getService().getUrl() ?>?page=access-console" target="_blank"
+            id="access-console-btn"
+            class="hidden bg-fuchsia-100 text-fuchsia-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-fuchsia-200 transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            Access Console
+        </a>
         <a href="<?= ScriptApp.getService().getUrl() ?>?page=email-config" target="_blank"
             id="email-config-btn"
             class="hidden bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-emerald-200 transition-colors flex items-center gap-1">
@@ -860,6 +891,21 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
             </svg>
             Tab Visibility
+        </button>
+        <button type="button" id="brand-chip-config-btn" onclick="openBrandChipConfigModal()"
+            class="hidden bg-teal-100 text-teal-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-teal-200 transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+            </svg>
+            Brand Chips
+        </button>
+        <button type="button" id="photo-required-config-btn" onclick="openPhotoRequiredModal()"
+            class="hidden bg-rose-100 text-rose-700 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-rose-200 transition-colors flex items-center gap-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            Photo Required
         </button>
         <a href="<?= ScriptApp.getService().getUrl() ?>?page=broken-unit-summary" target="_blank"
             id="smf-broken-summary-btn"
@@ -2464,36 +2510,46 @@
                                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-400"></span>
                                     2.2) ตู้แช่เย็นบานกระจก (Glass Door Chiller)
                                 </h4>
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-xs text-amber-800 leading-relaxed">
+                                    <b>⚠️ วิธีแยก 3 ประเภท (ดูที่ตัวตู้):</b><br>
+                                    🚫🔌 <b>Remote</b> = ตัวตู้<u>ไม่มีปลั๊ก</u> ต่อท่อน้ำยาไปเครื่องคอมเพรสเซอร์ที่อื่น (ห้องเครื่อง/หลังร้าน)<br>
+                                    🔌 <b>Plugin</b> = มีปลั๊กไฟเสียบกับตัวตู้เอง มีคอมเพรสเซอร์ในตัว (ได้ยิน/รู้สึกเสียงมอเตอร์ทำงานที่ตัวตู้)<br>
+                                    🚪 <b>Walk-in</b> = ห้องเย็น/ตู้เย็นขนาดใหญ่ที่<u>เดินเข้าไปข้างในได้</u> ไม่ใช่แค่เปิดบานประตูหยิบของจากด้านนอก — ถ้าเปิดบานแล้วหยิบของได้เลยโดยไม่ต้องก้าวเข้าไป ให้นับเป็น Plugin หรือ Remote ตามลักษณะปลั๊ก ไม่ใช่ Walk-in<br>
+                                    ❓ ถ้าไม่แน่ใจให้ถ่ายรูปด้านหลัง/ใต้ตู้แนบไปด้วย
+                                </div>
                                 <!-- hidden qty fields — always submitted -->
                                 <input type="hidden" name="refBevPluginQty" id="refBevPluginQty" value="0">
                                 <input type="hidden" name="refBevWalkInQty" id="refBevWalkInQty" value="0">
                                 <input type="hidden" name="refBevRemoteQty" id="refBevRemoteQty" value="0">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-3">
+                                    <div class="relative bg-blue-100 border-2 border-blue-500 rounded-lg p-3 pt-4 shadow-sm">
+                                        <span class="absolute -top-2.5 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">🚫🔌 ค่าเริ่มต้น / พบบ่อยสุด</span>
+                                        <label class="block text-xs font-bold text-blue-800 mb-1">ตู้ Remote — จำนวน (ตู้) <span class="text-blue-500 italic font-normal">— ใส่ 0 หากไม่มีตู้</span></label>
+                                        <input type="number" id="refBevRemoteQty-input" min="0" value="0"
+                                            class="input-field w-full border-2 border-blue-400 p-2 rounded text-sm font-bold focus:ring-2 focus:ring-blue-500 bg-white"
+                                            placeholder="0"
+                                            oninput="onBevQtyInput('Remote')">
+                                    </div>
                                     <div>
                                         <label class="block text-xs text-gray-500 mb-1">ตู้ Plugin — จำนวน (ตู้) <span class="text-blue-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
                                         <input type="number" id="refBevPluginQty-input" min="0" value="0"
                                             class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-blue-400"
                                             placeholder="0"
-                                            oninput="onBevQtyInput('Plugin')">
+                                            oninput="onBevQtyInput('Plugin')"
+                                            onblur="confirmBevType('Plugin', this)">
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-500 mb-1">ตู้ Walk-in — จำนวน (ตู้) <span class="text-blue-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
+                                        <label class="block text-xs text-gray-500 mb-1">ตู้ Walk-in (พบน้อยที่สุด) — จำนวน (ตู้) <span class="text-blue-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
                                         <input type="number" id="refBevWalkInQty-input" min="0" value="0"
                                             class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-blue-400"
                                             placeholder="0"
-                                            oninput="onBevQtyInput('WalkIn')">
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs text-gray-500 mb-1">ตู้ Remote — จำนวน (ตู้) <span class="text-blue-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
-                                        <input type="number" id="refBevRemoteQty-input" min="0" value="0"
-                                            class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-blue-400"
-                                            placeholder="0"
-                                            oninput="onBevQtyInput('Remote')">
+                                            oninput="onBevQtyInput('WalkIn')"
+                                            onblur="confirmBevType('WalkIn', this)">
                                     </div>
                                 </div>
+                                <div id="details-ref-bev-remote" class="mt-2 mb-1"></div>
                                 <div id="details-ref-bev-plugin" class="mt-2 mb-1"></div>
                                 <div id="details-ref-bev-walkin" class="mt-2 mb-1"></div>
-                                <div id="details-ref-bev-remote" class="mt-2 mb-1"></div>
                                 <script>
                                     function onBevQtyInput(type) {
                                         const map = {
@@ -2505,13 +2561,36 @@
                                         if (m) document.getElementById(m.hidden).value = parseInt(document.getElementById(m.input).value) || 0;
                                         updateBevDetails();
                                     }
+                                    // Plugin/Walk-in are the two types most often mistaken for Remote (see
+                                    // amber banner above), so ask the surveyor to double-check on blur — but
+                                    // only once per value, tracked via dataset.confirmed, so re-focusing the
+                                    // same field without changing it doesn't nag repeatedly.
+                                    function confirmBevType(type, inputEl) {
+                                        const qty = parseInt(inputEl.value) || 0;
+                                        if (qty <= 0) { inputEl.dataset.confirmed = ''; return; }
+                                        if (inputEl.dataset.confirmed === String(qty)) return;
+                                        const typeName = type === 'Plugin'
+                                            ? 'Plugin (🔌 มีปลั๊กเสียบกับตัวตู้เอง มีคอมเพรสเซอร์ในตัว)'
+                                            : 'Walk-in (🚪 ห้องเย็น/ตู้เย็นขนาดใหญ่ที่เดินเข้าไปข้างในได้จริง)';
+                                        const ok = confirm('⚠️ กรุณายืนยัน\n\nจำนวน ' + qty + ' ตู้ที่กรอกนี้ เป็นตู้ประเภท ' + typeName + ' ใช่หรือไม่?\n\nถ้าตัวตู้ไม่มีปลั๊ก/เดินเข้าไม่ได้ อาจเป็น Remote — กด Cancel เพื่อกลับไปแก้ไข');
+                                        if (ok) {
+                                            inputEl.dataset.confirmed = String(qty);
+                                        } else {
+                                            inputEl.dataset.confirmed = '';
+                                            inputEl.focus();
+                                            inputEl.select();
+                                        }
+                                    }
+                                    function renderRefDoorCountField(unitNum, namePrefix) {
+                                        return doorCountRow(`${namePrefix}DoorCount_${unitNum}`);
+                                    }
                                     function updateBevDetails() {
                                         const pluginQty = parseInt(document.getElementById('refBevPluginQty').value) || 0;
                                         const walkinQty = parseInt(document.getElementById('refBevWalkInQty').value) || 0;
                                         const remoteQty = parseInt(document.getElementById('refBevRemoteQty').value) || 0;
-                                        updateDynamicUnitDetails('details-ref-bev-plugin', pluginQty, 'ตู้แช่เย็นบานกระจก (Plugin)', 'ref_bev_plugin', 'refBevPlugin', ['เครื่องดื่ม', 'อาหารสด', 'อื่นๆ'], 'BP');
-                                        updateDynamicUnitDetails('details-ref-bev-walkin', walkinQty, 'ตู้แช่เย็นบานกระจก (Walk-in)', 'ref_bev_walkin', 'refBevWalkIn', ['เครื่องดื่ม', 'อาหารสด', 'อื่นๆ'], 'BW');
-                                        updateDynamicUnitDetails('details-ref-bev-remote', remoteQty, 'ตู้แช่เย็นบานกระจก (Remote)', 'ref_bev_remote', 'refBevRemote', ['เครื่องดื่ม', 'อาหารสด', 'อื่นๆ'], 'BR');
+                                        updateDynamicUnitDetails('details-ref-bev-remote', remoteQty, 'ตู้แช่เย็นบานกระจก (Remote)', 'ref_bev_remote', 'refBevRemote', ['เครื่องดื่ม', 'อาหารสด', 'อื่นๆ'], 'BR', renderRefDoorCountField);
+                                        updateDynamicUnitDetails('details-ref-bev-plugin', pluginQty, 'ตู้แช่เย็นบานกระจก (Plugin)', 'ref_bev_plugin', 'refBevPlugin', ['เครื่องดื่ม', 'อาหารสด', 'อื่นๆ'], 'BP', renderRefDoorCountField);
+                                        updateDynamicUnitDetails('details-ref-bev-walkin', walkinQty, 'ตู้แช่เย็นบานกระจก (Walk-in)', 'ref_bev_walkin', 'refBevWalkIn', ['เครื่องดื่ม', 'อาหารสด', 'อื่นๆ'], 'BW', renderRefDoorCountField);
                                     }
                                 </script>
                             </div>
@@ -2522,39 +2601,85 @@
                                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
                                     2.3) ตู้แช่อาหารแช่แข็ง
                                 </h4>
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
-                                    <div>
-                                        <label class="block text-xs text-gray-500 mb-1">1 ประตู — จำนวน (ตู้) <span class="text-indigo-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
-                                        <input type="number" name="refFrozen1DoorQty" id="refFrozen1DoorQty" min="0" value="0"
-                                            class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-indigo-400"
-                                            placeholder="0" oninput="updateFrozenDetails()">
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-xs text-amber-800 leading-relaxed">
+                                    <b>⚠️ วิธีแยก 3 ประเภท (ดูที่ตัวตู้):</b><br>
+                                    🔌 <b>Plugin</b> = มีปลั๊กไฟเสียบกับตัวตู้เอง มีคอมเพรสเซอร์ในตัว (ได้ยิน/รู้สึกเสียงมอเตอร์ทำงานที่ตัวตู้)<br>
+                                    🚫🔌 <b>Remote</b> = ตัวตู้<u>ไม่มีปลั๊ก</u> ต่อท่อน้ำยาไปเครื่องคอมเพรสเซอร์ที่อื่น (ห้องเครื่อง/หลังร้าน)<br>
+                                    🚪 <b>Walk-in</b> = ห้องเย็น/ตู้เย็นขนาดใหญ่ที่<u>เดินเข้าไปข้างในได้</u> ไม่ใช่แค่เปิดบานประตูหยิบของจากด้านนอก<br>
+                                    ❓ ถ้าไม่แน่ใจให้ถ่ายรูปด้านหลัง/ใต้ตู้แนบไปด้วย
+                                </div>
+                                <!-- hidden qty fields — always submitted -->
+                                <input type="hidden" name="refFrozenPluginQty" id="refFrozenPluginQty" value="0">
+                                <input type="hidden" name="refFrozenRemoteQty" id="refFrozenRemoteQty" value="0">
+                                <input type="hidden" name="refFrozenWalkInQty" id="refFrozenWalkInQty" value="0">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-3">
+                                    <div class="relative bg-indigo-100 border-2 border-indigo-500 rounded-lg p-3 pt-4 shadow-sm">
+                                        <span class="absolute -top-2.5 left-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">🔌 ค่าเริ่มต้น / พบบ่อยสุด</span>
+                                        <label class="block text-xs font-bold text-indigo-800 mb-1">ตู้ Plugin — จำนวน (ตู้) <span class="text-indigo-500 italic font-normal">— ใส่ 0 หากไม่มีตู้</span></label>
+                                        <input type="number" id="refFrozenPluginQty-input" min="0" value="0"
+                                            class="input-field w-full border-2 border-indigo-400 p-2 rounded text-sm font-bold focus:ring-2 focus:ring-indigo-500 bg-white"
+                                            placeholder="0"
+                                            oninput="onFrozenQtyInput('Plugin')">
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-500 mb-1">2 ประตู — จำนวน (ตู้) <span class="text-indigo-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
-                                        <input type="number" name="refFrozen2DoorQty" id="refFrozen2DoorQty" min="0" value="0"
+                                        <label class="block text-xs text-gray-500 mb-1">ตู้ Remote — จำนวน (ตู้) <span class="text-indigo-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
+                                        <input type="number" id="refFrozenRemoteQty-input" min="0" value="0"
                                             class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-indigo-400"
-                                            placeholder="0" oninput="updateFrozenDetails()">
+                                            placeholder="0"
+                                            oninput="onFrozenQtyInput('Remote')"
+                                            onblur="confirmFrozenType('Remote', this)">
                                     </div>
                                     <div>
-                                        <label class="block text-xs text-gray-500 mb-1">3 ประตู — จำนวน (ตู้) <span class="text-indigo-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
-                                        <input type="number" name="refFrozen3DoorQty" id="refFrozen3DoorQty" min="0" value="0"
+                                        <label class="block text-xs text-gray-500 mb-1">ตู้ Walk-in (พบน้อยที่สุด) — จำนวน (ตู้) <span class="text-indigo-400 italic">— ใส่ 0 หากไม่มีตู้</span></label>
+                                        <input type="number" id="refFrozenWalkInQty-input" min="0" value="0"
                                             class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-indigo-400"
-                                            placeholder="0" oninput="updateFrozenDetails()">
-                                        <script>
-                                            function updateFrozenDetails() {
-                                                const d1 = parseInt(document.getElementById('refFrozen1DoorQty').value) || 0;
-                                                const d2 = parseInt(document.getElementById('refFrozen2DoorQty').value) || 0;
-                                                const d3 = parseInt(document.getElementById('refFrozen3DoorQty').value) || 0;
-                                                updateDynamicUnitDetails('details-ref-frozen', [
-                                                    { qty: d1, subLabel: '1 ประตู' },
-                                                    { qty: d2, subLabel: '2 ประตู' },
-                                                    { qty: d3, subLabel: '3 ประตู' }
-                                                ], 'ตู้อาหารแช่แข็ง', 'ref_frozen', 'refFrozen', [], 'FC');
-                                            }
-                                        </script>
+                                            placeholder="0"
+                                            oninput="onFrozenQtyInput('WalkIn')"
+                                            onblur="confirmFrozenType('WalkIn', this)">
                                     </div>
                                 </div>
-                                <div id="details-ref-frozen" class="mt-2 mb-1"></div>
+                                <div id="details-ref-frozen-plugin" class="mt-2 mb-1"></div>
+                                <div id="details-ref-frozen-remote" class="mt-2 mb-1"></div>
+                                <div id="details-ref-frozen-walkin" class="mt-2 mb-1"></div>
+                                <script>
+                                    function onFrozenQtyInput(type) {
+                                        const map = {
+                                            'Plugin': { input: 'refFrozenPluginQty-input', hidden: 'refFrozenPluginQty' },
+                                            'Remote': { input: 'refFrozenRemoteQty-input', hidden: 'refFrozenRemoteQty' },
+                                            'WalkIn': { input: 'refFrozenWalkInQty-input', hidden: 'refFrozenWalkInQty' }
+                                        };
+                                        const m = map[type];
+                                        if (m) document.getElementById(m.hidden).value = parseInt(document.getElementById(m.input).value) || 0;
+                                        updateFrozenDetails();
+                                    }
+                                    // Remote/Walk-in are the two types most often mistaken for Plugin here
+                                    // (Plugin is the common case for frozen units) — confirm on blur, once per
+                                    // value, same pattern as confirmBevType above.
+                                    function confirmFrozenType(type, inputEl) {
+                                        const qty = parseInt(inputEl.value) || 0;
+                                        if (qty <= 0) { inputEl.dataset.confirmed = ''; return; }
+                                        if (inputEl.dataset.confirmed === String(qty)) return;
+                                        const typeName = type === 'Remote'
+                                            ? 'Remote (🚫🔌 ตัวตู้ไม่มีปลั๊ก ต่อท่อน้ำยาไปเครื่องคอมเพรสเซอร์ที่อื่น)'
+                                            : 'Walk-in (🚪 ห้องเย็น/ตู้เย็นขนาดใหญ่ที่เดินเข้าไปข้างในได้จริง)';
+                                        const ok = confirm('⚠️ กรุณายืนยัน\n\nจำนวน ' + qty + ' ตู้ที่กรอกนี้ เป็นตู้แช่แข็งประเภท ' + typeName + ' ใช่หรือไม่?\n\nถ้าตัวตู้มีปลั๊กเสียบกับตัวตู้เอง อาจเป็น Plugin — กด Cancel เพื่อกลับไปแก้ไข');
+                                        if (ok) {
+                                            inputEl.dataset.confirmed = String(qty);
+                                        } else {
+                                            inputEl.dataset.confirmed = '';
+                                            inputEl.focus();
+                                            inputEl.select();
+                                        }
+                                    }
+                                    function updateFrozenDetails() {
+                                        const pluginQty = parseInt(document.getElementById('refFrozenPluginQty').value) || 0;
+                                        const remoteQty = parseInt(document.getElementById('refFrozenRemoteQty').value) || 0;
+                                        const walkinQty = parseInt(document.getElementById('refFrozenWalkInQty').value) || 0;
+                                        updateDynamicUnitDetails('details-ref-frozen-plugin', pluginQty, 'ตู้แช่อาหารแช่แข็ง (Plugin)', 'ref_frozen_plugin', 'refFrozenPlugin', [], 'FP', renderRefDoorCountField);
+                                        updateDynamicUnitDetails('details-ref-frozen-remote', remoteQty, 'ตู้แช่อาหารแช่แข็ง (Remote)', 'ref_frozen_remote', 'refFrozenRemote', [], 'FR', renderRefDoorCountField);
+                                        updateDynamicUnitDetails('details-ref-frozen-walkin', walkinQty, 'ตู้แช่อาหารแช่แข็ง (Walk-in)', 'ref_frozen_walkin', 'refFrozenWalkIn', [], 'FW', renderRefDoorCountField);
+                                    }
+                                </script>
                             </div>
 
                             <!-- 2.4 Ice Cream Freezer -->
@@ -2594,18 +2719,20 @@
                             </div>
 
                             <!-- 2.6 Stainless 4-Door -->
-                            <div class="pb-4 bg-amber-50 rounded-lg p-3">
+                            <div class="pb-4 bg-amber-50 rounded-lg p-3 border-2 border-amber-400">
                                 <h4 class="font-semibold text-amber-700 mb-1 flex items-center gap-2">
                                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"></span>
                                     2.6) ตู้ 4 ประตู Stainless
+                                    <span class="text-[10px] font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full">⚠️ ข้อมูลสำคัญ — ห้ามข้าม</span>
                                 </h4>
+                                <p class="text-xs font-semibold text-amber-700 mb-3">📦 ตู้นี้อยู่ที่ <u>ห้องสต๊อก (Stock Room)</u> ไม่ใช่หน้าร้าน — อย่าลืมเข้าไปตรวจสอบด้วย</p>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
                                     <div>
                                         <label class="block text-xs text-gray-500 mb-1">จำนวน (ตู้) <span class="text-amber-500 italic">— ใส่ 0 หากไม่มีตู้</span></label>
                                         <input type="number" name="refSs4DoorQty" id="refSs4DoorQty" min="0" value="0"
                                             class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-amber-400"
                                             placeholder="0"
-                                            oninput="updateDynamicUnitDetails('details-ref-ss4door', this.value, 'ตู้ 4 ประตู Stainless', 'ref_ss4door', 'refSs4Door', [], 'SS')">
+                                            oninput="this.dataset.touched='1'; updateDynamicUnitDetails('details-ref-ss4door', this.value, 'ตู้ 4 ประตู Stainless', 'ref_ss4door', 'refSs4Door', [], 'SS')">
                                     </div>
                                 </div>
                                 <div id="details-ref-ss4door" class="mt-2 mb-1"></div>
@@ -3103,8 +3230,9 @@
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">เวลาทำการใหม่ (New Hours) *</label>
-                                <input type="text" name="newHours" required
+                                <input type="text" name="newHours" value="6:00-24:00" required
                                     class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-violet-400" placeholder="เช่น 06:00–24:00">
+                                <p class="text-xs text-violet-500 italic mt-1">ค่าเริ่มต้นคือเวลาทำการใหม่มาตรฐาน — แก้ไขได้หากสาขานี้ใช้เวลาต่างไป</p>
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 mb-1">วันที่สำรวจ (Survey Date) *</label>
@@ -3362,28 +3490,71 @@
 
     <!-- Tab Visibility Config Modal (Admin / Super Admin) -->
     <div id="tabVisibilityModal"
-        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-        <div class="relative p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <h3 class="text-lg font-bold text-gray-800 mb-1">แสดง Tab สำหรับผู้ใช้ทั่วไป</h3>
-            <p class="text-xs text-gray-500 mb-4">เลือก Tab ที่ต้องการให้ผู้ใช้ทั่วไป (ไม่ใช่ Admin) มองเห็น เช่น เปิดเฉพาะ EDMI Solar Meter ในวันศุกร์นี้ — Admin ที่เปิด Admin View จะเห็นทุก Tab เสมอ</p>
-            <div id="tabVisibilityList" class="space-y-2 mb-4"></div>
-            <div class="mb-4 pt-3 border-t">
-                <label for="defaultTabSelect" class="block text-xs font-semibold text-gray-600 mb-1">Tab เริ่มต้นเมื่อเปิดแอป (Default Tab)</label>
-                <select id="defaultTabSelect" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2"></select>
+        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
+        <div class="relative w-full max-w-lg shadow-lg rounded-md bg-white flex flex-col max-h-[90vh]">
+            <div class="p-5 pb-3 border-b flex-shrink-0">
+                <h3 class="text-lg font-bold text-gray-800 mb-1">แสดง Tab สำหรับผู้ใช้ทั่วไป</h3>
+                <p class="text-xs text-gray-500">เลือก Tab ที่ให้ผู้ใช้ทั่วไปมองเห็น และจำกัดให้เฉพาะทีมมองเห็นได้ในบรรทัดเดียวกัน — Admin ที่เปิด Admin View จะเห็นทุก Tab เสมอ</p>
             </div>
-            <div class="mb-4 pt-3 border-t">
-                <label class="block text-xs font-semibold text-gray-600 mb-1">Tab จำกัดเฉพาะทีม (Team-Restricted Tabs)</label>
-                <p class="text-xs text-gray-400 mb-2">กำหนดว่า Tab เหล่านี้ให้ทีมไหนมองเห็นได้ — Admin ที่เปิด Admin View จะเห็นทุก Tab เสมอ</p>
-                <div id="teamTabAccessList" class="space-y-2"></div>
-            </div>
-            <div class="flex justify-between items-center gap-2 pt-3 border-t">
-                <button type="button" onclick="_setAllTabVisibility(true)" class="text-xs text-indigo-600 hover:underline">เลือกทั้งหมด</button>
-                <div class="flex gap-2">
-                    <button type="button" onclick="closeTabVisibilityModal()"
-                        class="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                    <button type="button" onclick="saveTabVisibility()" id="saveTabVisibilityBtn"
-                        class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow">Save</button>
+            <div class="p-5 overflow-y-auto flex-1 min-h-0">
+                <div class="flex items-center justify-between mb-2 px-1">
+                    <span class="text-xs font-semibold text-gray-500">Tab ทั่วไป (General Tabs)</span>
+                    <button type="button" onclick="_setAllTabVisibility(true)" class="text-xs text-indigo-600 hover:underline font-medium">เลือกทั้งหมด</button>
                 </div>
+                <div id="tabVisibilityList" class="space-y-2 mb-4"></div>
+
+                <div class="mb-4 pt-3 border-t">
+                    <label for="defaultTabSelect" class="block text-xs font-semibold text-gray-600 mb-1">Tab เริ่มต้นเมื่อเปิดแอป (Default Tab)</label>
+                    <select id="defaultTabSelect" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2"></select>
+                </div>
+
+                <div class="pt-3 border-t">
+                    <span class="block text-xs font-semibold text-gray-500 mb-1">Tab เฉพาะทีม (ไม่อยู่ในรายการทั่วไป)</span>
+                    <p class="text-xs text-gray-400 mb-2">Tab เหล่านี้ไม่ใช่ Tab ของผู้ใช้ทั่วไป — กำหนดได้เฉพาะทีมที่มองเห็น</p>
+                    <div id="teamTabAccessList" class="space-y-2"></div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 p-5 pt-3 border-t flex-shrink-0">
+                <button type="button" onclick="closeTabVisibilityModal()"
+                    class="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button type="button" onclick="saveTabVisibility()" id="saveTabVisibilityBtn"
+                    class="px-4 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Brand Quick-Pick Chip Config Modal (Admin / Super Admin) -->
+    <div id="brandChipConfigModal"
+        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
+        <div class="relative w-full max-w-lg shadow-lg rounded-md bg-white flex flex-col max-h-[90vh]">
+            <div class="p-5 pb-3 border-b flex-shrink-0">
+                <h3 class="text-lg font-bold text-gray-800 mb-1">ปุ่มเลือกยี่ห้อด่วน (Brand Quick-Pick Chips)</h3>
+                <p class="text-xs text-gray-500">ค่าเริ่มต้นคือยี่ห้อยอดนิยม N อันดับแรก (เรียงตามความถี่การใช้งานจริง) — หรือกด "เลือกเอง" เพื่อกำหนดยี่ห้อที่ต้องการแสดงเองแทน ใส่ 0 เพื่อซ่อนปุ่มด่วนของหมวดนั้น</p>
+            </div>
+            <div id="brandChipConfigList" class="p-5 space-y-2 overflow-y-auto flex-1 min-h-0"></div>
+            <div class="flex justify-end gap-2 p-5 pt-3 border-t flex-shrink-0">
+                <button type="button" onclick="closeBrandChipConfigModal()"
+                    class="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button type="button" onclick="saveBrandChipConfig()" id="saveBrandChipConfigBtn"
+                    class="px-4 py-2 text-sm font-bold text-white bg-teal-600 rounded-lg hover:bg-teal-700 shadow">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipment Photo Required Config Modal (Super Admin) -->
+    <div id="photoRequiredModal"
+        class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full flex items-center justify-center z-50 p-4">
+        <div class="relative w-full max-w-md shadow-lg rounded-md bg-white flex flex-col max-h-[90vh]">
+            <div class="p-5 pb-3 border-b flex-shrink-0">
+                <h3 class="text-lg font-bold text-gray-800 mb-1">ข้อกำหนดรูปถ่ายอุปกรณ์ (Equipment Photo Required)</h3>
+                <p class="text-xs text-gray-500">เปิด = ต้องแนบรูปให้ครบทุกเครื่อง/ตู้ก่อนส่งแบบสำรวจ — ปิด = ส่งได้แม้ไม่มีรูป</p>
+            </div>
+            <div id="photoRequiredList" class="p-5 space-y-2 overflow-y-auto flex-1 min-h-0"></div>
+            <div class="flex justify-end gap-2 p-5 pt-3 border-t flex-shrink-0">
+                <button type="button" onclick="closePhotoRequiredModal()"
+                    class="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button type="button" onclick="savePhotoRequiredConfig()" id="savePhotoRequiredBtn"
+                    class="px-4 py-2 text-sm font-bold text-white bg-rose-600 rounded-lg hover:bg-rose-700 shadow">Save</button>
             </div>
         </div>
     </div>
@@ -3449,6 +3620,69 @@
         const ENUM_GROUP_KEYS = ['aircon_brand', 'aircon_type', 'ref_brand', 'ref_ice_cream_supplier',
             'np_brand_SC', 'np_brand_JT', 'np_brand_SH', 'np_brand_MK', 'np_brand_WF', 'np_plug'];
         function _mergedOptions(groupKey, fallbackDefaults) { return _enumCache[groupKey] || fallbackDefaults; }
+
+        // Quick-pick chips for Brand fields — surfaces the top N (most-used first,
+        // since _mergedOptions/getEnumFieldOptions already sorts by submission
+        // frequency) as one-tap buttons above the existing searchable text input,
+        // so the common case doesn't require typing/scrolling a long datalist.
+        // The input+datalist stays underneath for anything outside the top N or
+        // a brand new value — this is additive, not a replacement. N is
+        // admin-configurable per Brand category (see openBrandChipConfigModal /
+        // getBrandChipConfig in UploadSchedule.gs); starts at a hardcoded default
+        // client-side until that fetch lands, mirroring the _enumCache pattern.
+        const BRAND_CHIP_GROUPS = ['ref_brand', 'aircon_brand', 'np_brand_SC', 'np_brand_JT', 'np_brand_SH', 'np_brand_MK', 'np_brand_WF'];
+        const BRAND_CHIP_DEFAULT_COUNT = 16;
+        let _brandChipCounts = {};
+        function _brandChipCount(groupKey) {
+            const n = _brandChipCounts[groupKey];
+            return (typeof n === 'number' && n >= 0) ? n : BRAND_CHIP_DEFAULT_COUNT;
+        }
+        // Explicit admin pick of WHICH brands show as chips, overriding the auto
+        // top-N-by-frequency behavior above — e.g. to exclude a frequently-mistyped
+        // brand or pin a strategically important one that isn't top-N yet. Stored
+        // as {groupKey: string[]}; an empty/missing array means "no override, use
+        // the auto top-N count instead" (see getBrandChipSelection in UploadSchedule.gs).
+        let _brandChipSelections = {};
+        function _brandChipList(groupKey, options) {
+            const opts = options || [];
+            const picked = _brandChipSelections[groupKey];
+            if (picked && picked.length) {
+                // Keep the real frequency order for anything still in `options`; a
+                // picked brand that's since dropped out of the live options list
+                // (e.g. never actually submitted yet) is appended so a saved pick
+                // never silently vanishes from the config modal or the chip row.
+                const inOptions = opts.filter(b => picked.indexOf(b) !== -1);
+                const extra = picked.filter(b => opts.indexOf(b) === -1);
+                return inOptions.concat(extra);
+            }
+            return opts.slice(0, _brandChipCount(groupKey));
+        }
+        function _brandChipsHtml(options, inputId, groupKey) {
+            const top = _brandChipList(groupKey, options);
+            if (!top.length) return '';
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            const chips = top.map(b => `<button type="button" data-brand="${esc(b)}" onclick="_pickBrandChip('${inputId}', this)"
+                class="px-2.5 py-1 rounded-full border border-gray-300 bg-gray-50 text-gray-700 text-xs font-medium hover:bg-indigo-50 hover:border-indigo-300 transition-colors">${b}</button>`).join('');
+            return `<div class="flex flex-wrap gap-1.5 mb-1.5">${chips}</div>`;
+        }
+        function _pickBrandChip(inputId, btnEl) {
+            const value = btnEl.getAttribute('data-brand');
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.value = value;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            const group = btnEl.parentElement;
+            if (group) {
+                Array.prototype.forEach.call(group.children, function (el) {
+                    el.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+                    el.classList.add('bg-gray-50', 'text-gray-700', 'border-gray-300');
+                });
+            }
+            btnEl.classList.remove('bg-gray-50', 'text-gray-700', 'border-gray-300');
+            btnEl.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+        }
         function _prefetchEnumOptions() {
             ENUM_GROUP_KEYS.forEach(function (k) {
                 google.script.run
@@ -3607,6 +3841,28 @@
                     })
                     .withFailureHandler(function (e) { console.error("Failed to load team tab access:", e); })
                     .getTeamTabAccess();
+
+                // Fetch admin-configured Brand quick-pick chip counts (index.html's
+                // _brandChipsHtml) — falls back to BRAND_CHIP_DEFAULT_COUNT per group
+                // until this lands, so there's no flash of a differently-sized chip row.
+                google.script.run
+                    .withSuccessHandler(function (res) { if (res && res.success) _brandChipCounts = res.data || {}; })
+                    .withFailureHandler(function (e) { console.error("Failed to load brand chip config:", e); })
+                    .getBrandChipConfig();
+
+                // Fetch admin-configured explicit brand chip picks (overrides the
+                // auto top-N count above for any group where an admin chose one).
+                google.script.run
+                    .withSuccessHandler(function (res) { if (res && res.success) _brandChipSelections = res.data || {}; })
+                    .withFailureHandler(function (e) { console.error("Failed to load brand chip selection:", e); })
+                    .getBrandChipSelection();
+
+                // Fetch admin-configured per-survey-type equipment photo requirement
+                // toggle — defaults true (see _equipmentPhotoRequired above) until this lands.
+                google.script.run
+                    .withSuccessHandler(function (res) { if (res && res.success) _equipmentPhotoRequired = Object.assign({ aircon: true, ref: true, np: true }, res.data || {}); })
+                    .withFailureHandler(function (e) { console.error("Failed to load equipment photo requirement config:", e); })
+                    .getEquipmentPhotoRequired();
 
                 // Fetch Survey Configuration (with delay to ensure DOM is ready)
                 setTimeout(function () {
@@ -4298,11 +4554,12 @@
             const selectName = `${namePrefix}Brand_${unitNum}`;
             const listId = `${namePrefix}_brand_list_${unitNum}`;
             const brandLabel = labelOverride || 'ยี่ห้อ (Brand)';
-            const opts = _mergedOptions('ref_brand', REF_BRAND_DEFAULTS)
-                .map(b => `<option value="${b}">`).join('');
+            const brandList = _mergedOptions('ref_brand', REF_BRAND_DEFAULTS);
+            const opts = brandList.map(b => `<option value="${b}">`).join('');
             return `
                 <div class="mb-3">
                     <label class="block text-xs font-semibold text-gray-600 mb-1">${brandLabel}</label>
+                    ${_brandChipsHtml(brandList, selectName, 'ref_brand')}
                     <input type="text" list="${listId}" name="${selectName}" id="${selectName}" autocomplete="off"
                         class="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
                         placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่...">
@@ -4347,54 +4604,131 @@
         const _condColors = ['#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d', '#16a34a'];
         const _condLabels = ['0 – ชำรุด/หมดสภาพ', '1 – แย่มาก', '2 – แย่ ควรซ่อม', '3 – พอใช้', '4 – ดี', '5 – ใหม่/สมบูรณ์'];
 
+        // Every unit ships a value of 3 (พอใช้/adequate) in the hidden input from the
+        // start, so the sheet is never blank even if something bypasses the JS check —
+        // but that alone doesn't prove a human actually looked at the unit. So the
+        // widget renders in a distinct, grayed-out "unconfirmed" state (neutral outline
+        // buttons + amber warning label + amber ring around the group) until the
+        // surveyor explicitly taps ANY button (including 3, to confirm the default is
+        // really correct) — only then does it switch to the normal vivid/colored
+        // "confirmed" look. validateCondRatings() gates submission on that confirmed
+        // flag, not on the value being non-blank, so a genuinely-skipped rating still
+        // blocks submit even though its hidden value already reads "3".
+        const COND_RATING_DEFAULT = 3;
         function condRatingRow(name) {
+            const dv = COND_RATING_DEFAULT;
             let btns = '';
             for (let v = 0; v <= 5; v++) {
                 btns += `<button type="button" onclick="setCondRating('${name}',${v})" id="${name}_btn_${v}" title="${_condLabels[v]}"
-                    style="width:24px;height:24px;border-radius:50%;border:2px solid ${_condColors[v]};color:${_condColors[v]};background:transparent;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;">${v}</button>`;
+                    style="width:24px;height:24px;border-radius:50%;border:2px solid #cbd5e1;color:#94a3b8;background:#f1f5f9;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;">${v}</button>`;
             }
             return `
             <div class="border-t border-gray-100 pt-2 mt-1">
                 <label class="block text-xs font-semibold text-gray-600 mb-1" title="0 = ชำรุด/หมดสภาพ, 5 = ใหม่/สมบูรณ์">⭐ สภาพเครื่อง (Condition Rating) <span class="text-red-500">*</span></label>
-                <div id="${name}_group" class="flex items-center gap-1.5 flex-wrap rounded px-1 py-0.5">
+                <div id="${name}_group" class="flex items-center gap-1.5 flex-wrap rounded px-1.5 py-1 bg-amber-50 ring-1 ring-amber-300">
                     ${btns}
-                    <input type="hidden" name="${name}" id="${name}" value="">
-                    <span id="${name}_label" class="text-xs text-gray-400 ml-1 italic">ยังไม่ให้คะแนน</span>
+                    <input type="hidden" name="${name}" id="${name}" value="${dv}" data-confirmed="0">
+                    <span id="${name}_label" class="text-xs ml-1 font-semibold text-amber-600">⚠️ ยังไม่ได้ยืนยัน (ค่าเริ่มต้น ${_condLabels[dv]}) — แตะเพื่อยืนยัน/แก้ไข</span>
                 </div>
             </div>`;
         }
 
         function setCondRating(name, val) {
             const hidden = document.getElementById(name);
-            if (hidden) hidden.value = val;
+            if (hidden) { hidden.value = val; hidden.setAttribute('data-confirmed', '1'); }
             const grp = document.getElementById(name + '_group');
-            if (grp) grp.classList.remove('bg-red-50', 'ring-2', 'ring-red-200');
+            if (grp) grp.classList.remove('bg-red-50', 'ring-2', 'ring-red-200', 'bg-amber-50', 'ring-1', 'ring-amber-300');
             const lbl = document.getElementById(name + '_label');
-            if (lbl) { lbl.textContent = _condLabels[val]; lbl.style.color = _condColors[val]; lbl.classList.remove('italic', 'text-gray-400'); }
+            if (lbl) { lbl.textContent = _condLabels[val]; lbl.style.color = _condColors[val]; lbl.classList.remove('font-semibold', 'text-amber-600'); }
             for (let v = 0; v <= 5; v++) {
                 const btn = document.getElementById(name + '_btn_' + v);
                 if (!btn) continue;
                 if (v <= val) {
                     btn.style.background = _condColors[v];
                     btn.style.color = '#fff';
+                    btn.style.borderColor = _condColors[v];
                 } else {
                     btn.style.background = 'transparent';
                     btn.style.color = _condColors[v];
+                    btn.style.borderColor = _condColors[v];
                 }
             }
         }
 
-        // Validate all condition ratings in a form are filled; highlights and scrolls to the first missing one
+        // Validate every condition-rating widget was actually confirmed by a tap (not
+        // just left at its silent default) — highlights and scrolls to the first one.
         function validateCondRatings(form) {
-            const unrated = [];
+            const unconfirmed = [];
             form.querySelectorAll('input[type="hidden"][name*="CondRating"]').forEach(el => {
-                if (el.value === '') unrated.push(el.name);
+                if (el.getAttribute('data-confirmed') !== '1') unconfirmed.push(el.name);
             });
-            if (unrated.length === 0) return true;
-            alert('⚠️ กรุณาให้คะแนนสภาพเครื่อง (⭐ 0-5) ให้ครบทุกเครื่อง/ตู้ก่อนส่งแบบสำรวจ\nPlease give a condition rating (⭐ 0-5) for every unit before submitting.\n\nยังไม่ได้ให้คะแนน: ' + unrated.length + ' รายการ');
-            const firstGrp = document.getElementById(unrated[0] + '_group');
+            if (unconfirmed.length === 0) return true;
+            alert('⚠️ กรุณาแตะให้คะแนนสภาพเครื่อง (⭐ 0-5) ให้ครบทุกเครื่อง/ตู้ก่อนส่งแบบสำรวจ (แม้ค่าเริ่มต้นจะเป็น 3 ก็ต้องแตะยืนยัน)\nPlease tap a condition rating (⭐ 0-5) for every unit before submitting — even to confirm the default of 3 is correct.\n\nยังไม่ได้ยืนยัน: ' + unconfirmed.length + ' รายการ');
+            const firstGrp = document.getElementById(unconfirmed[0] + '_group');
             if (firstGrp) {
                 firstGrp.classList.add('bg-red-50', 'ring-2', 'ring-red-200');
+                firstGrp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return false;
+        }
+
+        // ─── Door Count picker widget — same "must actively tap, not just accept a
+        // silent default" pattern as the Condition Rating widget above. Ships value 1
+        // (single-door, the common case) so the sheet is never blank, but stays in the
+        // amber "unconfirmed" state until the surveyor taps a button; validateDoorCounts()
+        // gates submission on that confirmed flag. Used by Bev Remote/Plugin/Walk-in and
+        // Frozen Plugin/Remote/Walk-in unit cards (any extraFieldFn caller can reuse it).
+        const DOOR_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6];
+        const DOOR_COUNT_DEFAULT = 1;
+        function doorCountRow(name) {
+            const dv = DOOR_COUNT_DEFAULT;
+            let btns = '';
+            DOOR_COUNT_OPTIONS.forEach(v => {
+                const label = v === 6 ? '6+' : String(v);
+                btns += `<button type="button" onclick="setDoorCount('${name}',${v})" id="${name}_btn_${v}" title="${label} ประตู"
+                    style="min-width:28px;height:28px;padding:0 6px;border-radius:6px;border:2px solid #cbd5e1;color:#64748b;background:#f1f5f9;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;line-height:1;">${label}</button>`;
+            });
+            return `
+            <div class="mb-3 p-2 bg-teal-50 border border-teal-200 rounded-lg" id="${name}_group">
+                <label class="block text-xs font-bold text-teal-700 mb-1">🚪 จำนวนประตู (Door Count) <span class="text-red-500">*</span></label>
+                <div class="flex items-center gap-1.5 flex-wrap rounded px-1.5 py-1 bg-amber-50 ring-1 ring-amber-300" id="${name}_btnwrap">
+                    ${btns}
+                    <input type="hidden" name="${name}" id="${name}" value="${dv}" data-confirmed="0">
+                    <span id="${name}_label" class="text-xs ml-1 font-semibold text-amber-600">⚠️ ยังไม่ได้ยืนยัน — แตะเพื่อเลือก</span>
+                </div>
+            </div>`;
+        }
+        function setDoorCount(name, val) {
+            const hidden = document.getElementById(name);
+            if (hidden) { hidden.value = val; hidden.setAttribute('data-confirmed', '1'); }
+            const wrap = document.getElementById(name + '_btnwrap');
+            if (wrap) wrap.classList.remove('bg-amber-50', 'ring-1', 'ring-amber-300');
+            const grp = document.getElementById(name + '_group');
+            if (grp) grp.classList.remove('ring-2', 'ring-red-400');
+            const lbl = document.getElementById(name + '_label');
+            if (lbl) { lbl.textContent = 'เลือกแล้ว: ' + (val === 6 ? '6+' : val) + ' ประตู'; lbl.className = 'text-xs ml-1 font-semibold text-teal-700'; }
+            DOOR_COUNT_OPTIONS.forEach(v => {
+                const btn = document.getElementById(name + '_btn_' + v);
+                if (!btn) return;
+                if (v === val) {
+                    btn.style.background = '#0d9488'; btn.style.color = '#fff'; btn.style.borderColor = '#0d9488';
+                } else {
+                    btn.style.background = 'transparent'; btn.style.color = '#0d9488'; btn.style.borderColor = '#99f6e4';
+                }
+            });
+        }
+        // Validate every door-count widget was actually confirmed by a tap — mirrors
+        // validateCondRatings() below.
+        function validateDoorCounts(form) {
+            const unconfirmed = [];
+            form.querySelectorAll('input[type="hidden"][name*="DoorCount_"]').forEach(el => {
+                if (el.getAttribute('data-confirmed') !== '1') unconfirmed.push(el.name);
+            });
+            if (unconfirmed.length === 0) return true;
+            alert('⚠️ กรุณาเลือกจำนวนประตูให้ครบทุกตู้ก่อนส่งแบบสำรวจ\nPlease pick a door count for every unit before submitting.\n\nยังไม่ได้เลือก: ' + unconfirmed.length + ' รายการ');
+            const firstGrp = document.getElementById(unconfirmed[0] + '_group');
+            if (firstGrp) {
+                firstGrp.classList.add('ring-2', 'ring-red-400');
                 firstGrp.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
             return false;
@@ -4457,7 +4791,10 @@
                             ${renderRefBrandDropdown(globalIndex, namePrefix, extraFieldFn ? 'ยี่ห้อตู้ (ถ้ามี)' : undefined)}
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 mb-1">Asset No. (ถ้ามี)</label>
-                                <input type="text" name="${namePrefix}AssetNo_${globalIndex}" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="ระบุ Asset No." />
+                                <div class="flex gap-1">
+                                    <input id="aiFormRef_${namePrefix.replace(/[^A-Za-z0-9]/g,'_')}${globalIndex}" type="text" name="${namePrefix}AssetNo_${globalIndex}" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="ระบุ Asset No." />
+                                    <button type="button" onclick="openAssetMapPicker(document.querySelector('#content-ref-survey input[name=branchCode]').value, 'aiFormRef_${namePrefix.replace(/[^A-Za-z0-9]/g,'_')}${globalIndex}')" class="shrink-0 px-2 border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-gray-600 mb-1">สถานะการใช้งาน</label>
@@ -4616,7 +4953,12 @@
             // too instead of this function keeping its own separate hardcoded list.
             tabs.forEach(tab => {
                 if (GENERAL_USER_TABS.indexOf(tab.id) !== -1) {
-                    const visible = _generalTabVisibility.hasOwnProperty(tab.id) ? _generalTabVisibility[tab.id] : true;
+                    let visible = _generalTabVisibility.hasOwnProperty(tab.id) ? _generalTabVisibility[tab.id] : true;
+                    if (visible) {
+                        const role = _teamTabAccess.hasOwnProperty(tab.id) ? _teamTabAccess[tab.id] : (TEAM_TAB_DEFAULTS[tab.id] || 'ALL');
+                        if (role === 'SMF') visible = _userIsSMF;
+                        else if (role === 'MMS') visible = _userIsMMS;
+                    }
                     tab.classList.toggle('hidden', !visible);
                 } else {
                     tab.classList.add('hidden');
@@ -4673,6 +5015,84 @@
         function showSuccess() { document.getElementById('successModal').classList.remove('hidden'); }
         // Accumulated file store — persists files across multiple camera shots / gallery picks
         const _accumulatedFiles = {};
+
+        // Every equipment unit rendered via photoUpload()/updateDynamicUnitDetails
+        // (Aircon, Ref, New Product) must have at least one attached photo before a
+        // real submit — same "value/unit + photo both required" rule already enforced
+        // for EDMI codes and Trading Hours checklist items. Forms use novalidate, so
+        // this has to be an explicit JS check; see feedback_gas_novalidate_required.
+        // specs: [{ label, catPrefix, qty }] — photo category key is `${catPrefix}_${i}`.
+        function _missingEquipmentPhotos(specs) {
+            const missing = [];
+            specs.forEach(function(s) {
+                const qty = parseInt(s.qty) || 0;
+                for (let i = 1; i <= qty; i++) {
+                    const files = (_accumulatedFiles[s.catPrefix + '_' + i] || []).filter(Boolean);
+                    if (files.length === 0) missing.push(s.label + ' #' + i);
+                }
+            });
+            return missing;
+        }
+
+        // Super-Admin-configurable per-survey-type toggle for the equipment-photo
+        // requirement above — default true for all 3 (matches the hardcoded behavior
+        // before this toggle existed) so nothing changes until an admin explicitly
+        // disables one. Populated async in initApp() via getEquipmentPhotoRequired()
+        // (UploadSchedule.gs), same source-of-truth pattern as _brandChipCounts etc.
+        let _equipmentPhotoRequired = { aircon: true, ref: true, np: true };
+        const PHOTO_REQUIRED_LABELS = {
+            aircon: '❄️ แบบสำรวจแอร์ (Aircon Survey)',
+            ref: '🧊 แบบสำรวจตู้แช่ (Ref Survey)',
+            np: '🍦 New Product'
+        };
+
+        function openPhotoRequiredModal() {
+            const list = document.getElementById('photoRequiredList');
+            list.innerHTML = '';
+            Object.keys(PHOTO_REQUIRED_LABELS).forEach(function(key) {
+                const on = _equipmentPhotoRequired.hasOwnProperty(key) ? !!_equipmentPhotoRequired[key] : true;
+                const row = document.createElement('label');
+                row.className = 'flex items-center justify-between gap-2 text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50';
+                row.innerHTML = '<span>' + PHOTO_REQUIRED_LABELS[key] + '</span>' +
+                    '<input type="checkbox" data-photo-required-type="' + key + '" ' + (on ? 'checked' : '') +
+                    ' class="w-4 h-4 text-rose-600 rounded">';
+                list.appendChild(row);
+            });
+            document.getElementById('photoRequiredModal').classList.remove('hidden');
+        }
+
+        function closePhotoRequiredModal() {
+            document.getElementById('photoRequiredModal').classList.add('hidden');
+        }
+
+        function savePhotoRequiredConfig() {
+            const config = {};
+            document.querySelectorAll('#photoRequiredList input[data-photo-required-type]').forEach(function(cb) {
+                config[cb.dataset.photoRequiredType] = cb.checked;
+            });
+            const btn = document.getElementById('savePhotoRequiredBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            const clientEmail = CURRENT_USER ? CURRENT_USER.email : '';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.disabled = false;
+                    btn.textContent = 'Save';
+                    if (res && res.success) {
+                        _equipmentPhotoRequired = res.data || config;
+                        closePhotoRequiredModal();
+                    } else {
+                        alert('บันทึกไม่สำเร็จ: ' + (res && res.error));
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    btn.disabled = false;
+                    btn.textContent = 'Save';
+                    alert('บันทึกไม่สำเร็จ: ' + err.message);
+                })
+                .setEquipmentPhotoRequired(config, clientEmail);
+        }
 
         // Remove one accumulated file and its thumbnail
         function _removeAccumulatedFile(id, wrapEl) {
@@ -5834,6 +6254,7 @@
         // --- Refrigerator Survey Submit ---
         async function _runRefSurvey(form, isDraft) {
             if (!isDraft && !validateCondRatings(form)) return;
+            if (!isDraft && !validateDoorCounts(form)) return;
             showLoading();
             const loadingText = document.querySelector('#globalLoading span');
             if (loadingText) loadingText.textContent = isDraft ? "กำลังบันทึกร่าง..." : "กำลังส่งข้อมูล...";
@@ -6014,10 +6435,15 @@
                                 if (_refCbContainer) { _refCbContainer.innerHTML = ''; if (_refHint) _refCbContainer.appendChild(_refHint); if (_refHint) _refHint.classList.remove('hidden'); }
                                 const _refSymptoms = document.getElementById('ref-unit-symptom-checklists');
                                 if (_refSymptoms) _refSymptoms.innerHTML = '';
-                                ['details-ref-open','details-ref-bev-plugin','details-ref-bev-walkin','details-ref-bev-remote','details-ref-frozen','details-ref-icecream','details-ref-ice'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
-                                // Reset visible bev display inputs (no name attr, not reset by form.reset())
-                                ['refBevPluginQty-input','refBevWalkInQty-input','refBevRemoteQty-input'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 0; });
-                                ['refBevPluginQty','refBevWalkInQty','refBevRemoteQty'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 0; });
+                                ['details-ref-open','details-ref-bev-plugin','details-ref-bev-walkin','details-ref-bev-remote','details-ref-frozen-plugin','details-ref-frozen-remote','details-ref-frozen-walkin','details-ref-icecream','details-ref-ice'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+                                // Reset visible bev/frozen display inputs (no name attr, not reset by form.reset())
+                                ['refBevPluginQty-input','refBevWalkInQty-input','refBevRemoteQty-input','refFrozenPluginQty-input','refFrozenRemoteQty-input','refFrozenWalkInQty-input'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 0; });
+                                ['refBevPluginQty','refBevWalkInQty','refBevRemoteQty','refFrozenPluginQty','refFrozenRemoteQty','refFrozenWalkInQty'].forEach(id => { const el = document.getElementById(id); if (el) el.value = 0; });
+                                // form.reset() clears .value but not custom dataset flags —
+                                // next new survey must confirm Ss4Door fresh, not inherit the
+                                // previous submission's confirmation.
+                                var ss4El = document.getElementById('refSs4DoorQty');
+                                if (ss4El) delete ss4El.dataset.touched;
                                 var refSearch = document.getElementById('ref-station-search');
                                 if (refSearch) refSearch.value = '';
                             }
@@ -6052,6 +6478,38 @@
             if (!form.branchCode.value || !form.branchName.value) {
                 alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)");
                 return;
+            }
+            // ตู้ 4 ประตู Stainless is high-value equipment easy to miss since it's the
+            // last category on a long form — if the surveyor never touched this field
+            // (left it at the silent default of 0), force an explicit confirmation
+            // rather than letting it silently submit as "none".
+            const ss4Input = form.refSs4DoorQty;
+            if (ss4Input && ss4Input.dataset.touched !== '1') {
+                const ss4Ok = confirm('⚠️ กรุณายืนยัน\n\nคุณยังไม่ได้ระบุจำนวน "ตู้ 4 ประตู Stainless" (ข้อมูลนี้สำคัญ)\n\n📦 ตู้นี้อยู่ที่ห้องสต๊อก (Stock Room) ไม่ใช่หน้าร้าน — ตรวจสอบให้แน่ใจว่าเข้าไปดูในห้องสต๊อกแล้ว\n\nยืนยันหรือไม่ว่าสาขานี้ไม่มีตู้ประเภทนี้จริง?\n\nกด Cancel เพื่อกลับไปกรอกจำนวน');
+                if (!ss4Ok) {
+                    ss4Input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    ss4Input.focus();
+                    return;
+                }
+                ss4Input.dataset.touched = '1';
+            }
+            if (_equipmentPhotoRequired.ref) {
+                const missingRefPhotos = _missingEquipmentPhotos([
+                    { label: 'ตู้ OPEN', catPrefix: 'ref_open', qty: form.refOpenQty.value },
+                    { label: 'ตู้ Bev Plugin', catPrefix: 'ref_bev_plugin', qty: form.refBevPluginQty.value },
+                    { label: 'ตู้ Bev Walk-in', catPrefix: 'ref_bev_walkin', qty: form.refBevWalkInQty.value },
+                    { label: 'ตู้ Bev Remote', catPrefix: 'ref_bev_remote', qty: form.refBevRemoteQty.value },
+                    { label: 'ตู้แช่แข็ง Plugin', catPrefix: 'ref_frozen_plugin', qty: form.refFrozenPluginQty.value },
+                    { label: 'ตู้แช่แข็ง Remote', catPrefix: 'ref_frozen_remote', qty: form.refFrozenRemoteQty.value },
+                    { label: 'ตู้แช่แข็ง Walk-in', catPrefix: 'ref_frozen_walkin', qty: form.refFrozenWalkInQty.value },
+                    { label: 'ตู้ไอศกรีม', catPrefix: 'ref_icecream', qty: form.refIceCreamQty.value },
+                    { label: 'ตู้น้ำแข็ง', catPrefix: 'ref_ice', qty: form.refIceQty.value },
+                    { label: 'ตู้ 4 ประตู Stainless', catPrefix: 'ref_ss4door', qty: form.refSs4DoorQty.value }
+                ]);
+                if (missingRefPhotos.length > 0) {
+                    alert('กรุณาแนบรูปถ่ายให้ครบทุกตู้ก่อนกดยืนยัน — ยังขาดรูปของ: ' + missingRefPhotos.join(', '));
+                    return;
+                }
             }
             await _runRefSurvey(form, false);
         }
@@ -6605,16 +7063,52 @@
             'tab-layout-survey': '📐 Layout Survey'
         };
 
+        // Role select gets a colored left border so SMF/MMS-restricted tabs are
+        // visually distinct from "Everyone" at a glance, without reading the text.
+        const TEAM_TAB_ROLE_COLOR = { 'ALL': 'border-gray-300', 'SMF': 'border-indigo-400 bg-indigo-50', 'MMS': 'border-teal-400 bg-teal-50' };
+        function _applyTeamTabRoleColor(sel) {
+            Object.values(TEAM_TAB_ROLE_COLOR).forEach(function(c) { c.split(' ').forEach(function(cls) { sel.classList.remove(cls); }); });
+            (TEAM_TAB_ROLE_COLOR[sel.value] || TEAM_TAB_ROLE_COLOR.ALL).split(' ').forEach(function(cls) { sel.classList.add(cls); });
+        }
+        function _teamTabRoleOptionsHtml(current) {
+            return TEAM_TAB_ROLE_OPTIONS.map(function(o) {
+                return '<option value="' + o.value + '"' + (o.value === current ? ' selected' : '') + '>' + o.label + '</option>';
+            }).join('');
+        }
+        // Dims + disables the role select while its tab's visibility checkbox is
+        // unchecked, since the team restriction is moot for a tab that's hidden anyway.
+        function _syncTeamTabRowState(cb) {
+            const row = cb.closest('[data-tab-row]');
+            const sel = row && row.querySelector('select[data-team-tab-id]');
+            if (!sel) return;
+            sel.disabled = !cb.checked;
+            sel.classList.toggle('opacity-40', !cb.checked);
+        }
+
         function openTabVisibilityModal() {
             const list = document.getElementById('tabVisibilityList');
             list.innerHTML = '';
             GENERAL_USER_TABS.forEach(function(id) {
                 const visible = _generalTabVisibility.hasOwnProperty(id) ? _generalTabVisibility[id] : true;
-                const row = document.createElement('label');
-                row.className = 'flex items-center gap-2 text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50';
-                row.innerHTML = '<input type="checkbox" data-tab-id="' + id + '" ' + (visible ? 'checked' : '') +
-                    ' class="w-4 h-4 text-indigo-600 rounded"> <span>' + (TAB_VISIBILITY_LABELS[id] || id) + '</span>';
+                const role = _teamTabAccess.hasOwnProperty(id) ? _teamTabAccess[id] : (TEAM_TAB_DEFAULTS[id] || 'ALL');
+                const row = document.createElement('div');
+                row.setAttribute('data-tab-row', '');
+                row.className = 'border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50';
+                row.innerHTML =
+                    '<label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">' +
+                        '<input type="checkbox" data-tab-id="' + id + '" ' + (visible ? 'checked' : '') +
+                            ' class="w-4 h-4 text-indigo-600 rounded flex-shrink-0" onchange="_syncTeamTabRowState(this)">' +
+                        '<span class="flex-1">' + (TAB_VISIBILITY_LABELS[id] || id) + '</span>' +
+                    '</label>' +
+                    '<div class="flex items-center justify-between gap-2 mt-1.5 pl-6">' +
+                        '<span class="text-[11px] text-gray-400">ทีมที่มองเห็นได้</span>' +
+                        '<select data-team-tab-id="' + id + '" onchange="_applyTeamTabRoleColor(this)" class="text-xs border rounded-lg px-2 py-1">' + _teamTabRoleOptionsHtml(role) + '</select>' +
+                    '</div>';
                 list.appendChild(row);
+                const sel = row.querySelector('select[data-team-tab-id]');
+                _applyTeamTabRoleColor(sel);
+                sel.disabled = !visible;
+                sel.classList.toggle('opacity-40', !visible);
             });
 
             const defaultSelect = document.getElementById('defaultTabSelect');
@@ -6627,18 +7121,18 @@
                 defaultSelect.appendChild(opt);
             });
 
+            // Only tabs that AREN'T part of GENERAL_USER_TABS land here (e.g. Trading
+            // Hours Survey) — general tabs already got a role select in the list above.
             const teamList = document.getElementById('teamTabAccessList');
             teamList.innerHTML = '';
-            TEAM_RESTRICTED_TABS.forEach(function(id) {
+            TEAM_RESTRICTED_TABS.filter(function(id) { return GENERAL_USER_TABS.indexOf(id) === -1; }).forEach(function(id) {
                 const current = _teamTabAccess.hasOwnProperty(id) ? _teamTabAccess[id] : (TEAM_TAB_DEFAULTS[id] || 'ALL');
-                const opts = TEAM_TAB_ROLE_OPTIONS.map(function(o) {
-                    return '<option value="' + o.value + '"' + (o.value === current ? ' selected' : '') + '>' + o.label + '</option>';
-                }).join('');
                 const row = document.createElement('div');
                 row.className = 'flex items-center justify-between gap-2 text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2';
-                row.innerHTML = '<span>' + (TEAM_TAB_LABELS[id] || id) + '</span>' +
-                    '<select data-team-tab-id="' + id + '" class="text-xs border border-gray-300 rounded-lg px-2 py-1">' + opts + '</select>';
+                row.innerHTML = '<span>' + (TEAM_TAB_LABELS[id] || TAB_VISIBILITY_LABELS[id] || id) + '</span>' +
+                    '<select data-team-tab-id="' + id + '" onchange="_applyTeamTabRoleColor(this)" class="text-xs border rounded-lg px-2 py-1">' + _teamTabRoleOptionsHtml(current) + '</select>';
                 teamList.appendChild(row);
+                _applyTeamTabRoleColor(row.querySelector('select'));
             });
 
             document.getElementById('tabVisibilityModal').classList.remove('hidden');
@@ -6649,7 +7143,10 @@
         }
 
         function _setAllTabVisibility(val) {
-            document.querySelectorAll('#tabVisibilityList input[type=checkbox]').forEach(function(cb) { cb.checked = val; });
+            document.querySelectorAll('#tabVisibilityList input[type=checkbox]').forEach(function(cb) {
+                cb.checked = val;
+                _syncTeamTabRowState(cb);
+            });
         }
 
         function saveTabVisibility() {
@@ -6659,7 +7156,7 @@
             });
             const defaultTab = document.getElementById('defaultTabSelect').value || 'tab-aircon-survey';
             const teamConfig = {};
-            document.querySelectorAll('#teamTabAccessList select[data-team-tab-id]').forEach(function(sel) {
+            document.querySelectorAll('#tabVisibilityModal select[data-team-tab-id]').forEach(function(sel) {
                 teamConfig[sel.dataset.teamTabId] = sel.value;
             });
             const btn = document.getElementById('saveTabVisibilityBtn');
@@ -6692,6 +7189,116 @@
                 .withSuccessHandler(function(res) { _onSaveStepDone(!!(res && res.success), res && res.error); })
                 .withFailureHandler(function(err) { _onSaveStepDone(false, err.message); })
                 .setTeamTabAccess(teamConfig, clientEmail);
+        }
+
+        // --- Brand Quick-Pick Chip Count Config (Admin / Super Admin) ---
+        const BRAND_CHIP_GROUP_LABELS = {
+            'ref_brand': 'ยี่ห้อตู้แช่ (Ref Brand)',
+            'aircon_brand': 'ยี่ห้อแอร์ (Aircon Brand)',
+            'np_brand_SC': '🍦 Soft Serve Brand',
+            'np_brand_JT': '🥤 Juice/Slush Brand',
+            'np_brand_SH': '🥛 Shake Brand',
+            'np_brand_MK': '🧊 Ice Machine Brand',
+            'np_brand_WF': '💧 Water Filter Brand'
+        };
+
+        function _toggleBrandPicker(groupKey) {
+            const el = document.querySelector('[data-brand-picker="' + groupKey + '"]');
+            if (el) el.classList.toggle('hidden');
+        }
+        function _syncBrandPickChipStyle(cb) {
+            const label = cb.closest('label');
+            if (!label) return;
+            label.classList.toggle('bg-indigo-600', cb.checked);
+            label.classList.toggle('text-white', cb.checked);
+            label.classList.toggle('border-indigo-600', cb.checked);
+            label.classList.toggle('bg-white', !cb.checked);
+            label.classList.toggle('text-gray-600', !cb.checked);
+            label.classList.toggle('border-gray-300', !cb.checked);
+        }
+        const _escBrandChip = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        function _brandPickerHtml(groupKey) {
+            const options = _enumCache[groupKey] || [];
+            if (!options.length) return '<p class="text-xs text-gray-400 italic">ยังไม่มีข้อมูลยี่ห้อให้เลือก (โหลดไม่สำเร็จหรือยังไม่มีข้อมูลในระบบ)</p>';
+            const picked = _brandChipSelections[groupKey] || [];
+            return options.map(function(b) {
+                const checked = picked.indexOf(b) !== -1;
+                return '<label class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs cursor-pointer transition-colors ' +
+                    (checked ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50') + '">' +
+                    '<input type="checkbox" class="hidden" data-brand-pick="' + groupKey + '" value="' + _escBrandChip(b) + '" ' + (checked ? 'checked' : '') +
+                        ' onchange="_syncBrandPickChipStyle(this)">' + _escBrandChip(b) + '</label>';
+            }).join('');
+        }
+
+        function openBrandChipConfigModal() {
+            const list = document.getElementById('brandChipConfigList');
+            list.innerHTML = '';
+            BRAND_CHIP_GROUPS.forEach(function(groupKey) {
+                const count = _brandChipCount(groupKey);
+                const picked = _brandChipSelections[groupKey] || [];
+                const row = document.createElement('div');
+                row.className = 'border border-gray-200 rounded-lg overflow-hidden';
+                row.innerHTML =
+                    '<div class="flex items-center justify-between gap-2 px-3 py-2 text-sm text-gray-700">' +
+                        '<span>' + (BRAND_CHIP_GROUP_LABELS[groupKey] || groupKey) + '</span>' +
+                        '<div class="flex items-center gap-2 flex-shrink-0">' +
+                            '<input type="number" min="0" max="50" step="1" data-brand-chip-group="' + groupKey + '" value="' + count + '"' +
+                                ' title="จำนวนอัตโนมัติ (ใช้เมื่อไม่ได้เลือกเอง)" class="w-16 text-sm border border-gray-300 rounded-lg px-2 py-1 text-right">' +
+                            '<button type="button" onclick="_toggleBrandPicker(\'' + groupKey + '\')" class="text-xs text-indigo-600 hover:underline whitespace-nowrap">' +
+                                (picked.length ? 'กำหนดเอง (' + picked.length + ')' : 'เลือกเอง') + '</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="' + (picked.length ? '' : 'hidden') + ' px-3 pb-2 pt-2 border-t bg-gray-50" data-brand-picker="' + groupKey + '">' +
+                        '<p class="text-[11px] text-gray-400 mb-1.5">ติ๊กยี่ห้อที่ต้องการให้แสดงเป็นปุ่มด่วน (ไม่ติ๊กเลย = กลับไปใช้จำนวนอัตโนมัติด้านบน)</p>' +
+                        '<div class="flex flex-wrap gap-1.5" data-brand-picker-list="' + groupKey + '">' + _brandPickerHtml(groupKey) + '</div>' +
+                    '</div>';
+                list.appendChild(row);
+            });
+            document.getElementById('brandChipConfigModal').classList.remove('hidden');
+        }
+
+        function closeBrandChipConfigModal() {
+            document.getElementById('brandChipConfigModal').classList.add('hidden');
+        }
+
+        function saveBrandChipConfig() {
+            const config = {};
+            document.querySelectorAll('#brandChipConfigList input[data-brand-chip-group]').forEach(function(inp) {
+                config[inp.dataset.brandChipGroup] = parseInt(inp.value, 10) || 0;
+            });
+            const selectionConfig = {};
+            BRAND_CHIP_GROUPS.forEach(function(groupKey) { selectionConfig[groupKey] = []; });
+            document.querySelectorAll('#brandChipConfigList input[data-brand-pick]:checked').forEach(function(cb) {
+                selectionConfig[cb.dataset.brandPick].push(cb.value);
+            });
+            const btn = document.getElementById('saveBrandChipConfigBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            let _savePending = 2;
+            let _saveFailed = false;
+            function _onSaveStepDone(ok, errMsg) {
+                if (!ok) { _saveFailed = true; alert('บันทึกไม่สำเร็จ: ' + errMsg); }
+                _savePending--;
+                if (_savePending > 0) return;
+                btn.disabled = false;
+                btn.textContent = 'Save';
+                if (!_saveFailed) {
+                    _brandChipCounts = config;
+                    _brandChipSelections = selectionConfig;
+                    closeBrandChipConfigModal();
+                }
+            }
+
+            const clientEmail = CURRENT_USER ? CURRENT_USER.email : '';
+            google.script.run
+                .withSuccessHandler(function(res) { _onSaveStepDone(!!(res && res.success), res && res.error); })
+                .withFailureHandler(function(err) { _onSaveStepDone(false, err.message); })
+                .setBrandChipConfig(config, clientEmail);
+            google.script.run
+                .withSuccessHandler(function(res) { _onSaveStepDone(!!(res && res.success), res && res.error); })
+                .withFailureHandler(function(err) { _onSaveStepDone(false, err.message); })
+                .setBrandChipSelection(selectionConfig, clientEmail);
         }
 
 
@@ -6844,7 +7451,8 @@
                     <div class="p-3 space-y-2 bg-white">
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">ยี่ห้อ (Brand) *</label>
-                            <input type="text" list="ac_brand_list_${i}" name="AcUnit${i}_Brand" autocomplete="off"
+                            ${_brandChipsHtml(brands, 'ac_brand_' + i, 'aircon_brand')}
+                            <input type="text" list="ac_brand_list_${i}" name="AcUnit${i}_Brand" id="ac_brand_${i}" autocomplete="off"
                                 class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-blue-500"
                                 placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่...">
                             <datalist id="ac_brand_list_${i}">
@@ -6863,7 +7471,10 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Asset No. (ถ้ามี)</label>
-                            <input type="text" name="AcUnit${i}_AssetNo" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-blue-500" placeholder="ระบุ Asset No.">
+                            <div class="flex gap-1">
+                                <input id="aiFormAc_${i}" type="text" name="AcUnit${i}_AssetNo" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-blue-500" placeholder="ระบุ Asset No.">
+                                <button type="button" onclick="openAssetMapPicker(document.querySelector('#content-aircon-survey input[name=branchCode]').value, 'aiFormAc_${i}')" class="shrink-0 px-2 border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">สถานะการใช้งาน</label>
@@ -7289,6 +7900,14 @@
                 alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)");
                 return;
             }
+            if (_equipmentPhotoRequired.aircon) {
+                const acQty = parseInt((document.getElementById('acQuantityInput') || {}).value) || 0;
+                const missingAcPhotos = _missingEquipmentPhotos([{ label: 'แอร์เบอร์', catPrefix: 'ac_inv', qty: acQty }]);
+                if (missingAcPhotos.length > 0) {
+                    alert('กรุณาแนบรูปถ่ายให้ครบทุกเครื่องก่อนกดยืนยัน — ยังขาดรูปของ: ' + missingAcPhotos.join(', '));
+                    return;
+                }
+            }
             await _runAcSurvey(form, false);
         }
         async function saveDraftAirCon(btn) {
@@ -7330,6 +7949,9 @@
                 draft._refBevPluginInput = (document.getElementById('refBevPluginQty-input') || {}).value || '0';
                 draft._refBevWalkInInput = (document.getElementById('refBevWalkInQty-input') || {}).value || '0';
                 draft._refBevRemoteInput = (document.getElementById('refBevRemoteQty-input') || {}).value || '0';
+                draft._refFrozenPluginInput = (document.getElementById('refFrozenPluginQty-input') || {}).value || '0';
+                draft._refFrozenRemoteInput = (document.getElementById('refFrozenRemoteQty-input') || {}).value || '0';
+                draft._refFrozenWalkInInput = (document.getElementById('refFrozenWalkInQty-input') || {}).value || '0';
                 form.querySelectorAll('input,select,textarea').forEach(el => {
                     if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
                     if (el.type === 'radio') { if (el.checked) draft[el.name] = el.value; return; }
@@ -7464,15 +8086,18 @@
                     if (draft._refBevPluginInput !== undefined) { const el = document.getElementById('refBevPluginQty-input'); if (el) { el.value = draft._refBevPluginInput; if (typeof onBevQtyInput === 'function') onBevQtyInput('Plugin'); } }
                     if (draft._refBevWalkInInput !== undefined) { const el = document.getElementById('refBevWalkInQty-input'); if (el) { el.value = draft._refBevWalkInInput; if (typeof onBevQtyInput === 'function') onBevQtyInput('WalkIn'); } }
                     if (draft._refBevRemoteInput !== undefined) { const el = document.getElementById('refBevRemoteQty-input'); if (el) { el.value = draft._refBevRemoteInput; if (typeof onBevQtyInput === 'function') onBevQtyInput('Remote'); } }
+                    // Frozen inputs (display)
+                    if (draft._refFrozenPluginInput !== undefined) { const el = document.getElementById('refFrozenPluginQty-input'); if (el) { el.value = draft._refFrozenPluginInput; if (typeof onFrozenQtyInput === 'function') onFrozenQtyInput('Plugin'); } }
+                    if (draft._refFrozenRemoteInput !== undefined) { const el = document.getElementById('refFrozenRemoteQty-input'); if (el) { el.value = draft._refFrozenRemoteInput; if (typeof onFrozenQtyInput === 'function') onFrozenQtyInput('Remote'); } }
+                    if (draft._refFrozenWalkInInput !== undefined) { const el = document.getElementById('refFrozenWalkInQty-input'); if (el) { el.value = draft._refFrozenWalkInInput; if (typeof onFrozenQtyInput === 'function') onFrozenQtyInput('WalkIn'); } }
                     // Static qty fields + trigger card generation
-                    ['refOpenQty','refFrozen1DoorQty','refFrozen2DoorQty','refFrozen3DoorQty','refIceCreamQty','refIceQty','refSs4DoorQty'].forEach(n => {
+                    ['refOpenQty','refIceCreamQty','refIceQty','refSs4DoorQty'].forEach(n => {
                         const el = document.getElementById(n);
                         if (el && draft[n] !== undefined) {
                             el.value = draft[n] || '0';
                             el.dispatchEvent(new Event('input', {bubbles:true}));
                         }
                     });
-                    if (typeof updateFrozenDetails === 'function') updateFrozenDetails();
 
                     // Restore all other form fields after cards are generated
                     setTimeout(function() {
@@ -7628,7 +8253,8 @@
                 // Brand/Plug options (defaults ∪ real submitted data) — searchable datalist,
                 // typing a value not in the list adds it directly, no separate "Other" needed.
                 const brandDefaults = (cfg.brands || []).filter(function(b) { return b !== 'อื่นๆ'; });
-                const brandOptions = _mergedOptions('np_brand_' + cfg.code, brandDefaults).map(function(b) {
+                const npBrandList = _mergedOptions('np_brand_' + cfg.code, brandDefaults);
+                const brandOptions = npBrandList.map(function(b) {
                     return `<option value="${b}">`;
                 }).join('');
 
@@ -7654,6 +8280,7 @@
                     <div class="p-3 space-y-2 bg-white">
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">ยี่ห้อ (Brand)</label>
+                            ${_brandChipsHtml(npBrandList, 'np_brand_' + formCode + '_' + i, 'np_brand_' + cfg.code)}
                             <input type="text" list="np_brand_list_${formCode}_${i}" name="${formCode}_${i}_brand" id="np_brand_${formCode}_${i}" autocomplete="off"
                                 class="w-full text-sm border border-gray-300 rounded-md shadow-sm p-2 ${cfg.focus || ''}"
                                 placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่...">
@@ -7661,8 +8288,11 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Asset No. (ถ้ามี)</label>
-                            <input type="text" name="${formCode}_${i}_asset"
-                                class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50" placeholder="ระบุ Asset No.">
+                            <div class="flex gap-1">
+                                <input id="aiFormNp_${String(formCode).replace(/[^A-Za-z0-9]/g,'_')}_${i}" type="text" name="${formCode}_${i}_asset"
+                                    class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50" placeholder="ระบุ Asset No.">
+                                <button type="button" onclick="openAssetMapPicker(document.querySelector('#content-np-survey input[name=branchCode]').value, 'aiFormNp_${String(formCode).replace(/[^A-Za-z0-9]/g,'_')}_${i}')" class="shrink-0 px-2 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 mb-1">Serial No. (ถ้ามี)</label>
@@ -7921,6 +8551,17 @@
             if (!branchCodeEl || !branchCodeEl.value || !branchNameEl || !branchNameEl.value) {
                 alert('กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน'); return;
             }
+            if (_equipmentPhotoRequired.np) {
+                const npPhotoSpecs = NP_PRODUCTS_CONFIG.map(function(p) {
+                    const qtyEl = document.getElementById('np_qty_' + p.code);
+                    return { label: p.label.replace(/['"]/g, ''), catPrefix: (p.attachBase || ('np_' + p.code.toLowerCase())) + '_machine', qty: qtyEl ? qtyEl.value : 0 };
+                });
+                const missingNpPhotos = _missingEquipmentPhotos(npPhotoSpecs);
+                if (missingNpPhotos.length > 0) {
+                    alert('กรุณาแนบรูปถ่ายให้ครบทุกเครื่องก่อนกดยืนยัน — ยังขาดรูปของ: ' + missingNpPhotos.join(', '));
+                    return;
+                }
+            }
 
             const submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'กำลังบันทึก...'; }
@@ -7978,25 +8619,37 @@
 
                 const recordId = result.id;
 
-                // Upload photos
-                const allFileInputs = form.querySelectorAll('input[type=file][data-category-upload]');
-                if (allFileInputs.length > 0) {
+                // Upload photos — read from _accumulatedFiles, NOT the raw <input>.files.
+                // _photoPreview() resets each file input's own .value after every pick (so
+                // repeated camera shots re-trigger onchange), so by submit time every file
+                // input here is already empty — scanning form.querySelectorAll(...).files
+                // (the old approach) always found zero files and uploaded nothing. Also
+                // switched to the unguarded addNpSurveyPhotosOnSubmit: the old
+                // addNpSurveyPhotos is admin-only and was being called here without even a
+                // clientEmail, so it silently failed "Administrator privileges required"
+                // for every regular user's initial NP submission on top of the above.
+                const npPhotoCats = [];
+                NP_PRODUCTS_CONFIG.forEach(function(p) {
+                    const qty = parseInt(fd[p.code + '_qty']) || 0;
+                    for (let u = 1; u <= qty; u++) npPhotoCats.push((p.attachBase || ('np_' + p.code.toLowerCase())) + '_machine_' + u);
+                });
+                const npCatsWithFiles = npPhotoCats.filter(function(cat) { return (_accumulatedFiles[cat] || []).filter(Boolean).length > 0; });
+                if (npCatsWithFiles.length > 0) {
                     if (submitBtn) submitBtn.textContent = 'กำลังอัปโหลดรูปภาพ...';
-                    for (const fi of allFileInputs) {
-                        const cat = fi.dataset.categoryUpload;
-                        if (!fi.files || fi.files.length === 0) continue;
-                        for (const file of fi.files) {
+                    for (const cat of npCatsWithFiles) {
+                        const filesForCat = (_accumulatedFiles[cat] || []).filter(Boolean);
+                        for (const file of filesForCat) {
                             const base64 = await new Promise(function(res, rej) {
                                 const reader = new FileReader();
                                 reader.onload = function() { res(reader.result.split(',')[1]); };
                                 reader.onerror = rej;
                                 reader.readAsDataURL(file);
                             });
-                            await new Promise(function(res, rej) {
+                            await new Promise(function(res) {
                                 google.script.run
                                     .withSuccessHandler(res)
                                     .withFailureHandler(function(err) { console.warn('Photo upload err', err); res(null); })
-                                    .addNpSurveyPhotos(recordId, cat, [{ name: file.name, mimeType: file.type, data: base64 }]);
+                                    .addNpSurveyPhotosOnSubmit(recordId, cat, [{ name: file.name, mimeType: file.type, data: base64 }]);
                             });
                         }
                     }
@@ -8015,6 +8668,11 @@
                     if (msg) msg.innerHTML = `<div class="text-green-600 text-5xl mb-4">✓</div><h3 class="text-lg font-bold text-gray-900 mb-2">บันทึกสำเร็จ!</h3><p class="text-sm text-gray-600 mb-2">ID: <span class="font-mono font-bold text-blue-700">${recordId}</span></p><button id="okBtn" onclick="document.getElementById('successModal').classList.add('hidden')" class="mt-4 bg-blue-600 text-white font-bold py-2 px-6 rounded-lg">ตกลง</button>`;
                     modal.classList.remove('hidden');
                 } else { alert('บันทึกสำเร็จ! ID: ' + recordId); }
+                // Clear accumulated photo files for this submission — clearNpForm() below
+                // wipes the preview DOM but not this global map, and stale entries under
+                // the same category keys would otherwise wrongly look "already has a
+                // photo" to _missingEquipmentPhotos on the next NP submission.
+                npPhotoCats.forEach(function(cat) { delete _accumulatedFiles[cat]; });
                 clearNpForm();
             } catch(err) {
                 alert('เกิดข้อผิดพลาด: ' + err);
@@ -8026,7 +8684,105 @@
         document.getElementById('okBtn').addEventListener('click', function () {
             document.getElementById('successModal').classList.add('hidden');
         });
+
+        // ── Asset register mapping picker (Ref/Aircon/NP submission forms) ──────
+        // Lets anyone filling the form pick a unit's Asset No. from the store's
+        // real fixed-asset ledger (getStoreAssetRegisterForMapping, Survey.gs)
+        // instead of free-typing it — same picker as the report edit-mode one
+        // (RefSurveyReport.html/AirconSurveyReport.html), duplicated here since
+        // this is a separate page. Not permission-gated: filling the survey form
+        // itself was never admin/SMF-restricted, so neither is this.
+        function _armEscape(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+        let _assetMapCache = {};
+        let _assetMapCurrentTarget = null;
+        let _assetMapCurrentItems = [];
+
+        function openAssetMapPicker(branchCode, targetInputId) {
+            const code = String(branchCode || '').trim();
+            if (!code) { alert('กรุณาระบุรหัสสาขาก่อนเลือก Asset จากทะเบียนทรัพย์สิน'); return; }
+            _assetMapCurrentTarget = targetInputId;
+            const modal = document.getElementById('assetMapModal');
+            const listEl = document.getElementById('assetMapList');
+            const searchEl = document.getElementById('assetMapSearch');
+            if (searchEl) searchEl.value = '';
+            modal.classList.remove('hidden');
+            if (_assetMapCache[code]) {
+                _assetMapCurrentItems = _assetMapCache[code];
+                _renderAssetMapList();
+                return;
+            }
+            listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">กำลังโหลด...</p>';
+            google.script.run.withSuccessHandler(function(res) {
+                if (!res || !res.success) {
+                    listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ: ' + _armEscape(res && res.error || '') + '</p>';
+                    return;
+                }
+                _assetMapCache[code] = res.items || [];
+                _assetMapCurrentItems = _assetMapCache[code];
+                if (!res.prebuilt || !_assetMapCurrentItems.length) {
+                    listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลทะเบียนทรัพย์สินสำหรับสาขานี้</p>';
+                    return;
+                }
+                _renderAssetMapList();
+            }).withFailureHandler(function() {
+                listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ</p>';
+            }).getStoreAssetRegisterForMapping(code);
+        }
+
+        function _renderAssetMapList() {
+            const listEl = document.getElementById('assetMapList');
+            const searchEl = document.getElementById('assetMapSearch');
+            const q = (searchEl && searchEl.value || '').trim().toLowerCase();
+            const items = _assetMapCurrentItems.filter(function(it) {
+                return !q || String(it.assetNo).toLowerCase().indexOf(q) > -1 ||
+                    String(it.name).toLowerCase().indexOf(q) > -1 ||
+                    String(it.category).toLowerCase().indexOf(q) > -1;
+            });
+            if (!items.length) { listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ไม่พบรายการ</p>'; return; }
+            listEl.innerHTML = items.slice(0, 200).map(function(it) {
+                return '<button type="button" onclick="_pickAssetForMapping(\'' + _armEscape(it.assetNo) + '\')" class="w-full text-left border border-slate-200 hover:border-cyan-400 hover:bg-cyan-50 rounded-lg px-2.5 py-1.5 mb-1.5 transition">' +
+                    '<p class="font-mono font-semibold text-cyan-700 text-xs">' + _armEscape(it.assetNo) + '</p>' +
+                    '<p class="text-slate-600 text-xs truncate">' + _armEscape(it.name || '-') + '</p>' +
+                    '<p class="text-slate-400 text-[10px]">' + _armEscape(it.category || '') + '</p>' +
+                    '</button>';
+            }).join('');
+        }
+
+        function _pickAssetForMapping(assetNo) {
+            if (_assetMapCurrentTarget) {
+                const input = document.getElementById(_assetMapCurrentTarget);
+                if (input) input.value = assetNo;
+            }
+            _closeAssetMapPicker();
+        }
+
+        function _closeAssetMapPicker() {
+            document.getElementById('assetMapModal').classList.add('hidden');
+            _assetMapCurrentTarget = null;
+        }
     </script>
+
+    <!-- Asset register mapping picker modal -->
+    <div id="assetMapModal" class="hidden fixed inset-0 z-[70] flex items-start sm:items-center justify-center p-0 sm:p-4 bg-black/40">
+        <div class="bg-white rounded-none sm:rounded-xl shadow-xl w-full max-w-md h-full sm:h-auto sm:max-h-[80vh] flex flex-col">
+            <div class="p-3 border-b border-slate-200 flex items-center justify-between shrink-0">
+                <p class="text-sm font-semibold text-slate-700">เลือก Asset จากทะเบียนทรัพย์สิน</p>
+                <button onclick="_closeAssetMapPicker()" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div class="p-3 border-b border-slate-100 shrink-0">
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" /></svg>
+                    </span>
+                    <input id="assetMapSearch" type="text" placeholder="ค้นหาชื่อ/หมวด/เลข Asset..." oninput="_renderAssetMapList()" class="w-full border border-slate-300 rounded-lg p-2 pl-9 text-sm">
+                </div>
+            </div>
+            <div id="assetMapList" class="flex-1 overflow-y-auto p-2 text-sm"></div>
+        </div>
+    </div>
 </body>
 
 </html>

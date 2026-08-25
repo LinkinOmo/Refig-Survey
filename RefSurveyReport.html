@@ -428,6 +428,16 @@
                     <option value="No">ไม่มี</option>
                 </select>
             </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">ตู้เครื่องดื่ม</label>
+                <select id="filterBev" onchange="applyFilters()"
+                    class="border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-sky-400 outline-none">
+                    <option value="">ทั้งหมด</option>
+                    <option value="plugin">มี Plugin</option>
+                    <option value="remote">มี Remote</option>
+                    <option value="both">มีทั้ง Plugin และ Remote</option>
+                </select>
+            </div>
             <button onclick="resetFilters()"
                 class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium px-4 py-2 rounded-lg transition">
                 Reset
@@ -450,6 +460,7 @@
                         <th class="p-4">รหัส / ชื่อสาขา</th>
                         <th class="p-4">ผู้รายงาน</th>
                         <th class="p-4">ตู้ชำรุด</th>
+                        <th class="p-4" title="O = Open, R = Bev Remote, P = Bev Plugin, W = Bev Walk-in, F = Frozen, IC = Ice Cream, IM = Ice, SS = Stainless 4-Door (ยอดล่าสุดของทั้งสาขา)">ประเภทตู้แช่</th>
                         <th class="p-4">สถานะ</th>
                         <th class="p-4 text-right">รายละเอียด</th>
                     </tr>
@@ -596,6 +607,7 @@
                             <th class="p-4">รหัส / ชื่อสาขา</th>
                             <th class="p-4">ผู้รายงาน</th>
                             <th class="p-4">ชำรุด</th>
+                            <th class="p-4" title="SC = Soft Serve, JT = Jet Spray, SH = Slushy, MK = Ice Maker, WF = Water Filter">ประเภทสินค้า</th>
                             <th class="p-4">สถานะ</th>
                             <th class="p-4 text-right">รายละเอียด</th>
                         </tr>
@@ -769,7 +781,7 @@
             </div>
             <!-- Footer -->
             <div class="p-4 border-t border-slate-100 flex justify-between gap-3 flex-shrink-0">
-                <button id="refEditBtn" class="admin-only-link hidden px-4 py-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition flex items-center gap-1.5" onclick="toggleRefEditPanel()">
+                <button id="refEditBtn" class="hidden px-4 py-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition flex items-center gap-1.5" onclick="toggleRefEditPanel()">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     แก้ไข
                 </button>
@@ -814,6 +826,10 @@
         // separate from isSMF itself, which is also used by unrelated features (e.g.
         // Capex Budget Cross-Check) that must keep working regardless of this toggle.
         let smfCanEdit = false;
+        // General/"Operation" users, when a Super Admin turns on the Admin Console's
+        // "ผู้ใช้ทั่วไป (Operation) แก้ไขข้อมูลแบบสำรวจได้เหมือน SMF" toggle — same edit
+        // surface as smfCanEdit above, just not limited to the SMF team.
+        let opsCanEdit = false;
         // Pagination
         const PAGE_SIZE = 25;
         let currentPage = 1;
@@ -895,6 +911,8 @@
                             }
                             isSMF = !!flags.isSMF;
                             smfCanEdit = !!flags.smfEditAllowed;
+                            opsCanEdit = !!flags.opsEditAllowed;
+                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed));
                         })
                         .getUserFlags(_refUserEmail);
                 }
@@ -906,6 +924,7 @@
                 if ((res.isAdmin === true || res.isScheduleAdmin === true) && !isAdmin) { isAdmin = true; applyAdminUI(); }
                 if (res.isSMF === true && !isSMF) { isSMF = true; }
                 if (res.smfEditAllowed === true && !smfCanEdit) { smfCanEdit = true; }
+                if (res.opsEditAllowed === true && !opsCanEdit) { opsCanEdit = true; }
                 if (res.success) {
                     allData = res.data;
                     initRefCharts();
@@ -921,7 +940,13 @@
             // Fallback: load via google.script.run (logged-in users)
             document.getElementById('mainLoader').classList.remove('hidden');
 
-            var _MAX_RETRIES = 3;
+            // 5 attempts with increasing backoff (1.5s, 3s, 4.5s, 6s ⇒ ~15s cumulative
+            // before giving up) — 3 fixed 1.5s-apart attempts (~4.5s total) turned out too
+            // impatient: a cold Apps Script container can take 15-20s+ to warm up under
+            // load (confirmed against AirconSurveyReport.html needing ~20s for its first
+            // call to resolve), so this page was surfacing "server returned null" to users
+            // during ordinary cold starts that would have succeeded with more patience.
+            var _MAX_RETRIES = 5;
             var _dataLoadTimer = null;
 
             function _fetchRefSlim(attempt) {
@@ -943,8 +968,9 @@
                         if (!res) {
                             // GAS cold-start can return null on the first call — auto-retry silently
                             if (attempt < _MAX_RETRIES) {
-                                console.log('[RefSurvey] null response, retrying (' + attempt + '/' + _MAX_RETRIES + ')...');
-                                setTimeout(function() { _fetchRefSlim(attempt + 1); }, 1500);
+                                var _backoffMs = 1500 * attempt;
+                                console.log('[RefSurvey] null response, retrying (' + attempt + '/' + _MAX_RETRIES + ') in ' + _backoffMs + 'ms...');
+                                setTimeout(function() { _fetchRefSlim(attempt + 1); }, _backoffMs);
                             } else {
                                 document.getElementById('mainLoader').classList.add('hidden');
                                 document.getElementById('tableBody').innerHTML =
@@ -960,6 +986,7 @@
                         if ((res.isAdmin === true || res.isScheduleAdmin === true) && !isAdmin) { isAdmin = true; applyAdminUI(); }
                         if (res.isSMF === true && !isSMF) { isSMF = true; }
                         if (res.smfEditAllowed === true && !smfCanEdit) { smfCanEdit = true; }
+                        if (res.opsEditAllowed === true && !opsCanEdit) { opsCanEdit = true; }
                         if (!res.success) {
                             document.getElementById('tableBody').innerHTML =
                                 '<tr><td colspan="6" class="p-8 text-center text-red-500">Server Error: ' + htmlEscape(res.error || 'Unknown') + '</td></tr>';
@@ -1282,6 +1309,7 @@
             const dm  = document.getElementById('filterDM').value;
             const cm  = document.getElementById('filterCM').value;
             const am  = document.getElementById('filterAM').value;
+            const bev = document.getElementById('filterBev').value;
 
             const filtered = allData.filter(d => {
                 const matchBranch = !branch
@@ -1293,6 +1321,12 @@
                 const matchDM = !dm || (d['DM Area'] || '').trim() === dm;
                 const matchCM = !cm || (d['CM Area'] || '').trim() === cm;
                 const matchAM = !am || (d['AMM MTN'] || '').trim() === am;
+                const pluginQty = parseInt(d['Ref Bev Plugin Qty']) || 0;
+                const remoteQty = parseInt(d['Ref Bev Remote Qty']) || 0;
+                const matchBev = !bev
+                    || (bev === 'plugin' && pluginQty > 0)
+                    || (bev === 'remote' && remoteQty > 0)
+                    || (bev === 'both' && pluginQty > 0 && remoteQty > 0);
                 const matchStat = currentStatFilter === 'all'
                     || (currentStatFilter === 'Pending' && (d['Status'] || 'Pending') === 'Pending')
                     || (currentStatFilter === 'Acknowledged' && d['Status'] === 'Acknowledged')
@@ -1300,7 +1334,7 @@
                     || (currentStatFilter === 'Closed' && d['Status'] === 'Closed')
                     || (currentStatFilter === 'Rejected' && d['Status'] === 'Rejected')
                     || (currentStatFilter === 'broken' && d['Has Broken Ref'] === 'Yes');
-                return matchBranch && matchStatus && matchBroken && matchDM && matchCM && matchAM && matchStat;
+                return matchBranch && matchStatus && matchBroken && matchDM && matchCM && matchAM && matchBev && matchStat;
             });
 
             renderList(filtered);
@@ -1313,6 +1347,7 @@
             document.getElementById('filterDM').value = '';
             document.getElementById('filterCM').value = '';
             document.getElementById('filterAM').value = '';
+            document.getElementById('filterBev').value = '';
             currentStatFilter = 'all';
             applyFilters();
         }
@@ -1332,6 +1367,18 @@
             const start = (currentPage - 1) * PAGE_SIZE;
             const pageData = _currentFiltered.slice(start, start + PAGE_SIZE);
             const totalPages = Math.ceil(_currentFiltered.length / PAGE_SIZE);
+
+            // Bev badge shows the branch's most recent submission's qty (store-wide "all in
+            // store" total), not this row's own submission — rows can be an older round.
+            const _latestBevByBranch = {};
+            allData.forEach(function(r) {
+                const code = r['Branch Code'];
+                if (!code) return;
+                const existing = _latestBevByBranch[code];
+                if (!existing || new Date(r['Timestamp']) > new Date(existing['Timestamp'])) {
+                    _latestBevByBranch[code] = r;
+                }
+            });
 
             const tableBody = document.getElementById('tableBody');
             const mobileCards = document.getElementById('mobileCards');
@@ -1369,6 +1416,45 @@
                        d['AMM MTN'] ? '<span class="font-medium text-slate-500">AM:</span> ' + htmlEscape(d['AMM MTN']) : ''].filter(Boolean).join('  ')
                     : '';
 
+                // Ref equipment-type breakdown badge \u2014 every fridge type qty, not just Bev.
+                // Sourced from the branch's latest submission so the badge reflects the whole
+                // store's current count, even when this row is an older survey round.
+                const _bevSrc = _latestBevByBranch[d['Branch Code']] || d;
+                const bevPluginQty = parseInt(_bevSrc['Ref Bev Plugin Qty']) || 0;
+                const bevWalkInQty = parseInt(_bevSrc['Ref Bev Walk In Qty']) || 0;
+                const bevRemoteQty = parseInt(_bevSrc['Ref Bev Remote Qty']) || 0;
+                const refOpenQty = parseInt(_bevSrc['Ref Open Qty']) || 0;
+                // Legacy schema (1/2/3/4-door buckets) OR new schema (Plugin/Remote/Walk-in
+                // type split, matching Bev) — a given record only ever populates one set.
+                const refFrozenQty = (parseInt(_bevSrc['Ref Frozen1 Door Qty']) || 0)
+                    + (parseInt(_bevSrc['Ref Frozen2 Door Qty']) || 0)
+                    + (parseInt(_bevSrc['Ref Frozen3 Door Qty']) || 0)
+                    + (parseInt(_bevSrc['Ref Frozen4 Door Qty']) || 0)
+                    + (parseInt(_bevSrc['Ref Frozen Plugin Qty']) || 0)
+                    + (parseInt(_bevSrc['Ref Frozen Remote Qty']) || 0)
+                    + (parseInt(_bevSrc['Ref Frozen Walk In Qty']) || 0);
+                const refIceCreamQty = parseInt(_bevSrc['Ref Ice Cream Qty']) || 0;
+                const refIceQty = parseInt(_bevSrc['Ref Ice Qty']) || 0;
+                const refSs4Qty = parseInt(_bevSrc['Ref Ss4 Door Qty']) || 0;
+                // Every type always shown (dimmed when 0), so triage/coverage gaps are visible at a glance.
+                const _refChip = function(label, qty, color) {
+                    return '<span class="' + (qty > 0 ? color + ' font-bold' : 'text-slate-300') + '">' + label + qty + '</span>';
+                };
+                const refTotalQty = refOpenQty + bevRemoteQty + bevPluginQty + bevWalkInQty + refFrozenQty + refIceCreamQty + refIceQty + refSs4Qty;
+                const bevBadge = '<div class="flex flex-col gap-0.5">' +
+                      '<span class="text-xs font-bold text-slate-700">รวม ' + refTotalQty + ' ตู้</span>' +
+                      '<span class="text-[11px] font-mono leading-tight flex flex-wrap gap-x-1.5 gap-y-0.5">' +
+                        _refChip('O', refOpenQty, 'text-sky-700') +
+                        _refChip('R', bevRemoteQty, 'text-amber-700') +
+                        _refChip('P', bevPluginQty, 'text-teal-700') +
+                        _refChip('W', bevWalkInQty, 'text-slate-600') +
+                        _refChip('F', refFrozenQty, 'text-indigo-700') +
+                        _refChip('IC', refIceCreamQty, 'text-rose-700') +
+                        _refChip('IM', refIceQty, 'text-cyan-700') +
+                        _refChip('SS', refSs4Qty, 'text-slate-700') +
+                      '</span>' +
+                      '</div>';
+
                 // Desktop row
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50 transition cursor-pointer';
@@ -1381,6 +1467,7 @@
                     '</td>' +
                     '<td class="p-4 text-slate-700">' + reporter + '</td>' +
                     '<td class="p-4">' + (hasBroken ? '<span class="inline-block bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full border border-red-200">\u0e21\u0e35\u0e15\u0e39\u0e49\u0e0a\u0e33\u0e23\u0e38\u0e14</span>' : '<span class="text-slate-300 text-xs">\u2014</span>') + '</td>' +
+                    '<td class="p-4">' + bevBadge + '</td>' +
                     '<td class="p-4"><span class="status-badge status-' + htmlEscape(status) + '">' + htmlEscape(status) + '</span></td>' +
                     '<td class="p-4 text-right">' +
                         '<button onclick="event.stopPropagation(); openModal(\'' + safeId + '\')" class="text-sky-600 hover:text-sky-800 font-medium text-sm hover:bg-sky-50 px-3 py-1.5 rounded-lg transition border border-transparent hover:border-sky-100 shadow-sm">\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14</button>' +
@@ -1400,6 +1487,7 @@
                         '<span class="status-badge status-' + htmlEscape(status) + ' text-[10px] shrink-0">' + htmlEscape(status) + '</span>' +
                     '</div>' +
                     (hierarchyInfo ? '<p class="text-xs text-slate-400 mb-1">' + hierarchyInfo + '</p>' : '') +
+                    '<div class="mb-1">' + bevBadge + '</div>' +
                     '<div class="flex justify-between items-center text-xs text-slate-500 pt-3 border-t border-slate-100 mt-2">' +
                         '<span class="flex items-center gap-2">' + reporter +
                             (photoCount > 0 ? ' <span class="text-slate-400">\u00b7 ' + photoCount + ' \u0e23\u0e39\u0e1b</span>' : '') +
@@ -1513,7 +1601,7 @@
         function _renderModalContent(d) {
           try {
             const st = d["Status"] || 'Pending';
-            const canChangeStatus = isAdmin || smfCanEdit;
+            const canChangeStatus = isAdmin || smfCanEdit || opsCanEdit;
 
             // Admin-only buttons — now controlled by admin-only-link class set at page load (applyAdminUI)
             // Pre-fill edit panel with current values
@@ -1604,6 +1692,8 @@
                     if (supplier) rows += detailRow('แบรนด์ไอศกรีม', supplier + (supplierOther ? ` (${supplierOther})` : ''));
                     rows += detailRow(supplier ? 'ยี่ห้อตู้' : 'ยี่ห้อ', brand);
                     if (assetNo !== '-') rows += detailRow('Asset No.', assetNo);
+                    const doorCount = d[keyPrefix + 'Door Count_' + u];
+                    if (doorCount !== undefined && doorCount !== '') rows += detailRow('🚪 จำนวนประตู', String(doorCount));
                     rows += `<div class="flex items-center gap-2 py-0.5 text-xs">
                         <span class="text-slate-500">สถานะ:</span>
                         ${unitStatus === 'ใช้งาน'
@@ -1715,19 +1805,49 @@
             const remoteQty = parseInt(d['Ref Bev Remote Qty']) || 0;
             const totalBev = pluginQty + walkinQty + remoteQty;
             html += sectionHeader('2.2 ตู้ทำความเย็นเครื่องดื่ม' + (totalBev > 0 ? ' — ' + totalBev + ' ตู้' : ' — ไม่มี'), 'teal');
+            if (pluginQty > 0 || remoteQty > 0) {
+                html += `<div class="flex items-center justify-between flex-wrap gap-2 -mt-2 mb-3 px-1">`;
+                html += `<span class="text-xs text-slate-500">สรุป: Remote ${remoteQty} · Plugin ${pluginQty} · Walk-in ${walkinQty}</span>`;
+                if (canChangeStatus) {
+                    html += `<button onclick="swapRefBevPluginRemote()" title="ใช้เมื่อผู้สำรวจกรอกสลับกัน — จะย้ายจำนวน/รูปภาพ/รายละเอียดทั้งหมดระหว่าง Plugin กับ Remote" class="text-xs text-amber-700 hover:text-amber-900 border border-amber-300 hover:bg-amber-50 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5">`;
+                    html += `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/></svg>สลับ Plugin ↔ Remote</button>`;
+                }
+                html += `</div>`;
+            }
+            html += buildUnitRows('Ref Bev Remote ', remoteQty, 'ตู้ Remote', 1, 'BR', 1, 'ref_bev_remote', 'bg-teal-600');
             html += buildUnitRows('Ref Bev Plugin ', pluginQty, 'ตู้ Plugin', 1, 'BP', 1, 'ref_bev_plugin', 'bg-teal-600');
             html += buildUnitRows('Ref Bev Walk In ', walkinQty, 'ตู้ Walk-in', 1, 'BW', 1, 'ref_bev_walkin', 'bg-teal-600');
-            html += buildUnitRows('Ref Bev Remote ', remoteQty, 'ตู้ Remote', 1, 'BR', 1, 'ref_bev_remote', 'bg-teal-600');
 
-            // 2.3 Frozen (indigo)
+            // 2.3 Frozen (indigo) — legacy schema (1/2/3/4-door buckets) for old records,
+            // new schema (Plugin/Remote/Walk-in type split, matching Bev) for new ones.
+            // A given record only ever populates one set.
             const f1qty = parseInt(d['Ref Frozen1 Door Qty']) || 0;
             const f2qty = parseInt(d['Ref Frozen2 Door Qty']) || 0;
             const f3qty = parseInt(d['Ref Frozen3 Door Qty']) || 0;
-            const totalFrozen = f1qty + f2qty + f3qty;
+            const f4qty = parseInt(d['Ref Frozen4 Door Qty']) || 0;
+            const frozenPluginQty = parseInt(d['Ref Frozen Plugin Qty']) || 0;
+            const frozenRemoteQty = parseInt(d['Ref Frozen Remote Qty']) || 0;
+            const frozenWalkinQty = parseInt(d['Ref Frozen Walk In Qty']) || 0;
+            const totalFrozen = f1qty + f2qty + f3qty + f4qty + frozenPluginQty + frozenRemoteQty + frozenWalkinQty;
             html += sectionHeader('2.3 ตู้แช่อาหารแช่แข็ง' + (totalFrozen > 0 ? ' — ' + totalFrozen + ' ตู้' : ' — ไม่มี'), 'indigo');
+            if (frozenPluginQty > 0 || frozenRemoteQty > 0) {
+                html += `<div class="flex items-center justify-between flex-wrap gap-2 -mt-2 mb-3 px-1">`;
+                html += `<span class="text-xs text-slate-500">สรุป: Plugin ${frozenPluginQty} · Remote ${frozenRemoteQty} · Walk-in ${frozenWalkinQty}</span>`;
+                if (canChangeStatus) {
+                    html += `<button onclick="swapRefFrozenPluginRemote()" title="ใช้เมื่อผู้สำรวจกรอกสลับกัน — จะย้ายจำนวน/รูปภาพ/รายละเอียดทั้งหมดระหว่าง Plugin กับ Remote" class="text-xs text-amber-700 hover:text-amber-900 border border-amber-300 hover:bg-amber-50 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5">`;
+                    html += `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4"/></svg>สลับ Plugin ↔ Remote</button>`;
+                }
+                html += `</div>`;
+            } else if (frozenWalkinQty > 0) {
+                html += `<div class="-mt-2 mb-3 px-1"><span class="text-xs text-slate-500">สรุป: Plugin ${frozenPluginQty} · Remote ${frozenRemoteQty} · Walk-in ${frozenWalkinQty}</span></div>`;
+            }
+            html += buildUnitRows('Ref Frozen Plugin ', frozenPluginQty, 'ตู้แช่แข็ง Plugin', 1, 'FP', 1, 'ref_frozen_plugin', 'bg-indigo-700');
+            html += buildUnitRows('Ref Frozen Remote ', frozenRemoteQty, 'ตู้แช่แข็ง Remote', 1, 'FR', 1, 'ref_frozen_remote', 'bg-indigo-700');
+            html += buildUnitRows('Ref Frozen Walk In ', frozenWalkinQty, 'ตู้แช่แข็ง Walk-in', 1, 'FW', 1, 'ref_frozen_walkin', 'bg-indigo-700');
             html += buildUnitRows('Ref Frozen ', f1qty, 'ตู้แช่แข็ง 1 ประตู', 1, 'FC', 1, 'ref_frozen', 'bg-indigo-700');
             html += buildUnitRows('Ref Frozen ', f2qty, 'ตู้แช่แข็ง 2 ประตู', f1qty + 1, 'FC', f1qty + 1, 'ref_frozen', 'bg-indigo-700');
             html += buildUnitRows('Ref Frozen ', f3qty, 'ตู้แช่แข็ง 3 ประตู', f1qty + f2qty + 1, 'FC', f1qty + f2qty + 1, 'ref_frozen', 'bg-indigo-700');
+            html += buildUnitRows('Ref Frozen ', f4qty, 'ตู้แช่แข็ง 4 ประตูขึ้นไป', f1qty + f2qty + f3qty + 1, 'FC', f1qty + f2qty + f3qty + 1, 'ref_frozen', 'bg-indigo-700');
 
             // 2.4 Ice Cream (rose)
             const icQty = parseInt(d['Ref Ice Cream Qty']) || 0;
@@ -2020,12 +2140,16 @@ ${bodyHtml}
             if (!container) return;
             const defs = [
                 { id:'refEditQtyOpen',      col:'Ref Open Qty',         label:'2.1 ตู้ OPEN',              c:'sky'    },
+                { id:'refEditQtyBevRemote', col:'Ref Bev Remote Qty',   label:'2.2 ตู้ Bev Remote',        c:'teal'   },
                 { id:'refEditQtyBevPlugin', col:'Ref Bev Plugin Qty',   label:'2.2 ตู้ Bev Plugin',        c:'teal'   },
                 { id:'refEditQtyBevWalkin', col:'Ref Bev Walk In Qty',  label:'2.2 ตู้ Bev Walk-in',       c:'teal'   },
-                { id:'refEditQtyBevRemote', col:'Ref Bev Remote Qty',   label:'2.2 ตู้ Bev Remote',        c:'teal'   },
-                { id:'refEditQtyFrozen1',   col:'Ref Frozen1 Door Qty', label:'2.3 ตู้แช่แข็ง 1 ประตู',   c:'indigo' },
-                { id:'refEditQtyFrozen2',   col:'Ref Frozen2 Door Qty', label:'2.3 ตู้แช่แข็ง 2 ประตู',   c:'indigo' },
-                { id:'refEditQtyFrozen3',   col:'Ref Frozen3 Door Qty', label:'2.3 ตู้แช่แข็ง 3 ประตู',   c:'indigo' },
+                { id:'refEditQtyFrozenPlugin', col:'Ref Frozen Plugin Qty', label:'2.3 ตู้แช่แข็ง Plugin',   c:'indigo' },
+                { id:'refEditQtyFrozenRemote', col:'Ref Frozen Remote Qty', label:'2.3 ตู้แช่แข็ง Remote',   c:'indigo' },
+                { id:'refEditQtyFrozenWalkin', col:'Ref Frozen Walk In Qty', label:'2.3 ตู้แช่แข็ง Walk-in', c:'indigo' },
+                { id:'refEditQtyFrozen1',   col:'Ref Frozen1 Door Qty', label:'2.3 ตู้แช่แข็ง 1 ประตู (เก่า)',   c:'indigo' },
+                { id:'refEditQtyFrozen2',   col:'Ref Frozen2 Door Qty', label:'2.3 ตู้แช่แข็ง 2 ประตู (เก่า)',   c:'indigo' },
+                { id:'refEditQtyFrozen3',   col:'Ref Frozen3 Door Qty', label:'2.3 ตู้แช่แข็ง 3 ประตู (เก่า)',   c:'indigo' },
+                { id:'refEditQtyFrozen4',   col:'Ref Frozen4 Door Qty', label:'2.3 ตู้แช่แข็ง 4 ประตูขึ้นไป (เก่า)', c:'indigo' },
                 { id:'refEditQtyIceCream',  col:'Ref Ice Cream Qty',    label:'2.4 ตู้ไอศกรีม',            c:'rose'   },
                 { id:'refEditQtyIce',       col:'Ref Ice Qty',          label:'2.5 ตู้น้ำแข็ง',            c:'cyan'   },
                 { id:'refEditQtySs4',       col:'Ref Ss4 Door Qty',     label:'2.6 ตู้ 4 ประตู Stainless', c:'slate'  },
@@ -2040,6 +2164,61 @@ ${bodyHtml}
             container.innerHTML = html;
         }
 
+        // ── Edit-mode chip/checkbox controls — mirror the submission form's UX (index.html)
+        // so admins pick from the same constrained values instead of typing free text ──
+        function _editBrandChipsHtml(brands, inputId) {
+            const top = (brands || []).slice(0, 10);
+            if (!top.length) return '';
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            const chips = top.map(b => `<button type="button" data-brand="${esc(b)}" onclick="_editPickBrandChip('${inputId}', this)" class="px-2 py-0.5 rounded-full border border-slate-300 bg-slate-50 text-slate-700 text-[11px] font-medium hover:bg-teal-50 hover:border-teal-300 transition-colors">${esc(b)}</button>`).join('');
+            return `<div class="flex flex-wrap gap-1 mb-1">${chips}</div>`;
+        }
+        function _editPickBrandChip(inputId, btnEl) {
+            const input = document.getElementById(inputId);
+            if (input) { input.value = btnEl.getAttribute('data-brand'); }
+            const group = btnEl.parentElement;
+            if (group) {
+                Array.prototype.forEach.call(group.children, function(el) {
+                    el.classList.remove('bg-teal-600', 'text-white', 'border-teal-600');
+                    el.classList.add('bg-slate-50', 'text-slate-700', 'border-slate-300');
+                });
+            }
+            btnEl.classList.remove('bg-slate-50', 'text-slate-700', 'border-slate-300');
+            btnEl.classList.add('bg-teal-600', 'text-white', 'border-teal-600');
+        }
+        const _EDIT_STATUS_CLS = {
+            use: 'flex-1 text-center px-2 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-green-100 border-green-400 text-green-700 transition-colors',
+            no:  'flex-1 text-center px-2 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-red-100 border-red-400 text-red-700 transition-colors',
+            def: 'flex-1 text-center px-2 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-white border-slate-300 text-slate-500 transition-colors'
+        };
+        function _editRefStatusChipHtml(fieldKey, tCode, u, status) {
+            const isUse = status === 'ใช้งาน';
+            const hiddenId = `refEditStatusHidden_${tCode}_${u}`;
+            const useId = `refEditStatusUse_${tCode}_${u}`;
+            const noId = `refEditStatusNo_${tCode}_${u}`;
+            return `<div class="flex gap-1.5">` +
+                `<span id="${useId}" onclick="_editRefStatusChip('${hiddenId}','${useId}','${noId}',true)" class="${isUse ? _EDIT_STATUS_CLS.use : _EDIT_STATUS_CLS.def}">✓ ใช้งาน</span>` +
+                `<span id="${noId}" onclick="_editRefStatusChip('${hiddenId}','${useId}','${noId}',false)" class="${isUse ? _EDIT_STATUS_CLS.def : _EDIT_STATUS_CLS.no}">✗ ไม่ใช้งาน</span>` +
+                `<input type="hidden" id="${hiddenId}" data-edit-field="${htmlEscape(fieldKey)}" value="${status}">` +
+                `</div>`;
+        }
+        function _editRefStatusChip(hiddenId, useId, noId, use) {
+            const hidden = document.getElementById(hiddenId);
+            if (hidden) hidden.value = use ? 'ใช้งาน' : 'ไม่ใช้งาน';
+            const useEl = document.getElementById(useId), noEl = document.getElementById(noId);
+            if (useEl) useEl.className = use ? _EDIT_STATUS_CLS.use : _EDIT_STATUS_CLS.def;
+            if (noEl)  noEl.className  = use ? _EDIT_STATUS_CLS.def : _EDIT_STATUS_CLS.no;
+        }
+        function _editProductCheckboxesHtml(fieldKey, options, currentValueRaw) {
+            if (!options || !options.length) return '';
+            const current = String(currentValueRaw || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+            const boxes = options.map(function(opt) {
+                const checked = current.indexOf(opt) !== -1 ? 'checked' : '';
+                return `<label class="inline-flex items-center gap-1 text-xs text-slate-700"><input type="checkbox" data-edit-field="${htmlEscape(fieldKey)}" value="${htmlEscape(opt)}" ${checked} class="rounded border-slate-300 text-teal-600"> ${htmlEscape(opt)}</label>`;
+            }).join('');
+            return `<label class="block text-xs text-slate-500 mb-0.5">สินค้าที่วาง (เลือกได้มากกว่า 1)</label><div class="flex flex-wrap gap-2">${boxes}</div>`;
+        }
+
         function _buildRefEditUnitsFields(d) {
             function _qty(inputId, colKey) {
                 const el = document.getElementById(inputId);
@@ -2048,23 +2227,37 @@ ${bodyHtml}
             const f1qty = _qty('refEditQtyFrozen1','Ref Frozen1 Door Qty');
             const f2qty = _qty('refEditQtyFrozen2','Ref Frozen2 Door Qty');
             const f3qty = _qty('refEditQtyFrozen3','Ref Frozen3 Door Qty');
-            // NOTE: Frozen units share ONE flat index sequence across all three door-count
+            const f4qty = _qty('refEditQtyFrozen4','Ref Frozen4 Door Qty');
+            const frozenPluginQty = _qty('refEditQtyFrozenPlugin','Ref Frozen Plugin Qty');
+            const frozenRemoteQty = _qty('refEditQtyFrozenRemote','Ref Frozen Remote Qty');
+            const frozenWalkinQty = _qty('refEditQtyFrozenWalkin','Ref Frozen Walk In Qty');
+            // NOTE: Frozen units share ONE flat index sequence across all four door-count
             // groups (matching how the survey form and the read-only view number them —
-            // see buildUnitRows() calls below with startIdx = 1, f1qty+1, f1qty+f2qty+1).
-            // Each sub-group MUST use its correct startIdx here too, otherwise editing a
-            // door-count quantity re-numbers the flat index and the form ends up reading/
-            // writing a DIFFERENT unit's data under the wrong label ("data missing" bug).
+            // see buildUnitRows() calls below with startIdx = 1, f1qty+1, f1qty+f2qty+1,
+            // f1qty+f2qty+f3qty+1). Each sub-group MUST use its correct startIdx here too,
+            // otherwise editing a door-count quantity re-numbers the flat index and the
+            // form ends up reading/writing a DIFFERENT unit's data under the wrong label
+            // ("data missing" bug).
+            const OPEN_PRODUCT_OPTS = ['หมู/ไก่/เนื้อสัตว์', 'แซนวิช/แฮมเบอร์เกอร์/แพนเวิ่ง', 'ยำ/โยเกิร์ต/น้ำผลไม้', 'อาหารพร้อมทาน', 'อื่นๆ'];
+            const BEV_PRODUCT_OPTS = ['เครื่องดื่ม', 'อาหารสด', 'อื่นๆ'];
+            // productOptions mirrors what the submission form (index.html updateDynamicUnitDetails calls)
+            // actually offers per category — categories with [] never show product checkboxes on the form,
+            // so the edit panel matches (no free-text override left for those).
             const defs = [
-                { prefix:'Ref Open ',      qty:_qty('refEditQtyOpen','Ref Open Qty'),        startIdx:1,                 tCode:'OC', label:'ตู้ OPEN',                  b:'border-sky-200',    bg:'bg-sky-50',    hc:'text-sky-700',    sup:false },
-                { prefix:'Ref Bev Plugin ',qty:_qty('refEditQtyBevPlugin','Ref Bev Plugin Qty'), startIdx:1,              tCode:'BP', label:'ตู้ Bev Plugin',           b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false },
-                { prefix:'Ref Bev Walk In ',qty:_qty('refEditQtyBevWalkin','Ref Bev Walk In Qty'), startIdx:1,           tCode:'BW', label:'ตู้ Bev Walk-in',          b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false },
-                { prefix:'Ref Bev Remote ',qty:_qty('refEditQtyBevRemote','Ref Bev Remote Qty'), startIdx:1,              tCode:'BR', label:'ตู้ Bev Remote',           b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false },
-                { prefix:'Ref Frozen ',    qty:f1qty,                                        startIdx:1,                 tCode:'FC', label:'ตู้แช่แข็ง 1 ประตู',        b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false },
-                { prefix:'Ref Frozen ',    qty:f2qty,                                        startIdx:f1qty+1,           tCode:'FC', label:'ตู้แช่แข็ง 2 ประตู',        b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false },
-                { prefix:'Ref Frozen ',    qty:f3qty,                                        startIdx:f1qty+f2qty+1,     tCode:'FC', label:'ตู้แช่แข็ง 3 ประตู',        b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false },
-                { prefix:'Ref Ice Cream ', qty:_qty('refEditQtyIceCream','Ref Ice Cream Qty'), startIdx:1,               tCode:'IC', label:'ตู้ไอศกรีม',               b:'border-rose-200',   bg:'bg-rose-50',   hc:'text-rose-700',   sup:true  },
-                { prefix:'Ref Ice ',       qty:_qty('refEditQtyIce','Ref Ice Qty'),           startIdx:1,                tCode:'IM', label:'ตู้น้ำแข็ง',               b:'border-cyan-200',   bg:'bg-cyan-50',   hc:'text-cyan-700',   sup:false },
-                { prefix:'Ref Ss4 Door ',  qty:_qty('refEditQtySs4','Ref Ss4 Door Qty'),      startIdx:1,                tCode:'SS', label:'ตู้ 4 ประตู SS',           b:'border-slate-200',  bg:'bg-slate-100', hc:'text-slate-700',  sup:false },
+                { prefix:'Ref Open ',      qty:_qty('refEditQtyOpen','Ref Open Qty'),        startIdx:1,                 tCode:'OC', label:'ตู้ OPEN',                  b:'border-sky-200',    bg:'bg-sky-50',    hc:'text-sky-700',    sup:false, productOptions:OPEN_PRODUCT_OPTS, hasDoors:false },
+                { prefix:'Ref Bev Remote ',qty:_qty('refEditQtyBevRemote','Ref Bev Remote Qty'), startIdx:1,              tCode:'BR', label:'ตู้ Bev Remote',           b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false, productOptions:BEV_PRODUCT_OPTS, hasDoors:true },
+                { prefix:'Ref Bev Plugin ',qty:_qty('refEditQtyBevPlugin','Ref Bev Plugin Qty'), startIdx:1,              tCode:'BP', label:'ตู้ Bev Plugin',           b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false, productOptions:BEV_PRODUCT_OPTS, hasDoors:true },
+                { prefix:'Ref Bev Walk In ',qty:_qty('refEditQtyBevWalkin','Ref Bev Walk In Qty'), startIdx:1,           tCode:'BW', label:'ตู้ Bev Walk-in',          b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false, productOptions:BEV_PRODUCT_OPTS, hasDoors:true },
+                { prefix:'Ref Frozen Plugin ',qty:frozenPluginQty,                            startIdx:1,                 tCode:'FP', label:'ตู้แช่แข็ง Plugin',         b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false, productOptions:[], hasDoors:true },
+                { prefix:'Ref Frozen Remote ',qty:frozenRemoteQty,                            startIdx:1,                 tCode:'FR', label:'ตู้แช่แข็ง Remote',         b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false, productOptions:[], hasDoors:true },
+                { prefix:'Ref Frozen Walk In ',qty:frozenWalkinQty,                            startIdx:1,                 tCode:'FW', label:'ตู้แช่แข็ง Walk-in',        b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false, productOptions:[], hasDoors:true },
+                { prefix:'Ref Frozen ',    qty:f1qty,                                        startIdx:1,                 tCode:'FC', label:'ตู้แช่แข็ง 1 ประตู (เก่า)',        b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false, productOptions:[], hasDoors:false },
+                { prefix:'Ref Frozen ',    qty:f2qty,                                        startIdx:f1qty+1,           tCode:'FC', label:'ตู้แช่แข็ง 2 ประตู (เก่า)',        b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false, productOptions:[], hasDoors:false },
+                { prefix:'Ref Frozen ',    qty:f3qty,                                        startIdx:f1qty+f2qty+1,     tCode:'FC', label:'ตู้แช่แข็ง 3 ประตู (เก่า)',        b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false, productOptions:[], hasDoors:false },
+                { prefix:'Ref Frozen ',    qty:f4qty,                                        startIdx:f1qty+f2qty+f3qty+1, tCode:'FC', label:'ตู้แช่แข็ง 4 ประตูขึ้นไป (เก่า)', b:'border-indigo-200', bg:'bg-indigo-50', hc:'text-indigo-700', sup:false, productOptions:[], hasDoors:false },
+                { prefix:'Ref Ice Cream ', qty:_qty('refEditQtyIceCream','Ref Ice Cream Qty'), startIdx:1,               tCode:'IC', label:'ตู้ไอศกรีม',               b:'border-rose-200',   bg:'bg-rose-50',   hc:'text-rose-700',   sup:true,  productOptions:[], hasDoors:false },
+                { prefix:'Ref Ice ',       qty:_qty('refEditQtyIce','Ref Ice Qty'),           startIdx:1,                tCode:'IM', label:'ตู้น้ำแข็ง',               b:'border-cyan-200',   bg:'bg-cyan-50',   hc:'text-cyan-700',   sup:false, productOptions:[], hasDoors:false },
+                { prefix:'Ref Ss4 Door ',  qty:_qty('refEditQtySs4','Ref Ss4 Door Qty'),      startIdx:1,                tCode:'SS', label:'ตู้ 4 ประตู SS',           b:'border-slate-200',  bg:'bg-slate-100', hc:'text-slate-700',  sup:false, productOptions:[], hasDoors:false },
             ];
             const branchCode = d['Branch Code'] || '';
             const container = document.getElementById('_refEditUnitsBody');
@@ -2079,8 +2272,10 @@ ${bodyHtml}
                     const rawBrand = d[def.prefix+'Brand_'+u] || '';
                     const brand    = htmlEscape(rawBrand);
                     const assetNo  = htmlEscape(d[def.prefix+'Asset No_'+u] || '');
+                    const assetFieldKey = def.prefix+'Asset No_'+u;
+                    const assetInputId  = 'aiRef_' + assetFieldKey.replace(/[^A-Za-z0-9]/g,'_');
                     const status   = d[def.prefix+'Status_'+u] || 'ใช้งาน';
-                    const product  = htmlEscape(d[def.prefix+'Product_'+u]  || '');
+                    const productRaw = d[def.prefix+'Product_'+u]  || '';
                     const supplier = def.sup ? htmlEscape(d[def.prefix+'Supplier_'+u] || '') : null;
                     const note     = htmlEscape(d[def.prefix+'Note_'+u]     || '');
                     const brandListId = `refBrandList_${def.prefix}_${u}`;
@@ -2088,10 +2283,17 @@ ${bodyHtml}
                     const _eqId = branchCode ? `${branchCode}-${def.tCode}${String(u).padStart(2,'0')}` : `${def.tCode}${String(u).padStart(2,'0')}`;
                     html += `<div class="border ${def.b} rounded-lg p-3 mb-2 bg-white"><p class="text-xs font-semibold text-slate-400 mb-2 border-b border-slate-100 pb-1 flex items-center gap-2">ตู้ที่ ${localSeq} <span class="font-mono bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded tracking-normal">${htmlEscape(_eqId)}</span></p><div class="grid grid-cols-2 gap-2">`;
                     if (def.sup) html += `<div class="col-span-2"><label class="block text-xs text-slate-500 mb-0.5">แบรนด์ไอศกรีม</label><input type="text" data-edit-field="${def.prefix}Supplier_${u}" value="${supplier}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
-                    html += `<div class="col-span-2 sm:col-span-1"><label class="block text-xs text-slate-500 mb-0.5">ยี่ห้อ</label><input type="text" list="${brandListId}" data-edit-field="${def.prefix}Brand_${u}" autocomplete="off" value="${brand}" placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่..." class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white"><datalist id="${brandListId}">${brandOpts}</datalist></div>`;
-                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><input type="text" data-edit-field="${def.prefix}Asset No_${u}" value="${assetNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
-                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">สถานะ</label><select data-edit-field="${def.prefix}Status_${u}" class="w-full border border-slate-300 rounded p-1.5 text-sm"><option value="ใช้งาน" ${status==='ใช้งาน'?'selected':''}>ใช้งาน</option><option value="ไม่ใช้งาน" ${status!=='ใช้งาน'?'selected':''}>ไม่ใช้งาน</option></select></div>`;
-                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">สินค้าที่วาง</label><input type="text" data-edit-field="${def.prefix}Product_${u}" value="${product}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
+                    const brandInputId = `refEditBrandInput_${def.tCode}_${u}`;
+                    html += `<div class="col-span-2 sm:col-span-1"><label class="block text-xs text-slate-500 mb-0.5">ยี่ห้อ</label>${_editBrandChipsHtml(REF_BRANDS, brandInputId)}<input type="text" id="${brandInputId}" list="${brandListId}" data-edit-field="${def.prefix}Brand_${u}" autocomplete="off" value="${brand}" placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่..." class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white"><datalist id="${brandListId}">${brandOpts}</datalist></div>`;
+                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><div class="flex gap-1"><input id="${assetInputId}" type="text" data-edit-field="${assetFieldKey}" value="${assetNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm">${branchCode ? `<button type="button" onclick="openAssetMapPicker('${branchCode}','${assetInputId}')" class="shrink-0 px-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>` : ''}</div></div>`;
+                    if (def.hasDoors) {
+                        const doorCountVal = htmlEscape(String(d[def.prefix+'Door Count_'+u] ?? ''));
+                        html += `<div><label class="block text-xs text-slate-500 mb-0.5">🚪 จำนวนประตู</label><input type="number" min="0" step="1" data-edit-field="${def.prefix}Door Count_${u}" value="${doorCountVal}" class="w-full border border-slate-300 rounded p-1.5 text-sm" placeholder="-"></div>`;
+                    }
+                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">สถานะ</label>${_editRefStatusChipHtml(def.prefix+'Status_'+u, def.tCode, u, status)}</div>`;
+                    if (def.productOptions && def.productOptions.length) {
+                        html += `<div class="col-span-2">${_editProductCheckboxesHtml(def.prefix+'Product_'+u, def.productOptions, productRaw)}</div>`;
+                    }
                     html += `<div class="col-span-2"><label class="block text-xs text-slate-500 mb-0.5">หมายเหตุ</label><textarea data-edit-field="${def.prefix}Note_${u}" rows="2" class="w-full border border-slate-300 rounded p-1.5 text-sm resize-none">${note}</textarea></div>`;
                     const ctrlTempVal = htmlEscape(String(d[def.prefix+'Controller Temp_'+u] ?? ''));
                     const measTempVal = htmlEscape(String(d[def.prefix+'Measured Temp_'+u]   ?? ''));
@@ -2116,6 +2318,7 @@ ${bodyHtml}
             var f1 = parseInt(d['Ref Frozen1 Door Qty']) || 0;
             var f2 = parseInt(d['Ref Frozen2 Door Qty']) || 0;
             var f3 = parseInt(d['Ref Frozen3 Door Qty']) || 0;
+            var f4 = parseInt(d['Ref Frozen4 Door Qty']) || 0;
             function addGroup(keyPrefix, qty, typeLabel, tCode) {
                 var n = parseInt(qty) || 0;
                 for (var i = 1; i <= n; i++) {
@@ -2131,8 +2334,11 @@ ${bodyHtml}
             addGroup('Ref Bev Plugin ', d['Ref Bev Plugin Qty'], 'ตู้ Beverage Plugin', 'BP');
             addGroup('Ref Bev Walk In ', d['Ref Bev Walk In Qty'], 'ตู้ Beverage Walk-in', 'BW');
             addGroup('Ref Bev Remote ', d['Ref Bev Remote Qty'], 'ตู้ Beverage Remote', 'BR');
-            for (var i = 1; i <= f1 + f2 + f3; i++) {
-                var doorType = i <= f1 ? '1 ประตู' : (i <= f1 + f2 ? '2 ประตู' : '3 ประตู');
+            addGroup('Ref Frozen Plugin ', d['Ref Frozen Plugin Qty'], 'ตู้แช่แข็ง Plugin', 'FP');
+            addGroup('Ref Frozen Remote ', d['Ref Frozen Remote Qty'], 'ตู้แช่แข็ง Remote', 'FR');
+            addGroup('Ref Frozen Walk In ', d['Ref Frozen Walk In Qty'], 'ตู้แช่แข็ง Walk-in', 'FW');
+            for (var i = 1; i <= f1 + f2 + f3 + f4; i++) {
+                var doorType = i <= f1 ? '1 ประตู' : (i <= f1 + f2 ? '2 ประตู' : (i <= f1 + f2 + f3 ? '3 ประตู' : '4 ประตูขึ้นไป'));
                 var seqPad = String(i).padStart(2, '0');
                 var eid = branchCode ? branchCode + '-FC' + seqPad : 'FC' + seqPad;
                 units.push({ equipId: eid, safeId: eid.replace(/-/g, '_'), tCode: 'FC',
@@ -2561,7 +2767,7 @@ ${bodyHtml}
             const comments     = document.getElementById('refEditComments').value;
 
             // Collect qty
-            const qtyMap = { refEditQtyOpen:'Ref Open Qty', refEditQtyBevPlugin:'Ref Bev Plugin Qty', refEditQtyBevWalkin:'Ref Bev Walk In Qty', refEditQtyBevRemote:'Ref Bev Remote Qty', refEditQtyFrozen1:'Ref Frozen1 Door Qty', refEditQtyFrozen2:'Ref Frozen2 Door Qty', refEditQtyFrozen3:'Ref Frozen3 Door Qty', refEditQtyIceCream:'Ref Ice Cream Qty', refEditQtyIce:'Ref Ice Qty', refEditQtySs4:'Ref Ss4 Door Qty' };
+            const qtyMap = { refEditQtyOpen:'Ref Open Qty', refEditQtyBevPlugin:'Ref Bev Plugin Qty', refEditQtyBevWalkin:'Ref Bev Walk In Qty', refEditQtyBevRemote:'Ref Bev Remote Qty', refEditQtyFrozenPlugin:'Ref Frozen Plugin Qty', refEditQtyFrozenRemote:'Ref Frozen Remote Qty', refEditQtyFrozenWalkin:'Ref Frozen Walk In Qty', refEditQtyFrozen1:'Ref Frozen1 Door Qty', refEditQtyFrozen2:'Ref Frozen2 Door Qty', refEditQtyFrozen3:'Ref Frozen3 Door Qty', refEditQtyFrozen4:'Ref Frozen4 Door Qty', refEditQtyIceCream:'Ref Ice Cream Qty', refEditQtyIce:'Ref Ice Qty', refEditQtySs4:'Ref Ss4 Door Qty' };
             const unitQty = {};
             Object.entries(qtyMap).forEach(([inputId, colKey]) => {
                 const el = document.getElementById(inputId);
@@ -2569,11 +2775,25 @@ ${bodyHtml}
             });
 
             // Collect per-unit fields (Brand is a searchable datalist input now —
-            // its value is already final, no "Other" sentinel to resolve)
+            // its value is already final, no "Other" sentinel to resolve).
+            // Product is now a checkbox group sharing one data-edit-field per unit
+            // (matches the submission form's ', '-joined multi-select) — group and
+            // join those separately instead of the naive "last element wins" a plain
+            // per-element loop would do, and still write an empty string when every
+            // box in a group is unchecked so a real clear round-trips instead of
+            // silently keeping the old value.
             const unitFields = {};
+            const _checkboxGroups = {};
             document.querySelectorAll('[data-edit-field]').forEach(el => {
-                unitFields[el.getAttribute('data-edit-field')] = el.value.trim();
+                const key = el.getAttribute('data-edit-field');
+                if (el.type === 'checkbox') {
+                    if (!(key in _checkboxGroups)) _checkboxGroups[key] = [];
+                    if (el.checked) _checkboxGroups[key].push(el.value);
+                } else {
+                    unitFields[key] = el.value.trim();
+                }
             });
+            Object.entries(_checkboxGroups).forEach(([key, vals]) => { unitFields[key] = vals.join(', '); });
 
             // Collect broken unit details (keyed by Equipment ID)
             const brokenDetail = {};
@@ -2660,6 +2880,92 @@ ${bodyHtml}
                     alert('Error: ' + ((err && err.message) || err));
                 })
                 .updateRefUnitFrameRust(capturedId, fieldKey, value, clientEmail);
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
+        // ── Swap Plugin ↔ Remote beverage-fridge data (fixes surveyor mixups) ──
+        function swapRefBevPluginRemote() {
+            if (!currentId) return;
+            const rec = _fullRecordCache[currentId];
+            const pQty = rec ? (parseInt(rec['Ref Bev Plugin Qty']) || 0) : 0;
+            const rQty = rec ? (parseInt(rec['Ref Bev Remote Qty']) || 0) : 0;
+            if (!confirm('ยืนยันสลับข้อมูล Plugin ↔ Remote ของสาขานี้?\n\nPlugin (' + pQty + ' ตู้) จะกลายเป็น Remote\nRemote (' + rQty + ' ตู้) จะกลายเป็น Plugin\n\nจำนวน, รูปภาพ และรายละเอียดทุกตู้จะถูกย้ายไปด้วย (Walk-in จะไม่ถูกแตะต้อง)')) return;
+
+            var _lsU = null;
+            try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+            const capturedId = currentId;
+
+            document.getElementById('modalBody').innerHTML =
+                '<div class="flex flex-col items-center justify-center py-16 gap-3">' +
+                '<div class="loader mx-auto"></div>' +
+                '<p class="text-slate-400 text-sm mt-3">กำลังสลับข้อมูล...</p></div>';
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        delete _fullRecordCache[capturedId];
+                        const slimRec = allData.find(r => r["ID"] === capturedId);
+                        if (slimRec) {
+                            const tmp = slimRec['Ref Bev Plugin Qty'];
+                            slimRec['Ref Bev Plugin Qty'] = slimRec['Ref Bev Remote Qty'];
+                            slimRec['Ref Bev Remote Qty'] = tmp;
+                        }
+                        if (currentId === capturedId) openModal(capturedId);
+                        applyFilters();
+                    } else {
+                        alert('สลับข้อมูลไม่สำเร็จ: ' + ((res && res.error) || ''));
+                        if (currentId === capturedId) openModal(capturedId);
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    alert('Error: ' + ((err && err.message) || err));
+                    if (currentId === capturedId) openModal(capturedId);
+                })
+                .swapRefBevPluginRemote(capturedId, clientEmail);
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
+        // ── Swap Plugin ↔ Remote frozen-food data (same fix, Freezer section) ──
+        function swapRefFrozenPluginRemote() {
+            if (!currentId) return;
+            const rec = _fullRecordCache[currentId];
+            const pQty = rec ? (parseInt(rec['Ref Frozen Plugin Qty']) || 0) : 0;
+            const rQty = rec ? (parseInt(rec['Ref Frozen Remote Qty']) || 0) : 0;
+            if (!confirm('ยืนยันสลับข้อมูล Plugin ↔ Remote ของตู้แช่แข็งสาขานี้?\n\nPlugin (' + pQty + ' ตู้) จะกลายเป็น Remote\nRemote (' + rQty + ' ตู้) จะกลายเป็น Plugin\n\nจำนวน, รูปภาพ และรายละเอียดทุกตู้จะถูกย้ายไปด้วย (Walk-in จะไม่ถูกแตะต้อง)')) return;
+
+            var _lsU = null;
+            try { _lsU = JSON.parse(localStorage.getItem('app_user_data') || 'null'); } catch(e) {}
+            var clientEmail = (_lsU && _lsU.email) ? _lsU.email : '';
+            const capturedId = currentId;
+
+            document.getElementById('modalBody').innerHTML =
+                '<div class="flex flex-col items-center justify-center py-16 gap-3">' +
+                '<div class="loader mx-auto"></div>' +
+                '<p class="text-slate-400 text-sm mt-3">กำลังสลับข้อมูล...</p></div>';
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        delete _fullRecordCache[capturedId];
+                        const slimRec = allData.find(r => r["ID"] === capturedId);
+                        if (slimRec) {
+                            const tmp = slimRec['Ref Frozen Plugin Qty'];
+                            slimRec['Ref Frozen Plugin Qty'] = slimRec['Ref Frozen Remote Qty'];
+                            slimRec['Ref Frozen Remote Qty'] = tmp;
+                        }
+                        if (currentId === capturedId) openModal(capturedId);
+                        applyFilters();
+                    } else {
+                        alert('สลับข้อมูลไม่สำเร็จ: ' + ((res && res.error) || ''));
+                        if (currentId === capturedId) openModal(capturedId);
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    alert('Error: ' + ((err && err.message) || err));
+                    if (currentId === capturedId) openModal(capturedId);
+                })
+                .swapRefFrozenPluginRemote(capturedId, clientEmail);
         }
         // ────────────────────────────────────────────────────────────────────────
 
@@ -2798,7 +3104,7 @@ ${bodyHtml}
                 clearTimeout(_npTimer);
                 _npTimer = setTimeout(function() {
                     if (document.getElementById('npTableBody'))
-                        document.getElementById('npTableBody').innerHTML = '<tr><td colspan="6" class="p-8 text-center text-red-500">โหลดข้อมูลนานเกินไป กรุณาลองใหม่</td></tr>';
+                        document.getElementById('npTableBody').innerHTML = '<tr><td colspan="7" class="p-8 text-center text-red-500">โหลดข้อมูลนานเกินไป กรุณาลองใหม่</td></tr>';
                 }, 25000);
                 google.script.run
                     .withSuccessHandler(function(res) {
@@ -2806,13 +3112,13 @@ ${bodyHtml}
                         if (!res) {
                             if (attempt < _npRetries) { setTimeout(function(){ _fetch(attempt+1); }, 1500); return; }
                             if (document.getElementById('npTableBody'))
-                                document.getElementById('npTableBody').innerHTML = '<tr><td colspan="6" class="p-8 text-center text-amber-600">⚠️ โหลดข้อมูลไม่ได้ กรุณา Refresh</td></tr>';
+                                document.getElementById('npTableBody').innerHTML = '<tr><td colspan="7" class="p-8 text-center text-amber-600">⚠️ โหลดข้อมูลไม่ได้ กรุณา Refresh</td></tr>';
                             return;
                         }
                         if (res.isAdmin && !isAdmin) { isAdmin = true; applyAdminUI(); }
                         if (!res.success) {
                             if (document.getElementById('npTableBody'))
-                                document.getElementById('npTableBody').innerHTML = '<tr><td colspan="6" class="p-8 text-center text-red-500">Error: ' + htmlEscape(res.error||'') + '</td></tr>';
+                                document.getElementById('npTableBody').innerHTML = '<tr><td colspan="7" class="p-8 text-center text-red-500">Error: ' + htmlEscape(res.error||'') + '</td></tr>';
                             return;
                         }
                         npAllData = res.data;
@@ -2823,7 +3129,7 @@ ${bodyHtml}
                     .withFailureHandler(function(err) {
                         clearTimeout(_npTimer);
                         if (document.getElementById('npTableBody'))
-                            document.getElementById('npTableBody').innerHTML = '<tr><td colspan="6" class="p-8 text-center text-red-500">Error: ' + htmlEscape((err&&err.message)||'') + '</td></tr>';
+                            document.getElementById('npTableBody').innerHTML = '<tr><td colspan="7" class="p-8 text-center text-red-500">Error: ' + htmlEscape((err&&err.message)||'') + '</td></tr>';
                     })
                     .getNpSurveyListSlim();
             }
@@ -3025,6 +3331,17 @@ ${bodyHtml}
             }
             emptyState.classList.add('hidden'); emptyState.classList.remove('flex');
             mobileEmptyState.classList.add('hidden');
+            // Product-type badge sourced from the branch's latest submission \u2014 see the
+            // matching Ref-tab logic above (_latestBevByBranch) for why.
+            const _latestNpByBranch = {};
+            npAllData.forEach(function(r) {
+                const code = r['Branch Code'];
+                if (!code) return;
+                const existing = _latestNpByBranch[code];
+                if (!existing || new Date(r['Timestamp']) > new Date(existing['Timestamp'])) {
+                    _latestNpByBranch[code] = r;
+                }
+            });
             const tf=document.createDocumentFragment(), mf=document.createDocumentFragment();
             pageData.forEach(d => {
                 const ts=formatRecordDate(d['Timestamp']);
@@ -3039,6 +3356,25 @@ ${bodyHtml}
                        d['CM Area']?'<span class="font-medium text-slate-500">CM:</span> '+htmlEscape(d['CM Area']):'',
                        d['AMM MTN']?'<span class="font-medium text-slate-500">AM:</span> '+htmlEscape(d['AMM MTN']):''].filter(Boolean).join('  ')
                     : '';
+                // Every NP product type always shown (dimmed when 0), same pattern as the Ref tab.
+                const _npSrc = _latestNpByBranch[d['Branch Code']] || d;
+                const npScQty = parseInt(_npSrc['SC Qty']) || 0;
+                const npJtQty = parseInt(_npSrc['JT Qty']) || 0;
+                const npShQty = parseInt(_npSrc['SH Qty']) || 0;
+                const npMkQty = parseInt(_npSrc['MK Qty']) || 0;
+                const npWfQty = parseInt(_npSrc['WF Qty']) || 0;
+                const npTotalQty = npScQty + npJtQty + npShQty + npMkQty + npWfQty;
+                const _npChip = (label, qty, color) => '<span class="' + (qty > 0 ? color + ' font-bold' : 'text-slate-300') + '">' + label + qty + '</span>';
+                const npBadge = '<div class="flex flex-col gap-0.5">' +
+                      '<span class="text-xs font-bold text-slate-700">\u0e23\u0e27\u0e21 ' + npTotalQty + ' \u0e40\u0e04\u0e23\u0e37\u0e48\u0e2d\u0e07</span>' +
+                      '<span class="text-[11px] font-mono leading-tight flex flex-wrap gap-x-1.5 gap-y-0.5">' +
+                        _npChip('SC', npScQty, 'text-pink-700') +
+                        _npChip('JT', npJtQty, 'text-sky-700') +
+                        _npChip('SH', npShQty, 'text-blue-700') +
+                        _npChip('MK', npMkQty, 'text-cyan-700') +
+                        _npChip('WF', npWfQty, 'text-teal-700') +
+                      '</span>' +
+                      '</div>';
                 const tr=document.createElement('tr');
                 tr.className='hover:bg-slate-50 transition cursor-pointer';
                 tr.onclick=function(){ openNpModal(d['ID']); };
@@ -3046,12 +3382,13 @@ ${bodyHtml}
                     +'<td class="p-4"><div class="font-bold text-slate-800">'+branchCode+' \u2014 '+branchName+'</div>'+(hierarchyInfo?'<div class="text-xs text-slate-400 mt-0.5 flex flex-wrap gap-x-2">'+hierarchyInfo+'</div>':'')+'</td>'
                     +'<td class="p-4 text-slate-700">'+reporter+'</td>'
                     +'<td class="p-4">'+(hasBroken?'<span class="inline-block bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full border border-red-200">\u0e0a\u0e33\u0e23\u0e38\u0e14</span>':'<span class="text-slate-300 text-xs">\u2014</span>')+'</td>'
+                    +'<td class="p-4">'+npBadge+'</td>'
                     +'<td class="p-4"><span class="status-badge status-'+htmlEscape(status)+'">'+htmlEscape(status)+'</span></td>'
                     +'<td class="p-4 text-right"><button onclick="event.stopPropagation();openNpModal(\''+safeId+'\')" class="text-emerald-600 hover:text-emerald-800 font-medium text-sm hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition border border-transparent hover:border-emerald-100 shadow-sm">\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14</button></td>';
                 tf.appendChild(tr);
                 const mc=document.createElement('div');
                 mc.className='bg-white p-4 rounded-xl shadow-sm border border-slate-200 transition-all hover:shadow-md';
-                mc.innerHTML='<div class="flex justify-between items-start mb-2"><div class="flex-1 min-w-0 mr-2"><h3 class="font-bold text-slate-800 leading-tight">'+branchCode+' \u2014 '+branchName+'</h3>'+(hasBroken?'<span class="inline-block mt-1 bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200">\u0e2d\u0e38\u0e1b\u0e01\u0e23\u0e13\u0e4c\u0e0a\u0e33\u0e23\u0e38\u0e14</span>':'')+'</div><span class="status-badge status-'+htmlEscape(status)+' text-[10px] shrink-0">'+htmlEscape(status)+'</span></div>'+(hierarchyInfo?'<p class="text-xs text-slate-400 mb-1">'+hierarchyInfo+'</p>':'')+'<div class="flex justify-between items-center text-xs text-slate-500 pt-3 border-t border-slate-100 mt-2"><span>'+reporter+'</span><button onclick="openNpModal(\''+safeId+'\')" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition shadow-sm">\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14</button></div>';
+                mc.innerHTML='<div class="flex justify-between items-start mb-2"><div class="flex-1 min-w-0 mr-2"><h3 class="font-bold text-slate-800 leading-tight">'+branchCode+' \u2014 '+branchName+'</h3>'+(hasBroken?'<span class="inline-block mt-1 bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200">\u0e2d\u0e38\u0e1b\u0e01\u0e23\u0e13\u0e4c\u0e0a\u0e33\u0e23\u0e38\u0e14</span>':'')+'</div><span class="status-badge status-'+htmlEscape(status)+' text-[10px] shrink-0">'+htmlEscape(status)+'</span></div>'+(hierarchyInfo?'<p class="text-xs text-slate-400 mb-1">'+hierarchyInfo+'</p>':'')+'<div class="mb-1">'+npBadge+'</div><div class="flex justify-between items-center text-xs text-slate-500 pt-3 border-t border-slate-100 mt-2"><span>'+reporter+'</span><button onclick="openNpModal(\''+safeId+'\')" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition shadow-sm">\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14</button></div>';
                 mf.appendChild(mc);
             });
             tableBody.appendChild(tf); mobileCards.appendChild(mf);
@@ -3099,7 +3436,7 @@ ${bodyHtml}
             if (isAdmin) npDel.classList.remove('hidden'); else npDel.classList.add('hidden');
             document.getElementById('refEditBtn').classList.add('hidden');
             const npEd = document.getElementById('npEditBtn');
-            if (isAdmin) npEd.classList.remove('hidden'); else npEd.classList.add('hidden');
+            if (isAdmin || smfCanEdit || opsCanEdit) npEd.classList.remove('hidden'); else npEd.classList.add('hidden');
 
             document.getElementById('refEditPanel').classList.add('hidden');
             document.getElementById('npEditPanel').classList.add('hidden');
@@ -3158,7 +3495,7 @@ ${bodyHtml}
 
         function _renderNpModalContent(d) {
             const st = d['Status']||'Pending';
-            const canChangeStatus = isAdmin || smfCanEdit;
+            const canChangeStatus = isAdmin || smfCanEdit || opsCanEdit;
             document.getElementById('npEditStatus').value = d['Status']||'Pending';
             document.getElementById('npEditHasBroken').value = d['Has Broken NP']||'No';
             document.getElementById('npEditBrokenUnits').value = d['Broken Units']||'';
@@ -3221,9 +3558,9 @@ ${bodyHtml}
                     html += `</div></div>`;
                     // 3 labelled photo sections
                     html += `<div class="mt-3 pt-3 border-t border-slate-100 space-y-3">`;
-                    html += _npPhotoSectionHtml(attachments[machKey]||[], machKey, 'รูปเครื่อง',            '📷', isAdmin || smfCanEdit);
-                    html += _npPhotoSectionHtml(attachments[plugKey]||[], plugKey,  'รูปปลั๊กไฟ',           '🔌', isAdmin || smfCanEdit);
-                    html += _npPhotoSectionHtml(attachments[areaKey]||[], areaKey, 'รูปบริเวณที่ติดตั้ง',  '📍', isAdmin || smfCanEdit);
+                    html += _npPhotoSectionHtml(attachments[machKey]||[], machKey, 'รูปเครื่อง',            '📷', isAdmin || smfCanEdit || opsCanEdit);
+                    html += _npPhotoSectionHtml(attachments[plugKey]||[], plugKey,  'รูปปลั๊กไฟ',           '🔌', isAdmin || smfCanEdit || opsCanEdit);
+                    html += _npPhotoSectionHtml(attachments[areaKey]||[], areaKey, 'รูปบริเวณที่ติดตั้ง',  '📍', isAdmin || smfCanEdit || opsCanEdit);
                     html += `</div>`;
                     html += `</div></div>`;
                 }
@@ -3388,6 +3725,8 @@ ${bodyHtml}
                 for (let u=1;u<=qty;u++) {
                     const brand=htmlEscape(d[prod.prefix+'Brand_'+u]||'');
                     const assetNo=htmlEscape(d[prod.prefix+'Asset No_'+u]||'');
+                    const npAssetFieldKey=prod.prefix+'Asset No_'+u;
+                    const npAssetInputId='aiNp_'+npAssetFieldKey.replace(/[^A-Za-z0-9]/g,'_');
                     const serialNo=htmlEscape(d[prod.prefix+'Serial_'+u]||'');
                     const status=d[prod.prefix+'Status_'+u]||'ใช้งาน';
                     const plugv=d[prod.prefix+'Plug_'+u]||'';
@@ -3396,7 +3735,7 @@ ${bodyHtml}
                     html+=`<div class="border border-slate-200 rounded-lg p-3 mb-2 bg-white"><p class="text-xs font-semibold text-slate-400 mb-2 border-b pb-1 flex items-center gap-2">เครื่องที่ ${u} <span class="font-mono bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded">${htmlEscape(eqId)}</span></p>`;
                     html+=`<div class="grid grid-cols-2 gap-2">`;
                     html+=`<div class="col-span-2 sm:col-span-1"><label class="block text-xs text-slate-500 mb-0.5">ยี่ห้อ</label><input type="text" data-np-edit-field="${prod.prefix}Brand_${u}" value="${brand}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
-                    html+=`<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><input type="text" data-np-edit-field="${prod.prefix}Asset No_${u}" value="${assetNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
+                    html+=`<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><div class="flex gap-1"><input id="${npAssetInputId}" type="text" data-np-edit-field="${npAssetFieldKey}" value="${assetNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm">${branchCode ? `<button type="button" onclick="openAssetMapPicker('${branchCode}','${npAssetInputId}')" class="shrink-0 px-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>` : ''}</div></div>`;
                     html+=`<div><label class="block text-xs text-slate-500 mb-0.5">Serial No.</label><input type="text" data-np-edit-field="${prod.prefix}Serial_${u}" value="${serialNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
                     html+=`<div><label class="block text-xs text-slate-500 mb-0.5">สถานะเครื่อง</label><select data-np-edit-field="${prod.prefix}Status_${u}" class="w-full border border-slate-300 rounded p-1.5 text-sm"><option value="ใช้งาน" ${status==='ใช้งาน'?'selected':''}>ใช้งาน</option><option value="ไม่ใช้งาน" ${status!=='ใช้งาน'?'selected':''}>ไม่ใช้งาน</option></select></div>`;
                     html+=`<div><label class="block text-xs text-slate-500 mb-0.5">🔌 ปลั๊กไฟรองรับ</label><select data-np-edit-field="${prod.prefix}Plug_${u}" class="w-full border border-slate-300 rounded p-1.5 text-sm"><option value="" ${!plugv?'selected':''}>— ไม่ระบุ —</option><option value="Yes" ${plugv==='Yes'?'selected':''}>✅ มีปลั๊กไฟ</option><option value="No" ${plugv==='No'?'selected':''}>⚠️ ไม่มีปลั๊กไฟ</option><option value="ไม่แน่ใจ" ${plugv==='ไม่แน่ใจ'?'selected':''}>❓ ไม่แน่ใจ</option></select></div>`;
@@ -3544,6 +3883,8 @@ ${bodyHtml}
             _currentModalMode='ref';
             const npDel=document.getElementById('npDeleteBtn'); if (npDel) npDel.classList.add('hidden');
             const npEd=document.getElementById('npEditBtn'); if (npEd) npEd.classList.add('hidden');
+            const refEd=document.getElementById('refEditBtn');
+            if (refEd) { if (isAdmin || smfCanEdit || opsCanEdit) refEd.classList.remove('hidden'); else refEd.classList.add('hidden'); }
             _origOpenModal(id);
         };
         // Patch closeModal to reset NP state
@@ -3554,8 +3895,97 @@ ${bodyHtml}
             const npEd=document.getElementById('npEditBtn'); if (npEd) npEd.classList.add('hidden');
             _origCloseModal();
         };
+
+        // ── Asset register mapping picker (edit mode) ───────────────────────
+        // Lets an editor pick a unit's Asset No. from the store's real
+        // fixed-asset ledger (getStoreAssetRegisterForMapping, Survey.gs)
+        // instead of free-typing it. Results are cached per branch code for
+        // the life of the page since the ledger doesn't change mid-session.
+        let _assetMapCache = {};
+        let _assetMapCurrentTarget = null;
+        let _assetMapCurrentItems = [];
+
+        function openAssetMapPicker(branchCode, targetInputId) {
+            const code = String(branchCode || '').trim();
+            if (!code) return;
+            _assetMapCurrentTarget = targetInputId;
+            const modal = document.getElementById('assetMapModal');
+            const listEl = document.getElementById('assetMapList');
+            const searchEl = document.getElementById('assetMapSearch');
+            if (searchEl) searchEl.value = '';
+            modal.classList.remove('hidden');
+            if (_assetMapCache[code]) {
+                _assetMapCurrentItems = _assetMapCache[code];
+                _renderAssetMapList();
+                return;
+            }
+            listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">กำลังโหลด...</p>';
+            google.script.run.withSuccessHandler(function(res) {
+                if (!res || !res.success) {
+                    listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ: ' + htmlEscape(res && res.error || '') + '</p>';
+                    return;
+                }
+                _assetMapCache[code] = res.items || [];
+                _assetMapCurrentItems = _assetMapCache[code];
+                if (!res.prebuilt || !_assetMapCurrentItems.length) {
+                    listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลทะเบียนทรัพย์สินสำหรับสาขานี้</p>';
+                    return;
+                }
+                _renderAssetMapList();
+            }).withFailureHandler(function(err) {
+                listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ</p>';
+            }).getStoreAssetRegisterForMapping(code);
+        }
+
+        function _renderAssetMapList() {
+            const listEl = document.getElementById('assetMapList');
+            const searchEl = document.getElementById('assetMapSearch');
+            const q = (searchEl && searchEl.value || '').trim().toLowerCase();
+            const items = _assetMapCurrentItems.filter(function(it) {
+                return !q || String(it.assetNo).toLowerCase().indexOf(q) > -1 ||
+                    String(it.name).toLowerCase().indexOf(q) > -1 ||
+                    String(it.category).toLowerCase().indexOf(q) > -1;
+            });
+            if (!items.length) { listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ไม่พบรายการ</p>'; return; }
+            listEl.innerHTML = items.slice(0, 200).map(function(it) {
+                return '<button type="button" onclick="_pickAssetForMapping(\'' + htmlEscape(it.assetNo) + '\')" class="w-full text-left border border-slate-200 hover:border-amber-400 hover:bg-amber-50 rounded-lg px-2.5 py-1.5 mb-1.5 transition">' +
+                    '<p class="font-mono font-semibold text-amber-700 text-xs">' + htmlEscape(it.assetNo) + '</p>' +
+                    '<p class="text-slate-600 text-xs truncate">' + htmlEscape(it.name || '-') + '</p>' +
+                    '<p class="text-slate-400 text-[10px]">' + htmlEscape(it.category || '') + '</p>' +
+                    '</button>';
+            }).join('');
+        }
+
+        function _pickAssetForMapping(assetNo) {
+            if (_assetMapCurrentTarget) {
+                const input = document.getElementById(_assetMapCurrentTarget);
+                if (input) input.value = assetNo;
+            }
+            _closeAssetMapPicker();
+        }
+
+        function _closeAssetMapPicker() {
+            document.getElementById('assetMapModal').classList.add('hidden');
+            _assetMapCurrentTarget = null;
+        }
     </script>
 
+    <!-- Asset register mapping picker modal -->
+    <div id="assetMapModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+            <div class="p-3 border-b border-slate-200 flex items-center justify-between">
+                <p class="text-sm font-semibold text-slate-700">เลือก Asset จากทะเบียนทรัพย์สิน</p>
+                <button onclick="_closeAssetMapPicker()" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div class="p-3 border-b border-slate-100">
+                <input id="assetMapSearch" type="text" placeholder="ค้นหาชื่อ/หมวด/เลข Asset..." oninput="_renderAssetMapList()" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
+            </div>
+            <div id="assetMapList" class="flex-1 overflow-y-auto p-2 text-sm"></div>
+        </div>
+    </div>
+
+    <script>var DUP_TYPE_KEY = 'ref'; var DUP_TYPE_LABEL = 'Ref Survey';</script>
+    <?!= include('DupCleanupWidget') ?>
 </body>
 
 </html>

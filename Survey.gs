@@ -467,6 +467,7 @@ function checkSurveyAdminStatus(clientEmail) {
     var isAdmin = false;
     var isSMF = false;
     var isScheduleAdmin = false;
+    var isSysAdmin = false;
 
     // ── 2-minute per-user script cache to avoid re-reading Employee_Database every call ──
     try {
@@ -475,7 +476,7 @@ function checkSurveyAdminStatus(clientEmail) {
         var _uv = _uc.get(_uk);
         if (_uv) {
             var _uf = JSON.parse(_uv);
-            return { isAdmin: _uf.isAdmin, isSMF: _uf.isSMF, isScheduleAdmin: _uf.isScheduleAdmin, smfEditAllowed: _uf.isSMF && _smfSurveyEditToggleOn_(), email: email };
+            return { isAdmin: _uf.isAdmin, isSMF: _uf.isSMF, isScheduleAdmin: _uf.isScheduleAdmin, isSysAdmin: _uf.isSysAdmin, smfEditAllowed: _uf.isSMF && _smfSurveyEditToggleOn_(), opsEditAllowed: _opsSurveyEditToggleOn_(), sysAdminDedupAllowed: _uf.isSysAdmin && _sysAdminDupCleanupToggleOn_(), email: email };
         }
     } catch(_uce) {}
     // ─────────────────────────────────────────────────────────────────────
@@ -502,6 +503,8 @@ function checkSurveyAdminStatus(clientEmail) {
                     var role = userType.toString().trim().toLowerCase();
                     if (role === 'admin' || role === 'super admin' || role === 'superadmin') {
                         isAdmin = true;
+                    } else if (role === 'system_admin' || role === 'sysadmin') {
+                        isSysAdmin = true;
                     } else if (role === 'survey_admin' || role === 'schedule_admin' ||
                                role === 'surveyadmin'  || role === 'scheduleadmin') {
                         isScheduleAdmin = true;
@@ -530,10 +533,10 @@ function checkSurveyAdminStatus(clientEmail) {
     try {
         var _uc2 = CacheService.getScriptCache();
         var _uk2 = 'AUTH_FLAGS_' + (email || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
-        _uc2.put(_uk2, JSON.stringify({ isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin }), 120);
+        _uc2.put(_uk2, JSON.stringify({ isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin }), 120);
     } catch(_uce2) {}
 
-    return { isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, smfEditAllowed: isSMF && _smfSurveyEditToggleOn_(), email: email };
+    return { isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, smfEditAllowed: isSMF && _smfSurveyEditToggleOn_(), opsEditAllowed: _opsSurveyEditToggleOn_(), sysAdminDedupAllowed: isSysAdmin && _sysAdminDupCleanupToggleOn_(), email: email };
 }
 
 // Independent of SMF_ADMIN_ENABLED (which elevates SMF to full Admin everywhere).
@@ -546,6 +549,20 @@ function _smfSurveyEditToggleOn_() {
         var v = PropertiesService.getScriptProperties().getProperty('SMF_SURVEY_EDIT_ENABLED_V1');
         return v === null ? true : v === 'true';
     } catch (e) { return true; }
+}
+
+// General/"Operation" survey-edit toggle — grants the SAME survey edit access
+// as SMF (Ref/NP/Aircon/EDMI/Layout/Trading Hours report fields + photo
+// reupload + the Asset No. register-mapping picker) to every logged-in user,
+// not just the SMF team. Unlike _smfSurveyEditToggleOn_ this is NOT about
+// preserving prior behavior — general users never had edit access before —
+// so it defaults to OFF and a Super Admin must explicitly turn it on. See
+// setOpsSurveyEditSetting() in UploadSchedule.gs / the Admin Console toggle.
+function _opsSurveyEditToggleOn_() {
+    try {
+        var v = PropertiesService.getScriptProperties().getProperty('OPS_SURVEY_EDIT_ENABLED_V1');
+        return v === 'true';
+    } catch (e) { return false; }
 }
 
 // Called by the frontend after page load to get the real flags for the logged-in user.
@@ -1023,12 +1040,13 @@ function processAirConSurveyForm(form) {
             if (folders.hasNext()) { folder = folders.next(); }
             else { folder = DriveApp.createFolder(folderName); }
             
+            var _branchPrefix = (form.branchCode || "NOSTORE").toString().trim().replace(/[^a-zA-Z0-9_-]/g, "");
             for (var category in form.attachments) {
-                var files = form.attachments[category]; 
+                var files = form.attachments[category];
                 if (files && files.length > 0) {
                     attachmentLinks[category] = [];
                     files.forEach(function(fileData) {
-                         var filename = id + "_" + category + "_" + fileData.name;
+                         var filename = _branchPrefix + "_" + category + "_" + id + "_" + fileData.name;
                          var blob = Utilities.newBlob(Utilities.base64Decode(fileData.data), fileData.mimeType, filename);
                          var file = folder.createFile(blob);
                          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -2027,9 +2045,9 @@ function getAirConSurveysReport() {
 function _invalidateAcSlimCache() {
     try {
         var cache = CacheService.getScriptCache();
-        var nStr = cache.get('AC_SLIM_V1_n');
-        var keys = ['AC_SLIM_V1_n', 'COMBINED_TREND_V1'];
-        if (nStr) { for (var i = 0; i < parseInt(nStr, 10); i++) keys.push('AC_SLIM_V1_' + i); }
+        var nStr = cache.get('AC_SLIM_V2_n');
+        var keys = ['AC_SLIM_V2_n', 'COMBINED_TREND_V1'];
+        if (nStr) { for (var i = 0; i < parseInt(nStr, 10); i++) keys.push('AC_SLIM_V2_' + i); }
         cache.removeAll(keys);
     } catch(e) {}
 }
@@ -2039,11 +2057,11 @@ function getAirconSurveyListSlim() {
         // Cache check FIRST — before any sheet/auth reads
         try {
             var _sc = CacheService.getScriptCache();
-            var _nStr = _sc.get('AC_SLIM_V1_n');
+            var _nStr = _sc.get('AC_SLIM_V2_n');
             if (_nStr !== null) {
                 var _n = parseInt(_nStr, 10), _json = '', _ok = true;
                 for (var _ci = 0; _ci < _n; _ci++) {
-                    var _ch = _sc.get('AC_SLIM_V1_' + _ci);
+                    var _ch = _sc.get('AC_SLIM_V2_' + _ci);
                     if (_ch === null) { _ok = false; break; }
                     _json += _ch;
                 }
@@ -2059,8 +2077,11 @@ function getAirconSurveyListSlim() {
         var h = {};
         headers.forEach(function(hdr, i) { h[String(hdr).trim()] = i; });
 
-        // Read only up to the furthest needed column (excludes Attachments_JSON and unit detail cols)
-        var NEED = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Broken Units','DM Area','CM Area','AMM MTN','Survey Round'];
+        // Read only up to the furthest needed column (excludes Attachments_JSON and most unit detail cols)
+        var AC_TYPE_CODE = { 'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+        var UNIT_TYPE_COLS = [];
+        for (var _u = 1; _u <= 20; _u++) UNIT_TYPE_COLS.push('Unit ' + _u + ' Type');
+        var NEED = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Broken Units','DM Area','CM Area','AMM MTN','Survey Round'].concat(UNIT_TYPE_COLS);
         var maxIdx = -1;
         NEED.forEach(function(k) { if (h[k] !== undefined && h[k] > maxIdx) maxIdx = h[k]; });
         if (maxIdx < 0) return { success: true, data: [], isAdmin: false, isSMF: false, isScheduleAdmin: false };
@@ -2075,6 +2096,13 @@ function getAirconSurveyListSlim() {
             var id = gv('ID'); if (!id) continue;
             var ts = gv('Timestamp');
             if (ts instanceof Date) ts = ts.toISOString();
+            // Unit-type breakdown — every AC type qty, computed from the 20 "Unit N Type" cells
+            // rather than stored per-type, since Aircon tracks type per-unit not per-type counts.
+            var typeQty = { WT: 0, HT: 0, CT: 0, FS: 0, PT: 0 };
+            for (var u = 1; u <= 20; u++) {
+                var code = AC_TYPE_CODE[gv('Unit ' + u + ' Type')];
+                if (code) typeQty[code]++;
+            }
             results.push({
                 id: String(id),
                 timestamp: ts,
@@ -2085,7 +2113,8 @@ function getAirconSurveyListSlim() {
                 round:       String(gv('Survey Round')  || '').trim(),
                 recorderName: String(gv('Reporter Name') || gv('Reporter Email') || ''),
                 status:      String(gv('Status')        || 'Pending'),
-                brokenUnits: String(gv('Broken Units')  || '')
+                brokenUnits: String(gv('Broken Units')  || ''),
+                wtQty: typeQty.WT, htQty: typeQty.HT, ctQty: typeQty.CT, fsQty: typeQty.FS, ptQty: typeQty.PT
             });
         }
 
@@ -2111,8 +2140,8 @@ function getAirconSurveyListSlim() {
             var _cj = JSON.stringify(results), _co = CacheService.getScriptCache();
             var _store = {}, _nc = 0;
             for (var _cs = 0; _cs < _cj.length; _cs += 90000)
-                _store['AC_SLIM_V1_' + _nc++] = _cj.substring(_cs, _cs + 90000);
-            _store['AC_SLIM_V1_n'] = String(_nc);
+                _store['AC_SLIM_V2_' + _nc++] = _cj.substring(_cs, _cs + 90000);
+            _store['AC_SLIM_V2_n'] = String(_nc);
             _co.putAll(_store, 300);
         } catch(_we) {}
 
@@ -2208,7 +2237,7 @@ function updateSurvey(form) {
         var _wlock = _acquireWriteLock_();
         // Permission check: only admins and SMF team members (with the edit toggle on) can update status
         var authCheck = checkSurveyAdminStatus(form.clientEmail || Session.getActiveUser().getEmail());
-        if (!authCheck.isAdmin && !authCheck.smfEditAllowed) {
+        if (!authCheck.isAdmin && !authCheck.smfEditAllowed && !authCheck.opsEditAllowed) {
             return { success: false, error: "Permission denied. Admin or SMF team required." };
         }
         var actionUser = authCheck.email || Session.getActiveUser().getEmail();
@@ -3095,12 +3124,13 @@ function processRefSurveyForm(form) {
             if (folders.hasNext()) { folder = folders.next(); }
             else { folder = DriveApp.createFolder(folderName); }
 
+            var _branchPrefix = (form.branchCode || "NOSTORE").toString().trim().replace(/[^a-zA-Z0-9_-]/g, "");
             for (var category in form.attachments) {
                 var files = form.attachments[category];
                 if (files && files.length > 0) {
                     attachmentLinks[category] = [];
                     files.forEach(function(fileData) {
-                        var filename = id + "_" + category + "_" + fileData.name;
+                        var filename = _branchPrefix + "_" + category + "_" + id + "_" + fileData.name;
                         var blob = Utilities.newBlob(Utilities.base64Decode(fileData.data), fileData.mimeType, filename);
                         var file = folder.createFile(blob);
                         file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -3219,7 +3249,7 @@ function processRefSurveyForm(form) {
             htmlBody += '<h3>สรุปจำนวนตู้แช่รวม</h3>';
             htmlBody += '<p><b>OPEN:</b> ' + (form.refOpenQty || 0) + ' ตู้</p>';
             htmlBody += '<p><b>ตู้แช่เย็นบานกระจก:</b> Plugin ' + (form.refBevPluginQty || 0) + ' / Walk-in ' + (form.refBevWalkInQty || 0) + ' / Remote ' + (form.refBevRemoteQty || 0) + ' ตู้</p>';
-            htmlBody += '<p><b>อาหารแช่แข็ง:</b> 1 ประตู ' + (form.refFrozen1DoorQty || 0) + ' / 2 ประตู ' + (form.refFrozen2DoorQty || 0) + ' / 3 ประตู ' + (form.refFrozen3DoorQty || 0) + ' ตู้</p>';
+            htmlBody += '<p><b>อาหารแช่แข็ง:</b> Plugin ' + (form.refFrozenPluginQty || 0) + ' / Remote ' + (form.refFrozenRemoteQty || 0) + ' / Walk-in ' + (form.refFrozenWalkInQty || 0) + ' ตู้</p>';
             htmlBody += '<p><b>ไอศกรีม:</b> ' + (form.refIceCreamQty || 0) + ' ตู้ | <b>น้ำแข็ง:</b> ' + (form.refIceQty || 0) + ' ตู้</p>';
             htmlBody += '<p><b>ตู้ 4 ประตู Stainless:</b> ' + (form.refSs4DoorQty || 0) + ' ตู้</p>';
             
@@ -3288,9 +3318,9 @@ function processRefSurveyForm(form) {
                 return card;
             }
 
-            var _f1 = parseInt(form.refFrozen1DoorQty) || 0;
-            var _f2 = parseInt(form.refFrozen2DoorQty) || 0;
-            var _f3 = parseInt(form.refFrozen3DoorQty) || 0;
+            var _frozenPluginQty = parseInt(form.refFrozenPluginQty) || 0;
+            var _frozenRemoteQty = parseInt(form.refFrozenRemoteQty) || 0;
+            var _frozenWalkinQty = parseInt(form.refFrozenWalkInQty) || 0;
             var _openQty   = parseInt(form.refOpenQty)      || 0;
             var _pluginQty = parseInt(form.refBevPluginQty) || 0;
             var _walkinQty = parseInt(form.refBevWalkInQty) || 0;
@@ -3313,13 +3343,13 @@ function processRefSurveyForm(form) {
                 htmlBody += sectionCard('2.2 ตู้ทำความเย็นเครื่องดื่ม (' + (_pluginQty+_walkinQty+_remoteQty) + ' ตู้)', '#0d9488',
                     _bevBodyHtml, null);
 
-            // 2.3 ตู้แช่แข็ง — per-unit photos use global sequential index (shared 'ref_frozen' prefix)
+            // 2.3 ตู้แช่แข็ง — per-unit photos embedded inside each sub-type, same pattern as 2.2
             var _frozenBodyHtml = '';
-            if (_f1 > 0) _frozenBodyHtml += '<p style="margin:0 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">1 ประตู (' + _f1 + ' ตู้)</p>' + unitRowsHtml('Ref Frozen ', _f1, 1, 'ref_frozen');
-            if (_f2 > 0) _frozenBodyHtml += '<p style="margin:' + (_f1 > 0 ? '10px' : '0') + ' 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">2 ประตู (' + _f2 + ' ตู้)</p>' + unitRowsHtml('Ref Frozen ', _f2, _f1 + 1, 'ref_frozen');
-            if (_f3 > 0) _frozenBodyHtml += '<p style="margin:' + (_f1 + _f2 > 0 ? '10px' : '0') + ' 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">3 ประตู (' + _f3 + ' ตู้)</p>' + unitRowsHtml('Ref Frozen ', _f3, _f1 + _f2 + 1, 'ref_frozen');
+            if (_frozenPluginQty > 0) _frozenBodyHtml += '<p style="margin:0 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">Plugin (' + _frozenPluginQty + ' ตู้)</p>' + unitRowsHtml('Ref Frozen Plugin ', _frozenPluginQty, 1, 'ref_frozen_plugin');
+            if (_frozenRemoteQty > 0) _frozenBodyHtml += '<p style="margin:' + (_frozenPluginQty > 0 ? '10px' : '0') + ' 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">Remote (' + _frozenRemoteQty + ' ตู้)</p>' + unitRowsHtml('Ref Frozen Remote ', _frozenRemoteQty, 1, 'ref_frozen_remote');
+            if (_frozenWalkinQty > 0) _frozenBodyHtml += '<p style="margin:' + (_frozenPluginQty + _frozenRemoteQty > 0 ? '10px' : '0') + ' 0 6px 0;font-size:12px;font-weight:700;color:#4338ca;">Walk-in (' + _frozenWalkinQty + ' ตู้)</p>' + unitRowsHtml('Ref Frozen Walk In ', _frozenWalkinQty, 1, 'ref_frozen_walkin');
             if (_frozenBodyHtml)
-                htmlBody += sectionCard('2.3 ตู้แช่อาหารแช่แข็ง (' + (_f1+_f2+_f3) + ' ตู้)', '#4f46e5',
+                htmlBody += sectionCard('2.3 ตู้แช่อาหารแช่แข็ง (' + (_frozenPluginQty+_frozenRemoteQty+_frozenWalkinQty) + ' ตู้)', '#4f46e5',
                     _frozenBodyHtml, null);
 
             // 2.4 ไอศกรีม
@@ -3405,9 +3435,9 @@ function processRefSurveyForm(form) {
 function _invalidateRefSlimCache() {
     try {
         var cache = CacheService.getScriptCache();
-        var nStr = cache.get('REF_SLIM_V1_n');
-        var keys = ['REF_SLIM_V1_n', 'COMBINED_TREND_V1'];
-        if (nStr) { for (var i = 0; i < parseInt(nStr, 10); i++) keys.push('REF_SLIM_V1_' + i); }
+        var nStr = cache.get('REF_SLIM_V3_n');
+        var keys = ['REF_SLIM_V3_n', 'COMBINED_TREND_V1'];
+        if (nStr) { for (var i = 0; i < parseInt(nStr, 10); i++) keys.push('REF_SLIM_V3_' + i); }
         cache.removeAll(keys);
     } catch(e) {}
 }
@@ -3461,11 +3491,11 @@ function getRefSurveyListSlim() {
         // ── Cache hit: return immediately, no sheet reads at all ──────────────
         try {
             var _sc = CacheService.getScriptCache();
-            var _nStr = _sc.get('REF_SLIM_V1_n');
+            var _nStr = _sc.get('REF_SLIM_V3_n');
             if (_nStr !== null) {
                 var _n = parseInt(_nStr, 10), _json = '', _ok = true;
                 for (var _ci = 0; _ci < _n; _ci++) {
-                    var _ch = _sc.get('REF_SLIM_V1_' + _ci);
+                    var _ch = _sc.get('REF_SLIM_V3_' + _ci);
                     if (_ch === null) { _ok = false; break; }
                     _json += _ch;
                 }
@@ -3482,7 +3512,7 @@ function getRefSurveyListSlim() {
         var lastRow  = sheet.getLastRow();
         var headers  = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 
-        var LIST_KEYS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Has Broken Ref','Broken Units','DM Area','CM Area','AMM MTN','Survey Round'];
+        var LIST_KEYS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Has Broken Ref','Broken Units','DM Area','CM Area','AMM MTN','Survey Round','Ref Open Qty','Ref Bev Plugin Qty','Ref Bev Walk In Qty','Ref Bev Remote Qty','Ref Frozen1 Door Qty','Ref Frozen2 Door Qty','Ref Frozen3 Door Qty','Ref Frozen4 Door Qty','Ref Frozen Plugin Qty','Ref Frozen Remote Qty','Ref Frozen Walk In Qty','Ref Ice Cream Qty','Ref Ice Qty','Ref Ss4 Door Qty'];
         var keyIdx = {};
         LIST_KEYS.forEach(function(k) { keyIdx[k] = headers.indexOf(k); });
 
@@ -3510,9 +3540,9 @@ function getRefSurveyListSlim() {
             var _co = CacheService.getScriptCache();
             var _store = {}, _nc = 0;
             for (var _cs = 0; _cs < _cj.length; _cs += 90000) {
-                _store['REF_SLIM_V1_' + _nc++] = _cj.substring(_cs, _cs + 90000);
+                _store['REF_SLIM_V3_' + _nc++] = _cj.substring(_cs, _cs + 90000);
             }
-            _store['REF_SLIM_V1_n'] = String(_nc);
+            _store['REF_SLIM_V3_n'] = String(_nc);
             _co.putAll(_store, 300);
         } catch(_we) {}
 
@@ -3555,6 +3585,190 @@ function getRefSurveyRecordById(id) {
         }
         try { row['Attachments_JSON'] = JSON.parse(row['Attachments_JSON'] || '{}'); } catch(e) { row['Attachments_JSON'] = {}; }
         return { success: true, data: row };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Field surveyors regularly confuse "Plugin" (self-contained, has its own plug)
+// vs "Remote" (piped to an external compressor, no plug on the unit itself)
+// beverage chillers. Both are stored as fully separate column blocks
+// ("Ref Bev Plugin *" vs "Ref Bev Remote *", plus Attachments_JSON keys
+// "ref_bev_plugin_N" vs "ref_bev_remote_N"), so a mixup means the qty and every
+// per-unit field/photo landed under the wrong block — this swaps them back in
+// one shot instead of requiring a manual re-entry per store.
+// Swap is driven by header suffix (whatever comes after "Ref Bev Plugin"/
+// "Ref Bev Remote"), so it stays correct even if new per-unit fields are added
+// later — no field list to keep in sync here.
+// ─────────────────────────────────────────────────────────────────────────────
+function swapRefBevPluginRemote(id, clientEmail) {
+    try {
+        var _wlock = _acquireWriteLock_();
+        var userEmail = clientEmail || Session.getActiveUser().getEmail();
+        var adminCheck = checkSurveyAdminStatus(userEmail);
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
+            return { success: false, error: "Administrator privileges required." };
+        }
+
+        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
+        if (!sheet) return { success: false, error: "Sheet not found" };
+
+        var lastRow = sheet.getLastRow();
+        var lastCol = sheet.getLastColumn();
+        if (lastRow < 2) return { success: false, error: "Record not found: " + String(id) };
+
+        var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+        var idIdx = headers.indexOf("ID");
+        if (idIdx === -1) return { success: false, error: "ID column not found" };
+
+        var ids = sheet.getRange(2, idIdx + 1, lastRow - 1, 1).getValues();
+        var searchId = String(id).trim();
+        var rowIndex = -1;
+        for (var i = 0; i < ids.length; i++) {
+            if (String(ids[i][0]).trim() === searchId) { rowIndex = i + 2; break; }
+        }
+        if (rowIndex === -1) return { success: false, error: "Record not found: " + searchId };
+
+        var rowVals = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
+
+        var PLUGIN_PREFIX = "Ref Bev Plugin";
+        var REMOTE_PREFIX = "Ref Bev Remote";
+
+        function ensureCol(colKey) {
+            var idx = headers.indexOf(colKey);
+            if (idx !== -1) return idx;
+            headers.push(colKey);
+            rowVals.push('');
+            sheet.getRange(1, headers.length).setValue(colKey);
+            return headers.length - 1;
+        }
+
+        // Collect every distinct suffix used by either block (e.g. " Qty", " Brand_1", " Status_2")
+        var suffixes = {};
+        headers.forEach(function(h) {
+            if (h.indexOf(PLUGIN_PREFIX) === 0) suffixes[h.substring(PLUGIN_PREFIX.length)] = true;
+            if (h.indexOf(REMOTE_PREFIX) === 0) suffixes[h.substring(REMOTE_PREFIX.length)] = true;
+        });
+
+        var swappedFields = 0;
+        Object.keys(suffixes).forEach(function(suf) {
+            var pIdx = ensureCol(PLUGIN_PREFIX + suf);
+            var rIdx = ensureCol(REMOTE_PREFIX + suf);
+            var tmp = rowVals[pIdx];
+            rowVals[pIdx] = rowVals[rIdx];
+            rowVals[rIdx] = tmp;
+            swappedFields++;
+        });
+
+        // Attachments_JSON: rename ref_bev_plugin_N <-> ref_bev_remote_N keys (both directions)
+        var attachIdx = headers.indexOf("Attachments_JSON");
+        if (attachIdx !== -1) {
+            var attach = {};
+            try { attach = JSON.parse(rowVals[attachIdx] || "{}"); } catch (e) {}
+            var newAttach = {};
+            Object.keys(attach).forEach(function(k) {
+                var newKey = k;
+                if (k.indexOf("ref_bev_plugin_") === 0) newKey = "ref_bev_remote_" + k.substring("ref_bev_plugin_".length);
+                else if (k.indexOf("ref_bev_remote_") === 0) newKey = "ref_bev_plugin_" + k.substring("ref_bev_remote_".length);
+                newAttach[newKey] = attach[k];
+            });
+            rowVals[attachIdx] = JSON.stringify(newAttach);
+        }
+
+        sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowVals]);
+        _invalidateRefSlimCache();
+        try { CacheService.getScriptCache().remove('REF_SURVEY_REPORT_V1'); } catch (e) {}
+
+        return { success: true, swappedFields: swappedFields };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// Same swap as swapRefBevPluginRemote() above, for the Freezer section (2.3),
+// which gained the identical Plugin/Remote/Walk-in type split — surveyors mix
+// up Plugin vs Remote there too (Walk-in is visually distinct enough that it's
+// left untouched, same precedent as the Bev swap).
+function swapRefFrozenPluginRemote(id, clientEmail) {
+    try {
+        var _wlock = _acquireWriteLock_();
+        var userEmail = clientEmail || Session.getActiveUser().getEmail();
+        var adminCheck = checkSurveyAdminStatus(userEmail);
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
+            return { success: false, error: "Administrator privileges required." };
+        }
+
+        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
+        if (!sheet) return { success: false, error: "Sheet not found" };
+
+        var lastRow = sheet.getLastRow();
+        var lastCol = sheet.getLastColumn();
+        if (lastRow < 2) return { success: false, error: "Record not found: " + String(id) };
+
+        var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+        var idIdx = headers.indexOf("ID");
+        if (idIdx === -1) return { success: false, error: "ID column not found" };
+
+        var ids = sheet.getRange(2, idIdx + 1, lastRow - 1, 1).getValues();
+        var searchId = String(id).trim();
+        var rowIndex = -1;
+        for (var i = 0; i < ids.length; i++) {
+            if (String(ids[i][0]).trim() === searchId) { rowIndex = i + 2; break; }
+        }
+        if (rowIndex === -1) return { success: false, error: "Record not found: " + searchId };
+
+        var rowVals = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
+
+        var PLUGIN_PREFIX = "Ref Frozen Plugin";
+        var REMOTE_PREFIX = "Ref Frozen Remote";
+
+        function ensureCol(colKey) {
+            var idx = headers.indexOf(colKey);
+            if (idx !== -1) return idx;
+            headers.push(colKey);
+            rowVals.push('');
+            sheet.getRange(1, headers.length).setValue(colKey);
+            return headers.length - 1;
+        }
+
+        // Collect every distinct suffix used by either block (e.g. " Qty", " Brand_1", " Status_2")
+        var suffixes = {};
+        headers.forEach(function(h) {
+            if (h.indexOf(PLUGIN_PREFIX) === 0) suffixes[h.substring(PLUGIN_PREFIX.length)] = true;
+            if (h.indexOf(REMOTE_PREFIX) === 0) suffixes[h.substring(REMOTE_PREFIX.length)] = true;
+        });
+
+        var swappedFields = 0;
+        Object.keys(suffixes).forEach(function(suf) {
+            var pIdx = ensureCol(PLUGIN_PREFIX + suf);
+            var rIdx = ensureCol(REMOTE_PREFIX + suf);
+            var tmp = rowVals[pIdx];
+            rowVals[pIdx] = rowVals[rIdx];
+            rowVals[rIdx] = tmp;
+            swappedFields++;
+        });
+
+        // Attachments_JSON: rename ref_frozen_plugin_N <-> ref_frozen_remote_N keys (both directions)
+        var attachIdx = headers.indexOf("Attachments_JSON");
+        if (attachIdx !== -1) {
+            var attach = {};
+            try { attach = JSON.parse(rowVals[attachIdx] || "{}"); } catch (e) {}
+            var newAttach = {};
+            Object.keys(attach).forEach(function(k) {
+                var newKey = k;
+                if (k.indexOf("ref_frozen_plugin_") === 0) newKey = "ref_frozen_remote_" + k.substring("ref_frozen_plugin_".length);
+                else if (k.indexOf("ref_frozen_remote_") === 0) newKey = "ref_frozen_plugin_" + k.substring("ref_frozen_remote_".length);
+                newAttach[newKey] = attach[k];
+            });
+            rowVals[attachIdx] = JSON.stringify(newAttach);
+        }
+
+        sheet.getRange(rowIndex, 1, 1, headers.length).setValues([rowVals]);
+        _invalidateRefSlimCache();
+        try { CacheService.getScriptCache().remove('REF_SURVEY_REPORT_V1'); } catch (e) {}
+
+        return { success: true, swappedFields: swappedFields };
     } catch (e) {
         return { success: false, error: e.toString() };
     }
@@ -3871,7 +4085,7 @@ function updateRefSurveyRecord(form) {
         // Prefer clientEmail from browser — Session.getActiveUser() returns empty in web app context
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) return { success: false, error: "Administrator privileges required." };
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) return { success: false, error: "Administrator privileges required." };
 
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found" };
@@ -4100,7 +4314,7 @@ function updateAcSurveyRecord(form) {
         // Prefer clientEmail from browser — Session.getActiveUser() returns empty in web app context
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) return { success: false, error: "Administrator privileges required." };
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) return { success: false, error: "Administrator privileges required." };
 
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found" };
@@ -4245,32 +4459,14 @@ function saveAcUnitControllerTemp(form) {
 function addRefSurveyPhotos(id, unitKey, files, clientEmail) {
     try {
         var adminCheck = checkSurveyAdminStatus(clientEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
             return { success: false, error: "Administrator privileges required." };
         }
-        var folderName = "Survey_Photos_Added";
-        var folder;
-        var folders = DriveApp.getFoldersByName(folderName);
-        if (folders.hasNext()) { folder = folders.next(); }
-        else { folder = DriveApp.createFolder(folderName); }
-
-        var newUrls = [];
-        var ts = new Date().getTime();
-        for (var i = 0; i < files.length; i++) {
-            var f = files[i];
-            if (f.data && f.name) {
-                var filename = "ref_" + id + "_" + unitKey + "_" + ts + "_" + i + "_" + f.name;
-                var blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || "image/jpeg", filename);
-                var file = folder.createFile(blob);
-                file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-                newUrls.push("https://drive.google.com/thumbnail?sz=w1000&id=" + file.getId());
-            }
-        }
-        if (newUrls.length === 0) return { success: false, error: "No valid files received." };
-
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found." };
 
+        // Look up the row (and its Branch Code, for the filename) BEFORE uploading —
+        // avoids orphaning uploaded files in Drive if the record isn't found.
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
         var colMap = {};
@@ -4285,6 +4481,29 @@ function addRefSurveyPhotos(id, unitKey, files, clientEmail) {
 
         var attachCol = colMap["Attachments_JSON"];
         if (!attachCol) return { success: false, error: "Attachments_JSON column not found." };
+
+        var branchColIdx = colMap["Branch Code"] ? colMap["Branch Code"] - 1 : -1;
+        var branchPrefix = (branchColIdx > -1 ? data[rowIndex - 1][branchColIdx] : "NOSTORE").toString().trim().replace(/[^a-zA-Z0-9_-]/g, "") || "NOSTORE";
+
+        var folderName = "Survey_Photos_Added";
+        var folder;
+        var folders = DriveApp.getFoldersByName(folderName);
+        if (folders.hasNext()) { folder = folders.next(); }
+        else { folder = DriveApp.createFolder(folderName); }
+
+        var newUrls = [];
+        var ts = new Date().getTime();
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            if (f.data && f.name) {
+                var filename = branchPrefix + "_" + unitKey + "_" + id + "_" + ts + "_" + i + "_" + f.name;
+                var blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || "image/jpeg", filename);
+                var file = folder.createFile(blob);
+                file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+                newUrls.push("https://drive.google.com/thumbnail?sz=w1000&id=" + file.getId());
+            }
+        }
+        if (newUrls.length === 0) return { success: false, error: "No valid files received." };
 
         var existing = {};
         try { existing = JSON.parse(data[rowIndex - 1][attachCol - 1] || "{}"); } catch(e) {}
@@ -4305,32 +4524,14 @@ function addRefSurveyPhotos(id, unitKey, files, clientEmail) {
 function addAcSurveyPhotos(id, unitKey, files, clientEmail) {
     try {
         var adminCheck = checkSurveyAdminStatus(clientEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
             return { success: false, error: "Administrator privileges required." };
         }
-        var folderName = "Survey_Photos_Added";
-        var folder;
-        var folders = DriveApp.getFoldersByName(folderName);
-        if (folders.hasNext()) { folder = folders.next(); }
-        else { folder = DriveApp.createFolder(folderName); }
-
-        var newUrls = [];
-        var ts = new Date().getTime();
-        for (var i = 0; i < files.length; i++) {
-            var f = files[i];
-            if (f.data && f.name) {
-                var filename = "ac_" + id + "_" + unitKey + "_" + ts + "_" + i + "_" + f.name;
-                var blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || "image/jpeg", filename);
-                var file = folder.createFile(blob);
-                file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-                newUrls.push("https://drive.google.com/thumbnail?sz=w1000&id=" + file.getId());
-            }
-        }
-        if (newUrls.length === 0) return { success: false, error: "No valid files received." };
-
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
         if (!sheet) return { success: false, error: "Sheet not found." };
 
+        // Look up the row (and its Branch Code, for the filename) BEFORE uploading —
+        // avoids orphaning uploaded files in Drive if the record isn't found.
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
         var colMap = {};
@@ -4345,6 +4546,29 @@ function addAcSurveyPhotos(id, unitKey, files, clientEmail) {
 
         var attachCol = colMap["Attachments_JSON"];
         if (!attachCol) return { success: false, error: "Attachments_JSON column not found." };
+
+        var branchColIdx = colMap["Branch Code"] ? colMap["Branch Code"] - 1 : -1;
+        var branchPrefix = (branchColIdx > -1 ? data[rowIndex - 1][branchColIdx] : "NOSTORE").toString().trim().replace(/[^a-zA-Z0-9_-]/g, "") || "NOSTORE";
+
+        var folderName = "Survey_Photos_Added";
+        var folder;
+        var folders = DriveApp.getFoldersByName(folderName);
+        if (folders.hasNext()) { folder = folders.next(); }
+        else { folder = DriveApp.createFolder(folderName); }
+
+        var newUrls = [];
+        var ts = new Date().getTime();
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            if (f.data && f.name) {
+                var filename = branchPrefix + "_" + unitKey + "_" + id + "_" + ts + "_" + i + "_" + f.name;
+                var blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || "image/jpeg", filename);
+                var file = folder.createFile(blob);
+                file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+                newUrls.push("https://drive.google.com/thumbnail?sz=w1000&id=" + file.getId());
+            }
+        }
+        if (newUrls.length === 0) return { success: false, error: "No valid files received." };
 
         var existing = {};
         try { existing = JSON.parse(data[rowIndex - 1][attachCol - 1] || "{}"); } catch(e) {}
@@ -4366,7 +4590,7 @@ function deleteRefSurveyPhoto(id, unitKey, url, clientEmail) {
     try {
         var _wlock = _acquireWriteLock_();
         var adminCheck = checkSurveyAdminStatus(clientEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
             return { success: false, error: "Administrator privileges required." };
         }
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
@@ -4404,7 +4628,7 @@ function deleteAcSurveyPhoto(id, unitKey, url, clientEmail) {
     try {
         var _wlock = _acquireWriteLock_();
         var adminCheck = checkSurveyAdminStatus(clientEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
             return { success: false, error: "Administrator privileges required." };
         }
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Aircon_Survey_Database");
@@ -4958,7 +5182,7 @@ function updateNpSurveyRecord(form) {
         var _wlock = _acquireWriteLock_();
         var userEmail = form.clientEmail || Session.getActiveUser().getEmail();
         var adminCheck = checkSurveyAdminStatus(userEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) return { success: false, error: 'Administrator privileges required.' };
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) return { success: false, error: 'Administrator privileges required.' };
 
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
         if (!sheet) return { success: false, error: 'Sheet not found' };
@@ -5024,55 +5248,81 @@ function updateNpSurveyRecord(form) {
 }
 
 // ── Add Photos ────────────────────────────────────────────────────────────────
+// Shared by the admin "add extra photo to an existing record" path and the
+// unguarded "attach photos right after creating a brand-new record" path used
+// by every regular user's initial NP submission (submitNpSurvey has no photo
+// step of its own — see addNpSurveyPhotosOnSubmit below).
+function _saveNpPhotos_(id, unitKey, files, folderName) {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
+    if (!sheet) return { success: false, error: 'Sheet not found.' };
+
+    // Look up the row (and its Branch Code, for the filename) BEFORE uploading —
+    // avoids orphaning uploaded files in Drive if the record isn't found.
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = {};
+    headers.forEach(function(h, idx) { colMap[String(h).trim()] = idx + 1; });
+
+    var idColIdx = (colMap['ID'] || 1) - 1;
+    var rowIndex = -1;
+    for (var i = 1; i < data.length; i++) {
+        if (data[i][idColIdx] == id) { rowIndex = i + 1; break; }
+    }
+    if (rowIndex === -1) return { success: false, error: 'Record not found.' };
+
+    var attachCol = colMap['Attachments_JSON'];
+    if (!attachCol) return { success: false, error: 'Attachments_JSON column not found.' };
+
+    var branchColIdx = colMap['Branch Code'] ? colMap['Branch Code'] - 1 : -1;
+    var branchPrefix = (branchColIdx > -1 ? data[rowIndex - 1][branchColIdx] : 'NOSTORE').toString().trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'NOSTORE';
+
+    var folders = DriveApp.getFoldersByName(folderName);
+    var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+
+    var newUrls = [];
+    var ts = new Date().getTime();
+    for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        if (f.data && f.name) {
+            var filename = branchPrefix + '_' + unitKey + '_' + id + '_' + ts + '_' + i + '_' + f.name;
+            var blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || 'image/jpeg', filename);
+            var file = folder.createFile(blob);
+            file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+            newUrls.push('https://drive.google.com/thumbnail?sz=w1000&id=' + file.getId());
+        }
+    }
+    if (newUrls.length === 0) return { success: false, error: 'No valid files received.' };
+
+    var existing = {};
+    try { existing = JSON.parse(data[rowIndex - 1][attachCol - 1] || '{}'); } catch(e) {}
+    existing[unitKey] = (existing[unitKey] || []).concat(newUrls);
+
+    sheet.getRange(rowIndex, attachCol).setValue(JSON.stringify(existing));
+    _invalidateNpSlimCache();
+    return { success: true, newUrls: newUrls };
+}
+
 function addNpSurveyPhotos(id, unitKey, files, clientEmail) {
     try {
         var adminCheck = checkSurveyAdminStatus(clientEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
             return { success: false, error: 'Administrator privileges required.' };
         }
-        var folderName = 'Survey_Photos_Added';
-        var folders = DriveApp.getFoldersByName(folderName);
-        var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+        return _saveNpPhotos_(id, unitKey, files, 'Survey_Photos_Added');
+    } catch(e) {
+        return { success: false, error: e.toString() };
+    }
+}
 
-        var newUrls = [];
-        var ts = new Date().getTime();
-        for (var i = 0; i < files.length; i++) {
-            var f = files[i];
-            if (f.data && f.name) {
-                var filename = 'np_' + id + '_' + unitKey + '_' + ts + '_' + i + '_' + f.name;
-                var blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || 'image/jpeg', filename);
-                var file = folder.createFile(blob);
-                file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-                newUrls.push('https://drive.google.com/thumbnail?sz=w1000&id=' + file.getId());
-            }
-        }
-        if (newUrls.length === 0) return { success: false, error: 'No valid files received.' };
-
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
-        if (!sheet) return { success: false, error: 'Sheet not found.' };
-
-        var data = sheet.getDataRange().getValues();
-        var headers = data[0];
-        var colMap = {};
-        headers.forEach(function(h, idx) { colMap[String(h).trim()] = idx + 1; });
-
-        var idColIdx = (colMap['ID'] || 1) - 1;
-        var rowIndex = -1;
-        for (var i = 1; i < data.length; i++) {
-            if (data[i][idColIdx] == id) { rowIndex = i + 1; break; }
-        }
-        if (rowIndex === -1) return { success: false, error: 'Record not found.' };
-
-        var attachCol = colMap['Attachments_JSON'];
-        if (!attachCol) return { success: false, error: 'Attachments_JSON column not found.' };
-
-        var existing = {};
-        try { existing = JSON.parse(data[rowIndex - 1][attachCol - 1] || '{}'); } catch(e) {}
-        existing[unitKey] = (existing[unitKey] || []).concat(newUrls);
-
-        sheet.getRange(rowIndex, attachCol).setValue(JSON.stringify(existing));
-        _invalidateNpSlimCache();
-        return { success: true, newUrls: newUrls };
+// Unguarded counterpart used ONLY right after submitNpSurvey creates a brand-new
+// record, from the same client that just created it — mirrors how Ref/Aircon embed
+// photos directly in their initial submit payload with no admin gate. Previously
+// handleNpSurveySubmit (index.html) called the ADMIN-gated addNpSurveyPhotos for
+// this, without a clientEmail — every regular user's initial NP photo upload was
+// silently failing ("Administrator privileges required", swallowed client-side).
+function addNpSurveyPhotosOnSubmit(id, unitKey, files) {
+    try {
+        return _saveNpPhotos_(id, unitKey, files, 'NewProduct_Survey_Attachments');
     } catch(e) {
         return { success: false, error: e.toString() };
     }
@@ -5083,7 +5333,7 @@ function deleteNpSurveyPhoto(id, unitKey, url, clientEmail) {
     try {
         var _wlock = _acquireWriteLock_();
         var adminCheck = checkSurveyAdminStatus(clientEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
             return { success: false, error: 'Administrator privileges required.' };
         }
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
@@ -5218,6 +5468,59 @@ function submitNpSurvey(form) {
         _invalidateNpSlimCache();
         return { success: true, id: id };
     } catch(e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ── Asset register mapping (survey edit mode) ──────────────────────────────
+// Lets an editor (isAdmin || smfCanEdit — same gate as the rest of the survey
+// edit panels) pick a unit's Asset No. from the real BGCFA fixed-asset ledger
+// instead of free-typing it. The ledger itself lives in the SEPARATE "Web App
+// People MNC" GAS project/Drive tree, pre-split into one small CSV per store
+// ("BCM Asset by Store", regenerated by Prepare_BCM_Asset_By_Store.ipynb) for
+// its own Flood Insurance Claim feature. Both apps' web apps run
+// executeAs: USER_DEPLOYING under the same owner account, so DriveApp here
+// can open that folder directly by name — no sharing/auth setup, no need to
+// call into the other app at all (same cross-project trick already used for
+// Store Master reads elsewhere in this app family). Mirrors
+// _lookupPrebuiltStoreAssets_/getStoreAssetList in that project's
+// FloodInsuranceClaim.js — kept as a separate read here (not a shared
+// library) since the two apps deploy independently.
+var ASSET_REGISTER_FOLDER_ = 'น้ำท่วม Writeoff';
+var ASSET_REGISTER_SUBFOLDER_ = 'BCM Asset by Store';
+
+function getStoreAssetRegisterForMapping(storeCode) {
+    var code = String(storeCode || '').trim();
+    if (!code) return { success: false, error: 'Missing store code' };
+    try {
+        var rootIt = DriveApp.getFoldersByName(ASSET_REGISTER_FOLDER_);
+        if (!rootIt.hasNext()) return { success: true, prebuilt: false, items: [] };
+        var subIt = rootIt.next().getFoldersByName(ASSET_REGISTER_SUBFOLDER_);
+        if (!subIt.hasNext()) return { success: true, prebuilt: false, items: [] };
+        var fileIt = subIt.next().getFilesByName(code + '.csv');
+        if (!fileIt.hasNext()) return { success: true, prebuilt: false, items: [] };
+
+        var rows = Utilities.parseCsv(fileIt.next().getBlob().getDataAsString('UTF-8'));
+        if (!rows.length) return { success: true, prebuilt: true, items: [] };
+        var idx = {};
+        rows[0].forEach(function (name, i) { idx[String(name).trim().toLowerCase()] = i; });
+
+        var items = [];
+        for (var r = 1; r < rows.length; r++) {
+            var row = rows[r];
+            if (!row.length || (row.length === 1 && !row[0])) continue; // trailing blank line
+            var assetNo = String(idx.hasOwnProperty('assetno') ? (row[idx.assetno] || '') : '').trim();
+            if (!assetNo) continue; // nothing to map without a real tag number
+            items.push({
+                assetNo:   assetNo,
+                category:  String(idx.hasOwnProperty('category') ? (row[idx.category] || '') : ''),
+                name:      String(idx.hasOwnProperty('name') ? (row[idx.name] || '') : ''),
+                qty:       idx.hasOwnProperty('qty') ? (row[idx.qty] || '') : '',
+                unitValue: idx.hasOwnProperty('unitvalue') ? (row[idx.unitvalue] || '') : ''
+            });
+        }
+        return { success: true, prebuilt: true, items: items };
+    } catch (e) {
         return { success: false, error: e.toString() };
     }
 }

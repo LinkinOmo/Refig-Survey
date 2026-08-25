@@ -1078,6 +1078,148 @@ function setSmfSurveyEditSetting(enabled, clientEmail) {
     }
 }
 
+// ─── General/Operation Survey Data Edit Setting ───────────────
+// Same edit surface as SMF Survey Data Edit above (Ref/NP/Aircon/EDMI/Layout/
+// Trading Hours report fields + photo reupload + the Asset No. register-
+// mapping picker, checked via checkSurveyAdminStatus().opsEditAllowed in
+// Survey.gs) but for ANY logged-in user, not just the SMF team. Defaults to
+// OFF (unlike the SMF toggle) since general/"Operation" users never had edit
+// access before this — an Admin must explicitly opt in.
+
+function getOpsSurveyEditSetting() {
+    var val = PropertiesService.getScriptProperties().getProperty('OPS_SURVEY_EDIT_ENABLED_V1');
+    return val === 'true';
+}
+
+function setOpsSurveyEditSetting(enabled, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin && !status.isSysAdmin) return { success: false, error: "Administrator privileges required." };
+        PropertiesService.getScriptProperties().setProperty('OPS_SURVEY_EDIT_ENABLED_V1', enabled ? 'true' : 'false');
+        return { success: true, enabled: enabled };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─── Brand Quick-Pick Chip Count ──────────────────────────────
+// Controls how many top-used brands render as one-tap "chip" buttons above
+// each Brand field's searchable text input (index.html's _brandChipsHtml) —
+// the chips themselves are always the most-submitted values first (same
+// frequency order as getEnumFieldOptions in Survey.gs), this only tunes how
+// many of them show per category. Stored as {groupKey: count}; a group
+// missing from the map (or any invalid/out-of-range value) falls back to
+// BRAND_CHIP_DEFAULT_COUNT so a newly added Brand category always renders
+// chips out of the box without needing admin setup first. 0 is a valid
+// count — it hides the chip row for that category, leaving just the
+// existing search input/datalist.
+var BRAND_CHIP_DEFAULT_COUNT = 16;
+var BRAND_CHIP_GROUPS = ['ref_brand', 'aircon_brand', 'np_brand_SC', 'np_brand_JT', 'np_brand_SH', 'np_brand_MK', 'np_brand_WF'];
+
+function getBrandChipConfig() {
+    try {
+        var val = PropertiesService.getScriptProperties().getProperty('BRAND_CHIP_COUNT_V1');
+        var stored = val ? JSON.parse(val) : {};
+        var merged = {};
+        BRAND_CHIP_GROUPS.forEach(function(k) {
+            var n = stored[k];
+            merged[k] = (typeof n === 'number' && n >= 0) ? n : BRAND_CHIP_DEFAULT_COUNT;
+        });
+        return { success: true, data: merged };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function setBrandChipConfig(config, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin && !status.isSysAdmin) return { success: false, error: "Administrator privileges required." };
+        var clean = {};
+        BRAND_CHIP_GROUPS.forEach(function(k) {
+            var n = parseInt((config || {})[k], 10);
+            clean[k] = (n >= 0 && n <= 50) ? n : BRAND_CHIP_DEFAULT_COUNT;
+        });
+        PropertiesService.getScriptProperties().setProperty('BRAND_CHIP_COUNT_V1', JSON.stringify(clean));
+        return { success: true, data: clean };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─── Brand Quick-Pick Chip Selection (explicit picks) ──────────
+// Lets an Admin pin the EXACT brands shown as chips per category, overriding
+// the auto top-N-by-frequency behavior above — e.g. to exclude a frequently
+// mistyped brand or surface one that isn't top-N yet. Stored as
+// {groupKey: string[]}; an empty/missing array for a group means "no
+// override", so BRAND_CHIP_COUNT_V1's auto top-N still applies for it.
+function getBrandChipSelection() {
+    try {
+        var val = PropertiesService.getScriptProperties().getProperty('BRAND_CHIP_SELECTION_V1');
+        var stored = val ? JSON.parse(val) : {};
+        var merged = {};
+        BRAND_CHIP_GROUPS.forEach(function(k) {
+            merged[k] = Array.isArray(stored[k]) ? stored[k] : [];
+        });
+        return { success: true, data: merged };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function setBrandChipSelection(config, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin && !status.isSysAdmin) return { success: false, error: "Administrator privileges required." };
+        var clean = {};
+        BRAND_CHIP_GROUPS.forEach(function(k) {
+            var arr = (config || {})[k];
+            clean[k] = Array.isArray(arr) ? arr.filter(function(v) { return typeof v === 'string' && v.trim(); }).slice(0, 50) : [];
+        });
+        PropertiesService.getScriptProperties().setProperty('BRAND_CHIP_SELECTION_V1', JSON.stringify(clean));
+        return { success: true, data: clean };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─── Equipment Photo Required Toggle (Super Admin) ──────────────
+// Lets an Admin/Super Admin turn off the "at least one photo per equipment unit"
+// requirement per survey type (Aircon/Ref/New Product), e.g. temporarily during a
+// network-poor bulk collection day. Stored as {type: true|false}; a type missing
+// from the stored config defaults to true (required) so the requirement is never
+// silently disabled by an incomplete/older saved config.
+var EQUIPMENT_PHOTO_TYPES = ['aircon', 'ref', 'np'];
+
+function getEquipmentPhotoRequired() {
+    try {
+        var val = PropertiesService.getScriptProperties().getProperty('EQUIPMENT_PHOTO_REQUIRED_V1');
+        var stored = val ? JSON.parse(val) : {};
+        var merged = {};
+        EQUIPMENT_PHOTO_TYPES.forEach(function(k) {
+            merged[k] = stored.hasOwnProperty(k) ? !!stored[k] : true;
+        });
+        return { success: true, data: merged };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function setEquipmentPhotoRequired(config, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin && !status.isSysAdmin) return { success: false, error: "Administrator privileges required." };
+        var clean = {};
+        EQUIPMENT_PHOTO_TYPES.forEach(function(k) {
+            clean[k] = !!(config || {})[k];
+        });
+        PropertiesService.getScriptProperties().setProperty('EQUIPMENT_PHOTO_REQUIRED_V1', JSON.stringify(clean));
+        return { success: true, data: clean };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
 // ─── Export Schedule as Excel URL ──────────────────────────────
 
 function getScheduleExportUrl() {
@@ -1968,6 +2110,38 @@ function getDuplicateSurveyData() {
 
     } catch (e) {
         Logger.log('getDuplicateSurveyData Error: ' + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─── Delete duplicate survey submissions for one site, keeping the latest ────
+// Super Admin (isAdmin) only. Thin wrapper over the shared merge-and-cleanup
+// engine in DuplicateCleanup.gs (mergeDuplicateSurveysForSite) — backs up every
+// matched row, merges any blank fields on the newest submission from the older
+// ones, then deletes the rest. Runs both Aircon and Ref for this exact
+// site+round in one call, matching the ตรวจซ้ำ tab's combined UI. Never crosses
+// rounds: a store's Q1 and Q2 submissions are each kept, only true
+// within-round duplicates are touched. See [[project_survey_round_tag]] for
+// why round-scoping matters here.
+function deleteDuplicateSurveysForSite(code, round, clientEmail) {
+    try {
+        var deletedCounts = { aircon: 0, ref: 0 };
+        var mergedAny = false;
+        var firstError = null;
+        ['aircon', 'ref'].forEach(function(typeKey) {
+            var res = mergeDuplicateSurveysForSite(typeKey, code, round, clientEmail);
+            if (res && res.success) {
+                deletedCounts[typeKey] = res.deleted || 0;
+                if (res.merged) mergedAny = true;
+            } else if (!firstError) {
+                // Super Admin check (or a hard error) failed — same admin check
+                // for both types, so one failure means both would fail.
+                firstError = (res && res.error) || 'Duplicate cleanup failed for ' + typeKey;
+            }
+        });
+        if (firstError) return { success: false, error: firstError };
+        return { success: true, deleted: deletedCounts, merged: mergedAny };
+    } catch (e) {
         return { success: false, error: e.toString() };
     }
 }

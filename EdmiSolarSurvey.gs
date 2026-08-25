@@ -302,7 +302,7 @@ function updateEdmiSolarSurveyRecord(form) {
 
         var ownerEmail = colMap["Reporter Email"] ? String(data[rowIndex - 1][colMap["Reporter Email"] - 1] || '').trim().toLowerCase() : '';
         var isOwner = ownerEmail && userEmail && ownerEmail === String(userEmail).trim().toLowerCase();
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !isOwner) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed && !isOwner) {
             return { success: false, error: "Administrator privileges or original reporter required." };
         }
 
@@ -375,7 +375,7 @@ function deleteEdmiSolarSurveyRecord(id, clientEmail) {
 function addEdmiSurveyPhotos(id, unitKey, files, clientEmail) {
     try {
         var adminCheck = checkSurveyAdminStatus(clientEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
             return { success: false, error: "Administrator privileges required." };
         }
 
@@ -434,7 +434,7 @@ function deleteEdmiSurveyPhoto(id, unitKey, url, clientEmail) {
     try {
         var _wlock = _acquireWriteLock_();
         var adminCheck = checkSurveyAdminStatus(clientEmail);
-        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed) {
+        if (!adminCheck.isAdmin && !adminCheck.isScheduleAdmin && !adminCheck.smfEditAllowed && !adminCheck.opsEditAllowed) {
             return { success: false, error: "Administrator privileges required." };
         }
 
