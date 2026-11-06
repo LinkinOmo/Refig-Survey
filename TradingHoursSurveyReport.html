@@ -46,6 +46,7 @@
 </head>
 
 <body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
 
     <!-- Top Navigation Bar -->
     <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-sm bg-opacity-95">
@@ -79,6 +80,8 @@
                         </svg>
                         <span class="hidden sm:inline">Export Excel</span>
                     </button>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=survey_dashboard&type=hours"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all shadow-sm">📊 Dashboard</a>
                     <button onclick="window.location.reload()"
                         class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-violet-600 transition-all shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -134,6 +137,24 @@
                 <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">ส่งใน 7 วันล่าสุด</p>
                 <h3 class="text-3xl font-bold text-slate-800" id="statThisWeek">0</h3>
             </div>
+        </div>
+
+        <!-- Phase Progress: per-phase completion breakdown with progress bars -->
+        <div id="phaseProgressPanel" class="hidden glass-panel rounded-xl p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-slate-700">📊 ความคืบหน้าตามเฟส (Phase Progress)</h3>
+                <span class="text-xs text-slate-400">คลิกแถบเพื่อดูรายชื่อสาขาที่ยังไม่ได้สำรวจ</span>
+            </div>
+            <div id="phaseProgressBody" class="space-y-3"></div>
+        </div>
+
+        <!-- Survey Stage Progress: Pre-Conversion Ready vs Post-Conversion Verified, per phase -->
+        <div id="stageProgressPanel" class="hidden glass-panel rounded-xl p-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-sm font-bold text-slate-700">🔀 ความคืบหน้าตามขั้นตอน (Survey Stage Progress)</h3>
+                <span class="text-xs text-slate-400">พร้อม (Pre) → ตรวจผ่านหลังปรับเปลี่ยน (Post)</span>
+            </div>
+            <div id="stageProgressBody" class="space-y-4"></div>
         </div>
 
         <!-- Gap Panel: target stores with no submission yet -->
@@ -381,7 +402,7 @@
                                     : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
                             }
                             applyAdminUI();
-                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed));
+                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed || flags.smfDedupAllowed));
                             // Default to the "By AM" coverage view for Admin/SMF viewers —
                             // the button is only visible to them anyway (see applyAdminUI).
                             // Delayed: firing getTradingHoursCoverageByAM() immediately here
@@ -466,7 +487,7 @@
                     if (errTitle) errTitle.textContent = 'เกิดข้อผิดพลาด: ' + (err.message || err);
                     document.getElementById('loadErrorBanner').classList.remove('hidden');
                 })
-                .getTradingHoursSurveyListSlim();
+                .getTradingHoursSurveyListSlim(window.ARCHIVE_ON);
         }
 
         // "Ready" (Pre-Conversion) and "Verified OK" (Post-Conversion) are both the
@@ -498,6 +519,112 @@
             var notSurveyed = hoursTargetStoresList.filter(function(t) { return !surveyedCodes.has(t.code); });
             document.getElementById('statNotSurveyed').textContent = notSurveyed.length;
             _renderGapPanel(notSurveyed);
+            _renderPhaseProgress(surveyedCodes);
+            _renderStageProgress();
+        }
+
+        // Sequential-stage breakdown per phase: how many target stores have a Ready
+        // Pre-Conversion result vs. how many have gone further and passed Post-Conversion
+        // verification. Uses the LATEST submission per stage per store — a store that's
+        // since failed a re-survey after once being Ready would drop out of the "Ready" count.
+        function _renderStageProgress() {
+            var panel = document.getElementById('stageProgressPanel');
+            var body = document.getElementById('stageProgressBody');
+            if (!panel || !body) return;
+            if (hoursTargetStoresList.length === 0) { panel.classList.add('hidden'); return; }
+
+            var preReadyCodes = new Set();
+            var postVerifiedCodes = new Set();
+            allData.forEach(function(r) {
+                var code = String(r['Branch Code']).trim();
+                if (!_isReady(r)) return;
+                if (_isPostStage(r)) postVerifiedCodes.add(code);
+                else preReadyCodes.add(code);
+            });
+
+            var byPhase = {};
+            hoursTargetStoresList.forEach(function(t) {
+                var p = t.phase || 'ไม่ระบุเฟส';
+                if (!byPhase[p]) byPhase[p] = [];
+                byPhase[p].push(t);
+            });
+            var phaseNames = Object.keys(byPhase).sort(function(a, b) {
+                var na = parseInt((a.match(/\d+/) || [])[0], 10);
+                var nb = parseInt((b.match(/\d+/) || [])[0], 10);
+                if (!isNaN(na) && !isNaN(nb)) return na - nb;
+                return a.localeCompare(b);
+            });
+
+            function stageBar(label, count, total, colorClass) {
+                var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                return '<div class="mb-2 last:mb-0">' +
+                    '<div class="flex justify-between items-baseline mb-0.5">' +
+                        '<span class="text-xs text-slate-600">' + label + '</span>' +
+                        '<span class="text-xs text-slate-500">' + count + ' / ' + total + ' (' + pct + '%)</span>' +
+                    '</div>' +
+                    '<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">' +
+                        '<div class="h-full ' + colorClass + ' rounded-full transition-all" style="width:' + pct + '%"></div>' +
+                    '</div>' +
+                '</div>';
+            }
+
+            body.innerHTML = phaseNames.map(function(p) {
+                var targets = byPhase[p];
+                var total = targets.length;
+                var preReady = targets.filter(function(t) { return preReadyCodes.has(t.code); }).length;
+                var postVerified = targets.filter(function(t) { return postVerifiedCodes.has(t.code); }).length;
+                return '<div>' +
+                    '<p class="text-sm font-semibold text-slate-700 mb-1.5">' + htmlEscape(p) + '</p>' +
+                    stageBar('📋 พร้อมแล้ว (Pre-Conversion Ready)', preReady, total, 'bg-sky-500') +
+                    stageBar('🔁 ตรวจผ่านหลังปรับเปลี่ยน (Post-Conversion Verified)', postVerified, total, 'bg-emerald-500') +
+                '</div>';
+            }).join('');
+            panel.classList.remove('hidden');
+        }
+
+        // Per-phase completion breakdown (progress bar per phase, sorted "Phase 1" < "Phase 2" < ...
+        // numerically where possible so it stays correct if a Phase 3 is ever added).
+        function _renderPhaseProgress(surveyedCodes) {
+            var panel = document.getElementById('phaseProgressPanel');
+            var body = document.getElementById('phaseProgressBody');
+            if (!panel || !body) return;
+            if (hoursTargetStoresList.length === 0) { panel.classList.add('hidden'); return; }
+
+            var byPhase = {};
+            hoursTargetStoresList.forEach(function(t) {
+                var p = t.phase || 'ไม่ระบุเฟส';
+                if (!byPhase[p]) byPhase[p] = [];
+                byPhase[p].push(t);
+            });
+            var phaseNames = Object.keys(byPhase).sort(function(a, b) {
+                var na = parseInt((a.match(/\d+/) || [])[0], 10);
+                var nb = parseInt((b.match(/\d+/) || [])[0], 10);
+                if (!isNaN(na) && !isNaN(nb)) return na - nb;
+                return a.localeCompare(b);
+            });
+
+            body.innerHTML = phaseNames.map(function(p) {
+                var targets = byPhase[p];
+                var surveyed = targets.filter(function(t) { return surveyedCodes.has(t.code); }).length;
+                var total = targets.length;
+                var remaining = total - surveyed;
+                var pct = total > 0 ? Math.round((surveyed / total) * 100) : 0;
+                var barColor = pct >= 100 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400';
+                var remainingLabel = remaining > 0
+                    ? '<span class="text-amber-600 font-semibold">เหลือ ' + remaining + ' สาขา</span>'
+                    : '<span class="text-emerald-600 font-semibold">ครบแล้ว 🎉</span>';
+                return '' +
+                    '<div class="cursor-pointer group" onclick="toggleGapPanel()" title="ดูรายชื่อสาขาที่ยังไม่ได้สำรวจ">' +
+                        '<div class="flex justify-between items-baseline mb-1">' +
+                            '<span class="text-sm font-semibold text-slate-700 group-hover:text-violet-700">' + htmlEscape(p) + '</span>' +
+                            '<span class="text-xs text-slate-500">' + surveyed + ' / ' + total + ' (' + pct + '%) &middot; ' + remainingLabel + '</span>' +
+                        '</div>' +
+                        '<div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">' +
+                            '<div class="h-full ' + barColor + ' rounded-full transition-all" style="width:' + pct + '%"></div>' +
+                        '</div>' +
+                    '</div>';
+            }).join('');
+            panel.classList.remove('hidden');
         }
 
         function _renderGapPanel(notSurveyed) {

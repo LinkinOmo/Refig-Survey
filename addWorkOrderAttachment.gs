@@ -21,6 +21,7 @@ function addWorkOrderAttachment(id, attachmentList) {
         if (newUrls.length === 0) return { success: false, error: "No valid files processing" };
 
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var rowIndex = -1;
         var currentUrls = "";

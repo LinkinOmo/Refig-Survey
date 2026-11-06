@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed Asset Rating Checklist</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 landscape; margin: 8mm; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', sans-serif; font-size: 10.5pt; color: #111; margin: 0; background: #e5e7eb; }
+        .sheet { width: 281mm; min-height: 194mm; margin: 8mm auto; background: #fff; padding: 6mm 7mm; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+        @media print { body { background: #fff; } .sheet { margin: 0; box-shadow: none; padding: 0; width: auto; min-height: 0; page-break-after: always; } .sheet:last-child { page-break-after: auto; } .noprint { display: none !important; } }
+        h1 { font-size: 15pt; margin: 0; }
+        h2 { font-size: 11pt; margin: 2.2mm 0 1.2mm; padding: 1mm 2mm; background: #ede9fe; border-left: 4px solid #7c3aed; }
+        .hdr { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #7c3aed; padding-bottom: 1.5mm; }
+        .muted { color: #555; font-size: 8.5pt; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { border: 1px solid #555; padding: 1.2mm 1.5mm; vertical-align: middle; }
+        th { background: #f3f4f6; font-size: 9pt; }
+        .tally { table-layout: fixed; }
+        .tally td { height: 9.5mm; }
+        .tally th, .tally td { font-size: 8pt; text-align: center; padding: .8mm .6mm; }
+        .tally th.g { background: #ede9fe; }
+        .o { background: #fff7ed !important; }
+        th.o { background: #ffedd5 !important; }
+        .mis td { height: 8.5mm; }
+        .mis th, .mis td { font-size: 8.5pt; text-align: center; }
+        .mis td:first-child { text-align: left; }
+        .box { display: inline-block; width: 3.6mm; height: 3.6mm; border: 1.2px solid #111; vertical-align: -0.6mm; margin-right: 1mm; }
+        .fill { border-bottom: 1px dotted #333; display: inline-block; min-width: 40mm; }
+        .pill { display: inline-block; padding: .3mm 2.2mm; border-radius: 3mm; color: #fff; font-weight: 700; }
+        .crit td { font-size: 9.5pt; }
+        .crit .band { text-align: center; white-space: nowrap; width: 27mm; }
+        .legend { font-size: 8pt; line-height: 1.35; }
+        .sign td { height: 16mm; vertical-align: bottom; text-align: center; font-size: 9pt; }
+        .toolbar { position: sticky; top: 0; background: #4c1d95; color: #fff; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; z-index: 5; font-size: 14px; }
+        .toolbar button, .toolbar input, .toolbar select { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; }
+        .toolbar button { background: #fff; color: #4c1d95; font-weight: 700; cursor: pointer; }
+        body.store .ho-only { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="toolbar noprint">
+        <b>🖨️ แบบประเมินระดับสี (Fixed Asset Pre-Count)</b>
+        <span>สาขา:</span><input id="storeInput" list="storeList" placeholder="รหัส / ชื่อสาขา (เว้นว่าง = ฟอร์มเปล่า)" style="min-width:260px" onchange="fillStore(this.value)">
+        <datalist id="storeList"></datalist>
+        <span>ฉบับ:</span><select id="edition" onchange="setEdition(this.value)">
+            <option value="ho">สำนักงานใหญ่ (มีเกณฑ์จำนวนแรงงาน)</option>
+            <option value="store">ส่งสาขา (ไม่มีเกณฑ์จำนวนแรงงาน)</option>
+        </select>
+        <button onclick="window.print()">พิมพ์ / Save PDF</button>
+        <span style="font-size:12px;opacity:.85">A4 แนวนอน 3 หน้า · ตั้งค่าเครื่องพิมพ์: Margins = Default, เปิด Background graphics</span>
+    </div>
+
+    <!-- PAGE 1: store info + storage-area tally -->
+    <div class="sheet">
+        <div class="hdr">
+            <div><h1>แบบสำรวจพื้นที่เก็บ Fixed Asset &amp; ประเมินระดับสีสาขา</h1><div class="muted">โครงการตรวจนับทรัพย์สิน HYPER Store (FAD / PPT-MTN / OPT) · เกณฑ์ <span class="ver"></span> — หน้า 1/3: บันทึกพื้นที่เก็บ<br><b>📸 กรอกครบแล้ว ถ่ายรูปแบบฟอร์มทุกหน้า แนบในแอป ข้อ 8 (บังคับ)</b></div></div>
+            <div class="muted" style="text-align:right">บันทึกเข้าระบบ: แท็บ 🏷️ Fixed Asset Hyper<br>ระบบคำนวณคะแนนให้อัตโนมัติ</div>
+        </div>
+        <table style="margin-top:2.5mm"><tr>
+            <td style="width:24%">รหัสสาขา: <b id="sCode" class="fill" style="min-width:25mm"></b></td>
+            <td style="width:30%">ชื่อสาขา: <b id="sName" class="fill"></b></td>
+            <td style="width:22%">VP: <b id="sVp" class="fill" style="min-width:30mm"></b></td>
+            <td>วันที่สำรวจ: <span class="fill" style="min-width:30mm"></span></td>
+        </tr><tr>
+            <td colspan="2">ผู้สำรวจ (ชื่อ / หน่วยงาน): <span class="fill" style="min-width:90mm"></span></td>
+            <td colspan="2">VP ประเมินเดิม: <span class="sVpColor"></span></td>
+        </tr></table>
+
+        <h2>A. พื้นที่เก็บทรัพย์สินนอกพื้นที่ขาย — 1 แถว ต่อ 1 พื้นที่</h2>
+        <table class="tally">
+            <colgroup>
+                <col style="width:8mm"><col style="width:33mm"><col style="width:13mm"><col style="width:9mm"><col style="width:10mm"><col style="width:9mm">
+                <col span="9" style="width:9mm">
+                <col style="width:10mm"><col style="width:10mm"><col style="width:17mm"><col style="width:10mm"><col style="width:11mm"><col style="width:12mm"><col style="width:15mm">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th rowspan="3">#</th><th rowspan="3">ชื่อพื้นที่</th><th rowspan="3">ประเภท<br><span style="font-weight:400">(รหัส T)</span></th><th rowspan="3">ชั้น</th>
+                    <th colspan="2" rowspan="2">ขนาด</th><th colspan="9">จำนวนชิ้น แยกกลุ่ม (ไม่มีให้ใส่ 0)</th>
+                    <th rowspan="3">รวม<br>ชิ้น</th><th rowspan="3">ของหนัก<br>ชิ้นใหญ่</th>
+                    <th rowspan="3">มี Tag อ่านได้<br><span style="font-weight:400">①≥80 ②50–79<br>③20–49 ④&lt;20 %</span></th>
+                    <th rowspan="3">สูง &gt;2ม.<br>/ซ้อนทับ</th><th rowspan="3">ต้องใช้โฟล์ค<br>ลิฟท์/นั่งร้าน<br>/รถบรรทุก</th>
+                    <th rowspan="3">ความเสี่ยง<br>(รหัส H)</th><th rowspan="3">ภาพ Asset<br><span style="font-weight:400">(แนบ / เลขรูป)</span></th>
+                </tr>
+                <tr><th colspan="3" class="g">A ใช้งานประจำ</th><th colspan="3" class="g">B ใช้ตามฤดูกาล</th><th colspan="3" class="g">C ไม่ใช้งาน</th></tr>
+                <tr><th>ตร.ม.</th><th>ช่อง<br>จอด</th>
+                    <th>A.1</th><th class="o">A.2</th><th class="o">A.3</th><th>B.1</th><th class="o">B.2</th><th class="o">B.3</th><th>C.1</th><th class="o">C.2</th><th class="o">C.3</th></tr>
+            </thead>
+            <tbody id="tallyRows"></tbody>
+            <tfoot><tr style="font-weight:700;background:#f5f3ff"><td colspan="4">รวมทั้งสาขา</td><td></td><td></td><td></td><td class="o"></td><td class="o"></td><td></td><td class="o"></td><td class="o"></td><td></td><td class="o"></td><td class="o"></td><td></td><td></td><td colspan="5" style="text-align:left;font-weight:400;font-size:8pt">จำนวนพื้นที่เก็บ: ______ จุด</td></tr></tfoot>
+        </table>
+        <div class="legend" style="display:grid;grid-template-columns:1.2fr 1fr;gap:4mm;margin-top:2mm">
+            <div><b>กลุ่มทรัพย์สิน:</b> <b>A</b> ใช้งานประจำ / สำรองพร้อมใช้ · <b>B</b> ใช้ตามฤดูกาล / เทศกาล / Event · <b>C</b> ไม่ใช้งานแล้ว / ชำรุด / ล้าสมัย — แต่ละกลุ่มแบ่ง 3 ประเภท:
+                <b>.1</b> = ของสาขานี้ · <b>.2</b> = มาจากสาขาอื่น · <b>.3</b> = ไม่ทราบที่มา หรือของ Supplier (ถ่ายรูป แจ้งรับคืนภายใน 14 วัน) — <span style="background:#ffedd5">ช่องสีส้ม</span> = ต้องระบุแหล่งที่มาในหน้า 2 ข้อ C (เกณฑ์ K3)<br>
+                <b>ขนาด:</b> ช่องจอดรถที่ใช้เก็บของ 1 ช่อง = 12.5 ตร.ม. · <b>ของหนัก/ชิ้นใหญ่</b> = ตู้แช่, เครื่องจักร, ชั้นเหล็ก, Checkout ฯลฯ (ต้องใช้ ≥ 2 คน) ·
+                <b>ทรัพย์สิน MIS</b> (คอมพิวเตอร์ / เครื่องชั่ง / อุปกรณ์เทคโนโลยี) ไม่ต้องนับในตารางนี้ — บันทึกแยกในหน้า 2 ข้อ B</div>
+            <div><b>รหัสประเภทพื้นที่:</b> <span id="typeLegend"></span><br><b>รหัสความเสี่ยง:</b> <span id="hazLegend"></span></div>
+        </div>
+    </div>
+
+    <!-- PAGE 2: MIS assets + origins / sales floor / supplier / pipeline -->
+    <div class="sheet">
+        <div class="hdr">
+            <div><h1>ทรัพย์สิน MIS &amp; แหล่งที่มา / พื้นที่ขาย</h1><div class="muted">หน้า 2/3 · สาขา <b class="sCode2"></b> <span class="sName2"></span></div></div>
+            <div class="muted" style="text-align:right">เกณฑ์ <span class="ver"></span></div>
+        </div>
+        <h2>B. ทรัพย์สิน MIS (คอมพิวเตอร์ / เครื่องชั่ง / อุปกรณ์เทคโนโลยี) — นับแยกให้ทีม MIS · ไม่นำไปคิดคะแนนระดับสี</h2>
+        <table class="mis">
+            <thead><tr><th style="width:62mm">ประเภท</th><th>A ใช้งานอยู่</th><th>B ใช้ตามฤดูกาล</th><th>C ไม่ใช้งาน / ชำรุด</th><th>รวม</th>
+                <th class="o" style="width:42mm">ในนี้มาจากสาขาอื่น /<br>ไม่ทราบที่มา / Supplier</th><th>ไม่มี Tag /<br>Tag อ่านไม่ได้</th><th style="width:48mm">พบที่ (เช่น FA01, สำนักงาน)</th><th style="width:18mm">ภาพ Asset</th></tr></thead>
+            <tbody id="misRows"></tbody>
+            <tfoot><tr style="font-weight:700;background:#f0f9ff"><td>รวม MIS</td><td></td><td></td><td></td><td></td><td class="o"></td><td></td><td colspan="2"></td></tr></tfoot>
+        </table>
+        <h2>C. แหล่งที่มา / พื้นที่ขาย &amp; สำนักงาน / Supplier / Pipeline</h2>
+        <table>
+            <tr><td colspan="3" style="background:#fff7ed"><b>แหล่งที่มาอื่นของทรัพย์สิน (เกณฑ์ K3)</b> — จากชิ้นกลุ่ม .2 / .3 ทุกพื้นที่: จำนวน ______ ที่ &nbsp; ระบุ (สาขาต้นทาง / Supplier / ไม่ทราบที่มา): <span class="fill" style="min-width:120mm"></span><br>
+                <span class="muted">แต่ละสาขาต้นทาง / แต่ละ Supplier / กลุ่มที่ไม่ทราบที่มา นับเป็น 1 ที่ — ไม่มี = 0 · 1 ที่ = 1 · 2 ที่ = 2 · มากกว่า 2 ที่ขึ้นไป = 3 คะแนน</span></td></tr>
+            <tr>
+                <td style="width:38%">ทรัพย์สินในพื้นที่ขายมี Tag อ่านได้: <span class="box"></span>≥80% <span class="box"></span>50–79% <span class="box"></span>20–49% <span class="box"></span>&lt;20%</td>
+                <td style="width:31%">ของใช้งานที่สงสัยว่ามาจากสาขาอื่น (A.2): ______ ชิ้น</td>
+                <td>พนักงานสาขาช่วยนับได้: ______ คน</td>
+            </tr><tr>
+                <td colspan="2">Supplier ที่มีของค้าง: <span class="fill" style="min-width:110mm"></span></td>
+                <td>แจ้ง Supplier รับคืน: <span class="box"></span>แจ้งแล้ว <span class="box"></span>ยังไม่แจ้ง</td>
+            </tr><tr>
+                <td>รายการที่แจ้งขอประมูลแล้ว (Pipeline): ______ รายการ</td>
+                <td colspan="2">ของไม่ใช้งาน (C) ที่น่าจะซ่อม / นำกลับมาใช้ได้: ______ ชิ้น · ถ่ายรูปทุกพื้นที่: มุมกว้าง + ภาพใกล้</td>
+            </tr><tr>
+                <td colspan="3" style="height:20mm;vertical-align:top">หมายเหตุ:</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- PAGE 3: criteria scoring + colour result + sign-off -->
+    <div class="sheet">
+        <div class="hdr">
+            <div><h1>ใบให้คะแนนระดับสีสาขา (Rating Criteria K1–K6)</h1><div class="muted">หน้า 3/3 · สาขา <b class="sCode2"></b> <span class="sName2"></span> · แต่ละเกณฑ์ให้ 0–3 คะแนน · K1–K5 จากหน้า 1–2 · K6 จากข้อมูล HO (ค่า ≥ เกณฑ์ จึงได้คะแนนช่องนั้น)</div></div>
+            <div class="muted" style="text-align:right">เกณฑ์ <span class="ver"></span><br>ปรับเกณฑ์หลังสาขานำร่อง</div>
+        </div>
+        <table class="crit" style="margin-top:2.5mm">
+            <thead><tr><th style="width:9mm">K</th><th style="width:50mm">เกณฑ์</th><th>วิธีวัด</th><th style="width:24mm">ค่าที่วัดได้</th>
+                <th class="band">0 คะแนน</th><th class="band">1 คะแนน</th><th class="band">2 คะแนน</th><th class="band">3 คะแนน</th><th style="width:15mm">คะแนน</th></tr></thead>
+            <tbody id="critRows"></tbody>
+            <tfoot><tr style="font-weight:700;background:#f5f3ff"><td colspan="8" style="text-align:right">คะแนนรวม (0–18)</td><td style="font-size:14pt;text-align:center"></td></tr></tfoot>
+        </table>
+        <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:5mm;margin-top:3mm">
+            <div>
+                <h2 style="margin-top:0">D. ระดับสี <span class="ho-only">→ แรงงาน</span> → งบประมาณ (ติ๊ก 1 ช่อง)</h2>
+                <table><thead><tr><th>ระดับสี</th><th>คะแนนรวม</th><th class="ho-only">แรงงานภายนอก</th><th>งบ/สาขา</th></tr></thead><tbody id="colorRows"></tbody></table>
+                <p class="muted" style="margin:1.2mm 0 0" id="overrideNote"></p>
+            </div>
+            <div>
+                <h2 style="margin-top:0">E. เทียบกับ VP &amp; ข้อเสนอ</h2>
+                <table>
+                    <tr><td>VP ประเมินเดิม: <span class="sVpColor"></span></td></tr>
+                    <tr><td>ผลเกณฑ์เทียบ VP: <span class="box"></span>ตรงกัน <span class="box"></span>ยากกว่า VP ___ ระดับ <span class="box"></span>ง่ายกว่า VP ___ ระดับ</td></tr>
+                    <tr><td>ทีมสำรวจเสนอสีอื่น: <span class="box"></span>ไม่ (ใช้ผลเกณฑ์) <span class="box"></span>เสนอ ______ เหตุผล (บังคับ):<br><span class="fill" style="min-width:100%;margin-top:4mm"></span></td></tr>
+                    <tr><td>จุดอันตรายต้องแก้ทันที: <span class="box"></span>ไม่มี <span class="box"></span>มี — <span class="fill" style="min-width:60mm"></span></td></tr>
+                </table>
+            </div>
+        </div>
+        <table class="sign" style="margin-top:4mm"><tr>
+            <td>ลงชื่อ ................................................<br>ผู้สำรวจ (PPT-MTN / FAD)<br>วันที่ ........../........../..........</td>
+            <td>ลงชื่อ ................................................<br>ผู้จัดการสาขา (SGM / DM)<br>วันที่ ........../........../..........</td>
+            <td>ลงชื่อ ................................................<br>VP Operations (ยืนยันระดับสี)<br>วันที่ ........../........../..........</td>
+        </tr></table>
+    </div>
+
+    <script>
+        const FA = <?!= JSON.stringify(getHyperFaConfig_()) ?>;
+        const STORES = <?!= JSON.stringify(HYPER_FA_STORES) ?>;
+        const PRESET = <?!= JSON.stringify(storeCode || '') ?>;
+        const PRESET_EDITION = <?!= JSON.stringify(edition || 'ho') ?>;
+        const VERSION = 'Draft v2 (29/10/2026)';
+        let EDITION = 'ho', CUR = '';
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+        // Same bands as hyperFaVpColor_() in HyperFixedAssetSurvey.gs
+        function vpColor(need) { if (need === '' || need == null) return ''; need = parseInt(need, 10); return need >= 8 ? 'RED' : need >= 4 ? 'ORG' : need >= 1 ? 'YEL' : 'GRE'; }
+        function pill(c) { return '<span class="pill" style="background:' + c.hex + '">' + c.k + ' ' + c.l + '</span>'; }
+        function colorBoxes() { return FA.colors.slice().reverse().map(function(c) { return '<span class="box"></span>' + pill(c) + ' '; }).join(''); }
+        function setAll(sel, h) { document.querySelectorAll(sel).forEach(function(el) { el.innerHTML = h; }); }
+
+        setAll('.ver', VERSION);
+        document.getElementById('typeLegend').innerHTML = FA.areaTypes.map(function(t, i) { return '<b>T' + (i + 1) + '</b> ' + esc(t); }).join(' · ');
+        document.getElementById('hazLegend').innerHTML = FA.hazard.map(function(h, i) { return '<b>H' + (i + 1) + '</b> ' + esc(h); }).join(' · ');
+        let rows = '';
+        for (let i = 1; i <= 8; i++) {
+            rows += '<tr><td>FA' + String(i).padStart(2, '0') + '</td><td></td><td>T</td>' + '<td></td>'.repeat(3);
+            for (let g = 0; g < 3; g++) rows += '<td></td><td class="o"></td><td class="o"></td>';
+            rows += '<td></td><td></td><td style="font-size:7.5pt">① ② ③ ④</td><td>☐</td><td>☐</td><td>H</td><td style="font-size:7.5pt">☐ แนบ #____</td></tr>';
+        }
+        document.getElementById('tallyRows').innerHTML = rows;
+        document.getElementById('misRows').innerHTML = FA.misTypes.map(function(t) { return '<tr><td>' + esc(t) + '</td><td></td><td></td><td></td><td></td><td class="o"></td><td></td><td></td><td style="font-size:7.5pt">☐ แนบ #____</td></tr>'; }).join('');
+
+        // criteria rows — bands are generated from the live cut points so paper and app always agree
+        const HOW = {
+            K1: 'รวม ตร.ม. ทุกพื้นที่ (ช่องจอด × 12.5)',
+            K2: 'รวมจำนวนชิ้นทุกกลุ่ม A + B + C (.1 / .2 / .3) — ไม่รวม MIS',
+            K3: 'จำนวนแหล่งที่มาอื่นของชิ้นกลุ่ม .2 / .3 (หน้า 2 ข้อ C): แต่ละสาขาต้นทาง / แต่ละ Supplier / ไม่ทราบที่มา = 1 ที่',
+            K4: '100 − % ที่มี Tag (เฉลี่ยถ่วงตามจำนวนชิ้น: ①90 ②65 ③35 ④10)',
+            K5: 'นับปัจจัย: ① ≥ 4 พื้นที่เก็บ ② ของหนัก ≥ 20 ชิ้น ③ ต้องใช้โฟล์คลิฟท์/นั่งร้าน/รถบรรทุก ④ กองสูง > 2 ม. หรือซ้อนทับ (สูงสุด 3 คะแนน)',
+            K6: 'ข้อมูลสาขาของ HO (Store Size): ① ขนาด Standard ≥ 8K ตร.ม. ② อายุสาขา ≥ ' + FA.profileAge + ' ปี ③ ≥ 2 ชั้น หรือ ≥ 2 อาคาร'
+        };
+        document.getElementById('critRows').innerHTML = FA.criteria.map(function(c) {
+            const f = function(n) { return Number(n).toLocaleString(); };
+            let cells;
+            if (c.unit === 'ที่') cells = ['- (ไม่มี)', f(c.cuts[0]) + ' ที่', f(c.cuts[1]) + ' ที่', 'มากกว่า ' + f(c.cuts[2] - 1) + ' ที่ขึ้นไป'];
+            else {
+                const u = c.unit === 'ปัจจัย' ? ' ข้อ' : ' ' + c.unit;
+                const lo = function(i) { return c.unit === 'ปัจจัย' ? f(c.cuts[i]) + u : f(c.cuts[i]) + '–&lt;' + f(c.cuts[i + 1]) + u; };
+                cells = ['&lt; ' + f(c.cuts[0]) + u, lo(0), lo(1), '≥ ' + f(c.cuts[2]) + u];
+            }
+            return '<tr><td style="text-align:center;font-weight:700">' + c.k + '</td><td><b>' + esc(c.l) + '</b></td><td style="font-size:8.5pt">' + esc(HOW[c.k] || c.hint) + (c.k === 'K6' ? '<div id="k6info" style="font-size:8pt;color:#9a3412"></div>' : '') + '</td><td' + (c.k === 'K6' ? ' id="k6val" style="text-align:center;font-weight:700"' : '') + '></td>' +
+                cells.map(function(x) { return '<td class="band"><span class="box"></span>' + x + '</td>'; }).join('') + '<td' + (c.k === 'K6' ? ' id="k6score" style="text-align:center;font-weight:700;font-size:13pt"' : '') + '></td></tr>';
+        }).join('');
+        document.getElementById('colorRows').innerHTML = FA.colors.slice().reverse().map(function(c, i, arr) {
+            const next = i === 0 ? 18 : arr[i - 1].min - 1;
+            return '<tr><td><span class="box"></span>' + pill(c) + ' ' + esc(c.th) + '</td><td style="text-align:center">' + c.min + '–' + next + '</td><td class="ho-only" style="text-align:center">' + (c.people ? c.people + ' คน × ' + c.days + ' วัน' : 'ไม่ต้องเพิ่มคน (สาขาทำเอง)') + '</td><td style="text-align:right">' + c.cost.toLocaleString() + ' ฿</td></tr>';
+        }).join('');
+        document.getElementById('overrideNote').innerHTML = '⚠️ เป็น <b>แดง</b> ทันที ไม่ว่าคะแนนเท่าไร ถ้าพื้นที่เก็บรวม ≥ ' + FA.redOverride.sqm.toLocaleString() + ' ตร.ม. หรือ ≥ ' + FA.redOverride.pieces.toLocaleString() + ' ชิ้น<span class="ho-only"> · งบ ≈ 500 ฿ / คน / วัน</span>';
+
+        document.getElementById('storeList').innerHTML = STORES.map(function(s) { return '<option value="' + esc(s[0] + ' ' + (s[3] || s[2])) + '">'; }).join('');
+        // HO edition shows the labour criteria; the edition sent to stores leaves out every head-count
+        function setEdition(v) {
+            EDITION = v === 'store' ? 'store' : 'ho';
+            document.body.classList.toggle('store', EDITION === 'store');
+            document.getElementById('edition').value = EDITION;
+            document.title = 'Fixed Asset Rating Checklist' + (EDITION === 'store' ? ' (Store)' : ' (HO)');
+            fillStore(CUR);
+        }
+        function fillStore(v) {
+            CUR = v || '';
+            const code = String(v || '').trim().split(' ')[0];
+            // no code = truly blank form (some stores have an empty branch-new code, so never search for '')
+            const s = code ? STORES.find(function(x) { return x[0] === code || x[1] === code; }) : null;
+            const set = function(id, h) { document.getElementById(id).innerHTML = h; };
+            const vpK = s ? vpColor(s[8]) : '', c = FA.colors.find(function(x) { return x.k === vpK; }), ho = EDITION === 'ho';
+            const vpHtml = c ? pill(c) + (ho ? ' (' + s[8] + ' คน)' : '') : colorBoxes() + (ho ? ' จำนวนคนที่ขอ ____' : '');
+            set('sCode', s ? s[0] : ''); set('sName', s ? esc((s[3] ? s[3] + ' / ' : '') + s[2] + ' · ' + s[4]) : '');
+            set('sVp', s ? esc(s[5] || '-') : ''); setAll('.sVpColor', vpHtml);
+            setAll('.sCode2', s ? s[0] : '__________'); setAll('.sName2', s ? esc(s[3] || s[2]) : '');
+            // K6 is desk data — pre-fill it so the field team only scores K1–K5
+            const pf = profile(s), k6 = FA.criteria.find(function(c) { return c.k === 'K6'; });
+            set('k6info', s ? 'สาขานี้: ขนาด ' + esc(s[14] || 'ไม่มีข้อมูล') + ' · เปิด ' + esc(s[15] || '-') + (pf.age !== '' ? ' (' + pf.age + ' ปี)' : '') + ' · ' + (s[16] !== '' ? s[16] + ' ชั้น / ' + s[17] + ' อาคาร' : 'ชั้นไม่มีข้อมูล') : '');
+            set('k6val', s ? pf.factors.length + ' ข้อ' : '');
+            set('k6score', s && k6 ? String(k6.cuts.filter(function(x) { return pf.factors.length >= x; }).length) : '');
+        }
+        // Same rules as hyperFaProfile_() in HyperFixedAssetSurvey.gs
+        function profile(st) {
+            const f = []; let age = '';
+            if (!st) return { factors: f, age: age };
+            if (/^Standard/i.test(st[14] || '')) f.push('size');
+            if (st[15]) { age = Math.floor((new Date() - new Date(st[15] + 'T00:00:00')) / (365.25 * 864e5)); if (age >= FA.profileAge) f.push('age'); }
+            if ((parseInt(st[16], 10) || 0) >= 2 || (parseInt(st[17], 10) || 0) >= 2) f.push('levels');
+            return { factors: f, age: age };
+        }
+        if (PRESET) document.getElementById('storeInput').value = PRESET;
+        CUR = PRESET;
+        setEdition(PRESET_EDITION);
+    </script>
+</body>
+</html>

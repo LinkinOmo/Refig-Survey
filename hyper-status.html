@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hyper Submission &amp; Review Status</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; }
+  .tab-btn.active { background: #4338ca; color: #fff; }
+  .type-chip { border:1px solid #c7d2fe; background:#fff; color:#3730a3; border-radius:9999px; padding:2px 10px; font-size:12px; cursor:pointer; user-select:none; }
+  .type-chip.on { background:#4338ca; color:#fff; border-color:#4338ca; }
+  .st { display:inline-flex; align-items:center; gap:3px; padding:1px 7px; border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap; }
+  .st-none { background:#fee2e2; color:#991b1b; }
+  .st-Pending, .st-Corrected { background:#fef3c7; color:#92400e; }
+  .st-Acknowledged { background:#d1fae5; color:#065f46; }
+  .st-Rejected { background:#fecaca; color:#7f1d1d; }
+  .miss { display:inline-block; background:#fee2e2; color:#991b1b; border-radius:9999px; padding:1px 8px; font-size:11px; margin:1px; }
+  th { position: sticky; top: 0; z-index: 1; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div class="bg-gradient-to-r from-indigo-700 to-indigo-900 text-white px-4 py-4 shadow-lg">
+  <div class="max-w-7xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+    <div>
+      <h1 class="text-lg font-bold">🧭 Hyper — สถานะการส่ง &amp; การตรวจรับ</h1>
+      <p class="text-xs text-indigo-200 mt-0.5">สาขาไหนยังไม่ส่ง · ส่งแล้วรอตรวจ · ไม่ผ่าน · ตรวจรับแล้ว — ตู้แช่ · แอร์ · อุปกรณ์อาคาร · Fresh Food · แสงสว่าง · ห้องน้ำ · ที่จอดรถ/ผู้พิการ</p>
+    </div>
+    <div class="flex items-center gap-3 text-xs">
+      <span id="reviewer-badge" class="hidden bg-amber-400 text-amber-900 font-bold px-2 py-0.5 rounded-full">✍️ ผู้ตรวจรับ</span>
+      <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-schedule" target="_blank" class="text-indigo-100 underline">📅 Hyper Schedule</a>
+      <a href="<?= ScriptApp.getService().getUrl() ?>?page=survey_dashboard&type=hyperRef" target="_blank" class="text-indigo-100 underline">📊 Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-7xl mx-auto px-3 py-4 space-y-4">
+  <!-- Controls -->
+  <div class="bg-white rounded-xl border p-3 space-y-2">
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+      <label class="text-gray-600">นับเฉพาะที่ส่งตั้งแต่</label>
+      <input type="date" id="f-since" class="border rounded-lg px-2 py-1">
+      <button onclick="loadData(true)" class="px-3 py-1 rounded-lg bg-indigo-600 text-white font-semibold">โหลด</button>
+      <button onclick="document.getElementById('f-since').value='';loadData(true)" class="px-3 py-1 rounded-lg border">ทั้งหมด (ไม่จำกัดวันที่)</button>
+      <span id="plan-hint" class="text-xs text-gray-500"></span>
+      <span class="ml-auto text-xs text-gray-400" id="gen-at"></span>
+      <button onclick="exportExcel()" class="px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold">⬇️ Excel</button>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 text-sm">
+      <input id="f-q" oninput="render()" placeholder="ค้นหารหัส / ชื่อสาขา / AMM" class="border rounded-lg px-2 py-1">
+      <select id="f-fmt" onchange="render()" class="border rounded-lg px-2 py-1"><option value="">ทุกรูปแบบ</option></select>
+      <select id="f-reg" onchange="render()" class="border rounded-lg px-2 py-1"><option value="">ทุกภาค</option></select>
+      <select id="f-amm" onchange="render()" class="border rounded-lg px-2 py-1"><option value="">ทุก AMM</option></select>
+      <span class="text-gray-500 text-xs ml-2">แบบสำรวจที่นับ:</span>
+      <span id="type-chips" class="flex flex-wrap gap-1"></span>
+    </div>
+  </div>
+
+  <div id="loading" class="text-sm text-gray-500">กำลังโหลด...</div>
+  <div id="err" class="hidden bg-red-50 border border-red-300 text-red-700 rounded-xl p-3 text-sm"></div>
+
+  <div id="main" class="hidden space-y-4">
+    <div id="cards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3"></div>
+
+    <div class="bg-white rounded-xl border overflow-x-auto">
+      <table class="w-full text-sm min-w-[720px]">
+        <thead><tr class="bg-indigo-50 text-xs font-bold text-indigo-800">
+          <th class="px-3 py-2 text-left">แบบสำรวจ</th><th class="px-3 py-2 text-left w-1/3">ส่งแล้ว / ทั้งหมด</th>
+          <th class="px-3 py-2 text-center">❌ ยังไม่ส่ง</th><th class="px-3 py-2 text-center">⏳ รอตรวจ</th>
+          <th class="px-3 py-2 text-center">🔁 ไม่ผ่าน</th><th class="px-3 py-2 text-center">✅ ตรวจรับแล้ว</th>
+        </tr></thead>
+        <tbody id="type-body"></tbody>
+      </table>
+    </div>
+
+    <div class="flex gap-1 bg-white p-1 rounded-xl shadow-sm border w-fit flex-wrap">
+      <button class="tab-btn active px-4 py-2 rounded-lg text-sm font-semibold" data-tab="missing" onclick="showTab('missing')">❌ ยังไม่ส่ง <span id="n-missing"></span></button>
+      <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="pending" onclick="showTab('pending')">⏳ รอตรวจ <span id="n-pending"></span></button>
+      <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="rejected" onclick="showTab('rejected')">🔁 ไม่ผ่าน <span id="n-rejected"></span></button>
+      <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="ack" onclick="showTab('ack')">✅ ตรวจรับแล้ว <span id="n-ack"></span></button>
+      <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="matrix" onclick="showTab('matrix')">📋 ภาพรวมรายสาขา</button>
+    </div>
+    <div id="tab-body" class="bg-white rounded-xl border overflow-x-auto" style="max-height:70vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- Reject note modal (no browser prompt()) -->
+<div id="rej-modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-4 space-y-3">
+    <h3 class="font-bold text-gray-800">🔁 ไม่ผ่าน — ระบุสิ่งที่ต้องแก้ไข</h3>
+    <p id="rej-target" class="text-xs text-gray-500"></p>
+    <textarea id="rej-note" rows="4" class="w-full border rounded-lg p-2 text-sm" placeholder="เช่น รูปตู้ไม่ครบ / IR ไม่ได้วัด 3 จุด / Asset No. ผิด"></textarea>
+    <div class="flex justify-end gap-2">
+      <button onclick="closeReject()" class="px-3 py-1.5 rounded-lg border text-sm">ยกเลิก</button>
+      <button onclick="confirmReject()" class="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-semibold">บันทึก ไม่ผ่าน</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var BASE = '<?= ScriptApp.getService().getUrl() ?>';
+var DATA = null, TAB = 'missing', SEL = {}, USER_EMAIL = '', CAN_REVIEW = false, REJ = null, FLAGS_LOADED = false;
+var REVIEW_SLA_DAYS = 3;   // manual: AMM reviews within 3 working days
+
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function isPend(st) { return st === 'Pending' || st === 'Corrected'; }
+function stLabel(st) { return { Pending: '⏳ รอตรวจ', Corrected: '⏳ แก้แล้ว รอตรวจ', Acknowledged: '✅ ผ่าน', Rejected: '🔁 ไม่ผ่าน' }[st] || st; }
+
+(function init() {
+  try {
+    var u = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+    if (u && localStorage.getItem('app_auth_token')) USER_EMAIL = u.email || '';
+  } catch (e) {}
+  loadData(false);
+})();
+
+function loadFlags() {
+  if (!USER_EMAIL) return;
+  google.script.run.withSuccessHandler(function(f) {
+    CAN_REVIEW = !!(f && (f.isAdmin || f.isScheduleAdmin || f.smfEditAllowed || f.opsEditAllowed));
+    document.getElementById('reviewer-badge').classList.toggle('hidden', !CAN_REVIEW);
+    if (DATA) render();
+  }).withFailureHandler(function() {}).getUserFlags(USER_EMAIL);
+}
+
+function loadData(useInput) {
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('err').classList.add('hidden');
+  var since = useInput ? document.getElementById('f-since').value : null;
+  // First load: default to the Hyper schedule's plan start date (current round) when one exists.
+  google.script.run.withSuccessHandler(function(res) {
+    if (res && res.success && since === null && res.plan && res.plan.startDate) {
+      document.getElementById('f-since').value = res.plan.startDate;
+      return loadData(true);
+    }
+    onData(res);
+    // Flags only after the main payload — back-to-back google.script.run calls on first load
+    // can drop a callback (same note as the report pages).
+    if (!FLAGS_LOADED) { FLAGS_LOADED = true; loadFlags(); }
+  }).withFailureHandler(function(err) { showErr(err.message); }).getHyperSubmissionStatus(since || '');
+}
+
+function showErr(msg) {
+  document.getElementById('loading').classList.add('hidden');
+  var e = document.getElementById('err'); e.textContent = 'โหลดไม่สำเร็จ: ' + msg; e.classList.remove('hidden');
+}
+
+function onData(res) {
+  document.getElementById('loading').classList.add('hidden');
+  if (!res || !res.success) return showErr(res && res.error);
+  var keepSel = DATA ? SEL : null;
+  DATA = res;
+  if (!keepSel) { SEL = {}; res.kinds.forEach(function(k) { SEL[k.key] = true; }); }
+  document.getElementById('gen-at').textContent = 'ข้อมูล ณ ' + res.generatedAt + ' (cache ≤5 นาที)';
+  var p = res.plan || {};
+  document.getElementById('plan-hint').textContent = p.startDate
+    ? 'แผน Hyper' + (p.round ? ' รอบ ' + p.round : '') + ': เริ่ม ' + p.startDate + (p.deadline ? ' · deadline ' + p.deadline : '')
+    : 'ยังไม่มีแผน Hyper — นับทุกครั้งที่เคยส่ง';
+  fillSelect('f-fmt', res.stores.map(function(s) { return s.format; }), 'ทุกรูปแบบ');
+  fillSelect('f-reg', res.stores.map(function(s) { return s.region; }), 'ทุกภาค');
+  fillSelect('f-amm', res.stores.map(function(s) { return s.amm || '(ไม่ทราบ AMM)'; }), 'ทุก AMM');
+  document.getElementById('type-chips').innerHTML = res.kinds.map(function(k) {
+    return '<span class="type-chip' + (SEL[k.key] ? ' on' : '') + '" onclick="toggleType(\'' + k.key + '\')">' + k.icon + ' ' + esc(k.label) + '</span>';
+  }).join('');
+  document.getElementById('main').classList.remove('hidden');
+  render();
+}
+
+function fillSelect(id, vals, allLabel) {
+  var el = document.getElementById(id), cur = el.value;
+  var u = vals.filter(function(v, i) { return v && vals.indexOf(v) === i; }).sort();
+  el.innerHTML = '<option value="">' + allLabel + '</option>' + u.map(function(v) { return '<option' + (v === cur ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('');
+}
+
+function toggleType(k) {
+  SEL[k] = !SEL[k];
+  if (!Object.keys(SEL).some(function(x) { return SEL[x]; })) SEL[k] = true;   // keep at least one
+  onData(DATA);
+}
+
+function kindsOn() { return DATA.kinds.filter(function(k) { return SEL[k.key]; }); }
+
+function filteredStores() {
+  var q = document.getElementById('f-q').value.trim().toLowerCase();
+  var fmt = document.getElementById('f-fmt').value, reg = document.getElementById('f-reg').value, amm = document.getElementById('f-amm').value;
+  return DATA.stores.filter(function(s) {
+    if (fmt && s.format !== fmt) return false;
+    if (reg && s.region !== reg) return false;
+    if (amm && (s.amm || '(ไม่ทราบ AMM)') !== amm) return false;
+    if (q && (s.code + ' ' + s.name + ' ' + s.nameTh + ' ' + s.amm).toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+}
+
+// One row per (store, type) submission, for the review lists.
+function subRows(stores, pred) {
+  var out = [];
+  stores.forEach(function(s) {
+    kindsOn().forEach(function(k) { var c = s.s[k.key]; if (c && pred(c)) out.push({ s: s, k: k, c: c }); });
+  });
+  return out;
+}
+
+function render() {
+  if (!DATA) return;
+  var stores = filteredStores(), ks = kindsOn();
+  var complete = 0, none = 0, partial = 0;
+  stores.forEach(function(s) {
+    var n = ks.filter(function(k) { return s.s[k.key]; }).length;
+    if (n === ks.length) complete++; else if (n === 0) none++; else partial++;
+  });
+  var pend = subRows(stores, function(c) { return isPend(c.st); });
+  var overdue = pend.filter(function(r) { return r.c.ageDays !== '' && r.c.ageDays > REVIEW_SLA_DAYS; }).length;
+  var rej = subRows(stores, function(c) { return c.st === 'Rejected'; });
+  var ack = subRows(stores, function(c) { return c.st === 'Acknowledged'; });
+  var allAck = stores.filter(function(s) { return ks.every(function(k) { return s.s[k.key] && s.s[k.key].st === 'Acknowledged'; }); }).length;
+
+  document.getElementById('cards').innerHTML = [
+    card('สาขาในขอบเขต', stores.length, 'Big Format', 'slate'),
+    card('ส่งครบทุกแบบ', complete, pct(complete, stores.length), 'emerald'),
+    card('ส่งบางส่วน', partial, pct(partial, stores.length), 'sky'),
+    card('ยังไม่ส่งเลย', none, pct(none, stores.length), 'red'),
+    card('รอตรวจ (รายการ)', pend.length, overdue ? overdue + ' รายการ เกิน ' + REVIEW_SLA_DAYS + ' วัน' : 'ไม่มีค้างเกินกำหนด', 'amber'),
+    card('ไม่ผ่าน รอแก้', rej.length, 'รายการ', 'rose'),
+    card('ตรวจรับครบทุกแบบ', allAck, pct(allAck, stores.length) + ' ของสาขา', 'indigo')
+  ].join('');
+
+  document.getElementById('type-body').innerHTML = ks.map(function(k) {
+    var sub = 0, p = 0, r = 0, a = 0;
+    stores.forEach(function(s) { var c = s.s[k.key]; if (!c) return; sub++; if (isPend(c.st)) p++; else if (c.st === 'Rejected') r++; else if (c.st === 'Acknowledged') a++; });
+    var w = stores.length ? Math.round(sub * 100 / stores.length) : 0;
+    return '<tr class="border-t"><td class="px-3 py-2 font-semibold">' + k.icon + ' ' + esc(k.label) +
+      ' <a class="text-xs text-indigo-600 underline ml-1" target="_blank" href="' + BASE + '?page=' + k.page + '">รายงาน</a></td>' +
+      '<td class="px-3 py-2"><div class="flex items-center gap-2"><div class="flex-1 bg-gray-100 rounded-full h-2"><div class="bg-emerald-500 h-2 rounded-full" style="width:' + w + '%"></div></div>' +
+      '<span class="text-xs whitespace-nowrap">' + sub + ' / ' + stores.length + ' (' + w + '%)</span></div></td>' +
+      '<td class="px-3 py-2 text-center text-red-700 font-semibold">' + (stores.length - sub) + '</td>' +
+      '<td class="px-3 py-2 text-center text-amber-700 font-semibold">' + p + '</td>' +
+      '<td class="px-3 py-2 text-center text-rose-700 font-semibold">' + r + '</td>' +
+      '<td class="px-3 py-2 text-center text-emerald-700 font-semibold">' + a + '</td></tr>';
+  }).join('');
+
+  var missingStores = stores.filter(function(s) { return ks.some(function(k) { return !s.s[k.key]; }); });
+  document.getElementById('n-missing').textContent = '(' + missingStores.length + ')';
+  document.getElementById('n-pending').textContent = '(' + pend.length + ')';
+  document.getElementById('n-rejected').textContent = '(' + rej.length + ')';
+  document.getElementById('n-ack').textContent = '(' + ack.length + ')';
+
+  var body = document.getElementById('tab-body');
+  if (TAB === 'missing') body.innerHTML = renderMissing(missingStores, ks);
+  else if (TAB === 'pending') body.innerHTML = renderSubs(pend.sort(function(a, b) { return (b.c.ageDays || 0) - (a.c.ageDays || 0); }), 'pending');
+  else if (TAB === 'rejected') body.innerHTML = renderSubs(rej, 'rejected');
+  else if (TAB === 'ack') body.innerHTML = renderSubs(ack, 'ack');
+  else body.innerHTML = renderMatrix(stores, ks);
+}
+
+function pct(a, b) { return b ? Math.round(a * 100 / b) + '%' : '-'; }
+function card(label, val, sub, color) {
+  return '<div class="bg-white rounded-xl border-l-4 border-' + color + '-500 border p-3"><div class="text-xs text-gray-500">' + label + '</div>' +
+    '<div class="text-2xl font-bold text-' + color + '-700">' + val + '</div><div class="text-xs text-gray-400">' + esc(sub) + '</div></div>';
+}
+
+function storeCells(s) {
+  return '<td class="px-3 py-2 font-mono text-xs">' + esc(s.code) + '</td><td class="px-3 py-2">' + esc(s.name) +
+    (s.nameTh && s.nameTh !== s.name ? '<div class="text-xs text-gray-400">' + esc(s.nameTh) + '</div>' : '') + '</td>' +
+    '<td class="px-3 py-2 text-xs">' + esc(s.format) + '<div class="text-gray-400">' + esc(s.region) + '</div></td>' +
+    '<td class="px-3 py-2 text-xs">' + esc(s.amm || '-') + '</td>';
+}
+
+function renderMissing(list, ks) {
+  if (!list.length) return '<div class="p-8 text-center text-emerald-700 text-sm">🎉 ทุกสาขาส่งครบแล้ว</div>';
+  list.sort(function(a, b) {
+    var ma = ks.filter(function(k) { return !a.s[k.key]; }).length, mb = ks.filter(function(k) { return !b.s[k.key]; }).length;
+    return mb - ma || a.code.localeCompare(b.code);
+  });
+  return '<table class="w-full text-sm min-w-[760px]"><thead><tr class="bg-red-50 text-xs font-bold text-red-800">' +
+    '<th class="px-3 py-2 text-left">รหัส</th><th class="px-3 py-2 text-left">สาขา</th><th class="px-3 py-2 text-left">รูปแบบ / ภาค</th><th class="px-3 py-2 text-left">AMM</th>' +
+    '<th class="px-3 py-2 text-left">ยังไม่ส่ง</th><th class="px-3 py-2 text-left">ส่งแล้ว</th></tr></thead><tbody>' +
+    list.map(function(s) {
+      var miss = ks.filter(function(k) { return !s.s[k.key]; }).map(function(k) {
+        return '<span class="miss" title="' + (s.ever[k.key] ? 'เคยส่งก่อนวันที่เลือก' : 'ไม่เคยส่ง') + '">' + k.icon + ' ' + esc(k.label) + (s.ever[k.key] ? ' ·เคยส่ง' : '') + '</span>';
+      }).join('');
+      var got = ks.filter(function(k) { return s.s[k.key]; }).map(function(k) { return '<span class="st st-' + s.s[k.key].st + '">' + k.icon + '</span>'; }).join(' ');
+      return '<tr class="border-t">' + storeCells(s) + '<td class="px-3 py-2">' + miss + '</td><td class="px-3 py-2">' + (got || '<span class="text-xs text-gray-400">-</span>') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function renderSubs(rows, mode) {
+  if (!rows.length) return '<div class="p-8 text-center text-gray-400 text-sm">ไม่มีรายการ</div>';
+  var head = '<th class="px-3 py-2 text-left">รหัส</th><th class="px-3 py-2 text-left">สาขา</th><th class="px-3 py-2 text-left">รูปแบบ / ภาค</th><th class="px-3 py-2 text-left">AMM</th>' +
+    '<th class="px-3 py-2 text-left">แบบสำรวจ</th><th class="px-3 py-2 text-left">ส่งเมื่อ / ผู้ส่ง</th>' +
+    (mode === 'pending' ? '<th class="px-3 py-2 text-center">รอมา</th>' : '<th class="px-3 py-2 text-left">ผู้ตรวจ / หมายเหตุ</th>') +
+    '<th class="px-3 py-2 text-right">จัดการ</th>';
+  return '<table class="w-full text-sm min-w-[980px]"><thead><tr class="bg-gray-50 text-xs font-bold text-gray-600">' + head + '</tr></thead><tbody>' +
+    rows.map(function(r) {
+      var c = r.c, late = c.ageDays !== '' && c.ageDays > REVIEW_SLA_DAYS;
+      var key = esc(r.k.key) + '|' + esc(c.id);
+      var actions = '<a target="_blank" class="px-2 py-1 rounded border text-xs" href="' + BASE + '?page=' + r.k.page + '&open=' + encodeURIComponent(c.id) + '">🔍 เปิดดู</a>';
+      if (CAN_REVIEW) {
+        if (mode !== 'ack') actions += ' <button data-act="Acknowledged" data-key="' + key + '" class="px-2 py-1 rounded bg-emerald-600 text-white text-xs">✅ ผ่าน</button>';
+        if (mode !== 'rejected') actions += ' <button data-act="Rejected" data-key="' + key + '" class="px-2 py-1 rounded bg-red-600 text-white text-xs">🔁 ไม่ผ่าน</button>';
+        if (mode !== 'pending') actions += ' <button data-act="Pending" data-key="' + key + '" class="px-2 py-1 rounded border text-xs" title="ย้อนกลับเป็นรอตรวจ">↩</button>';
+      }
+      var info = mode === 'pending'
+        ? '<td class="px-3 py-2 text-center ' + (late ? 'text-red-600 font-bold' : 'text-gray-600') + '">' + (c.ageDays === '' ? '-' : c.ageDays + ' วัน') + (c.st === 'Corrected' ? '<div class="text-xs text-amber-700">แก้ไขแล้ว</div>' : '') + '</td>'
+        : '<td class="px-3 py-2 text-xs">' + esc(c.by || '-') + '<div class="text-gray-400">' + esc(c.rdate) + '</div>' + (c.note ? '<div class="text-rose-700">' + esc(c.note) + '</div>' : '') + '</td>';
+      return '<tr class="border-t">' + storeCells(r.s) + '<td class="px-3 py-2 whitespace-nowrap">' + r.k.icon + ' ' + esc(r.k.label) + '</td>' +
+        '<td class="px-3 py-2 text-xs">' + esc(c.ts) + '<div class="text-gray-400">' + esc(c.rep) + (c.n > 1 ? ' · ส่ง ' + c.n + ' ครั้ง' : '') + '</div></td>' +
+        info + '<td class="px-3 py-2 text-right whitespace-nowrap">' + actions + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function renderMatrix(stores, ks) {
+  return '<table class="w-full text-sm min-w-[980px]"><thead><tr class="bg-indigo-50 text-xs font-bold text-indigo-800">' +
+    '<th class="px-3 py-2 text-left">รหัส</th><th class="px-3 py-2 text-left">สาขา</th><th class="px-3 py-2 text-left">รูปแบบ / ภาค</th><th class="px-3 py-2 text-left">AMM</th>' +
+    ks.map(function(k) { return '<th class="px-2 py-2 text-center">' + k.icon + '<div>' + esc(k.label) + '</div></th>'; }).join('') + '</tr></thead><tbody>' +
+    stores.map(function(s) {
+      return '<tr class="border-t">' + storeCells(s) + ks.map(function(k) {
+        var c = s.s[k.key];
+        if (!c) return '<td class="px-2 py-2 text-center"><span class="st st-none">❌ ยังไม่ส่ง</span></td>';
+        return '<td class="px-2 py-2 text-center"><a target="_blank" href="' + BASE + '?page=' + k.page + '&open=' + encodeURIComponent(c.id) + '" class="st st-' + c.st + '" title="' + esc(c.ts + ' · ' + c.rep + (c.note ? ' · ' + c.note : '')) + '">' + stLabel(c.st) + '</a></td>';
+      }).join('') + '</tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function showTab(t) {
+  TAB = t;
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === t); });
+  render();
+}
+
+// ── Review actions ─────────────────────────────────────────────
+document.getElementById('tab-body').addEventListener('click', function(e) {
+  var b = e.target.closest('button[data-act]');
+  if (!b) return;
+  var parts = b.getAttribute('data-key').split('|'), act = b.getAttribute('data-act');
+  if (act === 'Rejected') return openReject(parts[0], parts[1]);
+  sendReview(parts[0], parts[1], act, '', b);
+});
+
+function findCell(kind, id) {
+  for (var i = 0; i < DATA.stores.length; i++) { var c = DATA.stores[i].s[kind]; if (c && c.id === id) return { s: DATA.stores[i], c: c }; }
+  return null;
+}
+
+function openReject(kind, id) {
+  var f = findCell(kind, id);
+  REJ = { kind: kind, id: id };
+  document.getElementById('rej-target').textContent = (f ? f.s.code + ' ' + f.s.name + ' · ' : '') + id;
+  document.getElementById('rej-note').value = f && f.c.note || '';
+  document.getElementById('rej-modal').classList.remove('hidden');
+  document.getElementById('rej-note').focus();
+}
+function closeReject() { document.getElementById('rej-modal').classList.add('hidden'); REJ = null; }
+function confirmReject() {
+  var note = document.getElementById('rej-note').value.trim();
+  if (!note) { document.getElementById('rej-note').classList.add('border-red-500'); return; }
+  var r = REJ; closeReject();
+  sendReview(r.kind, r.id, 'Rejected', note, null);
+}
+
+function sendReview(kind, id, status, note, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  google.script.run.withSuccessHandler(function(res) {
+    if (!res || !res.success) { showToast('❌ ' + (res && res.error || 'บันทึกไม่สำเร็จ'), true); render(); return; }
+    var f = findCell(kind, id);
+    if (f) { f.c.st = res.status; f.c.by = res.by; f.c.rdate = res.date; f.c.note = res.note; }
+    showToast(status === 'Acknowledged' ? '✅ ตรวจรับแล้ว' : status === 'Rejected' ? '🔁 บันทึกไม่ผ่านแล้ว' : '↩ ย้อนเป็นรอตรวจ');
+    render();
+  }).withFailureHandler(function(err) { showToast('❌ ' + err.message, true); render(); })
+    .setHyperReviewStatus(kind, id, status, note, USER_EMAIL);
+}
+
+function showToast(msg, bad) {
+  var t = document.createElement('div');
+  t.className = 'fixed bottom-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm text-white ' + (bad ? 'bg-red-600' : 'bg-gray-800');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3500);
+}
+
+// ── Excel export (current filters) ─────────────────────────────
+function exportExcel() {
+  if (!DATA) return;
+  var ks = kindsOn(), stores = filteredStores();
+  var matrix = stores.map(function(s) {
+    var row = { 'รหัส': s.code, 'สาขา': s.name, 'รูปแบบ': s.format, 'ภาค': s.region, 'AMM': s.amm };
+    ks.forEach(function(k) { var c = s.s[k.key]; row[k.label] = c ? stLabel(c.st).replace(/^\S+\s/, '') : 'ยังไม่ส่ง'; });
+    return row;
+  });
+  var subs = [];
+  stores.forEach(function(s) { ks.forEach(function(k) { var c = s.s[k.key]; if (c) subs.push({ 'รหัส': s.code, 'สาขา': s.name, 'แบบสำรวจ': k.label, 'ID': c.id, 'ส่งเมื่อ': c.ts, 'ผู้ส่ง': c.rep, 'สถานะตรวจ': c.st, 'ผู้ตรวจ': c.by, 'วันที่ตรวจ': c.rdate, 'หมายเหตุ': c.note, 'รอมา (วัน)': isPend(c.st) ? c.ageDays : '' }); }); });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(matrix), 'Store Matrix');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(subs), 'Submissions');
+  XLSX.writeFile(wb, 'Hyper_Submission_Status_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+}
+</script>
+</body>
+</html>

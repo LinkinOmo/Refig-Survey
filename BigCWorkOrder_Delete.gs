@@ -13,6 +13,7 @@ function deleteBigCWorkOrder(workOrderId, userEmail) {
             return { success: false, error: 'Sheet not found' };
         }
         
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var rowIndex = -1;
         

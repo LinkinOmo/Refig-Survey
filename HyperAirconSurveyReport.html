@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyper Aircon Survey Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #0e7490; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: 0.75rem; font-weight: 600; color: #64748b; min-width: 140px; }
+        .detail-value { font-size: 0.85rem; color: #1e293b; }
+        #detailModal { transition: opacity 0.28s ease; }
+        #detailModal.modal-open { opacity: 1; }
+        #detailModal:not(.modal-open) { opacity: 0; }
+        #modalContent { transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1); will-change: transform; }
+        #detailModal:not(.modal-open) #modalContent { transform: translateY(100%); }
+        #detailModal.modal-open #modalContent { transform: translateY(0); }
+        @media (min-width: 768px) {
+            #modalContent { transition: transform 0.28s ease, opacity 0.28s ease; }
+            #detailModal:not(.modal-open) #modalContent { transform: scale(0.95); opacity: 0; }
+            #detailModal.modal-open #modalContent { transform: scale(1); opacity: 1; }
+        }
+        @media (max-width: 767px) {
+            #detailModal { background: #f1f5f9 !important; }
+            #detailModal #modalContent { max-height: 100dvh !important; height: 100dvh; border-radius: 0 !important; }
+        }
+
+        /* ── QR label sheet (print) ── */
+        #qrPrint { display: none; }
+        .qr-sheet { display: grid; gap: 3mm; width: 100%; max-width: 192mm; }
+        .qr-sheet > * { min-width: 0; }
+        .qr-sheet.sz-s { grid-template-columns: repeat(4, 1fr); }
+        .qr-sheet.sz-m { grid-template-columns: repeat(3, 1fr); }
+        .qr-sheet.sz-l { grid-template-columns: repeat(2, 1fr); }
+        .qr-label { border: 1px dashed #94a3b8; border-radius: 2mm; padding: 2.5mm; text-align: center; break-inside: avoid; page-break-inside: avoid; background: #fff; font-family: 'Prompt', sans-serif; color: #0f172a; }
+        .qr-label .qr-store { font-size: 7pt; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .qr-label .qr-code { display: flex; justify-content: center; margin: 1.5mm 0; }
+        .qr-label .qr-code canvas { display: none !important; }
+        .qr-label .qr-code img { display: block !important; width: 34mm !important; height: 34mm !important; image-rendering: pixelated; }
+        .sz-s .qr-label .qr-code img { width: 26mm !important; height: 26mm !important; }
+        .sz-l .qr-label .qr-code img { width: 50mm !important; height: 50mm !important; }
+        .qr-label .qr-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 800; font-size: 11pt; letter-spacing: .3px; }
+        .sz-s .qr-label .qr-id { font-size: 9.5pt; }
+        .qr-label .qr-type { font-size: 7.5pt; line-height: 1.25; margin-top: .5mm; }
+        .qr-label .qr-meta { font-size: 7pt; color: #475569; margin-top: .5mm; }
+        @media print {
+            @page { size: A4; margin: 8mm; }
+            body > *:not(#qrPrint) { display: none !important; }
+            body { background: #fff !important; }
+            #qrPrint { display: block !important; }
+            #qrPrint .qr-head { font-size: 9pt; margin-bottom: 3mm; color: #334155; }
+        }
+    </style>
+</head>
+
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-sm bg-opacity-95">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-4">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>"
+                        class="text-slate-500 hover:text-cyan-700 transition-colors p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                    </a>
+                    <div class="h-8 w-1 bg-cyan-600 rounded-full"></div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">❄️ รายงานสำรวจแอร์ Hyper</h1>
+                        <p class="text-xs text-slate-500 font-medium">Hyper Aircon Survey — Report</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="loader" id="mainLoader"></div>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=equip" target="_blank" class="px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100">🔎 ค้นหาอุปกรณ์</a>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-status" target="_blank" title="สถานะการส่ง &amp; การตรวจรับ ทุกแบบสำรวจ Hyper" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100">🧭 สถานะ</a>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=survey_dashboard&type=hyperAc" target="_blank" class="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">📊 Dashboard</a>
+                    <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                    <button onclick="downloadHyperAcExcel()"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"></path></svg>
+                        <span class="hidden sm:inline">Export Excel</span>
+                    </button>
+                    <button onclick="window.location.reload()"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-cyan-700 transition-all shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <span class="hidden sm:inline">Refresh</span>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200 hidden sm:block"></div>
+                    <div class="hidden sm:flex flex-col items-end">
+                        <span id="nav-user-name" class="text-xs font-bold text-slate-700"></span>
+                        <span id="access-level-display" class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide">User Access</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">สาขาที่สำรวจแล้ว</p>
+                <h3 class="text-3xl font-bold text-slate-800"><span id="statStores">0</span><span class="text-base text-slate-400 font-medium"> / <span id="statStoreTotal">0</span></span></h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-400">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Chiller (เครื่อง)</p>
+                <h3 class="text-3xl font-bold text-slate-800" id="statChiller">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-blue-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">AHU / FCU</p>
+                <h3 class="text-3xl font-bold text-blue-700" id="statChw">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-teal-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">แอร์ DX</p>
+                <h3 class="text-3xl font-bold text-teal-700" id="statDx">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-orange-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">🔥 สาขามีจุดร้อน</p>
+                <h3 class="text-3xl font-bold text-orange-600" id="statHot">0</h3>
+            </div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">⚠️ แจ้งชำรุด</p>
+                <h3 class="text-3xl font-bold text-red-600" id="statBroken">0</h3>
+            </div>
+        </div>
+        <p class="text-xs text-slate-400 -mt-3">ตัวเลขนับจากรายการล่าสุดของแต่ละสาขา (สาขาที่สำรวจซ้ำไม่ถูกนับซ้ำ) · จุดร้อน = พื้นที่ขายวัดได้เกิน <span id="hotLimitLabel">27</span>°C</p>
+
+        <div class="glass-panel p-4 rounded-xl">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="md:col-span-2">
+                    <input type="text" id="searchInput" placeholder="ค้นหา รหัสสาขา / ชื่อสาขา / ผู้แจ้ง..."
+                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-400"
+                        oninput="_debouncedApplyFilters()">
+                </div>
+                <div>
+                    <select id="formatFilter" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-400" onchange="applyFilters()">
+                        <option value="">-- ทุกรูปแบบ (Format) --</option>
+                    </select>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                    <label class="flex items-center gap-2"><input type="checkbox" id="latestOnly" checked onchange="applyFilters()"> ล่าสุด/สาขา</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" id="brokenOnly" onchange="applyFilters()"> เฉพาะชำรุด</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" id="issueOnly" onchange="applyFilters()"> 🌡️ มีค่าอุณหภูมิผิดปกติ</label>
+                </div>
+            </div>
+        </div>
+
+        <div id="cardList" class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden"></div>
+
+        <div class="glass-panel rounded-xl overflow-hidden hidden md:block">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3 text-left">สาขา</th>
+                            <th class="px-4 py-3 text-left">Format</th>
+                            <th class="px-4 py-3 text-left">Chiller</th>
+                            <th class="px-4 py-3 text-right">AHU/FCU</th>
+                            <th class="px-4 py-3 text-right">แอร์ DX</th>
+                            <th class="px-4 py-3 text-right">พัดลม/ม่าน</th>
+                            <th class="px-4 py-3 text-right">พื้นที่ขาย สูงสุด</th>
+                            <th class="px-4 py-3 text-left">ผู้แจ้ง / วันที่</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="emptyState" class="hidden text-center py-16 text-slate-400">
+            <p class="text-lg font-semibold">ไม่พบข้อมูล</p>
+        </div>
+        <div id="loadErrorBanner" class="hidden max-w-lg mx-auto mt-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl text-center">
+            <p class="text-sm font-bold text-red-700" id="loadErrorTitle">โหลดข้อมูลไม่สำเร็จหลังลองหลายครั้ง</p>
+            <p class="text-xs text-red-500 mt-1">กรุณากดปุ่ม Refresh ด้านบน หรือโหลดหน้านี้ใหม่อีกครั้ง</p>
+        </div>
+        <div class="flex justify-center items-center gap-3 pb-8" id="paginationBar"></div>
+    </div>
+
+    <!-- Detail / Edit Modal -->
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div id="modalContent" class="bg-white w-full md:max-w-3xl md:rounded-2xl rounded-t-2xl max-h-[92dvh] overflow-y-auto shadow-2xl">
+            <div class="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex justify-between items-center z-10">
+                <h3 class="text-lg font-bold text-slate-800">รายละเอียดการสำรวจแอร์ Hyper</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700 p-1">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-5" id="modalBody"></div>
+            <div class="sticky bottom-0 bg-white border-t border-slate-100 px-5 py-3 flex justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ (Delete)</button>
+                <div class="flex gap-2 ml-auto">
+                    <button id="qrBtn" onclick="openQrPrint()" class="hidden px-3 py-2 text-sm font-semibold text-indigo-700 border border-indigo-300 rounded-lg hover:bg-indigo-50">🏷️ พิมพ์ QR</button>
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="px-4 py-2 text-sm font-bold text-white bg-cyan-700 rounded-lg hover:bg-cyan-800 shadow">บันทึก (Save)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Unit history (survey timeline + PM / CM log) -->
+    <div id="histModal" class="hidden fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-black/50">
+        <div class="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl max-h-[92dvh] overflow-y-auto shadow-2xl">
+            <div class="sticky top-0 bg-white border-b border-slate-100 px-5 py-3 flex justify-between items-center z-10">
+                <h3 class="text-base font-bold text-slate-800">📜 ประวัติอุปกรณ์ &amp; PM / CM</h3>
+                <button onclick="closeUnitHistory()" class="text-slate-400 hover:text-slate-700 p-1 text-xl leading-none">✕</button>
+            </div>
+            <div class="p-5" id="histBody"></div>
+        </div>
+    </div>
+    <!-- QR label sheet: preview panel + print-only area -->
+    <div id="qrPanel" class="hidden fixed inset-0 z-[70] bg-black/50 flex items-end md:items-center justify-center">
+        <div class="bg-white w-full md:max-w-4xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b border-slate-100 flex flex-wrap items-center gap-2">
+                <h3 class="text-base font-bold text-slate-800 mr-auto">🏷️ พิมพ์ป้าย QR ติดอุปกรณ์ <span id="qrCount" class="text-xs font-normal text-slate-500"></span></h3>
+                <span class="text-xs text-slate-500">ขนาดป้าย:</span>
+                <button type="button" data-qrsize="s" onclick="setQrSize('s')" class="text-xs border border-slate-300 rounded px-2 py-1">เล็ก (4 คอลัมน์)</button>
+                <button type="button" data-qrsize="m" onclick="setQrSize('m')" class="text-xs border border-slate-300 rounded px-2 py-1 bg-indigo-600 text-white">กลาง (3)</button>
+                <button type="button" data-qrsize="l" onclick="setQrSize('l')" class="text-xs border border-slate-300 rounded px-2 py-1">ใหญ่ (2)</button>
+                <button type="button" onclick="printQrSheet()" class="px-4 py-1.5 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">🖨️ พิมพ์ (A4)</button>
+                <button type="button" onclick="closeQrPrint()" class="text-slate-400 hover:text-slate-700 text-xl leading-none px-1">✕</button>
+            </div>
+            <div class="px-5 py-2 border-b border-slate-100 flex flex-wrap gap-1.5" id="qrOptCats"></div>
+            <div class="p-5 overflow-y-auto bg-slate-100"><div id="qrPreview" class="bg-white p-4 shadow-sm"></div></div>
+        </div>
+    </div>
+    <div id="qrPrint"></div>
+    <input type="file" id="hyperPhotoUploadInput" multiple accept="image/*" style="display:none">
+
+    <script>
+        // Same big-format store list as the form (shared with the Hyper Ref Survey)
+        const HYPER_STORE_TOTAL = <?!= HYPER_REF_STORES.length ?>;
+        const AREA_KEYS = ['salesFrontTemp', 'salesMidTemp', 'salesBackTemp', 'foodCourtTemp'];
+        const PLANT_TEMP_PAIRS = [['chwsCtrlTemp', 'chwsMeasTemp', 'น้ำเย็นจ่าย CHWS'], ['chwrCtrlTemp', 'chwrMeasTemp', 'น้ำเย็นกลับ CHWR']];
+        const PLANT_GAP_C = 2;
+
+        let CONFIG = null;
+        let allData = [];
+        let currentId = null;
+        let currentRecord = null;
+        let isAdmin = false, smfCanEdit = false, opsCanEdit = false;
+        let _userEmail = '';
+        const PAGE_SIZE = 25;
+        let currentPage = 1;
+        let _currentFiltered = [];
+
+        let _filterDebounceTimer = null;
+        function _debouncedApplyFilters() { clearTimeout(_filterDebounceTimer); _filterDebounceTimer = setTimeout(applyFilters, 220); }
+
+        function htmlEscape(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+        function num(v) { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+        function tempVal(v) { if (v === '' || v == null) return null; const n = parseFloat(v); return isNaN(n) ? null : n; }
+        function formatRecordDate(ts) {
+            if (!ts) return '-';
+            const d = new Date(ts);
+            if (isNaN(d)) return String(ts);
+            return d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        function sysField(key) { return CONFIG.system.find(function(x) { return x.key === key; }); }
+        function sysHeader(key) { const f = sysField(key); return f ? f.header : key; }
+        function groupTotal(r, gid) { const g = CONFIG.groups.find(function(x) { return x.id === gid; }); return g ? num(r[g.totalHeader]) : 0; }
+
+        // ─── Temperature issue detection (mirrors the form's checks) ──────────────
+        function lowDeltaCats(r) {
+            // Per-unit records: the server counts units whose return − supply is under the threshold
+            if (r['Temp Gap Units'] !== undefined && r['Temp Gap Units'] !== '') return new Array(num(r['Temp Gap Units'])).fill(null);
+            const ct = CONFIG.catTemp;
+            return CONFIG.categories.filter(function(c) {
+                if (!c.hasTemp) return false;
+                const s = tempVal(r[c.ctrlTempHeader]), ret = tempVal(r[c.measTempHeader]);
+                return s !== null && ret !== null && (ret - s) < ct.threshold;
+            });
+        }
+        function plantGaps(r) {
+            return PLANT_TEMP_PAIRS.filter(function(p) {
+                const a = tempVal(r[sysHeader(p[0])]), b = tempVal(r[sysHeader(p[1])]);
+                return a !== null && b !== null && Math.abs(a - b) > PLANT_GAP_C;
+            });
+        }
+        function hotAreas(r) {
+            return AREA_KEYS.filter(function(k) { const v = tempVal(r[sysHeader(k)]); return v !== null && v > CONFIG.hotAreaC; });
+        }
+        function maxAreaTemp(r) {
+            const vals = AREA_KEYS.map(function(k) { return tempVal(r[sysHeader(k)]); }).filter(function(v) { return v !== null; });
+            return vals.length ? Math.max.apply(null, vals) : null;
+        }
+        function issueBadges(r) {
+            let h = '';
+            if (r['Has Broken'] === 'Yes') h += ' <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">⚠️ ชำรุด</span>';
+            const hot = hotAreas(r).length;
+            if (hot) h += ' <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200" title="พื้นที่ขายวัดได้เกิน ' + CONFIG.hotAreaC + '°C">🔥 ร้อน ×' + hot + '</span>';
+            const low = lowDeltaCats(r).length;
+            if (low) h += ' <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200" title="ลมกลับ − ลมจ่าย ต่ำกว่า ' + CONFIG.catTemp.threshold + '°C">❄️ ΔT ต่ำ ×' + low + '</span>';
+            if (plantGaps(r).length) h += ' <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200" title="น้ำเย็นวัดจริงต่างจากที่ Chiller/BMS แสดงเกิน ' + PLANT_GAP_C + '°C">🌡️ น้ำเย็นคลาดเคลื่อน</span>';
+            return h;
+        }
+        function hasTempIssue(r) { return hotAreas(r).length || lowDeltaCats(r).length || plantGaps(r).length; }
+
+        function canEdit() {
+            if (isAdmin || smfCanEdit || opsCanEdit) return true;
+            return !!(currentRecord && _userEmail && String(currentRecord['Reporter Email'] || '').toLowerCase() === _userEmail.toLowerCase());
+        }
+        function applyAdminUI() { document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin); }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const u = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                if (u && localStorage.getItem('app_auth_token')) {
+                    document.getElementById('nav-user-name').textContent = u.name || u.email || '';
+                    _userEmail = u.email || '';
+                }
+            } catch (e) {}
+            applyAdminUI();
+            // Main data first, flags second — two back-to-back google.script.run calls on
+            // first load can drop the second callback (same note as the EDMI report).
+            loadData();
+            if (_userEmail) {
+                google.script.run
+                    .withSuccessHandler(function(flags) {
+                        if (!flags) return;
+                        isAdmin = !!(flags.isAdmin || flags.isScheduleAdmin);
+                        smfCanEdit = !!flags.smfEditAllowed;
+                        opsCanEdit = !!flags.opsEditAllowed;
+                        const ad = document.getElementById('access-level-display');
+                        ad.textContent = isAdmin ? 'Administrator Access' : 'User Access';
+                        ad.className = isAdmin
+                            ? 'text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide'
+                            : 'text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200 uppercase tracking-wide';
+                        applyAdminUI();
+                    })
+                    .getUserFlags(_userEmail);
+            }
+        });
+
+
+        // Brand enum (shared list + brands already used in this survey) for the edit-mode datalist
+        let BRAND_OPTS = [];
+        function loadBrandOptions() {
+            google.script.run
+                .withSuccessHandler(function(res) { if (res && res.success) BRAND_OPTS = res.options || []; })
+                .getHyperAcBrandOptions();
+        }
+        function brandDatalistHtml() {
+            return '<datalist id="hyperBrandList">' + BRAND_OPTS.map(function(b) { return '<option value="' + htmlEscape(b) + '">'; }).join('') + '</datalist>';
+        }
+
+        let _loadDataAttempt = 0;
+        const _MAX_ATTEMPTS = 3;
+        function loadData() {
+            document.getElementById('mainLoader').classList.remove('hidden');
+            const myAttempt = ++_loadDataAttempt;
+            function _retryOrFail(reason) {
+                if (myAttempt < _MAX_ATTEMPTS) { setTimeout(loadData, 1500); return; }
+                document.getElementById('mainLoader').classList.add('hidden');
+                document.getElementById('loadErrorTitle').textContent = 'โหลดข้อมูลไม่สำเร็จหลังลองหลายครั้ง';
+                document.getElementById('loadErrorBanner').classList.remove('hidden');
+                console.error('Hyper Aircon report: gave up — ' + reason);
+            }
+            const watchdog = setTimeout(function() { if (myAttempt === _loadDataAttempt) _retryOrFail('no response after 15s'); }, 15000);
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    clearTimeout(watchdog);
+                    if (myAttempt !== _loadDataAttempt) return;
+                    if (!res) { _retryOrFail('null response (cold start)'); return; }
+                    document.getElementById('mainLoader').classList.add('hidden');
+                    document.getElementById('loadErrorBanner').classList.add('hidden');
+                    if (res.success) {
+                        CONFIG = res.config;
+                        allData = res.data || [];
+                        document.getElementById('hotLimitLabel').textContent = CONFIG.hotAreaC;
+                        populateFormatFilter();
+                        renderStats();
+                        applyFilters();
+                        loadBrandOptions();
+                    } else {
+                        document.getElementById('loadErrorTitle').textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (res.error || 'Unknown error');
+                        document.getElementById('loadErrorBanner').classList.remove('hidden');
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    clearTimeout(watchdog);
+                    if (myAttempt !== _loadDataAttempt) return;
+                    document.getElementById('mainLoader').classList.add('hidden');
+                    document.getElementById('loadErrorTitle').textContent = 'เกิดข้อผิดพลาด: ' + (err.message || err);
+                    document.getElementById('loadErrorBanner').classList.remove('hidden');
+                })
+                .getHyperAcSurveyList(window.ARCHIVE_ON);
+        }
+
+        // allData is newest-first, so the first row seen per branch is its latest survey.
+        function latestPerBranch(rows) {
+            const seen = new Set();
+            return rows.filter(function(r) {
+                const k = String(r['Branch Code']);
+                if (seen.has(k)) return false;
+                seen.add(k);
+                return true;
+            });
+        }
+
+        function populateFormatFilter() {
+            const sel = document.getElementById('formatFilter');
+            const cur = sel.value;
+            const formats = Array.from(new Set(allData.map(function(r) { return r['Store Format']; }).filter(Boolean))).sort();
+            sel.innerHTML = '<option value="">-- ทุกรูปแบบ (Format) --</option>' + formats.map(function(f) { return '<option value="' + htmlEscape(f) + '">' + htmlEscape(f) + '</option>'; }).join('');
+            sel.value = cur;
+        }
+
+        function renderStats() {
+            const latest = latestPerBranch(allData);
+            document.getElementById('statStores').textContent = latest.length;
+            document.getElementById('statStoreTotal').textContent = HYPER_STORE_TOTAL;
+            document.getElementById('statChiller').textContent = latest.reduce(function(s, r) { return s + num(r[sysHeader('chillerQty')]); }, 0).toLocaleString();
+            document.getElementById('statChw').textContent = latest.reduce(function(s, r) { return s + groupTotal(r, 'chw'); }, 0).toLocaleString();
+            document.getElementById('statDx').textContent = latest.reduce(function(s, r) { return s + groupTotal(r, 'dx'); }, 0).toLocaleString();
+            document.getElementById('statHot').textContent = latest.filter(function(r) { return hotAreas(r).length > 0; }).length;
+            document.getElementById('statBroken').textContent = latest.filter(function(r) { return r['Has Broken'] === 'Yes'; }).length;
+        }
+
+        function applyFilters() {
+            const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+            const fmt = document.getElementById('formatFilter').value;
+            const brokenOnly = document.getElementById('brokenOnly').checked;
+            const issueOnly = document.getElementById('issueOnly').checked;
+            const base = document.getElementById('latestOnly').checked ? latestPerBranch(allData) : allData;
+            _currentFiltered = base.filter(function(r) {
+                if (fmt && r['Store Format'] !== fmt) return false;
+                if (brokenOnly && r['Has Broken'] !== 'Yes') return false;
+                if (issueOnly && !hasTempIssue(r)) return false;
+                if (q) {
+                    const hay = [r['Branch Code'], r['Branch Name'], r['Reporter Name'], r['Reporter Email']].join(' ').toLowerCase();
+                    if (hay.indexOf(q) === -1) return false;
+                }
+                return true;
+            });
+            currentPage = 1;
+            renderList();
+        }
+
+        function chillerLabel(r) {
+            const type = String(r[sysHeader('chillerType')] || '');
+            const qty = num(r[sysHeader('chillerQty')]);
+            if (!type) return '-';
+            if (type.indexOf('ไม่มี') === 0) return 'ไม่มี (DX)';
+            return qty + ' × ' + (type.indexOf('Water') === 0 ? 'Water-cooled' : type.indexOf('Air') === 0 ? 'Air-cooled' : type);
+        }
+
+        function renderList() {
+            const totalPages = Math.max(1, Math.ceil(_currentFiltered.length / PAGE_SIZE));
+            if (currentPage > totalPages) currentPage = totalPages;
+            const pageItems = _currentFiltered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+            document.getElementById('recordCount').textContent = _currentFiltered.length + ' รายการ';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', _currentFiltered.length > 0);
+
+            let cards = '', rows = '';
+            pageItems.forEach(function(r) {
+                const id = htmlEscape(r['ID']);
+                const badges = issueBadges(r);
+                const maxT = maxAreaTemp(r);
+                const maxTxt = maxT === null ? '-' : '<span class="' + (maxT > CONFIG.hotAreaC ? 'text-orange-600 font-bold' : '') + '">' + maxT + '°C</span>';
+                cards += '<div class="glass-panel rounded-xl p-4 cursor-pointer hover:shadow-md transition-all" data-id="' + id + '">' +
+                    '<div class="flex justify-between items-start mb-2 gap-2"><p class="font-bold text-slate-800 text-sm">' + htmlEscape(r['Branch Code']) + ' - ' + htmlEscape(r['Branch Name']) + '</p>' +
+                    '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200">' + htmlEscape(r['Store Format'] || '-') + '</span></div>' +
+                    '<div class="grid grid-cols-2 gap-1 text-xs text-slate-600">' +
+                        '<span>Chiller <b>' + htmlEscape(chillerLabel(r)) + '</b></span>' +
+                        '<span>AHU/FCU <b class="text-blue-700">' + groupTotal(r, 'chw') + '</b></span>' +
+                        '<span>แอร์ DX <b class="text-teal-700">' + groupTotal(r, 'dx') + '</b></span>' +
+                        '<span>พื้นที่ขายสูงสุด <b>' + maxTxt + '</b></span>' +
+                    '</div>' +
+                    (badges ? '<div class="mt-2 flex flex-wrap gap-1">' + badges + '</div>' : '') +
+                    '<p class="text-xs text-slate-400 mt-2">โดย ' + htmlEscape(r['Reporter Name'] || '-') + ' · ' + formatRecordDate(r['Timestamp']) + '</p>' +
+                '</div>';
+                rows += '<tr class="hover:bg-cyan-50 cursor-pointer transition-colors" data-id="' + id + '">' +
+                    '<td class="px-4 py-3"><div class="font-semibold text-slate-800">' + htmlEscape(r['Branch Code']) + badges + '</div><div class="text-xs text-slate-500">' + htmlEscape(r['Branch Name']) + '</div></td>' +
+                    '<td class="px-4 py-3 text-xs">' + htmlEscape(r['Store Format'] || '-') + '</td>' +
+                    '<td class="px-4 py-3 text-xs">' + htmlEscape(chillerLabel(r)) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono text-blue-700">' + groupTotal(r, 'chw') + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono text-teal-700">' + groupTotal(r, 'dx') + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono">' + groupTotal(r, 'vent') + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono text-xs">' + maxTxt + '</td>' +
+                    '<td class="px-4 py-3 text-xs">' + htmlEscape(r['Reporter Name'] || '-') + '<div class="text-slate-400">' + formatRecordDate(r['Timestamp']) + '</div></td>' +
+                '</tr>';
+            });
+            document.getElementById('cardList').innerHTML = cards;
+            document.getElementById('tableBody').innerHTML = rows;
+            renderPagination(totalPages);
+        }
+
+        // Delegated row/card click — ids go through data-id, not inline onclick strings
+        ['cardList', 'tableBody'].forEach(function(id) {
+            document.getElementById(id).addEventListener('click', function(e) {
+                const el = e.target.closest('[data-id]');
+                if (el) openModal(el.dataset.id);
+            });
+        });
+
+        function renderPagination(totalPages) {
+            const bar = document.getElementById('paginationBar');
+            if (totalPages <= 1) { bar.innerHTML = ''; return; }
+            bar.innerHTML =
+                '<button ' + (currentPage <= 1 ? 'disabled' : '') + ' onclick="goPage(' + (currentPage - 1) + ')" class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 disabled:opacity-40 hover:bg-slate-50">ก่อนหน้า</button>' +
+                '<span class="text-sm text-slate-500">หน้า ' + currentPage + ' / ' + totalPages + '</span>' +
+                '<button ' + (currentPage >= totalPages ? 'disabled' : '') + ' onclick="goPage(' + (currentPage + 1) + ')" class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 disabled:opacity-40 hover:bg-slate-50">ถัดไป</button>';
+        }
+        function goPage(p) { currentPage = p; renderList(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+        function downloadHyperAcExcel() {
+            if (!CONFIG || !_currentFiltered.length) { alert('ไม่มีข้อมูลที่จะดาวน์โหลด'); return; }
+            if (typeof XLSX === 'undefined') { alert('ไลบรารียังไม่โหลด กรุณารอแล้วลองใหม่'); return; }
+            const cols = ['Timestamp', 'Branch Code', 'Branch Name', 'Store Format', 'Region', 'Reporter Name', 'Reporter Phone', 'Reporter Email'];
+            CONFIG.categories.forEach(function(c) {
+                c.sizes.forEach(function(s) { cols.push(s.header); });
+                cols.push(c.sumHeader);
+                if (c.hasTemp) cols.push(c.ctrlTempHeader, c.measTempHeader);
+            });
+            CONFIG.system.forEach(function(f) { cols.push(f.header); });
+            CONFIG.groups.forEach(function(g) { cols.push(g.totalHeader); });
+            cols.push(CONFIG.grandTotal.header, 'Has Broken', 'Broken Detail', 'Comments', 'DM Area', 'CM Area', 'AMM MTN');
+            const aoa = [cols].concat(_currentFiltered.map(function(r) {
+                return cols.map(function(h) { return h === 'Timestamp' ? formatRecordDate(r[h]) : (r[h] == null ? '' : r[h]); });
+            }));
+            const ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!cols'] = cols.map(function(h, i) { return { wch: i < 8 ? 16 : 12 }; });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Hyper Aircon Survey');
+            const fileName = 'hyper_aircon_survey_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+            // Per-unit sheet (Equipment ID, Asset No., supply/return ...) — units are not in the list payload
+            const btn = document.querySelector('button[onclick^="downloadHyperAcExcel"]');
+            const label = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = 'กำลังเตรียมข้อมูลรายเครื่อง...'; }
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (btn) { btn.disabled = false; btn.innerHTML = label; }
+                    if (res && res.success && res.rows && res.rows.length) {
+                        const ids = new Set(_currentFiltered.map(function(r) { return r['ID']; }));
+                        const unitCols = ['Branch Code', 'Branch Name', 'Survey ID', 'Survey Date', 'Equipment ID', 'ประเภท', 'ขนาด', 'ยี่ห้อ', 'รุ่น / สเปค', 'Asset No.', 'สถานะ', 'สภาพ (0-5)', 'Controller/Setpoint °C', 'Supply ลมจ่าย °C', 'Return ลมกลับ °C', 'ΔT ต่ำ (<6°C)', 'กระแสไฟ (A)', 'ปีที่ผลิต/ติดตั้ง', 'อายุ (ปี)', 'แหล่งที่มาของปี', 'หมายเหตุ'].concat(FF_XLS_COLS);
+                        const rows = res.rows.filter(function(x) { return ids.has(x['Survey ID']); });
+                        const uws = XLSX.utils.aoa_to_sheet([unitCols].concat(rows.map(function(x) {
+                            return unitCols.map(function(h) { return h === 'Survey Date' ? formatRecordDate(x[h]) : (x[h] == null ? '' : x[h]); });
+                        })));
+                        uws['!cols'] = unitCols.map(function(h, i) { return { wch: i < 2 ? 18 : 14 }; });
+                        XLSX.utils.book_append_sheet(wb, uws, 'Units');
+                    }
+                    XLSX.writeFile(wb, fileName);
+                })
+                .withFailureHandler(function() {
+                    if (btn) { btn.disabled = false; btn.innerHTML = label; }
+                    XLSX.writeFile(wb, fileName);
+                })
+                .getHyperAcUnitRows();
+        }
+
+        function openModal(id) {
+            currentId = id;
+            currentRecord = null;
+            document.getElementById('modalBody').innerHTML = '<div class="text-center py-10 text-slate-400">กำลังโหลด...</div>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            requestAnimationFrame(function() { document.getElementById('detailModal').classList.add('modal-open'); });
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (id !== currentId) return;
+                    if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-500 text-sm">โหลดรายการไม่สำเร็จ ' + htmlEscape(res && res.error) + '</p>'; return; }
+                    CONFIG = res.config || CONFIG;
+                    currentRecord = res.data;
+                    renderModalBody(res.data);
+                })
+                .withFailureHandler(function(err) { document.getElementById('modalBody').innerHTML = '<p class="text-red-500 text-sm">' + htmlEscape(err.message) + '</p>'; })
+                .getHyperAcSurveyRecordById(id);
+        }
+
+        function _photoBlockHtml(photos, unitKey, editable) {
+            const blockId = 'photos-' + unitKey;
+            const thumbs = (photos || []).map(function(url) {
+                const esc = htmlEscape(url);
+                const del = editable ? '<button type="button" data-del-photo="' + unitKey + '" data-url="' + esc + '" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button>' : '';
+                return '<div class="relative group inline-block"><a href="' + esc + '" target="_blank"><img src="' + esc + '" class="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm"></a>' + del + '</div>';
+            }).join('');
+            const add = editable ? '<button type="button" data-add-photo="' + unitKey + '" class="text-[11px] text-sky-600 hover:text-sky-800 border border-sky-200 hover:bg-sky-50 px-2 py-0.5 rounded-lg transition mt-2">＋ เพิ่ม/อัปโหลดรูป</button>' : '';
+            if (!thumbs && !editable) return '';
+            return '<div id="' + blockId + '"><div class="flex gap-2 flex-wrap mt-2">' + thumbs + '</div>' + add + '</div>';
+        }
+
+        // One editable input for a system field, rendered from config
+        function _sysInputHtml(r, f, dis, extraCls) {
+            if (f.type === 'select') {
+                const val = r[f.header] || '';
+                const opts = f.options.slice();
+                if (val && opts.indexOf(val) === -1) opts.unshift(val);
+                return '<select data-edit-key="' + f.key + '" class="w-full border border-slate-300 rounded px-2 py-1 text-sm bg-white"' + dis + '><option value="">-</option>' +
+                    opts.map(function(o) { return '<option' + (o === val ? ' selected' : '') + ' value="' + htmlEscape(o) + '">' + htmlEscape(o) + '</option>'; }).join('') + '</select>';
+            }
+            if (f.type === 'temp') {
+                const v = tempVal(r[f.header]);
+                return '<input type="number" step="0.1" data-edit-key="' + f.key + '" value="' + (v === null ? '' : v) + '" class="w-full border rounded px-2 py-1 text-sm ' + (extraCls || 'border-slate-300') + '"' + dis + '>';
+            }
+            const v = f.type === 'number' ? num(r[f.header]) : (r[f.header] || '');
+            return '<input type="' + (f.type === 'number' ? 'number" min="0' : 'text') + '" data-edit-key="' + f.key + '" value="' + htmlEscape(v) + '" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + dis + '>';
+        }
+        function _sysGridHtml(r, section, dis, cols, only) {
+            return '<div class="grid grid-cols-2 sm:grid-cols-' + (cols || 3) + ' gap-3 mt-2">' +
+                CONFIG.system.filter(function(f) { return f.section === section && (!only || only.indexOf(f.key) > -1); }).map(function(f) {
+                    let cls = '';
+                    if (section === 'area' && f.key !== 'thermostatSet') {
+                        const v = tempVal(r[f.header]);
+                        if (v !== null && v > CONFIG.hotAreaC) cls = 'border-orange-400 bg-orange-50';
+                    }
+                    return '<div' + (f.type === 'text' && section !== 'plant' ? ' class="col-span-2 sm:col-span-' + (cols || 3) + '"' : '') + '><label class="text-[11px] text-slate-500 block">' + htmlEscape(f.header) + '</label>' + _sysInputHtml(r, f, dis, cls) + '</div>';
+                }).join('') + '</div>';
+        }
+
+        // ─── Per-unit editor (records saved from the per-unit form) ──────────────────
+        // ct = Supply air, mt = Return air, tc = controller/setpoint
+        function _unitSizeLabel(c, sizeKey) {
+            const z = c.sizes.find(function(x) { return x.sizeKey === sizeKey; });
+            return z ? z.label : sizeKey;
+        }
+
+        // ─── Unit history: survey timeline + PM / CM maintenance log ──────────────────
+        // Survey rows come from Hyper_Equipment_History (one row per unit per survey / edit); PM / CM rows
+        // from Hyper_Equipment_Maintenance (recorded here by Admin / SMF / Ops-edit users).
+        let HIST_CTX = null;
+        function ageOf(yr) { const n = parseInt(yr, 10); return isNaN(n) ? null : Math.max(0, new Date().getFullYear() - n); }
+        function yearOptionsHtml(selected) {
+            const y = new Date().getFullYear();
+            let h = '<option value="">-</option>';
+            let found = false;
+            for (let i = y; i >= y - 35; i--) { if (String(i) === String(selected)) found = true; h += '<option value="' + i + '"' + (String(i) === String(selected) ? ' selected' : '') + '>' + i + '</option>'; }
+            if (selected && !found) h += '<option value="' + htmlEscape(selected) + '" selected>' + htmlEscape(selected) + '</option>';
+            return h;
+        }
+        function canRecordMaint() { return isAdmin || smfCanEdit || opsCanEdit; }
+        function dayDiff(dateStr) { const d = new Date(dateStr); return isNaN(d) ? null : Math.round((Date.now() - d.getTime()) / 86400000); }
+
+        function openUnitHistory(idx) {
+            const u = currentRecord['Units_JSON'][idx];
+            if (!u) return;
+            const cat = CONFIG.categories.find(function(x) { return x.id === u.c; }) || {};
+            HIST_CTX = { u: u, branch: currentRecord['Branch Code'], branchName: currentRecord['Branch Name'], category: cat.title || u.c, rows: [], maint: [], statuses: [] };
+            document.getElementById('histBody').innerHTML = '<div class="text-center py-10 text-slate-400">กำลังโหลดประวัติ...</div>';
+            document.getElementById('histModal').classList.remove('hidden');
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!HIST_CTX || HIST_CTX.u !== u) return;
+                    if (!res || !res.success) { document.getElementById('histBody').innerHTML = '<p class="text-red-500 text-sm">โหลดประวัติไม่สำเร็จ ' + htmlEscape(res && res.error) + '</p>'; return; }
+                    HIST_CTX.rows = res.rows || []; HIST_CTX.maint = res.maint || []; HIST_CTX.statuses = res.maintStatuses || [];
+                    renderUnitHistory();
+                })
+                .withFailureHandler(function(err) { document.getElementById('histBody').innerHTML = '<p class="text-red-500 text-sm">' + htmlEscape(err.message) + '</p>'; })
+                .getHyperAcUnitHistory(HIST_CTX.branch, u.id, u.as || '');
+        }
+        function closeUnitHistory() { document.getElementById('histModal').classList.add('hidden'); HIST_CTX = null; }
+
+        function renderUnitHistory() {
+            const c = HIST_CTX, u = c.u;
+            const age = ageOf(u.yr);
+            const pm = c.maint.filter(function(m) { return m['Maint Type'] === 'PM' && m['Status'] === 'เสร็จสิ้น'; });
+            const cmAll = c.maint.filter(function(m) { return m['Maint Type'] === 'CM'; });
+            const lastPm = pm[0], lastCm = cmAll[0];
+            const yearAgo = Date.now() - 365 * 86400000;
+            const cm12 = cmAll.filter(function(m) { const d = new Date(m['Work Date']); return !isNaN(d) && d.getTime() >= yearAgo; }).length;
+            const nextPm = c.maint.filter(function(m) { return m['Next PM Date']; }).map(function(m) { return m['Next PM Date']; }).sort().pop();
+            const nextDays = nextPm ? -dayDiff(nextPm) : null;
+            const chip = function(label, val, cls) { return '<div class="border rounded-lg px-3 py-2 ' + cls + '"><div class="text-[11px] opacity-70">' + label + '</div><div class="text-sm font-bold">' + val + '</div></div>'; };
+            let h = '<div class="flex flex-wrap items-start justify-between gap-2 mb-3"><div><div class="font-mono font-bold text-slate-800">' + htmlEscape(u.id) + '</div>' +
+                '<div class="text-xs text-slate-500">' + htmlEscape(c.category) + (u.br ? ' · ' + htmlEscape(u.br) : '') + (u.as ? ' · Asset ' + htmlEscape(u.as) : '') + '</div></div>' +
+                '<div class="text-xs text-slate-600">ปีที่ผลิต/ติดตั้ง: <b>' + (u.yr ? htmlEscape(u.yr) + ' (อายุ ' + age + ' ปี)' : 'ไม่ทราบ') + '</b></div></div>' +
+                '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">' +
+                chip('PM ล่าสุด', lastPm ? htmlEscape(lastPm['Work Date']) + ' (' + dayDiff(lastPm['Work Date']) + ' วันที่แล้ว)' : 'ยังไม่มีบันทึก', 'bg-blue-50 border-blue-200 text-blue-800') +
+                chip('CM ล่าสุด', lastCm ? htmlEscape(lastCm['Work Date']) + ' (' + dayDiff(lastCm['Work Date']) + ' วันที่แล้ว)' : 'ยังไม่มีบันทึก', 'bg-orange-50 border-orange-200 text-orange-800') +
+                chip('CM ใน 12 เดือน', cm12 + ' ครั้ง', cm12 >= 3 ? 'bg-red-50 border-red-300 text-red-800' : 'bg-slate-50 border-slate-200 text-slate-800') +
+                chip('PM ครั้งถัดไป', nextPm ? htmlEscape(nextPm) + (nextDays !== null && nextDays < 0 ? ' ⚠️ เกินกำหนด ' + (-nextDays) + ' วัน' : '') : '-', nextDays !== null && nextDays < 0 ? 'bg-red-50 border-red-300 text-red-800' : 'bg-slate-50 border-slate-200 text-slate-800') +
+                '</div>';
+            if (canRecordMaint()) {
+                const today = new Date().toISOString().slice(0, 10);
+                h += '<details class="border border-slate-200 rounded-lg mb-3"><summary class="px-3 py-2 text-sm font-semibold cursor-pointer text-indigo-700">➕ บันทึกงาน PM / CM ใหม่</summary>' +
+                    '<div class="p-3 grid grid-cols-2 gap-2 text-sm">' +
+                    '<div><label class="text-[11px] text-slate-500 block">ประเภท *</label><select id="mType" class="w-full border border-slate-300 rounded px-2 py-1"><option value="PM">PM (บำรุงรักษาเชิงป้องกัน)</option><option value="CM">CM (ซ่อมแก้ไข)</option></select></div>' +
+                    '<div><label class="text-[11px] text-slate-500 block">วันที่ทำงาน *</label><input id="mDate" type="date" value="' + today + '" class="w-full border border-slate-300 rounded px-2 py-1"></div>' +
+                    '<div class="col-span-2"><label class="text-[11px] text-slate-500 block">รายการงาน *</label><input id="mTitle" class="w-full border border-slate-300 rounded px-2 py-1" placeholder="เช่น ล้างคอยล์ / เปลี่ยนมอเตอร์พัดลม / เติมน้ำยา"></div>' +
+                    '<div class="col-span-2"><label class="text-[11px] text-slate-500 block">รายละเอียด / อาการ / อะไหล่ที่เปลี่ยน</label><textarea id="mDetails" rows="2" class="w-full border border-slate-300 rounded px-2 py-1"></textarea></div>' +
+                    '<div><label class="text-[11px] text-slate-500 block">ผู้ดำเนินการ / ผู้รับเหมา</label><input id="mBy" class="w-full border border-slate-300 rounded px-2 py-1"></div>' +
+                    '<div><label class="text-[11px] text-slate-500 block">ค่าใช้จ่าย (บาท)</label><input id="mCost" type="number" min="0" step="0.01" class="w-full border border-slate-300 rounded px-2 py-1"></div>' +
+                    '<div><label class="text-[11px] text-slate-500 block">สถานะงาน</label><select id="mStatus" class="w-full border border-slate-300 rounded px-2 py-1">' + c.statuses.map(function(s) { return '<option>' + htmlEscape(s) + '</option>'; }).join('') + '</select></div>' +
+                    '<div><label class="text-[11px] text-slate-500 block">PM ครั้งถัดไป</label><input id="mNext" type="date" class="w-full border border-slate-300 rounded px-2 py-1"></div>' +
+                    '<div class="col-span-2"><label class="text-[11px] text-slate-500 block">เลขที่ใบงาน CMS (ถ้ามี)</label><input id="mTicket" class="w-full border border-slate-300 rounded px-2 py-1"></div>' +
+                    '<div class="col-span-2 text-right"><button type="button" id="mSave" onclick="saveMaint()" class="px-4 py-1.5 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">บันทึก</button></div>' +
+                    '</div></details>';
+            }
+            // merged timeline, newest first
+            const items = [];
+            c.maint.forEach(function(m) { items.push({ d: String(m['Work Date']), k: 'm', m: m }); });
+            c.rows.forEach(function(r) { items.push({ d: String(r['Timestamp']).slice(0, 10), k: 's', r: r }); });
+            items.sort(function(a, b) { return b.d.localeCompare(a.d); });
+            h += '<div class="space-y-2">' + (items.length ? items.map(function(it) {
+                if (it.k === 'm') {
+                    const m = it.m, isCm = m['Maint Type'] === 'CM';
+                    return '<div class="border-l-4 ' + (isCm ? 'border-orange-500 bg-orange-50' : 'border-blue-500 bg-blue-50') + ' rounded-r-lg px-3 py-2 text-sm">' +
+                        '<div class="flex flex-wrap justify-between gap-2"><span><b>' + (isCm ? '🔧 CM' : '🛠️ PM') + '</b> · ' + htmlEscape(m['Work Date']) + ' · ' + htmlEscape(m['Status']) + '</span>' +
+                        (isAdmin ? '<button type="button" data-mdel="' + htmlEscape(m['Record ID']) + '" class="text-[11px] text-red-600 hover:underline">ลบ</button>' : '') + '</div>' +
+                        '<div class="font-semibold">' + htmlEscape(m['Title']) + '</div>' +
+                        (m['Details'] ? '<div class="text-xs text-slate-600">' + htmlEscape(m['Details']) + '</div>' : '') +
+                        '<div class="text-[11px] text-slate-500">' + [m['Done By'] ? 'โดย ' + htmlEscape(m['Done By']) : '', m['Cost (THB)'] !== '' && m['Cost (THB)'] != null ? 'ค่าใช้จ่าย ' + Number(m['Cost (THB)']).toLocaleString() + ' บาท' : '', m['CMS Ticket'] ? 'CMS ' + htmlEscape(m['CMS Ticket']) : '', m['Next PM Date'] ? 'PM ถัดไป ' + htmlEscape(m['Next PM Date']) : '', 'บันทึกโดย ' + htmlEscape(m['Recorded By'])].filter(Boolean).join(' · ') + '</div></div>';
+                }
+                const r = it.r, ev = r['Event'];
+                const col = ev === 'Survey' ? 'border-slate-400 bg-white' : ev === 'Edit' ? 'border-amber-400 bg-amber-50' : 'border-red-400 bg-red-50';
+                const t = [r['Temp 1'], r['Temp 2'], r['Temp 3']].map(function(v) { return v === '' || v == null ? '-' : v; }).join(' / ');
+                return '<div class="border-l-4 ' + col + ' rounded-r-lg px-3 py-2 text-xs border border-slate-100">' +
+                    '<div class="font-semibold text-sm">' + (ev === 'Survey' ? '📋 สำรวจ' : ev === 'Edit' ? '✏️ แก้ไขข้อมูล' : '🗑️ ลบออกจากการสำรวจ') + ' · ' + htmlEscape(formatRecordDate(r['Timestamp'])) + ' · ' + htmlEscape(r['By']) + '</div>' +
+                    '<div class="text-slate-600">สถานะ ' + htmlEscape(r['Status'] || '-') + ' · สภาพ ' + htmlEscape(r['Condition'] === '' ? '-' : r['Condition']) + '/5 · Controller ' + htmlEscape(r['Controller'] === '' ? '-' : r['Controller']) + ' · จุดวัด ' + htmlEscape(t) +
+                    (r['Year'] ? ' · ปี ' + htmlEscape(r['Year']) + ' (อายุ ' + htmlEscape(r['Age']) + ')' : '') + (r['Brand'] ? ' · ' + htmlEscape(r['Brand']) : '') + '</div>' +
+                    (r['Products'] ? '<div class="text-slate-500">สินค้า: ' + htmlEscape(r['Products']) + '</div>' : '') +
+                    (r['Note'] ? '<div class="text-slate-500">หมายเหตุ: ' + htmlEscape(r['Note']) + '</div>' : '') +
+                    (r['Changes'] ? '<div class="text-amber-700">เปลี่ยนแปลง: ' + htmlEscape(r['Changes']) + '</div>' : '') + '</div>';
+            }).join('') : '<p class="text-slate-400 text-sm">ยังไม่มีประวัติ</p>') + '</div>';
+            document.getElementById('histBody').innerHTML = h;
+        }
+
+        function saveMaint() {
+            const c = HIST_CTX;
+            if (!c) return;
+            const v = function(id) { return document.getElementById(id).value; };
+            const rec = { branchCode: c.branch, branchName: c.branchName, equipId: c.u.id, assetNo: c.u.as || '', category: c.category,
+                type: v('mType'), date: v('mDate'), title: v('mTitle'), details: v('mDetails'), doneBy: v('mBy'), cost: v('mCost'), status: v('mStatus'), nextPm: v('mNext'), ticket: v('mTicket') };
+            if (!rec.title.trim()) { alert('กรุณาระบุรายการงาน'); return; }
+            const btn = document.getElementById('mSave'); btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (!res || !res.success) { btn.disabled = false; btn.textContent = 'บันทึก'; alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); return; }
+                    const u = c.u; HIST_CTX = null; const i = currentRecord['Units_JSON'].indexOf(u); openUnitHistory(i);
+                })
+                .withFailureHandler(function(err) { btn.disabled = false; btn.textContent = 'บันทึก'; alert('Server Error: ' + err.message); })
+                .addHyperAcMaintenance(rec, _userEmail);
+        }
+
+        document.getElementById('histBody').addEventListener('click', function(e) {
+            const del = e.target.closest('[data-mdel]');
+            if (!del || !HIST_CTX) return;
+            if (!confirm('ลบบันทึก PM/CM นี้? ไม่สามารถย้อนกลับได้')) return;
+            const u = HIST_CTX.u;
+            google.script.run
+                .withSuccessHandler(function(res) { if (res && res.success) { HIST_CTX = null; openUnitHistory(currentRecord['Units_JSON'].indexOf(u)); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); })
+                .deleteHyperAcMaintenance(del.dataset.mdel, _userEmail);
+        });
+
+
+        // ─── Main-machine register attributes + replacement score (mirrors _hsFFScore_ in HyperSurveyEngine.gs) ──
+        const FF_KEYS = ['sn', 'cp', 'pn', 'rc', 'se', 'si', 'ss'];
+        const FF_XLS_COLS = ['Serial No.', 'Capacity', 'ราคาซื้อใหม่ (THB)', 'มูลค่างานซ่อม 5 ปี (THB)', '% ค่าซ่อม', 'คะแนน สัดส่วนการซ่อม', 'คะแนน ความคุ้มค่าพลังงาน', 'คะแนน อายุการใช้งาน', 'คะแนน ผลกระทบสาขา', 'คะแนน ความเสี่ยงอะไหล่', 'บทสรุป (คะแนนรวม)'];
+        function hyperFFScore(u, w) {
+            const y = parseInt(u.yr, 10);
+            const age = isNaN(y) ? null : Math.max(0, new Date().getFullYear() - y);
+            const ag = age === null ? null : age > 15 ? 5 : age > 10 ? 4 : 3;
+            const rp = (parseFloat(u.rc) || 0) > (parseFloat(u.pn) || 0) ? 5 : 4;
+            if (!w || ag === null) return { rp: rp, ag: ag, total: null };
+            let total = rp * w.rp + ag * w.ag, ok = true;
+            ['se', 'si', 'ss'].forEach(function(k) { if (!w[k]) return; const v = parseInt(u[k], 10) || 0; if (!v) ok = false; total += v * w[k]; });
+            return { rp: rp, ag: ag, total: ok ? Math.round(total * 100) / 100 : null };
+        }
+        function hyperFFBand(t) {
+            return t >= 4.5 ? { color: '#b91c1c', text: 'ควรพิจารณาเปลี่ยน' } : t >= 4 ? { color: '#b45309', text: 'วางแผน / เฝ้าระวัง' } : { color: '#15803d', text: 'ซ่อมบำรุงตามปกติ' };
+        }
+        function ffBadgeHtml(u, c) {
+            if (!c.ff) return '';
+            const sc = hyperFFScore(u, c.ff.w);
+            if (sc.total === null) return '';
+            const b = hyperFFBand(sc.total);
+            return '<span class="text-[11px] px-2 py-0.5 rounded-full text-white" style="background:' + b.color + '" title="คะแนนประเมินการเปลี่ยน (บทสรุป) — ' + b.text + '">คะแนน ' + sc.total.toFixed(2) + '</span>';
+        }
+        function ffEditHtml(u, idx, c, dis) {
+            if (!c.ff) return '';
+            const v = function(f) { return u[f] === undefined || u[f] === null ? '' : u[f]; };
+            const inp = function(f, label, type) {
+                return '<div><label class="text-[11px] text-slate-500 block">' + label + '</label><input data-uidx="' + idx + '" data-uf="' + f + '" type="' + type + '"' + (type === 'number' ? ' min="0"' : '') +
+                    ' value="' + htmlEscape(v(f)) + '" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + dis + '></div>';
+            };
+            const sc = hyperFFScore(u, c.ff.w);
+            const band = sc.total === null ? null : hyperFFBand(sc.total);
+            return '<div class="mt-2 border border-violet-200 bg-violet-50 rounded p-2">' +
+                '<p class="text-[11px] font-bold text-violet-700 mb-1">📋 ทะเบียนเครื่อง &amp; คะแนนประเมินการเปลี่ยน' +
+                    (band ? ' — คะแนนรวม <span style="color:' + band.color + '">' + sc.total.toFixed(2) + ' (' + band.text + ')</span> <span class="font-normal text-slate-500">· สัดส่วนซ่อม ' + sc.rp + ' · อายุ ' + sc.ag + '</span>'
+                          : ' <span class="font-normal text-slate-500">— คะแนนรวม: ข้อมูลยังไม่ครบ</span>') + '</p>' +
+                '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' +
+                    inp('sn', 'Serial No.', 'text') + inp('cp', 'Capacity', 'text') + inp('pn', 'ราคาซื้อใหม่ (บาท)', 'number') + inp('rc', 'ค่าซ่อม 5 ปี (บาท)', 'number') +
+                    (c.ff.ratings || []).map(function(r) {
+                        return '<div class="col-span-2"><label class="text-[11px] text-slate-500 block">' + htmlEscape(r.label) + '</label>' +
+                            '<select data-uidx="' + idx + '" data-uf="' + r.k + '" class="w-full border border-slate-300 rounded px-2 py-1 text-sm bg-white"' + dis + '><option value="">-</option>' +
+                            r.opts.map(function(o, i) { return '<option value="' + (i + 1) + '"' + (String(v(r.k)) === String(i + 1) ? ' selected' : '') + '>' + (i + 1) + ' — ' + htmlEscape(o) + '</option>'; }).join('') + '</select></div>';
+                    }).join('') +
+                '</div></div>';
+        }
+        function ffEditedVals(i) {
+            const o = {};
+            FF_KEYS.forEach(function(f) { const el = document.querySelector('#modalBody [data-uidx="' + i + '"][data-uf="' + f + '"]'); if (el) o[f] = el.value.trim(); });
+            return o;
+        }
+
+        function unitCardHtml(u, idx, c, dis, att, photoEditable) {
+            const sup = tempVal(u.ct), ret = tempVal(u.mt);
+            const low = c.hasTemp && sup !== null && ret !== null && (ret - sup) < CONFIG.catTemp.threshold;
+            const inp = function(f, val, extra, cls) {
+                return '<input data-uidx="' + idx + '" data-uf="' + f + '" value="' + htmlEscape(val) + '" ' + extra + ' class="w-full border ' + (cls || 'border-slate-300') + ' rounded px-2 py-1 text-sm"' + dis + '>';
+            };
+            const lab = function(t) { return '<label class="text-[11px] text-slate-500 block">' + t + '</label>'; };
+            const ratingOpts = ['', 0, 1, 2, 3, 4, 5].map(function(v) { return '<option value="' + v + '"' + (String(u.cr) === String(v) ? ' selected' : '') + '>' + (v === '' ? '-' : v + ' / 5') + '</option>'; }).join('');
+            return '<div class="border border-cyan-200 rounded-lg p-3 mb-2 bg-white" data-ucard="' + idx + '">' +
+                '<div class="flex flex-wrap items-center justify-between gap-2 mb-2">' +
+                    '<span class="text-xs font-bold text-cyan-700">' + htmlEscape(_unitSizeLabel(c, u.s)) + ' #' + num(u.n) + ' <a href="' + EQUIP_PAGE_URL + encodeURIComponent(u.id) + '" target="_blank" class="font-mono text-indigo-600 underline" title="เปิดหน้าอุปกรณ์ (QR / ประวัติ)">' + htmlEscape(u.id) + '</a></span>' +
+                    '<span class="flex items-center gap-2">' + (u.yr ? '<span class="text-[11px] px-2 py-0.5 rounded-full ' + (ageOf(u.yr) >= 15 ? 'bg-red-100 text-red-700' : ageOf(u.yr) >= 10 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600') + '">อายุ ' + ageOf(u.yr) + ' ปี</span>' : '') + ffBadgeHtml(u, c) +
+                        '<button type="button" data-hist="' + idx + '" class="text-[11px] text-indigo-600 border border-indigo-200 hover:bg-indigo-50 rounded px-2 py-0.5">📜 ประวัติ / PM·CM</button></span>' +
+                    (dis ? '' : '<label class="text-[11px] text-red-600 flex items-center gap-1"><input type="checkbox" data-uidx="' + idx + '" data-uf="del"> ลบเครื่องนี้</label>') +
+                '</div>' +
+                '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">' +
+                    '<div>' + lab('ยี่ห้อ (Brand)') + inp('br', u.br, 'type="text" list="hyperBrandList"') + '</div>' +
+                    '<div>' + lab('รุ่น / ขนาดจริง') + inp('sp', u.sp, 'type="text"') + '</div>' +
+                    '<div>' + lab('Asset No.') + inp('as', u.as, 'type="text"') + '</div>' +
+                    '<div>' + lab('ปีที่ผลิต / ติดตั้ง') + '<select data-uidx="' + idx + '" data-uf="yr" class="w-full border border-slate-300 rounded px-2 py-1 text-sm bg-white"' + dis + '>' + yearOptionsHtml(u.yr) + '</select></div>' +
+                    '<div>' + lab('ดูปีจาก') + '<select data-uidx="' + idx + '" data-uf="ys" class="w-full border border-slate-300 rounded px-2 py-1 text-sm bg-white"' + dis + '>' +
+                        ['', 'ป้าย Nameplate', 'ทะเบียนทรัพย์สิน', 'ประมาณการ'].map(function(o) { return '<option value="' + o + '"' + ((u.ys || '') === o ? ' selected' : '') + '>' + (o || '-') + '</option>'; }).join('') + '</select></div>' +
+                    '<div class="col-span-2 sm:col-span-3">' + lab('หมายเหตุ') + inp('nt', u.nt || '', 'type="text"') + '</div>' +
+                    '<div>' + lab('สถานะ') + '<select data-uidx="' + idx + '" data-uf="st" class="w-full border border-slate-300 rounded px-2 py-1 text-sm bg-white"' + dis + '>' +
+                        '<option value="ใช้งาน"' + (u.st !== 'ไม่ใช้งาน' ? ' selected' : '') + '>ใช้งาน</option><option value="ไม่ใช้งาน"' + (u.st === 'ไม่ใช้งาน' ? ' selected' : '') + '>ไม่ใช้งาน</option></select></div>' +
+                    '<div>' + lab('⭐ สภาพ (0-5)') + '<select data-uidx="' + idx + '" data-uf="cr" class="w-full border border-slate-300 rounded px-2 py-1 text-sm bg-white"' + dis + '>' + ratingOpts + '</select></div>' +
+                    '<div>' + lab('กระแสไฟ (A)') + inp('am', u.am, 'type="number" step="0.01"') + '</div>' +
+                    (c.hasTemp ?
+                        '<div>' + lab('🌡️ Controller / Setpoint (°C)') + inp('tc', u.tc, 'type="number" step="0.1"') + '</div>' +
+                        '<div>' + lab('ลมจ่าย Supply (°C)') + inp('ct', u.ct, 'type="number" step="0.1"') + '</div>' +
+                        '<div>' + lab('ลมกลับ Return (°C)') + inp('mt', u.mt, 'type="number" step="0.1"', low ? 'border-amber-400 bg-amber-50' : '') + '</div>' : '') +
+                '</div>' +
+                (low ? '<p class="text-[11px] text-amber-700 mt-1">⚠️ ΔT ' + (ret - sup).toFixed(1) + '°C (ต่ำกว่า ' + CONFIG.catTemp.threshold + '°C)</p>' : '') +
+                ffEditHtml(u, idx, c, dis) +
+                _photoBlockHtml(att[u.pk], u.pk, photoEditable) +
+            '</div>';
+        }
+
+        function unitsGroupHtml(units, groupId, dis, att, photoEditable) {
+            let html = '';
+            CONFIG.categories.filter(function(c) { return c.group === groupId; }).forEach(function(c) {
+                const list = [];
+                units.forEach(function(u, i) { if (u.c === c.id) list.push({ u: u, i: i }); });
+                html += '<div class="border border-slate-200 rounded-lg p-3 mb-2 bg-slate-50">' +
+                    '<div class="flex justify-between text-xs font-semibold text-slate-700 mb-2"><span>' + htmlEscape(c.title) + '</span><span>รวม ' + list.length + '</span></div>';
+                if (!list.length) html += '<p class="text-[11px] text-slate-400">ไม่มีเครื่องประเภทนี้</p>';
+                list.forEach(function(x) { html += unitCardHtml(x.u, x.i, c, dis, att, photoEditable); });
+                html += '</div>';
+            });
+            return html;
+        }
+
+        // Read the edited cards back into the Units_JSON shape (deleted ones dropped).
+        // Equipment ID / photo key come from the stored record, never re-derived.
+        function collectEditedUnits() {
+            const out = [];
+            currentRecord['Units_JSON'].forEach(function(orig, i) {
+                const val = function(f) { const el = document.querySelector('#modalBody [data-uidx="' + i + '"][data-uf="' + f + '"]'); return el ? el.value : ''; };
+                const del = document.querySelector('#modalBody [data-uidx="' + i + '"][data-uf="del"]');
+                if (del && del.checked) return;
+                // Categories without a temperature pair have no inputs for them — keep what is stored
+                const keep = function(f) { return document.querySelector('#modalBody [data-uidx="' + i + '"][data-uf="' + f + '"]') ? val(f) : (orig[f] == null ? '' : orig[f]); };
+                // start from the stored unit so fields this modal doesn't show are kept, not wiped
+                out.push(Object.assign({}, orig, ffEditedVals(i), { c: orig.c, s: orig.s, n: orig.n, id: orig.id, pk: orig.pk, yr: val('yr'), ys: val('ys'), nt: val('nt'),
+                    br: val('br'), sp: val('sp'), as: val('as'), st: val('st'), cr: val('cr'),
+                    ct: keep('ct'), mt: keep('mt'), tc: keep('tc'), am: val('am') }));
+            });
+            return out;
+        }
+
+        // ─── QR labels for C7 to stick on each unit ───────────────────────────────────
+        // Builds a printable A4 sheet (same document + window.print — popups lose the CSS in the GAS
+        // sandbox) with one cut-out label per unit: QR of the Equipment ID + ID, type/size, brand,
+        // Asset No. and store. Choose label size and which types to print.
+        // QR opens the equipment page (?page=equip) for that unit — details, photos, history, PM/CM
+        const EQUIP_PAGE_URL = '<?= ScriptApp.getService().getUrl() ?>?page=equip&id=';
+        let QRP = { size: 'm', cats: null };
+        function _qrSizeLabel(c, sizeKey) { const z = (c.sizes || []).find(function(x) { return x.sizeKey === sizeKey; }); return z ? z.label : sizeKey; }
+        function _qrShort(t) { return String(t || '').replace(/\s*[—(].*$/, '').replace(/ Showcase$/, '').trim(); }
+        function openQrPrint() {
+            const units = currentRecord && Array.isArray(currentRecord['Units_JSON']) ? currentRecord['Units_JSON'] : [];
+            if (!units.length) { alert('รายการนี้ไม่มีข้อมูลรายตู้ / รายเครื่อง (รูปแบบเก่า) — ไม่สามารถพิมพ์ QR ได้'); return; }
+            const present = {};
+            units.forEach(function(u) { present[u.c] = (present[u.c] || 0) + 1; });
+            QRP.cats = {};
+            Object.keys(present).forEach(function(k) { QRP.cats[k] = true; });
+            const cats = CONFIG.categories.filter(function(c) { return present[c.id]; });
+            document.getElementById('qrOptCats').innerHTML = cats.map(function(c) {
+                return '<label class="inline-flex items-center gap-1.5 text-xs border border-slate-200 rounded-full px-2.5 py-1 bg-white"><input type="checkbox" checked data-qrcat="' + c.id + '" onchange="QRP.cats[this.dataset.qrcat]=this.checked;renderQrSheet()"> ' +
+                    htmlEscape(_qrShort(c.title)) + ' <b>' + present[c.id] + '</b></label>';
+            }).join('');
+            document.getElementById('qrPanel').classList.remove('hidden');
+            renderQrSheet();
+        }
+        function closeQrPrint() { document.getElementById('qrPanel').classList.add('hidden'); document.getElementById('qrPrint').innerHTML = ''; }
+        function setQrSize(s) {
+            QRP.size = s;
+            document.querySelectorAll('[data-qrsize]').forEach(function(b) { b.classList.toggle('bg-indigo-600', b.dataset.qrsize === s); b.classList.toggle('text-white', b.dataset.qrsize === s); });
+            renderQrSheet();
+        }
+        function renderQrSheet() {
+            const r = currentRecord;
+            const units = (r['Units_JSON'] || []).filter(function(u) { return QRP.cats[u.c]; });
+            const catBy = {};
+            CONFIG.categories.forEach(function(c) { catBy[c.id] = c; });
+            const store = String(r['Branch Code'] || '') + ' ' + String(r['Branch Name'] || '');
+            const px = QRP.size === 's' ? 150 : QRP.size === 'l' ? 260 : 200;
+            const html = '<div class="qr-head">' + htmlEscape(store) + ' · ' + units.length + ' ป้าย · ตัดตามเส้นประ แล้วติดที่ตัวตู้ / เครื่อง (จุดที่เห็นชัด ไม่โดนน้ำ / ความร้อน)</div>' +
+                '<div class="qr-sheet sz-' + QRP.size + '">' + units.map(function(u, i) {
+                    const c = catBy[u.c] || {};
+                    return '<div class="qr-label"><div class="qr-store">Big C ' + htmlEscape(store) + '</div>' +
+                        '<div class="qr-code" id="qrc_' + i + '"></div>' +
+                        '<div class="qr-id">' + htmlEscape(u.id) + '</div>' +
+                        '<div class="qr-type">' + htmlEscape(_qrShort(c.title || u.c)) + ' [' + htmlEscape(_qrSizeLabel(c, u.s)) + ']</div>' +
+                        '<div class="qr-meta">' + [u.br, u.as ? 'Asset ' + u.as : '', u.yr ? 'ปี ' + u.yr : ''].filter(Boolean).map(htmlEscape).join(' · ') + '</div></div>';
+                }).join('') + '</div>';
+            const out = document.getElementById('qrPrint');
+            out.innerHTML = html;
+            const prev = document.getElementById('qrPreview');
+            prev.innerHTML = html;
+            if (typeof QRCode === 'undefined') { prev.insertAdjacentHTML('afterbegin', '<p class="text-red-600 text-sm">โหลดไลบรารี QR ไม่สำเร็จ — กรุณารีเฟรชหน้า</p>'); return; }
+            units.forEach(function(u, i) {
+                [out, prev].forEach(function(root) {
+                    const el = root.querySelector('#qrc_' + i);
+                    if (el) new QRCode(el, { text: EQUIP_PAGE_URL + encodeURIComponent(String(u.id)), width: px, height: px, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+                });
+            });
+            document.getElementById('qrCount').textContent = units.length + ' ป้าย';
+        }
+        function printQrSheet() {
+            if (!document.querySelector('#qrPrint .qr-label')) { alert('ไม่มีป้ายที่เลือกไว้'); return; }
+            // give qrcodejs a tick to swap its canvas for the <img> it prints best as
+            setTimeout(function() { window.print(); }, 300);
+        }
+
+        function renderModalBody(r) {
+            const att = r['Attachments_JSON'] || {};
+            const editable = canEdit();
+            const dis = editable ? '' : ' disabled';
+            // Photo add/delete is Admin / SMF / Ops-toggle only server-side (the original
+            // reporter can fix counts, not photos) — same split as the EDMI report.
+            const photoEditable = isAdmin || smfCanEdit || opsCanEdit;
+            const ct = CONFIG.catTemp;
+            const units = Array.isArray(r['Units_JSON']) ? r['Units_JSON'] : null;
+            let html = units ? brandDatalistHtml() : '';
+            html +=
+                '<div class="detail-row"><span class="detail-label">สาขา</span><span class="detail-value">' + htmlEscape(r['Branch Code']) + ' - ' + htmlEscape(r['Branch Name']) + ' (' + htmlEscape(r['Store Format'] || '-') + ')</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ผู้แจ้ง</span><span class="detail-value">' + htmlEscape(r['Reporter Name']) + ' (' + htmlEscape(r['Reporter Email']) + ') ' + htmlEscape(r['Reporter Phone'] || '') + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">วันเวลาที่ส่ง</span><span class="detail-value">' + formatRecordDate(r['Timestamp']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">รวม</span><span class="detail-value">' +
+                    CONFIG.groups.map(function(g) { return htmlEscape(g.label) + ' <b>' + num(r[g.totalHeader]) + '</b>'; }).join(' · ') + '</span></div>';
+            const badges = issueBadges(r);
+            if (badges) html += '<div class="mt-2 flex flex-wrap gap-1">' + badges + '</div>';
+
+            html += '<div class="mt-3"><label class="text-[11px] text-slate-500 block">' + htmlEscape(sysHeader('tempInstrument')) + '</label>' + _sysInputHtml(r, sysField('tempInstrument'), dis) + '</div>';
+
+            // Chiller plant
+            html += '<h4 class="mt-5 mb-1 font-bold text-slate-700">Chiller Plant</h4>' + _sysGridHtml(r, 'plant', dis, 3, units ? ['chillerType', 'bms'] : null) +
+                (units ? unitsGroupHtml(units, 'plant', dis, att, photoEditable) : '');
+            html += '<div class="grid grid-cols-2 gap-3 mt-2">';
+            PLANT_TEMP_PAIRS.forEach(function(p) {
+                const a = tempVal(r[sysHeader(p[0])]), b = tempVal(r[sysHeader(p[1])]);
+                const gap = a !== null && b !== null && Math.abs(a - b) > PLANT_GAP_C;
+                html += '<div class="border border-blue-100 rounded-lg p-2"><p class="text-[11px] font-semibold text-blue-700 mb-1">🌡️ ' + p[2] + '</p><div class="grid grid-cols-2 gap-2">' +
+                    '<div><label class="text-[10px] text-slate-500 block">แสดง</label>' + _sysInputHtml(r, sysField(p[0]), dis) + '</div>' +
+                    '<div><label class="text-[10px] text-slate-500 block">วัดจริง</label>' + _sysInputHtml(r, sysField(p[1]), dis, gap ? 'border-amber-400 bg-amber-50' : '') + '</div></div>' +
+                    (gap ? '<p class="text-[11px] text-amber-700 mt-1">⚠️ ต่าง ' + Math.abs(a - b).toFixed(1) + '°C</p>' : '') + '</div>';
+            });
+            html += '</div>' + _photoBlockHtml(att.hac_plant, 'hac_plant', photoEditable);
+
+            // Equipment per group
+            CONFIG.groups.forEach(function(g) {
+                html += '<h4 class="mt-5 mb-2 font-bold text-cyan-800">' + htmlEscape(g.label) + '</h4>';
+                if (units) { html += unitsGroupHtml(units, g.id, dis, att, photoEditable); } else CONFIG.categories.filter(function(c) { return c.group === g.id; }).forEach(function(c) {
+                    let temp = '';
+                    if (c.hasTemp) {
+                        const s = tempVal(r[c.ctrlTempHeader]), ret = tempVal(r[c.measTempHeader]);
+                        const low = s !== null && ret !== null && (ret - s) < ct.threshold;
+                        temp = '<div class="grid grid-cols-2 gap-2 mt-2">' +
+                            '<div><label class="text-[11px] text-slate-500 block">🌡️ ' + htmlEscape(ct.a.label) + ' Supply (°C)</label><input type="number" step="0.1" data-edit-key="' + c.ctrlTempKey + '" value="' + (s === null ? '' : s) + '" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + dis + '></div>' +
+                            '<div><label class="text-[11px] text-slate-500 block">🌡️ ' + htmlEscape(ct.b.label) + ' Return (°C)</label><input type="number" step="0.1" data-edit-key="' + c.measTempKey + '" value="' + (ret === null ? '' : ret) + '" class="w-full border ' + (low ? 'border-amber-400 bg-amber-50' : 'border-slate-300') + ' rounded px-2 py-1 text-sm"' + dis + '></div>' +
+                            (low ? '<p class="col-span-2 text-[11px] text-amber-700">⚠️ ΔT ' + (ret - s).toFixed(1) + '°C (ต่ำกว่า ' + ct.threshold + '°C)</p>' : '') +
+                        '</div>';
+                    }
+                    html += '<div class="border border-slate-200 rounded-lg p-3 mb-2 bg-slate-50">' +
+                        '<div class="flex justify-between text-xs font-semibold text-slate-700 mb-2"><span>' + htmlEscape(c.title) + '</span><span>รวม ' + num(r[c.sumHeader]) + '</span></div>' +
+                        '<div class="grid grid-cols-3 sm:grid-cols-5 gap-2">' +
+                        c.sizes.map(function(s) {
+                            return '<div><label class="text-[11px] text-slate-500 block">' + htmlEscape(s.label) + '</label>' +
+                                '<input type="number" min="0" data-edit-key="' + s.key + '" value="' + num(r[s.header]) + '" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + dis + '></div>';
+                        }).join('') +
+                        '</div>' + temp + _photoBlockHtml(att['hac_' + c.id], 'hac_' + c.id, photoEditable) + '</div>';
+                });
+                if (g.id === 'dx') html += _sysGridHtml(r, 'dx', dis, 2);
+            });
+
+            // Sales-floor temperatures
+            html += '<h4 class="mt-5 mb-1 font-bold text-orange-700">อุณหภูมิพื้นที่ขาย (จุดร้อน &gt; ' + CONFIG.hotAreaC + '°C)</h4>' + _sysGridHtml(r, 'area', dis, 5) +
+                _photoBlockHtml(att.hac_area, 'hac_area', photoEditable);
+
+            const broken = r['Has Broken'] === 'Yes';
+            html += '<div class="mt-5 p-3 bg-red-50 border border-red-200 rounded-lg">' +
+                '<label class="flex items-center gap-2 text-xs font-bold text-red-700"><input type="checkbox" id="editHasBroken"' + (broken ? ' checked' : '') + dis + '> ⚠️ มีแอร์ / อุปกรณ์ชำรุด หรือไม่เย็น</label>' +
+                '<textarea id="editBrokenDetail" rows="2" class="mt-2 w-full border border-red-300 rounded-lg px-2 py-1.5 text-sm" placeholder="ระบุเครื่องที่ชำรุดและอาการ"' + dis + '>' + htmlEscape(r['Broken Detail'] || '') + '</textarea>' +
+                _photoBlockHtml(att.hac_broken, 'hac_broken', photoEditable) + '</div>';
+
+            html += '<div class="mt-3"><label class="text-xs font-semibold text-slate-500 mb-1 block">หมายเหตุ (Comments)</label>' +
+                '<textarea id="editComments" rows="2" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"' + dis + '>' + htmlEscape(r['Comments'] || '') + '</textarea></div>';
+
+            document.getElementById('modalBody').innerHTML = html;
+            document.getElementById('saveBtn').classList.toggle('hidden', !editable);
+            document.getElementById('qrBtn').classList.toggle('hidden', !(Array.isArray(r['Units_JSON']) && r['Units_JSON'].length));
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('modal-open');
+            setTimeout(function() { document.getElementById('detailModal').classList.add('hidden'); }, 280);
+            currentId = null;
+            currentRecord = null;
+        }
+
+        function saveRecord() {
+            if (!currentId) return;
+            // Every config key is rendered in the modal, so the server's full recompute
+            // never blanks a field.
+            const form = { id: currentId, clientEmail: _userEmail };
+            document.querySelectorAll('#modalBody [data-edit-key]').forEach(function(el) { form[el.dataset.editKey] = el.value; });
+            if (currentRecord && Array.isArray(currentRecord['Units_JSON'])) {
+                const edited = collectEditedUnits();
+                const removed = currentRecord['Units_JSON'].length - edited.length;
+                if (removed > 0 && !confirm('จะลบเครื่อง ' + removed + ' เครื่องออกจากรายการนี้ ยืนยันหรือไม่?')) return;
+                form.unitsJson = JSON.stringify(edited);
+            }
+            const hasBroken = document.getElementById('editHasBroken').checked;
+            form.hasBroken = hasBroken ? 'Yes' : 'No';
+            form.brokenDetail = document.getElementById('editBrokenDetail').value;
+            form.comments = document.getElementById('editComments').value;
+            if (hasBroken && !form.brokenDetail.trim()) { alert('กรุณาระบุเครื่องที่ชำรุดและอาการ'); return; }
+
+            const btn = document.getElementById('saveBtn');
+            btn.textContent = 'กำลังบันทึก...';
+            btn.disabled = true;
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.textContent = 'บันทึก (Save)';
+                    btn.disabled = false;
+                    if (res && res.success) { closeModal(); loadData(); }
+                    else alert('บันทึกไม่สำเร็จ: ' + (res && res.error));
+                })
+                .withFailureHandler(function(err) { btn.textContent = 'บันทึก (Save)'; btn.disabled = false; alert('Server Error: ' + err.message); })
+                .updateHyperAcSurveyRecord(form);
+        }
+
+        function deleteRecord() {
+            if (!currentId) return;
+            if (!confirm('ยืนยันการลบรายการนี้? การลบไม่สามารถย้อนกลับได้')) return;
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (res && res.success) { closeModal(); loadData(); }
+                    else alert('ลบไม่สำเร็จ: ' + (res && res.error));
+                })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); })
+                .deleteHyperAcSurveyRecord(currentId, _userEmail);
+        }
+
+        // ─── Photo add / delete (delegated) ───────────────────────────────────────
+        let _photoTargetKey = null;
+        document.getElementById('modalBody').addEventListener('click', function(e) {
+            const histBtn = e.target.closest('[data-hist]');
+            if (histBtn) { openUnitHistory(parseInt(histBtn.dataset.hist, 10)); return; }
+            const addBtn = e.target.closest('[data-add-photo]');
+            if (addBtn) {
+                _photoTargetKey = addBtn.dataset.addPhoto;
+                const inp = document.getElementById('hyperPhotoUploadInput');
+                inp.value = '';
+                inp.click();
+                return;
+            }
+            const delBtn = e.target.closest('[data-del-photo]');
+            if (delBtn) {
+                e.preventDefault();
+                const capturedId = currentId;
+                if (!capturedId || !confirm('ลบรูปภาพนี้?')) return;
+                delBtn.disabled = true;
+                google.script.run
+                    .withSuccessHandler(function(res) {
+                        if (!res.success) { alert('ลบรูปไม่สำเร็จ: ' + res.error); delBtn.disabled = false; return; }
+                        delBtn.parentElement.remove();
+                    })
+                    .withFailureHandler(function(err) { alert('Error: ' + err.message); delBtn.disabled = false; })
+                    .deleteHyperAcSurveyPhoto(capturedId, delBtn.dataset.delPhoto, delBtn.dataset.url, _userEmail);
+            }
+        });
+
+        document.getElementById('hyperPhotoUploadInput').addEventListener('change', function() {
+            const files = Array.from(this.files);
+            const unitKey = _photoTargetKey;
+            const capturedId = currentId;
+            _photoTargetKey = null;
+            if (!files.length || !unitKey || !capturedId) return;
+            const block = document.getElementById('photos-' + unitKey);
+            const loadingId = 'ul-' + Date.now();
+            if (block) block.insertAdjacentHTML('beforeend', '<div id="' + loadingId + '" class="mt-2 text-xs text-cyan-700">กำลังอัปโหลด ' + files.length + ' รูป...</div>');
+            // One compressed photo per call — sending several full-size originals in one call failed on big batches.
+            const loadingEl = function() { return document.getElementById(loadingId); };
+            const compress = function(file) {
+                return new Promise(function(resolve) {
+                    const raw = function() { const r = new FileReader(); r.onload = function(ev) { resolve({ name: file.name, mimeType: file.type || 'image/jpeg', data: ev.target.result.split(',')[1] }); }; r.onerror = function() { resolve(null); }; r.readAsDataURL(file); };
+                    if (!/^image\//.test(file.type)) return raw();
+                    const url = URL.createObjectURL(file), img = new Image();
+                    img.onload = function() {
+                        URL.revokeObjectURL(url);
+                        let w = img.naturalWidth, h = img.naturalHeight; const k = Math.min(1, 1000 / Math.max(w, h)); w = Math.round(w * k); h = Math.round(h * k);
+                        const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+                        c.toBlob(function(b) {
+                            if (!b) return raw();
+                            const r = new FileReader(); r.onload = function(ev) { resolve({ name: file.name.replace(/\.[^/.]+$/, '') + '.jpg', mimeType: 'image/jpeg', data: ev.target.result.split(',')[1] }); }; r.onerror = raw; r.readAsDataURL(b);
+                        }, 'image/jpeg', 0.65);
+                    };
+                    img.onerror = function() { URL.revokeObjectURL(url); raw(); };
+                    img.src = url;
+                });
+            };
+            const send = function(fd) {
+                return new Promise(function(resolve) {
+                    google.script.run
+                        .withSuccessHandler(function(res) { resolve(res && res.success ? res.newUrls : null); })
+                        .withFailureHandler(function() { resolve(null); })
+                        .addHyperAcSurveyPhotos(capturedId, unitKey, [fd], _userEmail);
+                });
+            };
+            (async function() {
+                let failed = 0, done = 0;
+                for (const file of files) {
+                    const fd = await compress(file);
+                    let urls = null;
+                    for (let attempt = 0; fd && !urls && attempt < 3; attempt++) {
+                        urls = await send(fd);
+                        if (!urls) await new Promise(function(r) { setTimeout(r, 1500 * (attempt + 1)); });
+                    }
+                    if (!urls) { failed++; continue; }
+                    done++;
+                    const l = loadingEl(); if (l) l.textContent = 'กำลังอัปโหลด ' + done + '/' + files.length + ' รูป...';
+                    const grid = block && block.querySelector('.flex.gap-2.flex-wrap');
+                    if (grid) grid.insertAdjacentHTML('beforeend', urls.map(function(url) {
+                        const esc = htmlEscape(url);
+                        return '<div class="relative group inline-block"><a href="' + esc + '" target="_blank"><img src="' + esc + '" class="w-16 h-16 object-cover rounded-lg border border-slate-200 shadow-sm"></a>' +
+                            '<button type="button" data-del-photo="' + unitKey + '" data-url="' + esc + '" class="absolute top-1 right-1 w-5 h-5 bg-red-500 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-xs leading-none opacity-0 group-hover:opacity-100 transition-opacity shadow z-10" title="ลบรูป">✕</button></div>';
+                    }).join(''));
+                }
+                const l = loadingEl(); if (l) l.remove();
+                if (failed) alert('อัปโหลดรูปไม่สำเร็จ ' + failed + ' จาก ' + files.length + ' รูป กรุณาลองใหม่อีกครั้ง');
+            })();
+        });
+    </script>
+    <script>var HYPER_REVIEW_KIND = 'Ac';</script>
+    <?!= include('HyperReviewBar') ?>
+</body>
+</html>

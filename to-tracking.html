@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restroom Tracking Upload</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }</style>
+</head>
+
+<body>
+
+    <?!= include('auth') ?>
+
+    <div id="access-denied" class="hidden min-h-screen flex items-center justify-center">
+        <div class="text-center bg-white rounded-xl shadow-lg p-10 max-w-sm">
+            <div class="text-6xl mb-4">🔒</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
+            <p class="text-gray-500 mb-6">หน้านี้สำหรับ Admin เท่านั้น</p>
+            <a href="<?= ScriptApp.getService().getUrl() ?>" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Back to App</a>
+        </div>
+    </div>
+
+    <div id="main-page" class="hidden min-h-screen">
+        <header class="bg-sky-700 text-white shadow-md">
+            <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center gap-3">
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold">📥 Restroom Tracking — อัปโหลด</h1>
+                    <p class="text-sky-200 text-xs mt-0.5">ข้อมูลสาขา (Readiness · TOTAL SCORE · HAS · จำนวนห้องน้ำ) ที่แสดงในแบบสำรวจและรายงานห้องน้ำ Hyper</p>
+                </div>
+                <div class="text-right shrink-0">
+                    <div id="user-email-display" class="text-xs text-sky-200"></div>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_to_survey_report" class="text-sm underline">รายงานห้องน้ำ</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+            <section class="bg-white rounded-xl shadow p-5">
+                <h2 class="font-bold text-gray-800 mb-2">ข้อมูลที่ใช้อยู่</h2>
+                <div id="cur-box" class="text-sm text-gray-500">กำลังโหลด...</div>
+                <button id="btn-undo" type="button" onclick="undo()" class="hidden mt-3 px-3 py-1.5 rounded-lg border border-gray-300 text-sm hover:bg-gray-50">↩️ ย้อนกลับไปไฟล์ก่อนหน้า</button>
+                <p id="undo-status" class="text-xs mt-2"></p>
+            </section>
+
+            <section class="bg-white rounded-xl shadow p-5">
+                <h2 class="font-bold text-gray-800 mb-2">อัปโหลดไฟล์ใหม่</h2>
+                <ol class="text-sm text-gray-600 list-decimal list-inside space-y-1 mb-3">
+                    <li>เลือกไฟล์ <b>Restroom Tracking</b> (.xlsx) จาก LCD / Operation</li>
+                    <li>เลือกชีตของเดือนล่าสุด (เช่น <b>HC-2025-2027 October</b>) — ระบบหาคอลัมน์จากชื่อหัวตาราง</li>
+                    <li>ตรวจตัวอย่าง แล้วกด <b>ยืนยันใช้ข้อมูลนี้</b></li>
+                </ol>
+                <label class="flex items-center gap-3 border-2 border-dashed border-sky-300 bg-sky-50 rounded-lg p-4 cursor-pointer hover:bg-sky-100">
+                    <span class="text-3xl">📄</span>
+                    <span class="flex-1 text-sm text-sky-800"><b>เลือกไฟล์ .xlsx</b><br><span id="file-name" class="text-sky-600 text-xs">ยังไม่ได้เลือกไฟล์</span></span>
+                    <input type="file" id="file" accept=".xlsx,.xls" class="hidden" onchange="onFile(this)">
+                </label>
+                <div id="sheet-row" class="hidden mt-3"><label class="text-xs font-semibold text-gray-600">ชีต</label>
+                    <select id="sheet" onchange="preview()" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mt-1"></select></div>
+                <div id="preview" class="mt-4 text-sm"></div>
+                <button id="btn-save" type="button" onclick="save()" class="hidden mt-3 px-5 py-2 rounded-lg bg-sky-700 text-white font-bold hover:bg-sky-800">✅ ยืนยันใช้ข้อมูลนี้</button>
+                <p id="save-status" class="text-sm mt-2"></p>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        let _wb = null, _fileName = '', _aoa = null;
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) updateUserUI(CURRENT_USER);
+        });
+        // Called by auth.html after login, or by the listener above
+        function updateUserUI(user) {
+            const d = document.getElementById('user-email-display');
+            if (d) d.textContent = user ? (user.name || user.email) : '';
+            const ok = user && (user.isAdmin || user.isSysAdmin);
+            document.getElementById('access-denied').classList.toggle('hidden', !!ok);
+            document.getElementById('main-page').classList.toggle('hidden', !ok);
+            if (ok) loadInfo();
+        }
+        function _email() { return (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.email : ''; }
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+        function loadInfo() {
+            google.script.run.withSuccessHandler(function (res) {
+                const box = document.getElementById('cur-box');
+                if (!res || !res.success) { box.textContent = 'โหลดไม่สำเร็จ: ' + ((res && res.error) || 'no response'); return; }
+                const m = res.meta || {};
+                box.innerHTML = '<div class="flex flex-wrap items-center gap-2">' +
+                    (res.uploaded ? '<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-xs font-bold">ไฟล์ที่อัปโหลด</span>' : '<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">ข้อมูลตั้งต้น (ในโค้ด)</span>') +
+                    '<b class="text-gray-800">' + esc(res.source || '-') + '</b> · ' + res.stores + ' สาขา</div>' +
+                    (res.uploaded && m.at ? '<p class="text-xs text-gray-500 mt-1">อัปโหลดเมื่อ ' + esc(new Date(m.at).toLocaleString('en-GB')) + ' โดย ' + esc(m.by) + '</p>' : '') +
+                    (res.prev ? '<p class="text-xs text-gray-500 mt-1">ไฟล์ก่อนหน้า: ' + esc(res.prev.source) + '</p>' : '');
+                document.getElementById('btn-undo').classList.toggle('hidden', !res.uploaded);
+                document.getElementById('btn-undo').textContent = res.prev ? '↩️ ย้อนกลับไปไฟล์ก่อนหน้า' : '↩️ กลับไปใช้ข้อมูลตั้งต้น (' + (res.builtInSource || 'ในโค้ด') + ')';
+            }).withFailureHandler(function (e) { document.getElementById('cur-box').textContent = 'โหลดไม่สำเร็จ: ' + e.message; }).getHyperToTrackingAdminInfo(_email());
+        }
+
+        function onFile(input) {
+            const f = input.files[0];
+            if (!f) return;
+            _fileName = f.name;
+            document.getElementById('file-name').textContent = f.name;
+            const rd = new FileReader();
+            rd.onload = function (e) {
+                try {
+                    _wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    // default: the first sheet whose header row has the Oracle + TOTAL SCORE columns
+                    const ok = _wb.SheetNames.filter(function (n) { const h = (XLSX.utils.sheet_to_json(_wb.Sheets[n], { header: 1, defval: null })[0] || []).map(function (x) { return String(x || '').replace(/\s+/g, ' ').trim(); }); return h.indexOf('Oracle') > -1 && h.indexOf('TOTAL SCORE') > -1; });
+                    document.getElementById('sheet').innerHTML = _wb.SheetNames.map(function (n) { return '<option' + (n === ok[0] ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('');
+                    document.getElementById('sheet-row').classList.remove('hidden');
+                    preview();
+                } catch (err) { document.getElementById('preview').innerHTML = '<p class="text-red-600">อ่านไฟล์ไม่ได้: ' + esc(err.message) + '</p>'; }
+            };
+            rd.readAsArrayBuffer(f);
+        }
+        function preview() {
+            const name = document.getElementById('sheet').value;
+            _aoa = XLSX.utils.sheet_to_json(_wb.Sheets[name], { header: 1, raw: true, defval: null }).map(function (r) { return r.slice(0, 100); });
+            document.getElementById('btn-save').classList.add('hidden');
+            document.getElementById('preview').innerHTML = '<p class="text-gray-400">กำลังตรวจ...</p>';
+            google.script.run.withSuccessHandler(function (res) {
+                const p = document.getElementById('preview');
+                if (!res || !res.success) { p.innerHTML = '<p class="text-red-600">' + esc((res && res.error) || 'ผิดพลาด') + '</p>'; return; }
+                if (res.missing.length) { p.innerHTML = '<p class="text-red-600">ชีตนี้ไม่มีคอลัมน์: <b>' + esc(res.missing.join(', ')) + '</b> — เลือกชีตอื่น</p>'; return; }
+                const r = res.ready || {};
+                p.innerHTML = '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">' +
+                    ['สาขาในไฟล์|' + res.stats.stores, 'ตรงกับรายชื่อ Hyper|' + res.stats.matched, 'เปลี่ยนจากเดิม|' + res.changed, 'ต่ำกว่า KPI 90%|' + res.underKpi].map(function (x) { const a = x.split('|'); return '<div class="bg-gray-50 border rounded-lg p-2"><div class="text-lg font-bold">' + a[1] + '</div><div class="text-xs text-gray-500">' + a[0] + '</div></div>'; }).join('') + '</div>' +
+                    '<p class="text-xs text-gray-600 mt-2">Readiness: ' + Object.keys(r).map(function (k) { return esc(k) + ' ' + r[k]; }).join(' · ') + '</p>' +
+                    (res.unmatched.length ? '<p class="text-xs text-amber-700 mt-1">ไม่อยู่ในรายชื่อสาขา Hyper (เก็บไว้แต่ไม่แสดงในแบบสำรวจ): ' + esc(res.unmatched.join(', ')) + '</p>' : '');
+                document.getElementById('btn-save').classList.remove('hidden');
+            }).withFailureHandler(function (e) { document.getElementById('preview').innerHTML = '<p class="text-red-600">' + esc(e.message) + '</p>'; }).previewHyperToTracking(_aoa, _email());
+        }
+        function save() {
+            const st = document.getElementById('save-status'), btn = document.getElementById('btn-save');
+            btn.disabled = true; st.className = 'text-sm mt-2 text-gray-500'; st.textContent = 'กำลังบันทึก...';
+            const src = _fileName + ' · ' + document.getElementById('sheet').value;
+            google.script.run.withSuccessHandler(function (res) {
+                btn.disabled = false;
+                if (res && res.success) { st.className = 'text-sm mt-2 text-green-700'; st.textContent = '✓ ใช้ข้อมูลใหม่แล้ว (' + res.meta.stores + ' สาขา)'; btn.classList.add('hidden'); loadInfo(); }
+                else { st.className = 'text-sm mt-2 text-red-600'; st.textContent = '❌ ' + ((res && res.error) || 'บันทึกไม่สำเร็จ'); }
+            }).withFailureHandler(function (e) { btn.disabled = false; st.className = 'text-sm mt-2 text-red-600'; st.textContent = '❌ ' + e.message; }).saveHyperToTracking(_aoa, src, _email());
+        }
+        function undo() {
+            if (!confirm('ย้อนกลับข้อมูล Restroom Tracking?')) return;
+            const st = document.getElementById('undo-status');
+            st.textContent = 'กำลังย้อนกลับ...';
+            google.script.run.withSuccessHandler(function (res) { st.textContent = res && res.success ? '✓ ใช้: ' + res.source : '❌ ' + (res && res.error); loadInfo(); }).undoHyperToTracking(_email());
+        }
+    </script>
+</body>
+
+</html>

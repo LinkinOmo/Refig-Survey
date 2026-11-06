@@ -30,6 +30,7 @@
 </head>
 
 <body class="p-6">
+    <?!= include('ArchiveToggle') ?>
 
     <div id="auth-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8">
@@ -955,7 +956,7 @@
             setTimeout(function () {
                 const userEmail = CURRENT_USER ? CURRENT_USER.email : '';
                 console.log('Loading report for user:', userEmail);
-                google.script.run.withSuccessHandler(initReport).getAllBigCWorkOrdersReport(userEmail);
+                google.script.run.withSuccessHandler(initReport).getAllBigCWorkOrdersReport(userEmail, window.ARCHIVE_ON);
             }, 500);
         };
 
@@ -1670,7 +1671,7 @@
                         document.getElementById('loading').classList.remove('hidden');
                         document.getElementById('loading').innerHTML = '<p class="mt-2 text-gray-500">Updating list...</p>';
                         const userEmail = CURRENT_USER ? CURRENT_USER.email : '';
-                        google.script.run.withSuccessHandler(initReport).getAllBigCWorkOrdersReport(userEmail);
+                        google.script.run.withSuccessHandler(initReport).getAllBigCWorkOrdersReport(userEmail, window.ARCHIVE_ON);
                     } else {
                         alert("Error: " + res.error);
                     }
@@ -1723,7 +1724,7 @@
                         alert('Work order deleted successfully');
                         // Reload the report to reflect changes
                         document.getElementById('loading').classList.remove('hidden');
-                        google.script.run.withSuccessHandler(initReport).getAllBigCWorkOrdersReport(userEmail);
+                        google.script.run.withSuccessHandler(initReport).getAllBigCWorkOrdersReport(userEmail, window.ARCHIVE_ON);
                     } else {
                         alert('Error: ' + (result.error || 'Failed to delete work order'));
                     }

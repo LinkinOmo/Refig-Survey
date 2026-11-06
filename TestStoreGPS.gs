@@ -51,26 +51,5 @@ function testStoreGPSLookup() {
 }
 
 // Helper function (copy from Survey.gs)
-function findStoreSheet() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Store_Database");
-    if (sheet) return sheet;
-
-    // Fallback: Search for a sheet that looks like the Store DB
-    var sheets = ss.getSheets();
-    for (var i = 0; i < sheets.length; i++) {
-        var s = sheets[i];
-        if (s.getLastRow() < 1) continue;
-        var headers = s.getRange(1, 1, 1, Math.min(10, s.getLastColumn())).getValues()[0];
-        // Look for store-related headers
-        for (var j = 0; j < headers.length; j++) {
-            var header = String(headers[j]).toLowerCase();
-            if (header.indexOf("store") !== -1 || header.indexOf("latitude") !== -1 || header.indexOf("longitude") !== -1) {
-                return s;
-            }
-        }
-    }
-    
-    Logger.log("Could not identify Store Sheet.");
-    return null;
-}
+// findStoreSheet() lives in TripPlan01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.

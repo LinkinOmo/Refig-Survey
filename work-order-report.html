@@ -30,6 +30,7 @@
 </head>
 
 <body class="p-6">
+    <?!= include('ArchiveToggle') ?>
 
     <div id="auth-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8">
@@ -808,14 +809,14 @@
                 if (userStr) {
                     const user = JSON.parse(userStr);
                     // Pass email to backend for Admin Check
-                    google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport(user.email);
+                    google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport(user.email, window.ARCHIVE_ON);
                 } else {
                     // Fallback (Guest / No Login)
-                    google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport();
+                    google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport(null, window.ARCHIVE_ON);
                 }
             } catch (e) {
                 console.error("Auth Load Error", e);
-                google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport();
+                google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport(null, window.ARCHIVE_ON);
             }
 
             // Load employee list for dropdown
@@ -1208,7 +1209,7 @@
                     if (res.success) {
                         pendingChanges = {}; // Clear changes
                         // Reload data to reflect side effects (like dates/approvers)
-                        google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport();
+                        google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport(null, window.ARCHIVE_ON);
                     } else {
                         alert("Error saving: " + res.error);
                     }
@@ -1564,7 +1565,7 @@
             // Optimistic update or refresh
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('loading').innerHTML = '<p class="mt-2 text-gray-500">Updating list...</p>';
-            google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport();
+            google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport(null, window.ARCHIVE_ON);
         }
 
         function deleteOrder(id) {
@@ -1576,7 +1577,7 @@
                     .withSuccessHandler(res => {
                         if (res.success) {
                             // Refresh
-                            google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport();
+                            google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport(null, window.ARCHIVE_ON);
                         } else {
                             document.getElementById('loading').classList.add('hidden');
                             alert("Delete failed: " + res.error);
@@ -1614,7 +1615,7 @@
                         alert('All changes saved successfully!');
                         // Refresh data
                         document.getElementById('loading').classList.remove('hidden');
-                        google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport();
+                        google.script.run.withSuccessHandler(initReport).getAllWorkOrdersReport(null, window.ARCHIVE_ON);
                     } else {
                         alert('Error saving: ' + res.error);
                     }

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyper Equipment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background: #f8fafc; }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #4f46e5; width: 22px; height: 22px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .kv { display: grid; grid-template-columns: 9rem 1fr; gap: .25rem .75rem; font-size: .85rem; }
+        .kv dt { color: #64748b; font-size: .75rem; padding-top: .1rem; }
+        .kv dd { min-width: 0; overflow-wrap: anywhere; }
+        @media (max-width: 480px) { .kv { grid-template-columns: 7rem minmax(0, 1fr); } }
+        #dBody { overflow-x: hidden; }
+        #printLabel { display: none; }
+        #qrBig img, #qrBig canvas { width: 180px !important; height: 180px !important; }
+        #qrBig canvas { display: none !important; }
+        @media print {
+            @page { size: A4; margin: 10mm; }
+            body > *:not(#printLabel) { display: none !important; }
+            body { background: #fff !important; }
+            #printLabel { display: block !important; }
+            #printLabel .lab { width: 62mm; border: 1px dashed #94a3b8; border-radius: 2mm; padding: 3mm; text-align: center; font-family: 'Prompt', sans-serif; }
+            #printLabel canvas { display: none !important; }
+            #printLabel img { display: block !important; width: 40mm !important; height: 40mm !important; margin: 1.5mm auto; }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" class="p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-indigo-600 rounded-full"></div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold leading-tight">🔎 อุปกรณ์ Hyper — ค้นหา / QR / ประวัติ</h1>
+                    <p class="text-xs text-slate-500">ตู้แช่ · แอร์ · อุปกรณ์อาคาร (จากการสำรวจล่าสุดของแต่ละสาขา)</p>
+                </div>
+            </div>
+            <div class="hidden md:flex items-center gap-2 text-xs">
+                <a class="px-2 py-1 border rounded hover:bg-slate-50" href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_ref_survey_report" target="_blank">รายงานตู้แช่</a>
+                <a class="px-2 py-1 border rounded hover:bg-slate-50" href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_ac_survey_report" target="_blank">รายงานแอร์</a>
+                <a class="px-2 py-1 border rounded hover:bg-slate-50" href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_eq_survey_report" target="_blank">รายงานอุปกรณ์อาคาร</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-5 space-y-4">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-1 md:grid-cols-6 gap-3">
+            <input id="q" type="search" placeholder="ค้นหา Equipment ID / Asset No. / ยี่ห้อ / รุ่น / สาขา ..." class="md:col-span-3 border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="render()">
+            <select id="fKind" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" onchange="render()"><option value="">ทุกแบบสำรวจ</option></select>
+            <select id="fStore" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" onchange="render()"><option value="">ทุกสาขา</option></select>
+            <select id="fFlag" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" onchange="render()">
+                <option value="">ทั้งหมด</option>
+                <option value="bad">สภาพ ≤ 2 / ไม่ใช้งาน</option>
+                <option value="old">อายุ ≥ 15 ปี</option>
+                <option value="cert">ใบตรวจหมดอายุ / ใกล้หมด</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-3 text-sm text-slate-500"><div class="loader" id="loader"></div><span id="count"></span></div>
+        <div id="list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+    </div>
+
+    <!-- Unit detail -->
+    <div id="detail" class="hidden fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center">
+        <div class="bg-white w-full md:max-w-3xl md:rounded-2xl rounded-t-2xl max-h-[95dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b flex items-center justify-between"><b id="dTitle">อุปกรณ์</b><button onclick="closeDetail()" class="text-slate-400 text-xl">✕</button></div>
+            <div id="dBody" class="p-5 overflow-y-auto"></div>
+        </div>
+    </div>
+    <div id="printLabel"></div>
+
+    <script>
+        const APP_URL = '<?= ScriptApp.getService().getUrl() ?>';
+        const START_ID = '<?= (typeof startId !== "undefined" ? startId : "") ?>';
+        let ROWS = [], KINDS = {}, CUR = null, _userEmail = '', canWrite = false;
+
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function ageOf(yr) { const n = parseInt(yr, 10); return isNaN(n) ? null : new Date().getFullYear() - n; }
+        function certState(v) { if (!v) return ''; const t = new Date().toISOString().slice(0, 10), t60 = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10); return v < t ? 'expired' : v <= t60 ? 'due' : 'ok'; }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? (ts || '-') : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
+        function equipUrl(id) { return APP_URL + '?page=equip&id=' + encodeURIComponent(id); }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            load();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) { if (f) canWrite = !!(f.isAdmin || f.isScheduleAdmin || f.smfEditAllowed || f.opsEditAllowed); }).getUserFlags(_userEmail);
+        });
+
+        let _try = 0;
+        function load() {
+            const my = ++_try;
+            google.script.run.withSuccessHandler(function(raw) {
+                if (my !== _try) return;
+                if (!raw) { if (my < 3) setTimeout(load, 1500); return; }
+                const res = JSON.parse(raw);
+                document.getElementById('loader').classList.add('hidden');
+                if (!res.success) { document.getElementById('count').textContent = 'โหลดไม่สำเร็จ: ' + res.error; return; }
+                ROWS = res.rows; KINDS = res.kinds;
+                document.getElementById('fKind').insertAdjacentHTML('beforeend', Object.keys(KINDS).map(function(k) { return '<option value="' + k + '">' + KINDS[k] + '</option>'; }).join(''));
+                const stores = {};
+                ROWS.forEach(function(r) { stores[r.code] = r.sn; });
+                document.getElementById('fStore').insertAdjacentHTML('beforeend', Object.keys(stores).sort().map(function(c) { return '<option value="' + esc(c) + '">' + esc(c + ' ' + stores[c]) + '</option>'; }).join(''));
+                const want = START_ID || new URLSearchParams(location.search).get('id') || '';
+                if (want) {
+                    document.getElementById('q').value = want;
+                    const hit = ROWS.filter(function(r) { return r.id === want; });
+                    if (hit.length === 1) openDetail(hit[0]);
+                }
+                render();
+            }).withFailureHandler(function(err) { document.getElementById('loader').classList.add('hidden'); document.getElementById('count').textContent = 'Error: ' + err.message; }).getHyperEquipIndex();
+        }
+
+        function render() {
+            const q = document.getElementById('q').value.toLowerCase().trim();
+            const k = document.getElementById('fKind').value, st = document.getElementById('fStore').value, fl = document.getElementById('fFlag').value;
+            const list = ROWS.filter(function(r) {
+                if (k && r.k !== k) return false;
+                if (st && r.code !== st) return false;
+                if (fl === 'bad' && !(r.st === 'ไม่ใช้งาน' || (r.cr !== '' && parseInt(r.cr, 10) <= 2))) return false;
+                if (fl === 'old' && !(ageOf(r.yr) >= 15)) return false;
+                if (fl === 'cert' && ['expired', 'due'].indexOf(certState(r.ce)) === -1) return false;
+                if (q && [r.id, r.as, r.br, r.sp, r.cat, r.code, r.sn].join(' ').toLowerCase().indexOf(q) === -1) return false;
+                return true;
+            });
+            document.getElementById('count').textContent = list.length.toLocaleString() + ' รายการ' + (list.length > 300 ? ' (แสดง 300 รายการแรก — ค้นหาให้แคบลง)' : '');
+            document.getElementById('list').innerHTML = list.slice(0, 300).map(function(r, i) {
+                const age = ageOf(r.yr), cs = certState(r.ce);
+                return '<button type="button" data-i="' + ROWS.indexOf(r) + '" class="text-left bg-white border ' + (cs === 'expired' || r.st === 'ไม่ใช้งาน' ? 'border-red-300' : 'border-slate-200') + ' rounded-xl p-3 hover:shadow-md hover:border-indigo-300 transition">' +
+                    '<div class="flex justify-between gap-2"><span class="font-mono font-bold text-indigo-700">' + esc(r.id) + '</span><span class="text-[11px] text-slate-500">' + esc(KINDS[r.k] || r.k) + '</span></div>' +
+                    '<div class="text-sm">' + esc(r.cat) + ' <span class="text-slate-500">[' + esc(r.size) + ']</span></div>' +
+                    '<div class="text-xs text-slate-500">' + esc(r.code + ' ' + r.sn) + '</div>' +
+                    '<div class="flex flex-wrap gap-1 mt-1 text-[11px]">' +
+                        (r.br ? '<span class="px-2 py-0.5 rounded-full bg-slate-100">' + esc(r.br) + '</span>' : '') +
+                        (r.as ? '<span class="px-2 py-0.5 rounded-full bg-slate-100">Asset ' + esc(r.as) + '</span>' : '') +
+                        (age !== null ? '<span class="px-2 py-0.5 rounded-full ' + (age >= 15 ? 'bg-red-100 text-red-700' : age >= 10 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100') + '">อายุ ' + age + ' ปี</span>' : '') +
+                        (r.cr !== '' ? '<span class="px-2 py-0.5 rounded-full ' + (parseInt(r.cr, 10) <= 2 ? 'bg-red-100 text-red-700' : 'bg-slate-100') + '">สภาพ ' + r.cr + '/5</span>' : '') +
+                        (r.st === 'ไม่ใช้งาน' ? '<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700">ไม่ใช้งาน</span>' : '') +
+                        (cs === 'expired' ? '<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700">⛔ ใบตรวจหมดอายุ</span>' : cs === 'due' ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">⏰ ใบตรวจใกล้หมด</span>' : '') +
+                    '</div></button>';
+            }).join('') || '<p class="text-slate-400 text-sm">ไม่พบอุปกรณ์</p>';
+        }
+        document.getElementById('list').addEventListener('click', function(e) { const b = e.target.closest('[data-i]'); if (b) openDetail(ROWS[parseInt(b.dataset.i, 10)]); });
+
+        function openDetail(r) {
+            CUR = { row: r, data: null };
+            document.getElementById('dTitle').textContent = r.id;
+            document.getElementById('dBody').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังโหลด...</p>';
+            document.getElementById('detail').classList.remove('hidden');
+            google.script.run.withSuccessHandler(function(raw) {
+                const res = JSON.parse(raw || '{}');
+                if (!CUR || CUR.row !== r) return;
+                if (!res.success) { document.getElementById('dBody').innerHTML = '<p class="text-red-600">' + esc(res.error) + '</p>'; return; }
+                CUR.data = res;
+                renderDetail();
+            }).withFailureHandler(function(err) { document.getElementById('dBody').innerHTML = '<p class="text-red-600">' + esc(err.message) + '</p>'; })
+              .getHyperUnitDetail(r.k, r.sid, r.id);
+        }
+        function closeDetail() { document.getElementById('detail').classList.add('hidden'); CUR = null; }
+
+        function renderDetail() {
+            const d = CUR.data, u = d.unit, c = d.category || {};
+            const size = ((c.sizes || []).find(function(z) { return z.sizeKey === u.s; }) || {}).label || u.s;
+            const age = ageOf(u.yr), cs = certState(u.ce);
+            const row = function(k, v) { return v === '' || v == null ? '' : '<dt>' + k + '</dt><dd>' + v + '</dd>'; };
+            let temps = '';
+            if (d.kind === 'Ref' && (c.tempPoints || []).length) {
+                temps = row('Controller', u.ct === '' ? '-' : u.ct + ' °C') + (c.tempPoints || []).map(function(p, i) { const v = u['t' + (i + 1)]; return row('IR ' + (i + 1) + ' · ' + esc(p.label) + (i === (c.tpCmp || 0) ? ' ★' : ''), v === '' || v == null ? '-' : v + ' °C'); }).join('');
+            } else if (d.kind === 'Ac' && c.hasTemp) {
+                temps = row('Setpoint', u.tc === '' ? '-' : u.tc + ' °C') + row('ลมจ่าย Supply', u.ct === '' ? '-' : u.ct + ' °C') + row('ลมกลับ Return', u.mt === '' ? '-' : u.mt + ' °C');
+            }
+            const specs = (c.specs || []).map(function(f) { return row(esc(f.l), esc((u.sx || {})[f.k] || '-')); }).join('');
+            let h = '<div class="flex flex-col sm:flex-row gap-5">' +
+                '<div class="text-center shrink-0"><div id="qrBig" class="inline-block border rounded-lg p-2 bg-white"></div><div class="font-mono font-bold mt-1">' + esc(u.id) + '</div>' +
+                    '<button type="button" onclick="printOne()" class="mt-2 text-xs border border-indigo-300 text-indigo-700 rounded px-3 py-1 hover:bg-indigo-50">🖨️ พิมพ์ป้าย QR นี้</button>' +
+                    '<p class="text-[10px] text-slate-400 mt-1 max-w-[190px]">สแกนแล้วเปิดหน้านี้ได้ทันที</p></div>' +
+                '<dl class="kv flex-1 min-w-0">' +
+                    row('แบบสำรวจ', esc(d.kindLabel)) + row('สาขา', esc(d.survey.code + ' ' + d.survey.name)) +
+                    row('ประเภท / ขนาด', esc(c.title || u.c) + ' [' + esc(size) + ']') + row('ยี่ห้อ', esc(u.br)) + row('รุ่น / สเปค', esc(u.sp)) + row('Asset No.', esc(u.as)) +
+                    row('ปีที่ผลิต / ติดตั้ง', u.yr ? esc(u.yr) + ' (อายุ ' + age + ' ปี' + (u.ys ? ' · ' + esc(u.ys) : '') + ')' : 'ไม่ทราบ') +
+                    row('สถานะ', u.st === 'ไม่ใช้งาน' ? '<b class="text-red-600">ไม่ใช้งาน</b>' : esc(u.st)) + row('สภาพ', u.cr === '' ? '-' : '<b' + (parseInt(u.cr, 10) <= 2 ? ' class="text-red-600"' : '') + '>' + u.cr + ' / 5</b>') +
+                    specs + temps +
+                    ((u.pd || []).length ? row('สินค้าในตู้', esc(u.pd.join(', ') + (u.po ? ' / ' + u.po : ''))) : '') +
+                    row('ผู้รับเหมาดูแล', esc(u.mc)) +
+                    (u.ce ? row('ใบตรวจหมดอายุ', '<b class="' + (cs === 'expired' ? 'text-red-600' : cs === 'due' ? 'text-amber-600' : 'text-green-700') + '">' + esc(u.ce) + (cs === 'expired' ? ' (หมดอายุแล้ว)' : cs === 'due' ? ' (ใกล้หมด)' : '') + '</b>') : '') +
+                    row('กระแสไฟ', u.am === '' || u.am == null ? '' : u.am + ' A') + row('หมายเหตุ', esc(u.nt)) +
+                    (function() {
+                        // main-machine register attributes + replacement score (category scheme / _hsFFScore_)
+                        if (!d.ffScore) return '';
+                        const money = function(v) { return v === '' || v == null ? '' : Number(v).toLocaleString('en-US') + ' บาท'; };
+                        const t = d.ffScore.total;
+                        const col = t === '' ? '#64748b' : t >= 4.5 ? '#b91c1c' : t >= 4 ? '#b45309' : '#15803d';
+                        const txt = t === '' ? 'ข้อมูลยังไม่ครบ' : t >= 4.5 ? 'ควรพิจารณาเปลี่ยน' : t >= 4 ? 'วางแผน / เฝ้าระวัง' : 'ซ่อมบำรุงตามปกติ';
+                        return row('Serial No.', esc(u.sn)) + row('Capacity', esc(u.cp)) + row('ราคาซื้อใหม่', money(u.pn)) + row('ค่าซ่อม 5 ปี', money(u.rc)) +
+                            ((c.ff && c.ff.ratings) || []).map(function(r) { return row(esc(r.label), u[r.k] ? u[r.k] + ' — ' + esc(r.opts[u[r.k] - 1] || '') : '-'); }).join('') +
+                            row('คะแนนประเมินการเปลี่ยน', '<b style="color:' + col + '">' + (t === '' ? '-' : Number(t).toFixed(2)) + ' · ' + txt + '</b>');
+                    })() +
+                    row('สำรวจล่าสุด', fdate(d.survey.date) + ' โดย ' + esc(d.survey.reporter)) +
+                '</dl></div>';
+            if ((d.photos || []).length) h += '<div class="flex flex-wrap gap-2 mt-4">' + d.photos.map(function(p) { return '<a href="' + esc(p) + '" target="_blank"><img src="' + esc(p) + '" class="w-24 h-24 object-cover rounded-lg border"></a>'; }).join('') + '</div>';
+            h += historyHtml(d);
+            document.getElementById('dBody').innerHTML = h;
+            if (typeof QRCode !== 'undefined') new QRCode(document.getElementById('qrBig'), { text: equipUrl(u.id), width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+        }
+
+        function dayDiff(s) { const d = new Date(s); return isNaN(d) ? null : Math.round((Date.now() - d.getTime()) / 864e5); }
+        function historyHtml(d) {
+            const pm = d.maint.filter(function(m) { return m['Maint Type'] === 'PM' && m['Status'] === 'เสร็จสิ้น'; }), cm = d.maint.filter(function(m) { return m['Maint Type'] === 'CM'; });
+            const cm12 = cm.filter(function(m) { return dayDiff(m['Work Date']) !== null && dayDiff(m['Work Date']) <= 365; }).length;
+            const next = d.maint.map(function(m) { return m['Next PM Date']; }).filter(Boolean).sort().pop();
+            const overdue = next && next < new Date().toISOString().slice(0, 10);
+            const chip = function(l, v, cls) { return '<div class="border rounded-lg px-3 py-2 ' + cls + '"><div class="text-[11px] opacity-70">' + l + '</div><div class="text-sm font-bold">' + v + '</div></div>'; };
+            let h = '<h4 class="font-bold mt-6 mb-2">📜 ประวัติ &amp; PM / CM</h4><div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">' +
+                chip('PM ล่าสุด', pm[0] ? esc(pm[0]['Work Date']) : '-', 'bg-blue-50 border-blue-200') + chip('CM ล่าสุด', cm[0] ? esc(cm[0]['Work Date']) : '-', 'bg-orange-50 border-orange-200') +
+                chip('CM ใน 12 เดือน', cm12 + ' ครั้ง', cm12 >= 3 ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200') + chip('PM ครั้งถัดไป', next ? esc(next) + (overdue ? ' ⚠️' : '') : '-', overdue ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200') + '</div>';
+            if (canWrite) {
+                h += '<details class="border rounded-lg mb-3"><summary class="px-3 py-2 text-sm font-semibold text-indigo-700 cursor-pointer">➕ บันทึกงาน PM / CM</summary><div class="p-3 grid grid-cols-2 gap-2 text-sm">' +
+                    '<select id="mType" class="border rounded px-2 py-1"><option value="PM">PM (บำรุงรักษาเชิงป้องกัน)</option><option value="CM">CM (ซ่อมแก้ไข)</option></select>' +
+                    '<input id="mDate" type="date" value="' + new Date().toISOString().slice(0, 10) + '" class="border rounded px-2 py-1">' +
+                    '<input id="mTitle" placeholder="รายการงาน *" class="col-span-2 border rounded px-2 py-1">' +
+                    '<textarea id="mDetails" rows="2" placeholder="รายละเอียด / อะไหล่ที่เปลี่ยน" class="col-span-2 border rounded px-2 py-1"></textarea>' +
+                    '<input id="mBy" placeholder="ผู้ดำเนินการ / ผู้รับเหมา" class="border rounded px-2 py-1"><input id="mCost" type="number" min="0" placeholder="ค่าใช้จ่าย (บาท)" class="border rounded px-2 py-1">' +
+                    '<select id="mStatus" class="border rounded px-2 py-1">' + d.maintStatuses.map(function(s) { return '<option>' + esc(s) + '</option>'; }).join('') + '</select>' +
+                    '<label class="text-[11px] text-slate-500">PM ครั้งถัดไป<input id="mNext" type="date" class="w-full border rounded px-2 py-1 text-sm"></label>' +
+                    '<input id="mTicket" placeholder="เลขที่ใบงาน CMS" class="col-span-2 border rounded px-2 py-1">' +
+                    '<div class="col-span-2 text-right"><button type="button" id="mSave" onclick="saveMaint()" class="px-4 py-1.5 font-bold text-white bg-indigo-600 rounded-lg">บันทึก</button></div></div></details>';
+            } else if (!_userEmail) {
+                h += '<p class="text-xs text-slate-400 mb-3">เข้าสู่ระบบในแอปหลักก่อน เพื่อบันทึกงาน PM / CM</p>';
+            }
+            const items = [];
+            d.maint.forEach(function(m) { items.push({ d: String(m['Work Date']), m: m }); });
+            d.history.forEach(function(r) { items.push({ d: String(r['Timestamp']).slice(0, 10), r: r }); });
+            items.sort(function(a, b) { return b.d.localeCompare(a.d); });
+            h += '<div class="space-y-2">' + (items.map(function(it) {
+                if (it.m) {
+                    const m = it.m, isCm = m['Maint Type'] === 'CM';
+                    return '<div class="border-l-4 ' + (isCm ? 'border-orange-500 bg-orange-50' : 'border-blue-500 bg-blue-50') + ' rounded-r-lg px-3 py-2 text-sm"><b>' + (isCm ? '🔧 CM' : '🛠️ PM') + '</b> · ' + esc(m['Work Date']) + ' · ' + esc(m['Status']) +
+                        '<div class="font-semibold">' + esc(m['Title']) + '</div>' + (m['Details'] ? '<div class="text-xs text-slate-600">' + esc(m['Details']) + '</div>' : '') +
+                        '<div class="text-[11px] text-slate-500">' + [m['Done By'] ? 'โดย ' + esc(m['Done By']) : '', m['Cost (THB)'] ? Number(m['Cost (THB)']).toLocaleString() + ' บาท' : '', m['CMS Ticket'] ? 'CMS ' + esc(m['CMS Ticket']) : '', m['Next PM Date'] ? 'PM ถัดไป ' + esc(m['Next PM Date']) : ''].filter(Boolean).join(' · ') + '</div></div>';
+                }
+                const r = it.r, ev = r['Event'];
+                return '<div class="border-l-4 ' + (ev === 'Survey' ? 'border-slate-400' : ev === 'Edit' ? 'border-amber-400 bg-amber-50' : 'border-red-400 bg-red-50') + ' rounded-r-lg px-3 py-2 text-xs">' +
+                    '<b class="text-sm">' + (ev === 'Survey' ? '📋 สำรวจ' : ev === 'Edit' ? '✏️ แก้ไขข้อมูล' : '🗑️ ลบออก') + '</b> · ' + fdate(r['Timestamp']) + ' · ' + esc(r['By']) +
+                    '<div class="text-slate-600">สถานะ ' + esc(r['Status'] || '-') + ' · สภาพ ' + esc(r['Condition'] === '' ? '-' : r['Condition']) + '/5' + (r['Brand'] ? ' · ' + esc(r['Brand']) : '') + (r['Note'] ? ' · ' + esc(r['Note']) : '') + '</div>' +
+                    (r['Changes'] ? '<div class="text-amber-700">' + esc(r['Changes']) + '</div>' : '') + '</div>';
+            }).join('') || '<p class="text-sm text-slate-400">ยังไม่มีประวัติ</p>') + '</div>';
+            return h;
+        }
+
+        function saveMaint() {
+            const d = CUR.data, u = d.unit, v = function(id) { return document.getElementById(id).value; };
+            if (!v('mTitle').trim()) { alert('กรุณาระบุรายการงาน'); return; }
+            const rec = { branchCode: d.survey.code, branchName: d.survey.name, equipId: u.id, assetNo: u.as || '', category: (d.category || {}).title || u.c,
+                type: v('mType'), date: v('mDate'), title: v('mTitle'), details: v('mDetails'), doneBy: v('mBy'), cost: v('mCost'), status: v('mStatus'), nextPm: v('mNext'), ticket: v('mTicket') };
+            const btn = document.getElementById('mSave'); btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+            google.script.run.withSuccessHandler(function(res) {
+                if (!res || !res.success) { btn.disabled = false; btn.textContent = 'บันทึก'; alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); return; }
+                openDetail(CUR.row);
+            }).withFailureHandler(function(err) { btn.disabled = false; btn.textContent = 'บันทึก'; alert(err.message); }).addHyperUnitMaintenance(d.kind, rec, _userEmail);
+        }
+
+        function printOne() {
+            const d = CUR.data, u = d.unit, c = d.category || {};
+            const size = ((c.sizes || []).find(function(z) { return z.sizeKey === u.s; }) || {}).label || u.s;
+            const el = document.getElementById('printLabel');
+            el.innerHTML = '<div class="lab"><div style="font-size:8pt;color:#475569">Big C ' + esc(d.survey.code + ' ' + d.survey.name) + '</div><div id="qrPrintOne"></div>' +
+                '<div style="font-family:monospace;font-weight:800;font-size:12pt">' + esc(u.id) + '</div><div style="font-size:8pt">' + esc(String(c.title || u.c).replace(/\s*[—(].*$/, '')) + ' [' + esc(size) + ']</div>' +
+                '<div style="font-size:7.5pt;color:#475569">' + [u.br, u.as ? 'Asset ' + u.as : '', u.yr ? 'ปี ' + u.yr : ''].filter(Boolean).map(esc).join(' · ') + '</div></div>';
+            new QRCode(document.getElementById('qrPrintOne'), { text: equipUrl(u.id), width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+            setTimeout(function() { window.print(); }, 300);
+        }
+    </script>
+</body>
+</html>

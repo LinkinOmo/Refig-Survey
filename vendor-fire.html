@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Big C · Fire Prevention Survey (Vendor)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f8fafc; }
+  .tab-content.hidden { display: block; }   /* the included tab ships hidden for the main app's tab bar */
+</style>
+</head>
+<body class="min-h-screen">
+<!-- Vendor entry to the Hyper Fire Prevention survey. Opened from the Vendor Portal with a pass (?t=…) that
+     vendorIssueFirePass wrote to Vendor_Fire_Passes; every server call re-checks it (HyperFireSurvey.gs).
+     Hosts the SAME form as the main app (HyperFireSurveyTab.html) — the helpers below are the small subset of
+     index.html it relies on (photoUpload / _photoPreview / resizeImage / hyperUploadPhotos / dropdown /
+     loading), kept behaviour-identical; if those change in index.html, mirror them here. -->
+<div class="bg-gradient-to-r from-red-700 to-red-900 text-white px-4 py-3 shadow">
+  <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2">
+    <div><h1 class="font-bold">🧯 Big C — สำรวจความเสี่ยงอัคคีภัย (ผู้รับเหมา)</h1>
+      <p class="text-xs text-red-100" id="vf-who">กำลังตรวจสอบสิทธิ์…</p></div>
+    <span class="text-[11px] text-red-100" id="vf-exp"></span>
+  </div>
+</div>
+<div class="max-w-4xl mx-auto px-3 py-4">
+  <div id="vf-error" class="hidden bg-red-50 border border-red-300 text-red-800 rounded-lg p-4 text-sm"></div>
+  <div id="vf-nostore" class="hidden bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-4 text-sm">ไม่พบสาขา Big Format (Hyper / Market / Food Place) ในความรับผิดชอบของท่าน — หากควรมี กรุณาติดต่อ MTN ของ Big C</div>
+  <div id="vf-form" class="hidden">
+    <?!= include('HyperFireSurveyTab') ?>
+  </div>
+</div>
+
+<div id="globalLoading" class="hidden fixed inset-0 bg-black/40 z-[100] flex items-center justify-center"><div class="bg-white rounded-xl px-6 py-4 shadow-xl text-sm font-semibold text-gray-700 flex items-center gap-3"><span>Processing...</span></div></div>
+<div id="successModal" class="hidden fixed inset-0 bg-black/40 z-[100] flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 shadow-xl text-center max-w-sm">
+  <p class="text-3xl">✅</p><p class="font-bold mt-2">ส่งผลสำรวจเรียบร้อย</p><p class="text-xs text-gray-500 mt-1">MTN ของ Big C จะตรวจรับผลสำรวจ — หากต้องแก้ไขจะแจ้งกลับ</p>
+  <button onclick="document.getElementById('successModal').classList.add('hidden')" class="mt-4 bg-red-600 text-white font-semibold px-4 py-2 rounded-lg text-sm">ตกลง</button></div></div>
+
+<script>
+  // ── pass + the globals HyperFireSurveyTab.html expects from index.html ──
+  window.HFI_VENDOR_TOKEN = '<?= passToken ?>';
+  var HYPER_REF_STORES = [], VF_STORE_DB = {}, CURRENT_USER = null;
+  const _accumulatedFiles = {};
+  const _hyperUploadedUrls = new WeakMap();
+  function showLoading() { document.getElementById('globalLoading').classList.remove('hidden'); }
+  function hideLoading() { document.getElementById('globalLoading').classList.add('hidden'); }
+  function showSuccess() { document.getElementById('successModal').classList.remove('hidden'); }
+  function sdsDraftId() { return null; }
+  function sdsReset() {}
+  function _hyperRefStoreLabel(s) { return s[0] + ' ' + [s[2], s[1]].filter(Boolean).join(' / ') + ' · ' + s[3]; }
+  function _hyperRefFindStoreDb(code) { return VF_STORE_DB[code] || null; }   // AMM / DM / CM only — no CC emails for vendors
+  function renderStationDropdown(dropdownId, matches, onSelect) {
+    const dd = document.getElementById(dropdownId);
+    if (!dd) return;
+    if (!matches.length) { dd.classList.add('hidden'); dd.innerHTML = ''; return; }
+    dd.innerHTML = '';
+    matches.slice(0, 30).forEach(function(s) {
+      const it = document.createElement('div');
+      it.textContent = s; it.className = 'px-3 py-2 text-sm cursor-pointer hover:bg-red-50 border-b border-gray-100';
+      it.addEventListener('mousedown', function(e) { e.preventDefault(); onSelect(s); dd.classList.add('hidden'); });
+      dd.appendChild(it);
+    });
+    dd.classList.remove('hidden');
+  }
+  function photoUpload(label, idSuffix) {
+    const id = idSuffix || label;
+    return '<div class="mt-3"><label class="block text-xs font-semibold text-gray-600 mb-1">📸 ' + label + '</label><div class="flex gap-2 flex-wrap">' +
+      '<button type="button" onclick="document.getElementById(\'cam_' + id + '\').click()" class="px-3 py-1.5 rounded-lg border border-green-400 bg-green-50 text-green-700 text-xs font-semibold">📷 ถ่ายรูป</button>' +
+      '<input type="file" id="cam_' + id + '" data-category-upload="' + id + '" accept="image/*" capture="environment" class="hidden" onchange="_photoPreview(\'' + id + '\', this)">' +
+      '<button type="button" onclick="document.getElementById(\'file_' + id + '\').click()" class="px-3 py-1.5 rounded-lg border border-blue-400 bg-blue-50 text-blue-700 text-xs font-semibold">🖼️ เลือกจาก Gallery</button>' +
+      '<input type="file" id="file_' + id + '" data-category-upload="' + id + '" class="hidden" multiple accept="image/*" onchange="_photoPreview(\'' + id + '\', this)">' +
+      '</div><div id="preview_' + id + '" class="flex flex-wrap gap-2 mt-2"></div></div>';
+  }
+  function _photoPreview(id, input) {
+    const preview = document.getElementById('preview_' + id);
+    if (!preview) return;
+    if (!_accumulatedFiles[id]) _accumulatedFiles[id] = [];
+    Array.from(input.files).forEach(function(file) {
+      if (!file.type.startsWith('image/')) return;
+      const idx = _accumulatedFiles[id].push(file) - 1;
+      const wrap = document.createElement('div');
+      wrap.className = 'relative'; wrap.dataset.fileIndex = idx;
+      const fr = new FileReader();
+      fr.onload = function(e) { wrap.innerHTML = '<img src="' + e.target.result + '" class="w-16 h-16 object-cover rounded border"><button type="button" onclick="_removeAccumulatedFile(\'' + id + '\', this.parentElement)" class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs leading-none">✕</button>'; };
+      fr.readAsDataURL(file);
+      preview.appendChild(wrap);
+    });
+    input.value = '';
+  }
+  function _removeAccumulatedFile(id, wrap) { const i = parseInt(wrap.dataset.fileIndex, 10); if (_accumulatedFiles[id]) _accumulatedFiles[id][i] = null; wrap.remove(); }
+  // Canvas resize (the browser applies EXIF orientation when drawing an <img>).
+  function resizeImage(file, maxW, maxH, quality) {
+    return new Promise(function(resolve, reject) {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = function() {
+        let w = img.naturalWidth, h = img.naturalHeight; const r = Math.min(1, maxW / w, maxH / h);
+        w = Math.round(w * r); h = Math.round(h * r);
+        const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve({ name: (file.name || 'photo').replace(/\.\w+$/, '') + '.jpg', mimeType: 'image/jpeg', data: c.toDataURL('image/jpeg', quality).split(',')[1] });
+      };
+      img.onerror = function(e) { URL.revokeObjectURL(url); reject(e); };
+      img.src = url;
+    });
+  }
+  function _hyperUploadOne(idPrefix, uploadId, branchCode, cat, payload) {
+    return new Promise(function(resolve, reject) {
+      google.script.run.withSuccessHandler(function(res) { (res && res.success) ? resolve(res.url) : reject(new Error((res && res.error) || 'upload failed')); })
+        .withFailureHandler(reject).hyperUploadSurveyPhoto(idPrefix, uploadId, branchCode, cat, payload);
+    });
+  }
+  async function hyperUploadPhotos(idPrefix, branchCode, tasks, sizeFor, loadingText) {
+    const uploadId = idPrefix + '-' + Date.now(), slots = {};
+    tasks.forEach(function(t) { t.idx = (slots[t.cat] = slots[t.cat] || []).push(null) - 1; });
+    let done = 0, failed = 0, next = 0;
+    const show = function() { if (loadingText) loadingText.textContent = 'อัปโหลดรูปภาพ ' + done + '/' + tasks.length + (failed ? ' (ล้มเหลว ' + failed + ')' : '') + '...'; };
+    show();
+    async function worker() {
+      while (next < tasks.length) {
+        const t = tasks[next++];
+        let url = _hyperUploadedUrls.get(t.file);
+        if (!url) {
+          const sz = sizeFor(t.cat); let payload = null;
+          try { payload = await resizeImage(t.file, sz[0], sz[1], sz[2]); } catch (e) {}
+          for (let a = 0; payload && !url && a < 3; a++) {
+            try { url = await _hyperUploadOne(idPrefix, uploadId, branchCode, t.cat, payload); }
+            catch (e) { await new Promise(function(r) { setTimeout(r, 1500 * (a + 1)); }); }
+          }
+          if (url) _hyperUploadedUrls.set(t.file, url);
+        }
+        if (url) { slots[t.cat][t.idx] = url; done++; } else failed++;
+        show();
+      }
+    }
+    await Promise.all([worker(), worker(), worker()]);
+    const links = {};
+    Object.keys(slots).forEach(function(c) { const u = slots[c].filter(Boolean); if (u.length) links[c] = u; });
+    return { uploadId: uploadId, links: links, failed: failed };
+  }
+</script>
+<script>
+  (function vfInit() {
+    const err = function(m) { document.getElementById('vf-who').textContent = 'ไม่สามารถเปิดแบบสำรวจได้'; const e = document.getElementById('vf-error'); e.textContent = m; e.classList.remove('hidden'); };
+    if (!window.HFI_VENDOR_TOKEN) { err('ลิงก์ไม่ถูกต้อง — กรุณาเปิดจากเมนู 🧯 สำรวจอัคคีภัย ใน Vendor Portal'); return; }
+    google.script.run.withSuccessHandler(function(r) {
+      if (!r || !r.success) { err((r && r.error) || 'ตรวจสอบสิทธิ์ไม่สำเร็จ'); return; }
+      HYPER_REF_STORES = r.stores || []; VF_STORE_DB = r.storeDb || {};
+      CURRENT_USER = { email: r.vendor.email || '' };
+      document.getElementById('vf-who').textContent = '🏢 ' + (r.vendor.name || r.vendor.code) + ' · ' + HYPER_REF_STORES.length + ' สาขาในความรับผิดชอบ';
+      document.getElementById('vf-exp').textContent = 'ลิงก์ใช้ได้ถึง ' + r.expires;
+      if (!HYPER_REF_STORES.length) { document.getElementById('vf-nostore').classList.remove('hidden'); return; }
+      document.getElementById('vf-form').classList.remove('hidden');
+      const f = document.getElementById('hyper-fi-form');
+      if (r.vendor.phone && !f.reporterPhone.value) f.reporterPhone.value = r.vendor.phone;
+      // a vendor with one store lands on it directly
+      if (HYPER_REF_STORES.length === 1) { const s = HYPER_REF_STORES[0], inp = document.getElementById('hyper-fi-station-search'); inp.value = _hyperRefStoreLabel(s); _applyHyperFiStore(s); }
+    }).withFailureHandler(function(e) { err(e.message); }).getVendorFirePass(window.HFI_VENDOR_TOKEN);
+  })();
+</script>
+</body>
+</html>

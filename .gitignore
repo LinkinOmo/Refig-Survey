@@ -17,3 +17,7 @@ __pycache__/
 Pyhon ANL/
 Refride CM Plan/
 SRD Layout Porject/
+# Large internal data dumps (asset inventory DB exports, counting/safety source files)
+Asset Inventory CMS/
+Asset Count/
+Safety and Protection/

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fire Risk Paper Form</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 portrait; margin: 8mm; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', sans-serif; font-size: 9.5pt; color: #111; margin: 0; background: #e5e7eb; }
+        .sheet { width: 194mm; min-height: 281mm; margin: 8mm auto; background: #fff; padding: 6mm 7mm; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+        @media print { body { background: #fff; } .sheet { margin: 0; box-shadow: none; padding: 0; width: auto; min-height: 0; page-break-after: always; } .sheet:last-child { page-break-after: auto; } .noprint { display: none !important; } }
+        h1 { font-size: 14pt; margin: 0; }
+        h2 { font-size: 10.5pt; margin: 2.5mm 0 1.2mm; padding: 1mm 2mm; background: #fee2e2; border-left: 4px solid #dc2626; break-after: avoid; }
+        .hdr { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #dc2626; padding-bottom: 1.5mm; }
+        .muted { color: #555; font-size: 8pt; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { border: 1px solid #555; padding: .9mm 1.4mm; vertical-align: middle; }
+        th { background: #f3f4f6; font-size: 8.5pt; }
+        .zone { break-inside: avoid; margin-bottom: 2mm; }
+        .zone td.c, .zone th.c { width: 15mm; text-align: center; }
+        .zone td.n { width: 9mm; text-align: center; font-size: 8pt; color: #444; }
+        .zone tr.pt td { background: #fafafa; font-size: 8pt; height: 7mm; vertical-align: top; }
+        .crit { color: #dc2626; font-weight: 700; }
+        .box { display: inline-block; width: 3.4mm; height: 3.4mm; border: 1.2px solid #111; vertical-align: -0.6mm; margin-right: 1mm; }
+        .fill { border-bottom: 1px dotted #333; display: inline-block; min-width: 40mm; }
+        .pill { display: inline-block; padding: .2mm 2mm; border-radius: 3mm; color: #fff; font-weight: 700; font-size: 8.5pt; }
+        .log td { height: 8mm; font-size: 8.5pt; }
+        .log th { font-size: 8pt; }
+        .legend { font-size: 8pt; line-height: 1.4; }
+        .opt { white-space: nowrap; margin-right: 3mm; display: inline-block; }
+        .sign td { height: 13mm; vertical-align: bottom; text-align: center; font-size: 9pt; }
+        .rc td { font-size: 8.5pt; }
+        .toolbar { position: sticky; top: 0; background: #7f1d1d; color: #fff; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; z-index: 5; font-size: 14px; }
+        .toolbar button, .toolbar input { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; }
+        .toolbar button { background: #fff; color: #7f1d1d; font-weight: 700; cursor: pointer; }
+        #msg { font-size: 12px; opacity: .9; }
+    </style>
+</head>
+<body>
+    <div class="toolbar noprint">
+        <b>🖨️ แบบฟอร์มกระดาษ — สำรวจความเสี่ยงอัคคีภัย</b>
+        <span>สาขา:</span><input id="storeInput" placeholder="รหัสสาขา (เว้นว่าง = ฟอร์มเปล่า)" style="min-width:220px">
+        <button onclick="loadStore()">📥 ใส่ความเสี่ยงค้างจากครั้งก่อน</button>
+        <button onclick="window.print()">พิมพ์ / Save PDF</button>
+        <span id="msg">A4 แนวตั้ง · เปิด Background graphics ตอนพิมพ์</span>
+    </div>
+    <div id="pages"></div>
+
+<script>
+const FI = <?!= JSON.stringify(getHyperFiConfig_()) ?>;
+const PRESET = <?!= JSON.stringify(storeCode || '') ?>;
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const box = '<span class="box"></span>';
+let STORE = { code: '', name: '', last: null };
+
+const SEV_CODE = ['ส', 'ก', 'ต'];
+const ST_CODE = ['A', 'B', 'C'];
+const POINTS = z => z.multi ? 3 : 1;
+
+function header(page, total, sub) {
+    return '<div class="hdr"><div><h1>🧯 แบบสำรวจความเสี่ยงอัคคีภัย สาขา Big Format</h1>' +
+        '<div class="muted">Hyper · Big C Market · Food Place · Town Center — ' + sub + ' · หน้า ' + page + '/' + total + '</div></div>' +
+        '<div class="muted" style="text-align:right">บันทึกเข้าระบบ: แท็บ 🧯 ป้องกันอัคคีภัย Hyper<br>รหัสสาขา <b>' + (esc(STORE.code) || '________') + '</b></div></div>';
+}
+
+function infoBlock() {
+    return '<table style="margin-top:2.5mm"><tr>' +
+        '<td style="width:26%">รหัสสาขา: <b class="fill" style="min-width:22mm">' + esc(STORE.code) + '</b></td>' +
+        '<td style="width:44%">ชื่อสาขา: <b class="fill" style="min-width:55mm">' + esc(STORE.name) + '</b></td>' +
+        '<td>วันที่สำรวจ: <span class="fill" style="min-width:25mm"></span></td></tr><tr>' +
+        '<td colspan="2">ผู้สำรวจ (ชื่อ / หน่วยงาน / บริษัท): <span class="fill" style="min-width:75mm"></span></td>' +
+        '<td>โทร: <span class="fill" style="min-width:30mm"></span></td></tr></table>';
+}
+
+function howTo() {
+    const acts = FI.actions.map((a, i) => '<span class="opt"><b>' + (i + 1) + '</b> = ' + esc(a) + '</span>').join(' ');
+    const sts = FI.status.map((s, i) => '<span class="opt"><b>' + ST_CODE[i] + '</b> = ' + esc(s) + '</span>').join(' ');
+    const colors = FI.colors.slice().reverse().map(c => '<span class="opt"><span class="pill" style="background:' + c.hex + '">' + c.k + '</span> ' + esc(c.l) + ' (ตรวจซ้ำ ≤ ' + c.recheck + ' วัน)</span>').join(' ');
+    return '<h2>วิธีกรอก — ค้นหา → ลด → ตรวจซ้ำ</h2><div class="legend">' +
+        '1) เดินตรวจทีละพื้นที่ เขียนชื่อจุดจริงในแถว “จุด” แล้วกรอกทุกข้อ: <b>✓</b> ปกติ · <b>✗</b> พบความเสี่ยง · <b>–</b> ไม่มี / ไม่เกี่ยว · ไม่มีพื้นที่นี้ในสาขา ให้ขีดคร่อมทั้งตาราง<br>' +
+        '2) ข้อที่มี <span class="crit">●</span> = จุดวิกฤต พบความเสี่ยงถือเป็นระดับ <b>สูง</b> · ทุกข้อที่ ✗ ให้ลงรายละเอียดใน <b>ทะเบียนความเสี่ยง</b> (หน้าท้าย) และถ่ายรูป <b>ก่อน</b> / <b>หลัง</b> แก้ไข<br>' +
+        '3) แก้ได้ทันทีให้แก้เลย (ย้ายของ · ตีเทปแดง-ดำ ≥ 1 ม. · ปิดฝาตู้) · กรอกเสร็จแล้วบันทึกเข้าแอปภายในวันเดียวกัน — ระบบคำนวณระดับสีให้อัตโนมัติ<br>' +
+        '<b>ระดับ:</b> ส = สูง · ก = กลาง · ต = ต่ำ &nbsp; <b>สถานะ:</b> ' + sts + '<br><b>การแก้ไข:</b> ' + acts + '<br><b>ระดับสีสาขา:</b> ' + colors + '</div>';
+}
+
+function zoneTable(z, zi) {
+    const n = POINTS(z);
+    const cols = Array.from({ length: n }, (_, i) => '<th class="c">' + (n > 1 ? 'จุด ' + (i + 1) : 'ผล') + '</th>').join('');
+    const pt = '<tr class="pt"><td class="n"></td><td>ชื่อจุด / ชั้น →' + (z.tape ? ' &nbsp; ' + box + 'ตีเทปแดง-ดำแล้ว (ใส่ ✓ ใต้จุด)' : '') + '</td>' +
+        Array.from({ length: n }, () => '<td></td>').join('') + '</tr>';
+    const rows = z.items.map((it, j) => '<tr><td class="n">' + (zi + 1) + '.' + (j + 1) + '</td><td>' + (it.crit ? '<span class="crit">●</span> ' : '') + esc(it.l) + '</td>' +
+        Array.from({ length: n }, () => '<td class="c"></td>').join('') + '</tr>').join('');
+    return '<div class="zone"><h2>' + z.icon + ' ' + (zi + 1) + '. ' + esc(z.l) + (z.multi ? ' <span class="muted">(หลายจุด — เกิน 3 จุดใช้แผ่นเพิ่ม)</span>' : '') +
+        ' <span style="float:right;font-weight:400">' + box + 'ไม่มีพื้นที่นี้</span></h2>' +
+        '<table><thead><tr><th style="width:9mm">ข้อ</th><th>รายการตรวจ</th>' + cols + '</tr></thead><tbody>' + pt + rows + '</tbody></table></div>';
+}
+
+function protTable() {
+    const rows = FI.prot.map(p => {
+        let v;
+        if (p.t === 'sel') v = p.o.map((o, i) => '<span class="opt">' + box + (p.bad && p.bad.indexOf(i) > -1 ? '<span class="crit">' + esc(o) + '</span>' : esc(o)) + '</span>').join(' ');
+        else if (p.t === 'num') v = '<span class="fill" style="min-width:20mm"></span> ' + (p.badIfPositive ? '<span class="muted">(มากกว่า 0 = ต้องแก้)</span>' : '');
+        else v = 'วันที่ <span class="fill" style="min-width:30mm"></span>';
+        return '<tr><td style="width:38%">' + esc(p.l) + '</td><td>' + v + '</td></tr>';
+    }).join('');
+    return '<h2>🛡️ ระบบป้องกันทั้งสาขา</h2><table>' + rows + '</table>' +
+        '<div class="legend" style="margin-top:1mm">ตัวเลือกสีแดง = ช่องว่างของระบบป้องกัน → สาขาเป็นอย่างน้อยสีส้ม · FCP มี Fault / ปั๊มดับเพลิงไม่พร้อม / ทางหนีไฟถูกกีดขวาง → สาขาเป็นสีแดง</div>';
+}
+
+function riskLog(rowsN) {
+    const blank = Array.from({ length: rowsN }, (_, i) => '<tr><td style="text-align:center">' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="text-align:center">' + box + box + '</td></tr>').join('');
+    return '<h2>⚠️ ทะเบียนความเสี่ยง — ทุกข้อที่ ✗</h2><table class="log"><thead><tr>' +
+        '<th style="width:7mm">#</th><th style="width:12mm">ข้อ</th><th style="width:28mm">จุด / ชั้น</th><th>รายละเอียดที่พบ</th><th style="width:11mm">ระดับ<br>ส/ก/ต</th>' +
+        '<th style="width:13mm">การแก้ไข<br>(1–8)</th><th style="width:11mm">สถานะ<br>A/B/C</th><th style="width:20mm">กำหนดเสร็จ /<br>ผู้รับผิดชอบ</th><th style="width:15mm">รูป<br>ก่อน·หลัง</th>' +
+        '</tr></thead><tbody>' + blank + '</tbody></table>';
+}
+
+function summary() {
+    const colors = FI.colors.slice().reverse().map(c => '<span class="opt">' + box + '<span class="pill" style="background:' + c.hex + '">' + c.k + '</span></span>').join(' ');
+    return '<h2>สรุป</h2><table><tr><td style="width:50%">จำนวนความเสี่ยงที่พบ: <span class="fill" style="min-width:15mm"></span> ข้อ · แก้ไขแล้ว <span class="fill" style="min-width:12mm"></span> · ค้าง <span class="fill" style="min-width:12mm"></span></td>' +
+        '<td>ระดับสีสาขา (ประเมินเบื้องต้น): ' + colors + '</td></tr>' +
+        '<tr><td colspan="2">นัดตรวจซ้ำ: <span class="fill" style="min-width:35mm"></span> &nbsp; หมายเหตุ: <span class="fill" style="min-width:95mm"></span></td></tr></table>' +
+        '<table class="sign" style="margin-top:3mm"><tr><td>ผู้สำรวจ<br>(.................................)</td><td>ผู้จัดการสาขา / SGM<br>(.................................)</td><td>MTN ผู้ตรวจรับ<br>(.................................)</td></tr></table>';
+}
+
+// Open risks from the store's last survey — tick the new status on site, then update in the app with 📥 โหลดผลตรวจครั้งก่อน.
+function recheckBlock() {
+    const L = STORE.last;
+    if (!L) return '';
+    const zl = {}; FI.zones.forEach((z, i) => zl[z.k] = { z, i });
+    const rows = [];
+    (L.fire.cards || []).forEach(c => {
+        const zz = zl[c.z]; if (!zz) return;
+        zz.z.items.forEach((it, j) => {
+            const a = (c.items || {})[it.k];
+            if (a && a.r === 'risk' && a.st !== FI.status[0]) rows.push({ no: (zz.i + 1) + '.' + (j + 1), place: (c.place || zz.z.l) + (c.floor ? ' (' + c.floor + ')' : ''), item: it.l, a });
+        });
+    });
+    const col = FI.colors.find(c => c.k === L.rating);
+    const ts = L.ts ? new Date(L.ts).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    const body = rows.length ? rows.map((r, i) => '<tr><td style="text-align:center">' + (i + 1) + '</td><td style="text-align:center">' + r.no + '</td><td>' + esc(r.place) + '</td><td>' + esc(r.item) +
+        (r.a.nt ? '<br><span class="muted">' + esc(r.a.nt) + '</span>' : '') + '</td><td style="text-align:center">' + (SEV_CODE[FI.severity.indexOf(r.a.sev)] || '') + '</td><td>' + esc(r.a.st || '') +
+        (r.a.due ? '<br><span class="muted">กำหนด ' + esc(r.a.due) + '</span>' : '') + '</td><td>' + FI.status.map((s, k) => '<span class="opt">' + box + ST_CODE[k] + '</span>').join('') + '</td><td></td></tr>').join('')
+        : '<tr><td colspan="8" style="text-align:center;height:10mm">ไม่มีความเสี่ยงค้างจากครั้งก่อน</td></tr>';
+    return '<h2>🔁 ตรวจซ้ำ — ความเสี่ยงค้างจากครั้งก่อน (สำรวจ ' + esc(ts) + (col ? ' · <span class="pill" style="background:' + col.hex + '">' + col.k + '</span>' : '') + ')</h2>' +
+        '<table class="rc"><thead><tr><th style="width:7mm">#</th><th style="width:11mm">ข้อ</th><th style="width:30mm">จุด</th><th>รายการ</th><th style="width:10mm">ระดับ</th><th style="width:28mm">สถานะเดิม</th><th style="width:30mm">สถานะใหม่</th><th style="width:22mm">หมายเหตุ / รูปหลังแก้</th></tr></thead><tbody>' +
+        body + '</tbody></table><div class="legend" style="margin-top:1mm">ตรวจทุกข้อด้านบนให้ครบ แล้วเดินตรวจพื้นที่ทั้งหมดตามแบบฟอร์มหน้าถัดไปเพื่อหาความเสี่ยงใหม่</div>';
+}
+
+function render() {
+    // Pack zones into pages by item count so each page stays within A4.
+    const pages = [[]]; let load = 0;
+    FI.zones.forEach((z, i) => {
+        const w = z.items.length + 3;
+        if (load + w > (pages.length === 1 ? 26 : 44) && pages[pages.length - 1].length) { pages.push([]); load = 0; }
+        pages[pages.length - 1].push(zoneTable(z, i)); load += w;
+    });
+    const total = pages.length + 1;
+    let html = '<div class="sheet">' + header(1, total, 'ข้อมูลสาขา · วิธีกรอก · ตรวจทีละพื้นที่') + infoBlock() + howTo() + recheckBlock() + pages[0].join('') + '</div>';
+    for (let p = 1; p < pages.length; p++) html += '<div class="sheet">' + header(p + 1, total, 'ตรวจทีละพื้นที่ (ต่อ)') + pages[p].join('') + '</div>';
+    html += '<div class="sheet">' + header(total, total, 'ระบบป้องกัน · ทะเบียนความเสี่ยง · สรุป') + protTable() + riskLog(10) + summary() + '</div>';
+    document.getElementById('pages').innerHTML = html;
+}
+
+function loadStore() {
+    const code = document.getElementById('storeInput').value.trim();
+    STORE = { code, name: '', last: null };
+    if (!code) { render(); return; }
+    const msg = document.getElementById('msg');
+    if (!(window.google && google.script && google.script.run)) { render(); return; }
+    msg.textContent = '⏳ กำลังโหลดผลตรวจครั้งก่อน...';
+    google.script.run.withSuccessHandler(r => {
+        if (r && r.success && r.found) { STORE.name = r.name || ''; STORE.last = r; msg.textContent = '✅ ใส่ความเสี่ยงค้างจากครั้งก่อนแล้ว'; }
+        else msg.textContent = r && r.success ? 'ยังไม่มีผลสำรวจของสาขานี้ — พิมพ์เป็นฟอร์มสำรวจครั้งแรก' : '⚠️ โหลดไม่สำเร็จ: ' + ((r && r.error) || '');
+        render();
+    }).withFailureHandler(e => { msg.textContent = '⚠️ ' + e.message; render(); }).getHyperFiLatestForStore(code);
+}
+
+document.getElementById('storeInput').value = PRESET;
+document.getElementById('storeInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadStore(); });
+render();
+if (PRESET) loadStore();
+</script>
+</body>
+</html>

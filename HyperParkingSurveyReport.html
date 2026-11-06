@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyper Parking &amp; Accessibility Survey Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel { background: rgba(255,255,255,.95); border: 1px solid rgba(226,232,240,.8); box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #2563eb; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: .75rem; font-weight: 600; color: #64748b; min-width: 120px; }
+        .detail-value { font-size: .85rem; color: #1e293b; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16">
+            <div class="flex items-center gap-4">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-slate-500 p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-blue-600 rounded-full"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">♿ รายงานที่จอดรถ &amp; สิ่งอำนวยความสะดวกผู้พิการ Hyper</h1>
+                    <p class="text-xs text-slate-500 font-medium">Disabled Parking · Accessibility Route · Signs · Guard Measures</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="loader" id="mainLoader"></div>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-status" target="_blank" title="สถานะการส่ง &amp; การตรวจรับ ทุกแบบสำรวจ Hyper" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100">🧭 สถานะ</a>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=survey_dashboard&type=hyperPk" target="_blank" class="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">📊 Dashboard</a>
+                <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                <button onclick="downloadToExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
+                <button onclick="window.location.reload()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-500"><p class="text-xs font-semibold text-slate-500 mb-1">สาขาที่สำรวจแล้ว</p><h3 class="text-3xl font-bold"><span id="stStores">0</span><span class="text-base text-slate-400"> / <span id="stTotal">0</span></span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-blue-500"><p class="text-xs font-semibold text-slate-500 mb-1">ช่องจอดผู้พิการ / ขั้นต่ำ</p><h3 class="text-3xl font-bold text-blue-700"><span id="stBays">0</span><span class="text-base text-slate-400"> / <span id="stReq">0</span></span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500"><p class="text-xs font-semibold text-slate-500 mb-1">สาขาช่องผู้พิการไม่ถึงขั้นต่ำ</p><h3 class="text-3xl font-bold text-red-600" id="stShort">0</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-rose-500"><p class="text-xs font-semibold text-slate-500 mb-1">รายการที่ยังขาด (ที่จอด + เส้นทาง)</p><h3 class="text-3xl font-bold text-rose-600" id="stMissing">0</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-orange-500"><p class="text-xs font-semibold text-slate-500 mb-1">พบรถทั่วไปจอด (คัน) · สาขาไม่มี รปภ.</p><h3 class="text-3xl font-bold text-orange-600"><span id="stMisuse">0</span><span class="text-base text-slate-400"> · <span id="stNoGuard">0</span></span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-indigo-500"><p class="text-xs font-semibold text-slate-500 mb-1">งบประมาณประมาณการ</p><h3 class="text-2xl font-bold text-indigo-700"><span id="stBudget">0</span> <span class="text-sm">฿</span></h3></div>
+        </div>
+        <p class="text-xs text-slate-400 -mt-3">นับจากรายการล่าสุดของแต่ละสาขา · ขั้นต่ำตามกฎกระทรวงสิ่งอำนวยความสะดวกฯ 2548 (10–50 คัน → 1, 51–100 → 2, เกิน 100 เพิ่ม 1 ทุก 100 คัน)</p>
+
+        <div class="glass-panel p-4 rounded-xl">
+            <div class="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+                <h2 class="font-bold text-slate-700">♿ ความพร้อม 6 ด้าน (ตามรูปแบบสรุปของ LCD)</h2>
+                <span id="facFilterChip" class="hidden text-xs bg-blue-100 text-blue-800 rounded-full px-3 py-1 cursor-pointer" onclick="setFac(null)"></span>
+            </div>
+            <div class="overflow-x-auto"><table class="min-w-full text-sm" id="facTable"></table></div>
+            <p class="text-[11px] text-slate-400 mt-2">Ready = ไม่มีปัญหา · Improve = มีแล้วแต่ต้องปรับปรุง ≥1 รายการ · Urgent = ไม่มี / ใช้งานไม่ได้ (ป้ายไม่นับ Urgent) · N/A = ไม่ต้องมี (สาขาในศูนย์ฯ ใช้ของศูนย์ / ลิฟต์เฉพาะสาขา ≥ 2 ชั้น) · ไม่มีข้อมูล = ไม่ได้สำรวจการ์ดด้านนั้น — นับจากรายการล่าสุดของแต่ละสาขา · กดตัวเลขเพื่อกรองรายการ</p>
+        </div>
+
+        <div class="glass-panel p-4 rounded-xl grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="text" id="searchInput" placeholder="ค้นหา รหัสสาขา / ชื่อสาขา / ผู้แจ้ง..." class="md:col-span-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="applyFilters()">
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="latestOnly" checked onchange="applyFilters()"> ล่าสุด/สาขา</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="shortOnly" onchange="applyFilters()"> ช่องผู้พิการไม่ถึงขั้นต่ำ</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="highOnly" onchange="applyFilters()"> มีจุดเร่งด่วน</label>
+            <select id="classFilter" onchange="applyFilters()" class="md:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">ประเภทงาน: ทั้งหมด</option><option>Ready</option><option>Touch Up</option><option>Improvement</option><option value="-">ยังไม่ระบุ (แบบเดิม)</option>
+            </select>
+            <select id="bldgFilter" onchange="applyFilters()" class="md:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">ประเภทอาคาร: ทั้งหมด</option></select>
+            <p id="classSummary" class="md:col-span-1 text-xs text-slate-500 self-center"></p>
+        </div>
+
+        <div class="glass-panel rounded-xl overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">สาขา</th>
+                        <th class="px-4 py-3 text-left">ความพร้อม 6 ด้าน</th>
+                        <th class="px-4 py-3 text-right">โซน · รถยนต์ · มอเตอร์ไซค์</th>
+                        <th class="px-4 py-3 text-right">ช่องผู้พิการ / ขั้นต่ำ</th>
+                        <th class="px-4 py-3 text-right">สี / ป้าย (0-5)</th>
+                        <th class="px-4 py-3 text-right">ขาด (ที่จอด · เส้นทาง)</th>
+                        <th class="px-4 py-3 text-left">รปภ. · พบจอดผิด</th>
+                        <th class="px-4 py-3 text-left">ประเภทงาน · ทางลาด · รถเข็น</th>
+                        <th class="px-4 py-3 text-right">เร่งด่วน</th>
+                        <th class="px-4 py-3 text-right">งบประมาณ ฿</th>
+                        <th class="px-4 py-3 text-left">ผู้แจ้ง / วันที่</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <div id="emptyState" class="hidden text-center py-12 text-slate-400">ไม่พบข้อมูล</div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div class="bg-white w-full md:max-w-4xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดการสำรวจที่จอดรถ &amp; ผู้พิการ</h3><button onclick="closeModal()" class="text-slate-400 text-xl">✕</button></div>
+            <div class="p-5 overflow-y-auto" id="modalBody"></div>
+            <div class="px-5 py-3 border-t flex justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ</button>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm border border-slate-300 rounded-lg">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="hidden px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700">บันทึกหมายเหตุ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const HYPER_STORE_TOTAL = <?!= HYPER_REF_STORES.length ?>;
+        let PC = null, allData = [], filtered = [], currentRecord = null, currentId = null;
+        let isAdmin = false, smfCanEdit = false, opsCanEdit = false, _userEmail = '';
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fmt(n) { return Math.round(num(n)).toLocaleString(); }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? '-' : d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }); }
+        function latestPerBranch(rows) { const seen = new Set(); return rows.filter(function(r) { const k = String(r['Branch Code']); if (seen.has(k)) return false; seen.add(k); return true; }); }
+        function sc(v) { return v === '' || v == null ? '-' : v; }
+        function noGuard(r) { return PC && r['Guard Monitoring'] === PC.guard[PC.guard.length - 1]; }
+        // Records from the first version (2026-10-12 @513) had one store-level lot + disabled-only zones —
+        // reshape them into the zone-card form so one renderer handles both.
+        function normPk(d) {
+            d = d || {};
+            const zones = d.zones || [];
+            if (!zones.length || (zones[0].bays && typeof zones[0].bays === 'object')) return d;
+            const lot = d.lot || {}, out = [];
+            const disSum = zones.reduce(function(a, z) { return a + num(z.bays); }, 0);
+            if (lot.el || lot.total) out.push({ zid: 'LOT', name: 'ภาพรวมลานจอด (แบบเดิม)', type: (lot.types || [])[0] || '', bays: { car: Math.max(num(lot.total) - disSum, 0), moto: num(lot.moto) },
+                el: lot.el || {}, prob: lot.prob || [], probOther: lot.probOther, scope: [], calc: { score: lot.score, missing: 0 }, pk: 'hpk_lot' });
+            zones.forEach(function(z) {
+                out.push({ zid: z.zid, name: z.loc, floor: z.floor, bays: { dis: num(z.bays) }, el: {}, prob: [],
+                    dis: { near: z.near, dist: z.dist, chk: z.chk, paint: z.paint, sign: z.sign, misuse: z.misuse, prob: z.prob, probOther: z.probOther },
+                    scope: z.scope, prio: z.prio, budget: z.budget, nt: z.nt, pk: z.pk, calc: { score: '', missing: (z.calc || {}).missing } });
+            });
+            return Object.assign({}, d, { zones: out });
+        }
+        function zoneTotal(z) { return (PC.bayTypes || []).reduce(function(a, t) { return a + num((z.bays || {})[t.k]); }, 0); }
+        function classBadge(c) {
+            const cls = { Ready: 'bg-green-100 text-green-800', 'Touch Up': 'bg-amber-100 text-amber-800', Improvement: 'bg-purple-100 text-purple-800' }[c];
+            return cls ? '<span class="inline-block px-2 py-0.5 rounded-full font-bold ' + cls + '">' + esc(c) + '</span>' : '<span class="text-slate-400">-</span>';
+        }
+        // card-level work class: "Touch Up — ช่างสาขาทำเอง" → short badge
+        function cardClass(o) { return o && o.cls ? ' ' + classBadge(o.cls.split(' — ')[0]) : ''; }
+        // ── 6-facility status (computed server-side from Parking_JSON, see hyperPkFacilityStatus_) ──
+        const ST_ORDER = ['Ready', 'Improve', 'Urgent', 'N/A', ''];
+        const ST_CLS = { Ready: 'bg-green-100 text-green-800', Improve: 'bg-amber-100 text-amber-800', Urgent: 'bg-red-600 text-white', 'N/A': 'bg-slate-100 text-slate-500', '': 'bg-white text-slate-300 border border-slate-200' };
+        const ST_LBL = { '': 'ไม่มีข้อมูล' };
+        let facFilter = null;   // { col, v }
+        function stOf(r, col) { const v = r[col]; return v == null ? '' : String(v); }
+        function stBadge(v, title) { return '<span title="' + esc(title || '') + '" class="inline-block text-[10px] font-bold rounded px-1.5 py-0.5 mr-0.5 mb-0.5 ' + (ST_CLS[v || ''] || ST_CLS['']) + '">' + esc(v || '–') + '</span>'; }
+        function facCols() { return ((PC || {}).fac || []).concat([{ l: 'ภาพรวมสาขา', col: (PC || {}).statusCol || 'Accessibility Status', all: true }]); }
+        function renderFac() {
+            const l = latestPerBranch(allData);
+            let h = '<thead><tr class="bg-slate-50 text-xs text-slate-500"><th class="p-2 text-left">ด้าน</th><th class="p-2 text-right">สำรวจแล้ว</th>' +
+                ST_ORDER.map(function(v) { return '<th class="p-2 text-right">' + esc(ST_LBL[v] || v) + '</th>'; }).join('') + '<th class="p-2 text-right">% Ready (ของที่ต้องมี)</th></tr></thead><tbody>';
+            facCols().forEach(function(f) {
+                const c = {}; ST_ORDER.forEach(function(v) { c[v] = 0; });
+                l.forEach(function(r) { const v = stOf(r, f.col); c[c[v] !== undefined ? v : '']++; });
+                const app = c.Ready + c.Improve + c.Urgent;
+                h += '<tr class="border-t ' + (f.all ? 'font-bold bg-slate-50' : '') + '"><td class="p-2">' + esc(f.l) + '</td><td class="p-2 text-right">' + l.length + '</td>' +
+                    ST_ORDER.map(function(v) {
+                        const on = facFilter && facFilter.col === f.col && facFilter.v === v;
+                        return '<td class="p-2 text-right"><span data-fac="' + esc(f.col) + '" data-v="' + esc(v) + '" class="cursor-pointer inline-block min-w-[2.5rem] text-center rounded px-2 py-0.5 ' +
+                            (c[v] ? ST_CLS[v] : 'text-slate-300') + (on ? ' ring-2 ring-blue-500' : '') + '">' + c[v] + '</span></td>';
+                    }).join('') + '<td class="p-2 text-right">' + (app ? Math.round(c.Ready * 100 / app) + '%' : '-') + '</td></tr>';
+            });
+            document.getElementById('facTable').innerHTML = h + '</tbody>';
+        }
+        function setFac(f) {
+            facFilter = f;
+            const chip = document.getElementById('facFilterChip');
+            if (f) {
+                const col = facCols().find(function(x) { return x.col === f.col; });
+                chip.textContent = '✕ กรอง: ' + (col ? col.l : f.col) + ' = ' + (ST_LBL[f.v] || f.v);
+                document.getElementById('latestOnly').checked = true;   // the table counts latest-per-store
+            } else chip.textContent = '';
+            chip.classList.toggle('hidden', !f);
+            renderFac(); applyFilters();
+        }
+        document.addEventListener('click', function(e) {
+            const t = e.target.closest('[data-fac]');
+            if (!t) return;
+            const f = { col: t.dataset.fac, v: t.dataset.v };
+            setFac(facFilter && facFilter.col === f.col && facFilter.v === f.v ? null : f);
+        });
+        function ptLabel(k) { const t = ((PC || {}).pointTypes || []).find(function(x) { return x.k === k; }); return t ? t.l : (k || '-'); }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            loadData();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) {
+                if (!f) return;
+                isAdmin = !!(f.isAdmin || f.isScheduleAdmin); smfCanEdit = !!f.smfEditAllowed; opsCanEdit = !!f.opsEditAllowed;
+                document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+            }).getUserFlags(_userEmail);
+        });
+        let _attempt = 0;
+        function loadData() {
+            const my = ++_attempt;
+            google.script.run.withSuccessHandler(function(res) {
+                if (my !== _attempt) return;
+                if (!res) { if (my < 3) setTimeout(loadData, 1500); return; }
+                document.getElementById('mainLoader').classList.add('hidden');
+                if (!res.success) { alert('โหลดข้อมูลไม่สำเร็จ: ' + res.error); return; }
+                PC = res.pkConfig; allData = res.data || [];
+                const bSel = document.getElementById('bldgFilter');
+                if (bSel.options.length === 1) (PC.bldg || []).forEach(function(b) { bSel.insertAdjacentHTML('beforeend', '<option>' + esc(b) + '</option>'); });
+                renderStats(); renderFac(); applyFilters();
+            }).withFailureHandler(function(err) { document.getElementById('mainLoader').classList.add('hidden'); alert('Error: ' + err.message); }).getHyperPkSurveyList(window.ARCHIVE_ON);
+        }
+        function renderStats() {
+            const l = latestPerBranch(allData);
+            const sum = function(k) { return l.reduce(function(s, r) { return s + num(r[k]); }, 0); };
+            document.getElementById('stStores').textContent = l.length;
+            document.getElementById('stTotal').textContent = HYPER_STORE_TOTAL;
+            document.getElementById('stBays').textContent = sum('Disabled Bays');
+            document.getElementById('stReq').textContent = sum('Disabled Bays Required');
+            document.getElementById('stShort').textContent = l.filter(function(r) { return num(r['Disabled Bays Short']) > 0; }).length;
+            document.getElementById('stMissing').textContent = sum('Zone Items Missing') + sum('Access Items Missing');
+            document.getElementById('stMisuse').textContent = sum('Misuse Cars Seen');
+            document.getElementById('stNoGuard').textContent = l.filter(noGuard).length;
+            document.getElementById('stBudget').textContent = fmt(sum('Est. Budget (THB)'));
+        }
+        function applyFilters() {
+            const q = document.getElementById('searchInput').value.toLowerCase().trim();
+            const base = document.getElementById('latestOnly').checked ? latestPerBranch(allData) : allData;
+            const high = document.getElementById('highOnly').checked, short = document.getElementById('shortOnly').checked;
+            const wc = document.getElementById('classFilter').value, bf = document.getElementById('bldgFilter').value;
+            const cnt = { Ready: 0, 'Touch Up': 0, Improvement: 0 };
+            base.forEach(function(r) { if (cnt[r['Work Class']] !== undefined) cnt[r['Work Class']]++; });
+            document.getElementById('classSummary').innerHTML = '<span class="text-green-700">Ready ' + cnt.Ready + '</span> · <span class="text-amber-700">Touch Up ' + cnt['Touch Up'] + '</span> · <span class="text-purple-700">Improvement ' + cnt.Improvement + '</span>';
+            filtered = base.filter(function(r) {
+                if (high && !num(r['High Priority Items'])) return false;
+                if (short && !num(r['Disabled Bays Short'])) return false;
+                if (wc && (wc === '-' ? !!r['Work Class'] : r['Work Class'] !== wc)) return false;
+                if (bf && r['Building Type'] !== bf) return false;
+                if (facFilter && stOf(r, facFilter.col) !== facFilter.v) return false;
+                return !q || [r['Branch Code'], r['Branch Name'], r['Reporter Name']].join(' ').toLowerCase().indexOf(q) > -1;
+            });
+            document.getElementById('recordCount').textContent = filtered.length + ' รายการ';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+            document.getElementById('tableBody').innerHTML = filtered.map(function(r) {
+                const short = num(r['Disabled Bays Short']) > 0;
+                return '<tr class="hover:bg-blue-50 cursor-pointer" data-id="' + esc(r['ID']) + '">' +
+                    '<td class="px-4 py-3"><b>' + esc(r['Branch Code']) + '</b> ' + (r['Has Broken'] === 'Yes' ? '<span class="text-xs text-red-600">⚠️ ชำรุดเร่งด่วน</span>' : '') + '<div class="text-xs text-slate-500">' + esc(r['Branch Name']) + '</div></td>' +
+                    '<td class="px-4 py-3 whitespace-nowrap">' + (PC.fac || []).map(function(f) { return stBadge(stOf(r, f.col), f.l); }).join('') +
+                        '<div class="text-[10px] text-slate-500">ภาพรวม ' + stBadge(stOf(r, PC.statusCol), 'ภาพรวมสาขา') + '</div></td>' +
+                    '<td class="px-4 py-3 text-right">' + num(r['Parking Zones']) + ' · ' + num(r['Total Parking Bays']) + ' · ' + num(r['Motorcycle Bays']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-semibold ' + (short ? 'text-red-600' : 'text-green-700') + '">' + num(r['Disabled Bays']) + ' / ' + num(r['Disabled Bays Required']) + (short ? ' ⚠️' : '') + '</td>' +
+                    '<td class="px-4 py-3 text-right">' + sc(r['Avg Paint (0-5)']) + ' / ' + sc(r['Avg Sign (0-5)']) + '</td>' +
+                    '<td class="px-4 py-3 text-right ' + (num(r['Zone Items Missing']) + num(r['Access Items Missing']) ? 'text-red-600 font-semibold' : '') + '">' + num(r['Zone Items Missing']) + ' · ' + num(r['Access Items Missing']) + '</td>' +
+                    '<td class="px-4 py-3 text-xs"><span class="' + (noGuard(r) ? 'text-red-600 font-semibold' : '') + '">' + esc(r['Guard Monitoring'] || '-') + '</span><div class="text-slate-500">' + esc(r['Misuse Frequency'] || '-') +
+                        (num(r['Misuse Cars Seen']) ? ' · <b class="text-orange-600">ขณะสำรวจ ' + num(r['Misuse Cars Seen']) + ' คัน</b>' : '') + '</div></td>' +
+                    '<td class="px-4 py-3 text-xs">' + classBadge(r['Work Class']) +
+                        (r['Ramps'] !== '' && r['Ramps'] != null ? '<div class="' + (num(r['Ramps Fail']) ? 'text-red-600 font-semibold' : 'text-slate-500') + '">ทางลาดไม่ผ่าน ' + num(r['Ramps Fail']) + '/' + num(r['Ramps']) + (r['Steepest Ramp (1:X)'] ? ' · ชันสุด 1:' + r['Steepest Ramp (1:X)'] : '') + '</div>' : '') +
+                        (r['Wheelchairs'] !== '' && r['Wheelchairs'] != null ? '<div class="' + (num(r['Wheelchairs Short']) ? 'text-red-600 font-semibold' : 'text-slate-500') + '">รถเข็น ' + num(r['Wheelchairs OK']) + '/' + num(r['Wheelchairs']) + (num(r['Wheelchairs Short']) ? ' ขาด ' + num(r['Wheelchairs Short']) : '') + '</div>' : '') + '</td>' +
+                    '<td class="px-4 py-3 text-right ' + (num(r['High Priority Items']) ? 'text-orange-600 font-bold' : '') + '">' + num(r['High Priority Items']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono">' + fmt(r['Est. Budget (THB)']) + '</td>' +
+                    '<td class="px-4 py-3 text-xs">' + esc(r['Reporter Name']) + '<div class="text-slate-400">' + fdate(r['Timestamp']) + '</div></td></tr>';
+            }).join('');
+        }
+        document.getElementById('tableBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        function openModal(id) {
+            currentId = id; currentRecord = null;
+            document.getElementById('modalBody').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังโหลด...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            google.script.run.withSuccessHandler(function(res) {
+                if (id !== currentId) return;
+                if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(res && res.error) + '</p>'; return; }
+                currentRecord = res.data; PC = res.pkConfig || PC;
+                renderModal(res.data);
+            }).getHyperPkSurveyRecordById(id);
+        }
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); currentId = null; }
+        function canEdit() { return isAdmin || smfCanEdit || opsCanEdit || (currentRecord && _userEmail && String(currentRecord['Reporter Email']).toLowerCase() === _userEmail.toLowerCase()); }
+        function photos(list) { return (list || []).map(function(u) { return '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" class="w-20 h-20 object-cover rounded border"></a>'; }).join(''); }
+        function scoreCls(v) { return v === '' || v == null ? 'bg-slate-100 text-slate-500' : v <= 1 ? 'bg-red-600 text-white' : v <= 2 ? 'bg-red-100 text-red-700' : v <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'; }
+        function badge(label, v) { return '<span class="inline-flex items-center gap-1 text-xs mr-2 mb-1"><span class="text-slate-500">' + esc(label) + '</span><span class="px-1.5 rounded font-bold ' + scoreCls(v) + '">' + sc(v) + '</span></span>'; }
+        // checklist: ✔ what the place has, ✖ what is missing
+        // `notAsked` = items added to the form after this record was saved — shown grey, not as a red cross
+        function checklist(all, have, notAsked) {
+            return (all || []).map(function(c) {
+                if (notAsked && notAsked.indexOf(c) > -1 && (have || []).indexOf(c) < 0) return '<span class="inline-block text-[11px] rounded px-1.5 py-0.5 mr-1 mb-1 bg-slate-50 text-slate-400">– ' + esc(c) + ' (ไม่ได้ถาม — แบบฟอร์มเดิม)</span>';
+                const ok = (have || []).indexOf(c) > -1; return '<span class="inline-block text-[11px] rounded px-1.5 py-0.5 mr-1 mb-1 ' + (ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700 font-semibold') + '">' + (ok ? '✔ ' : '✖ ') + esc(c) + '</span>'; }).join('');
+        }
+        function scopeLine(o) {
+            return '<p class="text-xs mt-2"><b class="text-blue-700">ขอบเขตปรับปรุง:</b> ' + esc((o.scope || []).join(', ') || '-') + '</p>' +
+                '<p class="text-xs"><b>ความเร่งด่วน:</b> <span class="' + (o.prio === (PC.priority || [])[0] ? 'text-orange-600 font-bold' : '') + '">' + esc(o.prio || '-') + '</span>' + (o.budget ? ' · งบประมาณ ' + fmt(o.budget) + ' ฿' : '') +
+                    (o.cls ? ' · <b>ประเภทงาน:</b> ' + esc(o.cls) : '') + (o.qty ? ' · ปริมาณ ' + o.qty + ' ' + esc(o.unit || '') : '') + '</p>' +
+                (o.nt ? '<p class="text-xs text-slate-600 mt-1">หมายเหตุ: ' + esc(o.nt) + '</p>' : '');
+        }
+
+        function renderModal(r) {
+            const d = normPk(r['Parking_JSON']), m = d.mgmt || {}, att = r['Attachments_JSON'] || {};
+            const short = num(r['Disabled Bays Short']) > 0, BT = PC.bayTypes || [];
+            let h = '<div class="detail-row"><span class="detail-label">สาขา</span><span class="detail-value">' + esc(r['Branch Code']) + ' - ' + esc(r['Branch Name']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ผู้แจ้ง / วันที่</span><span class="detail-value">' + esc(r['Reporter Name']) + ' · ' + fdate(r['Timestamp']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">สรุป</span><span class="detail-value">' + (d.zones || []).length + ' โซน · ช่องรถยนต์ ' + num(r['Total Parking Bays']) + ' · ช่องผู้พิการ <b class="' + (short ? 'text-red-600' : 'text-green-700') + '">' + num(r['Disabled Bays']) + ' / ขั้นต่ำ ' + num(r['Disabled Bays Required']) + '</b>' +
+                ' · ขาด ' + num(r['Zone Items Missing']) + ' + ' + num(r['Access Items Missing']) + ' รายการ · เร่งด่วน ' + num(r['High Priority Items']) + ' จุด · งบประมาณประมาณการ <b>' + fmt(r['Est. Budget (THB)']) + ' ฿</b></span></div>';
+            h += '<div class="detail-row"><span class="detail-label">ความพร้อม 6 ด้าน</span><span class="detail-value">' +
+                (PC.fac || []).map(function(f) { return '<span class="inline-block mr-2 mb-1 text-xs">' + esc(f.l) + ' ' + stBadge(stOf(r, f.col), f.l) + '</span>'; }).join('') +
+                '<span class="inline-block text-xs font-bold">ภาพรวม ' + stBadge(stOf(r, PC.statusCol)) + '</span></span></div>';
+            if (r['Work Class']) h += '<div class="detail-row"><span class="detail-label">ประเภทงานสาขา</span><span class="detail-value">' + classBadge(r['Work Class']) +
+                ' · Touch Up ' + num(r['Touch Up Items']) + ' จุด (' + fmt(r['Touch Up Budget (THB)']) + ' ฿) · Improvement ' + num(r['Improvement Items']) + ' จุด (' + fmt(r['Improvement Budget (THB)']) + ' ฿)</span></div>';
+            const pf = d.prof;
+            if (pf) h += '<div class="detail-row"><span class="detail-label">อาคาร / ลิฟต์</span><span class="detail-value">' + esc(pf.bldg || '-') + (pf.floors ? ' · ' + pf.floors + ' ชั้น' : '') + ' · ' + esc(pf.lift || '-') +
+                    (pf.liftNt ? '<div class="text-xs text-slate-600">มาตรการช่วยเหลือ: ' + esc(pf.liftNt) + '</div>' : '') + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ทางเข้าหลักผู้พิการ</span><span class="detail-value">' + esc(pf.entry || '-') + '<div class="flex gap-2 flex-wrap mt-1">' + photos(att.hpk_entry) + '</div></span></div>';
+
+            // store total summary — zone × bay type (like the Hyper Ref per-type totals)
+            const tot = {};
+            BT.forEach(function(t) { tot[t.k] = 0; });
+            let tb = '<tr class="bg-slate-50"><th class="p-1.5 border text-left">โซน</th>' + BT.map(function(t) { return '<th class="p-1.5 border text-right whitespace-nowrap">' + esc(t.l) + '</th>'; }).join('') + '<th class="p-1.5 border text-right">รวม</th><th class="p-1.5 border text-right">สภาพ</th></tr>';
+            (d.zones || []).forEach(function(z) {
+                BT.forEach(function(t) { tot[t.k] += num((z.bays || {})[t.k]); });
+                const sco = (z.calc || {}).score;
+                tb += '<tr><td class="p-1.5 border"><b>' + esc(z.zid) + '</b> ' + esc(z.name || '') + '</td>' + BT.map(function(t) { return '<td class="p-1.5 border text-right">' + (num((z.bays || {})[t.k]) || '') + '</td>'; }).join('') +
+                    '<td class="p-1.5 border text-right font-bold">' + zoneTotal(z) + '</td><td class="p-1.5 border text-right"><span class="px-1.5 rounded font-bold ' + scoreCls(sco) + '">' + sc(sco) + '</span></td></tr>';
+            });
+            tb += '<tr class="bg-blue-50 font-bold"><td class="p-1.5 border">รวมทั้งสาขา</td>' + BT.map(function(t) { return '<td class="p-1.5 border text-right">' + tot[t.k] + '</td>'; }).join('') +
+                '<td class="p-1.5 border text-right">' + BT.reduce(function(a, t) { return a + tot[t.k]; }, 0) + '</td><td class="p-1.5 border text-right">' + sc(r['Lot Condition (0-5)']) + '</td></tr>';
+            h += '<div class="mt-4"><p class="text-xs font-semibold text-slate-500 mb-1">🅿️ สรุปยอดรวมทั้งสาขา</p><div class="overflow-x-auto"><table class="min-w-full text-xs border-collapse">' + tb + '</table></div>' +
+                ((att.hpk_layout || []).length ? '<div class="flex gap-2 flex-wrap mt-2">' + photos(att.hpk_layout) + '</div>' : '') + '</div>';
+            if (!(d.zones || []).some(function(z) { return num((z.bays || {}).dis) > 0; })) h += '<div class="border border-red-300 bg-red-50 rounded-lg p-3 mt-4 text-sm text-red-700 font-semibold">♿ ไม่มีที่จอดรถผู้พิการ</div>';
+
+            // parking zone cards
+            (d.zones || []).forEach(function(z) {
+                const c = z.calc || {}, ds = z.dis;
+                const bays = BT.filter(function(t) { return num((z.bays || {})[t.k]); }).map(function(t) { return esc(t.l) + ' <b>' + num(z.bays[t.k]) + '</b>'; }).join(' · ');
+                h += '<div class="border ' + (c.missing || (c.score !== '' && c.score != null && c.score <= 2) ? 'border-red-300' : 'border-blue-200') + ' rounded-lg p-3 mt-4">' +
+                    '<div class="flex flex-wrap justify-between gap-2"><b>🅿️ ' + esc(r['Branch Code'] + '-' + z.zid + ' · ' + (z.name || '-')) + (z.type ? ' · ' + esc(z.type) : '') + (z.floor ? ' · ชั้น ' + esc(z.floor) : '') + '</b>' +
+                        '<span class="text-xs"><span class="px-2 py-0.5 rounded-full font-bold ' + scoreCls(c.score) + '">สภาพ ' + sc(c.score) + '/5 · รวม ' + zoneTotal(z) + ' ช่อง</span>' + cardClass(z) + '</span></div>' +
+                    '<p class="text-xs mt-1">' + (bays || '-') + '</p>' +
+                    '<div class="mt-1">' + (PC.lotElements || []).filter(function(e) { return (z.el || {})[e.k] !== undefined; }).map(function(e) { return badge(e.l, z.el[e.k]); }).join('') + '</div>' +
+                    ((z.prob || []).length || z.probOther ? '<p class="text-xs mt-1"><b class="text-red-600">ปัญหา:</b> ' + esc((z.prob || []).join(', ') + (z.probOther ? ' — ' + z.probOther : '')) + '</p>' : '') +
+                    (ds ? '<div class="border border-blue-200 bg-blue-50/50 rounded-lg p-2 mt-2"><p class="text-xs font-bold text-blue-800">♿ ที่จอดผู้พิการ ' + num(z.bays.dis) + ' ช่อง · ' + esc(ds.near || '-') + (ds.dist ? ' (~' + ds.dist + ' ม.)' : '') + '</p>' +
+                        '<div class="mt-1">' + badge('สีพื้น/สัญลักษณ์', ds.paint) + badge('ป้าย', ds.sign) + (num(ds.misuse) ? '<span class="text-xs text-orange-600 font-bold">🚗 รถทั่วไปจอดขณะสำรวจ ' + num(ds.misuse) + ' คัน</span>' : '') + '</div>' +
+                        '<div class="mt-1">' + checklist(PC.zoneChecks, ds.chk) + '</div>' +
+                        ((ds.prob || []).length || ds.probOther ? '<p class="text-xs mt-1"><b class="text-red-600">ปัญหา:</b> ' + esc((ds.prob || []).join(', ') + (ds.probOther ? ' — ' + ds.probOther : '')) + '</p>' : '') + '</div>' : '') +
+                    scopeLine(z) + '<div class="flex flex-wrap gap-2 mt-2">' + photos(att[z.pk]) + '</div></div>';
+            });
+
+            // accessibility route points
+            (d.points || []).forEach(function(p) {
+                const c = p.calc || {}, t = (PC.pointTypes || []).find(function(x) { return x.k === p.type; }), rc = c.ramp, rm = p.m || {};
+                h += '<div class="border ' + (c.missing || (p.cond !== '' && p.cond <= 2) || (rc && rc.fails.length) ? 'border-red-300' : 'border-indigo-200') + ' rounded-lg p-3 mt-4">' +
+                    '<div class="flex flex-wrap justify-between gap-2"><b>' + esc(p.xid + ' · ' + ptLabel(p.type) + ' · ' + (p.loc || '-')) + (p.floor ? ' · ชั้น ' + esc(p.floor) : '') + '</b>' +
+                        '<span class="text-xs"><span class="px-2 py-0.5 rounded-full font-bold ' + scoreCls(p.cond) + '">สภาพ ' + sc(p.cond) + '/5</span>' + cardClass(p) + '</span></div>' +
+                    (rc ? '<div class="border border-indigo-200 bg-indigo-50/50 rounded-lg p-2 mt-2 text-xs"><b class="text-indigo-800">📐 ' + esc(rm.use || '-') + '</b> · ' +
+                        (rc.ratio ? 'ความชัน <b class="' + (rm.use === (PC.rampUse || [])[2] ? '' : rc.ratio < 12 ? 'text-red-600' : 'text-green-700') + '">1:' + rc.ratio + '</b> (' + rc.deg + '°) · ' + esc(rc.band) : 'ไม่ได้วัดความชัน') +
+                        (rm.rise ? ' · สูง ' + rm.rise + ' ซม.' + (rc.riseBand ? ' (' + esc(rc.riseBand) + ')' : '') : '') + (rm.run ? ' · ยาว ' + rm.run + ' ม.' : '') + (rm.w ? ' · กว้าง ' + rm.w + ' ซม.' : '') +
+                        ' · ราวจับ ' + esc(rm.rail || '-') + (rm.railMat ? ' (' + esc(rm.railMat) + ')' : '') + ' · ' + esc(rm.landing || 'ชานพัก -') +
+                        (rc.fails.length ? '<div class="text-red-600 font-semibold mt-1">✖ ' + esc(rc.fails.join(' · ')) + '</div>' : '') + '</div>' : '') +
+                    (t && t.checks.length ? '<div class="mt-2">' + checklist(t.checks, p.chk, p.type === 'ramp' && !(num(d.ver) >= num(PC.jsonVer)) ? [t.checks[t.checks.length - 1]] : null) + '</div>' : '') +
+                    (p.prob ? '<p class="text-xs mt-1"><b class="text-red-600">ปัญหา:</b> ' + esc(p.prob) + '</p>' : '') +
+                    scopeLine(p) + '<div class="flex flex-wrap gap-2 mt-2">' + photos(att[p.pk]) + '</div></div>';
+            });
+
+            // wheelchairs (from 2026-10-30; older records only have the total)
+            if (m.wcStore !== undefined) h += '<div class="border ' + (num(m.wcShort) || num(m.wcBroken) ? 'border-red-300' : 'border-teal-200') + ' bg-teal-50/40 rounded-lg p-3 mt-4"><b>♿ รถเข็นวีลแชร์</b>' +
+                '<p class="text-xs mt-1">มีทั้งหมด <b>' + num(m.wheelchairs) + '</b> คัน · ใช้งานได้ <b>' + num(m.wcOk) + '</b> · ชำรุด <b class="' + (num(m.wcBroken) ? 'text-red-600' : '') + '">' + num(m.wcBroken) + '</b>' +
+                    (m.wcNeed ? ' · ควรมี ' + num(m.wcNeed) + ' · <b class="' + (num(m.wcShort) ? 'text-red-600' : 'text-green-700') + '">' + (num(m.wcShort) ? 'ขาด ' + num(m.wcShort) + ' คัน' : 'เพียงพอ') + '</b>' : '') + ' · จัดเก็บที่ ' + esc(m.wcStore || '-') + '</p>' +
+                '<div class="mt-1">' + checklist(PC.wcChecks, m.wcChk) + '</div><div class="flex flex-wrap gap-2 mt-2">' + photos(att.hpk_wc) + '</div></div>';
+            // signs + guard
+            h += '<div class="border border-amber-200 bg-amber-50/40 rounded-lg p-3 mt-4"><b>📢 ป้ายสื่อสาร &amp; มาตรการ รปภ.</b>' +
+                '<p class="text-xs mt-1"><b>รปภ.:</b> <span class="' + (noGuard(r) ? 'text-red-600 font-semibold' : '') + '">' + esc(m.guard || '-') + '</span> · <b>พบผู้ไม่พิการจอด:</b> ' + esc(m.freq || '-') + (m.wheelchairs && m.wcStore === undefined ? ' · รถเข็นบริการ ' + m.wheelchairs + ' คัน' : '') + '</p>' +
+                '<p class="text-xs mt-1 font-semibold text-slate-600">ป้าย / การสื่อสาร</p><div>' + checklist(PC.signs, m.signs) + '</div>' +
+                '<p class="text-xs mt-1"><b>มาตรการที่ทำอยู่:</b> ' + esc((m.measures || []).join(', ') || '-') + '</p>' +
+                (m.nt ? '<p class="text-xs text-slate-600 mt-1">หมายเหตุ: ' + esc(m.nt) + '</p>' : '') +
+                '<div class="flex flex-wrap gap-2 mt-2">' + photos(att.hpk_sign) + '</div></div>';
+
+            const ed = canEdit() ? '' : ' disabled';
+            h += '<div class="mt-5 p-3 bg-red-50 border border-red-200 rounded-lg"><label class="flex items-center gap-2 text-xs font-bold text-red-700"><input type="checkbox" id="editHasBroken"' + (r['Has Broken'] === 'Yes' ? ' checked' : '') + ed + '> ⚠️ มีจุดชำรุดที่ต้องซ่อมทันที</label>' +
+                '<textarea id="editBrokenDetail" rows="2" class="mt-2 w-full border border-red-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Broken Detail'] || '') + '</textarea></div>' +
+                '<div class="mt-3"><label class="text-xs font-semibold text-slate-500">สรุปข้อเสนอปรับปรุงภาพรวมสาขา</label><textarea id="editComments" rows="3" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Comments'] || '') + '</textarea></div>' +
+                '<p class="text-[11px] text-slate-400 mt-2">แก้ไขข้อมูลที่จอด / เส้นทาง: ส่งแบบสำรวจใหม่ (รายงานใช้รายการล่าสุดของสาขา)</p>';
+            document.getElementById('modalBody').innerHTML = h;
+            document.getElementById('saveBtn').classList.toggle('hidden', !canEdit());
+        }
+        function saveRecord() {
+            const form = { id: currentId, clientEmail: _userEmail, hasBroken: document.getElementById('editHasBroken').checked ? 'Yes' : 'No',
+                           brokenDetail: document.getElementById('editBrokenDetail').value, comments: document.getElementById('editComments').value };
+            if (form.hasBroken === 'Yes' && !form.brokenDetail.trim()) { alert('กรุณาระบุจุดที่ชำรุด'); return; }
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); }).updateHyperPkSurveyRecord(form);
+        }
+        function deleteRecord() {
+            if (!currentId || !confirm('ยืนยันการลบรายการนี้?')) return;
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); }).deleteHyperPkSurveyRecord(currentId, _userEmail);
+        }
+
+        function downloadToExcel(btn) {
+            if (!filtered.length) { alert('ไม่มีข้อมูล'); return; }
+            const cols = ['Timestamp', 'Branch Code', 'Branch Name', 'Reporter Name', 'Parking Zones', 'Total Parking Bays', 'General Car Bays', 'Family Bays', 'EV Bays', 'Motorcycle Bays', 'Service Bays', 'Lot Condition (0-5)', 'Zones Condition ≤2', 'Disabled Bays', 'Disabled Bays Required', 'Disabled Bays Short',
+                'Disabled Zones', 'Zone Items Missing', 'Avg Paint (0-5)', 'Avg Sign (0-5)', 'Misuse Cars Seen', 'Misuse Frequency', 'Guard Monitoring', 'Signs Present', 'Measures',
+                'Access Points', 'Access Items Missing', 'Points Condition ≤2', 'High Priority Items', 'Est. Budget (THB)',
+                'Work Class', 'Touch Up Items', 'Touch Up Budget (THB)', 'Improvement Items', 'Improvement Budget (THB)', 'Building Type', 'Lift Status',
+                'Ramps', 'Ramps Fail', 'Steepest Ramp (1:X)', 'Wheelchairs', 'Wheelchairs OK', 'Wheelchairs Short', 'Wheelchair Storage',
+                'Status Parking', 'Status Ramp', 'Status Restroom', 'Status Elevator', 'Status Wheelchair', 'Status Signage', 'Accessibility Status', 'Has Broken', 'Broken Detail', 'Comments'];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cols].concat(filtered.map(function(r) { return cols.map(function(c) { return c === 'Timestamp' ? fdate(r[c]) : (r[c] == null ? '' : r[c]); }); }))), 'Stores');
+            const BT = PC.bayTypes || [];
+            const zones = [['Branch Code', 'Branch Name', 'Survey ID', 'โซน', 'ชื่อโซน', 'ประเภท', 'ชั้น'].concat(BT.map(function(t) { return t.l; })).concat(['รวมช่อง', 'สภาพเฉลี่ย'])
+                .concat((PC.lotElements || []).map(function(e) { return 'สภาพ: ' + e.l; })).concat(['ปัญหาโซน', '♿ ระยะถึงทางเข้า', '♿ ระยะ (ม.)', '♿ สีพื้น (0-5)', '♿ ป้าย (0-5)', '♿ รถทั่วไปจอดขณะสำรวจ'])
+                .concat(PC.zoneChecks.map(function(c) { return '♿ ' + c; })).concat(['♿ ขาด (รายการ)', '♿ ปัญหา', 'ขอบเขตปรับปรุง', 'ความเร่งด่วน', 'งบประมาณ ฿', 'ประเภทงาน', 'ปริมาณ', 'หน่วย', 'หมายเหตุ'])];
+            const points = [['Branch Code', 'Branch Name', 'Survey ID', 'จุด', 'ประเภท', 'ตำแหน่ง', 'ชั้น', 'สภาพ (0-5)', 'มีแล้ว', 'ยังขาด', 'ปัญหา', 'ขอบเขตปรับปรุง', 'ความเร่งด่วน', 'งบประมาณ ฿', 'ประเภทงาน', 'ปริมาณ', 'หน่วย',
+                'ทางลาด: ใช้เป็น', 'สูง (ซม.)', 'ยาว (ม.)', 'องศา', 'ความชัน 1:X', 'ช่วงความชัน', 'ช่วงความสูง', 'กว้าง (ซม.)', 'ราวจับ', 'วัสดุราวจับ', 'ชานพัก', 'ไม่ผ่าน', 'หมายเหตุ']];
+            // every Touch Up / Improvement card across the stores — the input for the in-house vs Pool Bid split
+            const work = [['Branch Code', 'Branch Name', 'Building Type', 'การ์ด', 'ประเภทจุด', 'ชื่อ / ตำแหน่ง', 'ประเภทงาน', 'ขอบเขตปรับปรุง', 'ปริมาณ', 'หน่วย', 'งบประมาณ ฿', 'ความเร่งด่วน', 'หมายเหตุ']];
+            let pending = filtered.length;
+            if (btn) { btn.disabled = true; btn.textContent = 'กำลังเตรียมข้อมูล...'; }
+            const finish = function() {
+                if (--pending > 0) return;
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(zones), 'Parking Zones');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(points), 'Access Route');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(work), 'Work Items');
+                XLSX.writeFile(wb, 'hyper_parking_accessibility_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+                if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+            };
+            filtered.forEach(function(r) {
+                google.script.run.withSuccessHandler(function(res) {
+                    const d = res && res.success ? normPk(res.data['Parking_JSON']) : {};
+                    const head = [r['Branch Code'], r['Branch Name'], r['ID']];
+                    (d.zones || []).forEach(function(z) {
+                        const ds = z.dis || null;
+                        zones.push(head.concat([z.zid, z.name, z.type, z.floor]).concat(BT.map(function(t) { return num((z.bays || {})[t.k]) || ''; })).concat([zoneTotal(z), (z.calc || {}).score])
+                            .concat((PC.lotElements || []).map(function(e) { const v = (z.el || {})[e.k]; return v === undefined ? '' : v; }))
+                            .concat([(z.prob || []).join(', ') + (z.probOther ? ' — ' + z.probOther : '')])
+                            .concat(ds ? [ds.near, ds.dist || '', ds.paint, ds.sign, ds.misuse || 0] : ['', '', '', '', ''])
+                            .concat(PC.zoneChecks.map(function(c) { return ds ? ((ds.chk || []).indexOf(c) > -1 ? '✔' : '✖') : ''; }))
+                            .concat([ds ? (z.calc || {}).missing : '', ds ? (ds.prob || []).join(', ') + (ds.probOther ? ' — ' + ds.probOther : '') : '', (z.scope || []).join(', '), z.prio, z.budget || '',
+                                z.cls || '', z.qty || '', z.unit || '', z.nt]));
+                    });
+                    (d.points || []).forEach(function(p) {
+                        const t = (PC.pointTypes || []).find(function(x) { return x.k === p.type; }), all = t ? t.checks : [];
+                        const rm = p.m || {}, rc = (p.calc || {}).ramp;
+                        points.push(head.concat([p.xid, ptLabel(p.type), p.loc, p.floor, p.cond, (p.chk || []).join(', '), all.filter(function(c) { return (p.chk || []).indexOf(c) === -1; }).join(', '),
+                            p.prob, (p.scope || []).join(', '), p.prio, p.budget || '', p.cls || '', p.qty || '', p.unit || '']
+                            .concat(rc ? [rm.use, rm.rise || '', rm.run || '', rc.deg, rc.ratio, rc.band, rc.riseBand, rm.w || '', rm.rail, rm.railMat, rm.landing, rc.fails.join(', ')] : ['', '', '', '', '', '', '', '', '', '', '', ''])
+                            .concat([p.nt])));
+                    });
+                    const bldg = (d.prof || {}).bldg || '';
+                    (d.zones || []).map(function(z) { return [z, z.zid, 'โซนที่จอด', z.name]; }).concat((d.points || []).map(function(p) { return [p, p.xid, ptLabel(p.type), p.loc]; }))
+                        .forEach(function(x) {
+                            const o = x[0];
+                            if (!o.cls || o.cls === (PC.workClass || [])[0]) return;
+                            work.push([r['Branch Code'], r['Branch Name'], bldg, x[1], x[2], x[3], o.cls.split(' — ')[0], (o.scope || []).join(', '), o.qty || '', o.unit || '', o.budget || '', o.prio, o.nt]);
+                        });
+                    finish();
+                }).withFailureHandler(finish).getHyperPkSurveyRecordById(r['ID']);
+            });
+        }
+    </script>
+    <script>var HYPER_REVIEW_KIND = 'Pk';</script>
+    <?!= include('HyperReviewBar') ?>
+</body>
+</html>

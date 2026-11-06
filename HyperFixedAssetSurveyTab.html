@@ -1,0 +1,577 @@
+        <!-- CONTENT: HYPER FIXED ASSET PRE-COUNT SURVEY — storage-area cards → K1–K5 criteria → colour RED/ORG/YEL/GRE.
+             Store list = HYPER_FA_STORES (asset register), not HYPER_REF_STORES: the register also holds the BMK / Food Place stores. -->
+        <div id="content-hyper-fa-survey" class="tab-content hidden">
+            <form id="hyper-fa-form" onsubmit="handleHyperFaSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">🏷️ สำรวจพื้นที่เก็บ Fixed Asset &amp; จัดระดับสีสาขา</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= MANUALS_URL ?>?page=fa-manual" target="_blank" class="text-emerald-600 hover:underline text-sm font-medium">📖 คู่มือ</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-fa-checklist" target="_blank" class="text-violet-600 hover:underline text-sm font-medium">🖨️ แบบฟอร์ม</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_fa_survey_report" target="_blank" class="report-view-link hidden text-violet-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+                <!-- Paper-first workflow: fill the printed form on site, then key it in here + attach its photo (section 8, required) -->
+                <div class="bg-amber-50 border-2 border-amber-400 rounded-lg px-4 py-3 text-sm text-amber-900">
+                    <p class="font-bold mb-1.5">📝 กรอกลงแบบฟอร์มกระดาษก่อน แล้วจึงกรอกในแอป</p>
+                    <ol class="list-decimal pl-5 space-y-0.5 text-xs">
+                        <li>พิมพ์ <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-fa-checklist" target="_blank" class="font-semibold text-violet-700 underline">🖨️ แบบฟอร์มกระดาษ</a> แล้ว <b>เขียนข้อมูลลงกระดาษระหว่างเดินสำรวจหน้างาน</b></li>
+                        <li>นำข้อมูลจากกระดาษมากรอกในแอปนี้ให้ตรงกัน</li>
+                        <li><b>ถ่ายรูปแบบฟอร์มกระดาษที่กรอกแล้ว ทุกหน้า</b> แนบในข้อ 8 เป็นหลักฐาน — <span class="text-red-600 font-semibold">ไม่แนบจะส่งไม่ได้</span></li>
+                    </ol>
+                </div>
+                <p class="text-xs text-violet-800 bg-violet-50 border border-violet-200 rounded px-3 py-2 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>เดินสำรวจ <b>ทุกพื้นที่ที่เก็บทรัพย์สิน</b> (ห้อง Fixture, หลังร้าน, ลานจอดที่ล้อมผ้าใบ, ดาดฟ้า ...) เพิ่ม <b>การ์ดทีละพื้นที่</b> แล้วใส่จำนวนชิ้นแยกตามกลุ่ม A / B / C × .1 / .2 / .3 —
+                    ระบบให้คะแนน <b>6 เกณฑ์ (K1–K5 จากการสำรวจ + K6 โปรไฟล์สาขาจากข้อมูล HO)</b> และจัด <b>ระดับสี แดง / ส้ม / เหลือง / เขียว</b> พร้อมจำนวนแรงงานและงบประมาณให้อัตโนมัติ</span>
+                </p>
+                <div id="hyper-fa-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="hyper-fa-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreHyperFaDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardHyperFaDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">ผู้สำรวจ (Surveyor) *</label><input type="text" name="reporterName" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ (Phone) *</label><input type="tel" name="reporterPhone" inputmode="tel" maxlength="20" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="hyper-fa-station-search" autocomplete="off" class="input-field w-full border p-2 rounded text-sm bg-violet-50" placeholder="พิมพ์รหัสสาขา (เช่น 15006) หรือชื่อสาขา ไทย/อังกฤษ..." oninput="handleHyperFaStationInput(this)">
+                                <div id="hyper-fa-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly><input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat"><input type="hidden" name="region"><input type="hidden" name="ammMtn"><input type="hidden" name="dmArea"><input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                    <div id="hyper-fa-store-ref" class="hidden mt-2"></div>
+                </div>
+
+                <div id="hyper-fa-rest-form" class="hidden">
+                    <!-- Live colour result — sticky so the surveyor sees the rating change while adding areas -->
+                    <div id="hfa-sticky" class="sticky top-0 z-30 bg-white/95 backdrop-blur border-2 border-gray-300 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span id="hfa-sum-color" class="px-3 py-0.5 rounded-full font-bold text-white bg-green-600">GRE</span>
+                        <span>คะแนน <b id="hfa-sum-score">0</b>/18</span>
+                        <span><b id="hfa-sum-areas">0</b> พื้นที่ · <b id="hfa-sum-sqm">0</b> ตร.ม.</span>
+                        <span>~<b id="hfa-sum-pieces">0</b> ชิ้น</span>
+                        <span class="ml-auto font-bold text-violet-800">แรงงาน <span id="hfa-sum-labor">-</span> · <span id="hfa-sum-cost">0</span> ฿</span>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">2. พื้นที่เก็บทรัพย์สิน (การ์ดทีละพื้นที่)</h3>
+                        <p class="text-xs text-gray-500 mb-1">ทุกจุดที่มีทรัพย์สินกองเก็บ <b>นอกพื้นที่ขาย</b> — ขนาดพื้นที่ใส่ ตร.ม. หรือจำนวนช่องจอดรถที่ใช้เก็บ (1 ช่อง = 12.5 ตร.ม.) · ทรัพย์สิน MIS (คอมพิวเตอร์ / เครื่องชั่ง / อุปกรณ์เทคโนโลยี) ไม่ต้องนับในการ์ดนี้ ให้ใส่ในข้อ 3</p>
+                        <div class="text-[11px] text-gray-600 bg-gray-50 border rounded p-2 mt-2 leading-relaxed">
+                            <b>กลุ่มทรัพย์สิน:</b> <b>A</b> ใช้งานประจำ/สำรองพร้อมใช้ · <b>B</b> ใช้ตามฤดูกาล/เทศกาล · <b>C</b> ไม่ใช้งานแล้ว/ชำรุด — แต่ละกลุ่มแบ่ง 3 ประเภท:
+                            <b>.1</b> = ของสาขานี้ · <b>.2</b> = มาจากสาขาอื่น · <b>.3</b> = ไม่ทราบที่มา หรือของ Supplier (ถ่ายรูป แจ้งรับคืนภายใน 14 วัน)
+                        </div>
+                        <div id="hfa-areas" class="space-y-4 mt-4"></div>
+                        <button type="button" onclick="hfaAddArea()" class="mt-3 w-full border-2 border-dashed border-violet-400 text-violet-800 bg-violet-50 hover:bg-violet-100 rounded-lg py-2 text-sm font-semibold">＋ เพิ่มพื้นที่เก็บ</button>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-sky-300 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">3. ทรัพย์สิน MIS (คอมพิวเตอร์ / เครื่องชั่ง / อุปกรณ์เทคโนโลยี)</h3>
+                        <p class="text-xs text-gray-500 mb-2">นับแยกให้ทีม MIS — รวมทั้งที่ใช้งานอยู่และที่เก็บไว้ · <b>ไม่นำไปคิดคะแนนระดับสี</b> · ไม่มีให้เว้นว่าง</p>
+                        <div id="hfa-mis" class="space-y-2"></div>
+                        <p class="text-[11px] text-sky-800 font-semibold mt-2" id="hfa-mis-total"></p>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">4. แหล่งที่มา / พื้นที่ขาย &amp; สำนักงาน / Supplier / Pipeline ประมูล</h3>
+                        <div class="border border-orange-200 bg-orange-50/50 rounded-lg p-2 mb-3">
+                            <p class="text-xs font-bold text-orange-800 mb-1">🔀 แหล่งที่มาอื่นของทรัพย์สิน (เกณฑ์ K3) — นับจากชิ้นกลุ่ม .2 / .3 ทุกพื้นที่</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <div><label class="block text-xs font-semibold text-gray-600 mb-1">จำนวนแหล่งที่มาอื่น (ที่) <span id="hfa-src-req" class="hidden text-red-600">*</span></label><input id="hfa-src-n" type="number" min="0" inputmode="numeric" oninput="hfaRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white" placeholder="0"></div>
+                                <div class="sm:col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">ระบุแหล่งที่มา (สาขาต้นทาง / Supplier / ไม่ทราบที่มา)</label><input id="hfa-src-names" class="w-full border border-gray-300 rounded p-2 text-sm bg-white" placeholder="เช่น สาขาบางนา, สาขาลาดพร้าว, ไม่ทราบที่มา"></div>
+                            </div>
+                            <p class="text-[11px] text-gray-500 mt-1">แต่ละสาขาต้นทาง / แต่ละ Supplier / กลุ่มที่ไม่ทราบที่มา นับเป็น 1 ที่ — ไม่มี = 0 คะแนน · 1 ที่ = 1 · 2 ที่ = 2 · มากกว่า 2 ที่ขึ้นไป = 3</p>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">ทรัพย์สินในพื้นที่ขายที่มี Tag อ่านได้ *</label><select id="hfa-f-tag" class="w-full border border-gray-300 rounded p-2 text-sm bg-white"></select></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">ของใช้งานที่สงสัยว่ามาจากสาขาอื่น (A.2, ชิ้น)</label><input id="hfa-f-a2" type="number" min="0" inputmode="numeric" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">พนักงานสาขาที่ช่วยนับได้ (คน)</label><input id="hfa-f-staff" type="number" min="0" inputmode="numeric" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+                            <div class="sm:col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">Supplier ที่มีของค้างในสาขา (ชื่อ)</label><input id="hfa-s-names" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น ตู้แช่ Pepsi 2, ชั้นโชว์ Nestle 4"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">แจ้ง Supplier มารับคืนแล้ว?</label><select id="hfa-s-notified" class="w-full border border-gray-300 rounded p-2 text-sm bg-white"><option value="">-- เลือก --</option><option value="Yes">แจ้งแล้ว</option><option value="No">ยังไม่แจ้ง</option></select></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">รายการที่แจ้งขอประมูลแล้ว (Pipeline, รายการ)</label><input id="hfa-p-items" type="number" min="0" inputmode="numeric" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>
+                            <div class="sm:col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">หมายเหตุพื้นที่ขาย / Pipeline</label><input id="hfa-f-nt" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น ตู้แช่ 3 ตู้ในพื้นที่ขาย Tag หลุด"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-violet-300 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">5. ผลจัดระดับสี (คำนวณอัตโนมัติ)</h3>
+                        <div class="overflow-x-auto"><table class="min-w-full text-xs border-collapse" id="hfa-criteria"></table></div>
+                        <div id="hfa-result" class="mt-3"></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 border-t pt-3">
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">ผู้สำรวจ / สาขา เสนอสีอื่น? (ถ้าไม่เห็นด้วย)</label><select id="hfa-p-color" onchange="hfaRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white"></select></div>
+                            <div class="sm:col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">เหตุผลที่เสนอสีต่างจากระบบ <span id="hfa-p-req" class="hidden text-red-600">*</span></label><input id="hfa-p-reason" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="ต้องระบุเมื่อเสนอสีต่างจากผลคำนวณ"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">6. จุดอันตรายที่ต้องแก้ทันที</h3>
+                        <div class="flex gap-4 mb-3">
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" onchange="document.getElementById('hfa-broken-section').classList.remove('hidden')"> <span class="text-sm">มี (Yes)</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" checked onchange="document.getElementById('hfa-broken-section').classList.add('hidden')"> <span class="text-sm">ไม่มี (No)</span></label>
+                        </div>
+                        <div id="hfa-broken-section" class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ระบุจุด และอันตราย *</label>
+                            <textarea name="brokenDetail" rows="3" class="input-field w-full border border-red-300 p-2 rounded text-sm" placeholder="เช่น FA02 ลานจอดชั้น 2 กองตู้แช่ขวางทางหนีไฟ"></textarea>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-2 border-b pb-2">7. สรุป / ข้อเสนอการเคลียร์ทรัพย์สิน</h3>
+                        <textarea name="comments" rows="3" class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50" placeholder="เช่น ลานจอดชั้น 2 ควรจ้าง Outsource คัดแยก 5 วัน, ตู้แช่ 12 ตู้ส่งประเมินซ่อมกลับมาใช้ (Optional)"></textarea>
+                    </div>
+                    <div id="hfa-paper-box" class="bg-white p-4 rounded-lg border-2 border-violet-300 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">8. หลักฐาน: รูปแบบฟอร์มกระดาษ *</h3>
+                        <p class="text-xs text-gray-500 mb-1">ถ่ายรูป <b>แบบฟอร์มกระดาษ (🖨️ แบบฟอร์ม) ที่กรอกหน้างานแล้ว</b> ให้เห็นตัวเลขชัดเจน <b>ทุกหน้า</b> — ใช้เป็นหลักฐานยืนยันข้อมูลที่ส่งในแอป</p>
+                        <div id="hfa-paper-photo"></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">9. CC Email Notification (Optional)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1</label><input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm"></div>
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2</label><input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetHyperFaForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveHyperFaDraft()" class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 text-sm">&#128190; Save Draft</button>
+                            <button type="submit" class="bg-violet-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-violet-700">Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div> <!-- End content-hyper-fa-survey -->
+
+        <script>
+            const HYPER_FA_CONFIG = <?!= JSON.stringify(getHyperFaConfig_()) ?>;
+            const HYPER_FA_STORES = <?!= JSON.stringify(HYPER_FA_STORES) ?>;
+            const HYPER_FA_DRAFT_KEY = 'hyper_fa_survey_draft_v1';
+            const HFA = { seq: 0 };
+            function hfaEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+            function _hfaOpts(list, sel, ph) { return '<option value="">' + (ph || '-- เลือก --') + '</option>' + list.map(function(o) { return '<option' + (o === sel ? ' selected' : '') + '>' + hfaEsc(o) + '</option>'; }).join(''); }
+            function _hfaChecks(list, picked, key) {
+                return '<div class="flex flex-wrap gap-1.5">' + list.map(function(o) {
+                    const on = (picked || []).indexOf(o) > -1;
+                    return '<label class="inline-flex items-center gap-1 text-xs border rounded-full px-2 py-1 cursor-pointer ' + (on ? 'bg-violet-50 border-violet-400' : 'bg-white border-gray-300') + '">' +
+                        '<input type="checkbox" data-' + key + ' value="' + hfaEsc(o) + '"' + (on ? ' checked' : '') + ' onchange="hfaChip(this);hfaRecalc()"> ' + hfaEsc(o) + '</label>';
+                }).join('') + '</div>';
+            }
+            function hfaChip(cb) { const l = cb.closest('label'); l.classList.toggle('bg-violet-50', cb.checked); l.classList.toggle('border-violet-400', cb.checked); l.classList.toggle('bg-white', !cb.checked); l.classList.toggle('border-gray-300', !cb.checked); }
+            function _hfaBranch() { const f = document.getElementById('hyper-fa-form'); return f && f.branchCode.value ? f.branchCode.value : '[Branch]'; }
+            function _hfaColor(k) { return HYPER_FA_CONFIG.colors.find(function(c) { return c.k === k; }) || null; }
+            function _hfaTagLabels() { return HYPER_FA_CONFIG.tag.map(function(t) { return t.l; }); }
+            function _hfaTagVal(l) { const t = HYPER_FA_CONFIG.tag.find(function(x) { return x.l === l; }); return t ? t.v : null; }
+            // Same bands as hyperFaVpColor_() in HyperFixedAssetSurvey.gs
+            function hfaVpColor(need) { if (need === '' || need == null) return ''; need = parseInt(need, 10); return need >= 8 ? 'RED' : need >= 4 ? 'ORG' : need >= 1 ? 'YEL' : 'GRE'; }
+            function hfaPill(k, extra) { const c = _hfaColor(k); return c ? '<span class="inline-block px-2 py-0.5 rounded-full font-bold text-white text-xs" style="background:' + c.hex + '">' + c.k + ' ' + c.l + (extra || '') + '</span>' : '<span class="text-gray-400 text-xs">-</span>'; }
+
+            (function() {
+                const C = HYPER_FA_CONFIG;
+                document.getElementById('hfa-f-tag').innerHTML = _hfaOpts(_hfaTagLabels());
+                document.getElementById('hfa-p-color').innerHTML = '<option value="">ใช้ผลของระบบ</option>' + C.colors.map(function(c) { return '<option value="' + c.k + '">' + c.k + ' ' + c.l + ' (' + c.th + ')</option>'; }).join('');
+                const num = function(f, ph, cls) { return '<input data-mis="' + f + '" type="number" min="0" inputmode="numeric" oninput="hfaRecalc()" class="w-full border ' + (cls || 'border-gray-300') + ' rounded p-1.5 text-sm" placeholder="' + ph + '">'; };
+                document.getElementById('hfa-mis').innerHTML = C.misTypes.map(function(t, i) {
+                    return '<div class="border border-sky-200 rounded-lg p-2" data-mis-row="' + i + '"><p class="text-xs font-bold text-sky-900 mb-1">💻 ' + hfaEsc(t) + '</p>' +
+                        '<div class="grid grid-cols-5 gap-1.5 text-[10px] text-gray-500 text-center"><span>A ใช้งาน</span><span>B ตามฤดูกาล</span><span>C ไม่ใช้งาน</span><span class="text-orange-700">จากที่อื่น*</span><span>ไม่มี Tag</span></div>' +
+                        '<div class="grid grid-cols-5 gap-1.5">' + num('a', '0') + num('b', '0') + num('c', '0') + num('oth', '0', 'border-orange-300 bg-orange-50') + num('notag', '0') + '</div>' +
+                        '<input data-mis="loc" class="w-full border border-gray-300 rounded p-1.5 text-xs mt-1.5" placeholder="พบที่ (เช่น FA01, สำนักงาน, Checkout)"></div>';
+                }).join('') + '<p class="text-[10px] text-gray-500">* จากที่อื่น = ในจำนวน A+B+C มาจากสาขาอื่น / ไม่ทราบที่มา / Supplier</p>';
+            })();
+            // Paper-form evidence photo (section 8) — photoUpload() lives in index.html, so render once the page has parsed
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('hfa-paper-photo').innerHTML = photoUpload('แบบฟอร์มกระดาษที่กรอกแล้ว (ทุกหน้า)', 'hfa_paper');
+            });
+            // v1 drafts stored A / S instead of A1 / C3 — same mapping as _hfaMigrateCnt_() in HyperFixedAssetSurvey.gs
+            function _hfaMigrateCnt(cnt) {
+                cnt = cnt || {};
+                if (cnt.A1 !== undefined || (cnt.A === undefined && cnt.S === undefined)) return cnt;
+                const o = Object.assign({}, cnt);
+                o.A1 = cnt.A; o.C3 = (parseInt(cnt.C3, 10) || 0) + (parseInt(cnt.S, 10) || 0);
+                delete o.A; delete o.S;
+                return o;
+            }
+
+            // ── Storage-area card (one per area, like the Hyper Parking zone cards) ──
+            function hfaAddArea(a) {
+                a = a || {};
+                const aid = a.aid || ('FA' + String(++HFA.seq).padStart(2, '0'));
+                const n = parseInt(aid.replace(/\D/g, ''), 10); if (n > HFA.seq) HFA.seq = n;
+                const C = HYPER_FA_CONFIG, cnt = _hfaMigrateCnt(a.cnt);
+                const sel = function(k, list, v) { return '<select data-r="' + k + '" onchange="hfaRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _hfaOpts(list, v) + '</select>'; };
+                // 3 × 3 matrix: rows A / B / C, columns .1 own store / .2 other store / .3 unknown or supplier
+                const GROUPS = [['A', 'ใช้งานประจำ'], ['B', 'ตามฤดูกาล'], ['C', 'ไม่ใช้งาน']];
+                const cntInputs = '<div class="grid grid-cols-[4.5rem_1fr_1fr_1fr] gap-1.5 items-center text-[10px] text-center font-semibold">' +
+                    '<span></span><span class="text-gray-600">.1 ของสาขา</span><span class="text-orange-700">.2 จากสาขาอื่น</span><span class="text-orange-700">.3 ไม่ทราบที่มา / Supplier</span>' +
+                    GROUPS.map(function(g) {
+                        return '<span class="text-left text-[11px] text-gray-700"><b>' + g[0] + '</b> ' + g[1] + '</span>' + [1, 2, 3].map(function(n) {
+                            const k = g[0] + n, other = n > 1;
+                            return '<input data-cnt="' + k + '" type="number" min="0" inputmode="numeric" value="' + (cnt[k] || '') + '" oninput="hfaRecalc()" aria-label="' + g[0] + '.' + n + '" class="w-full border ' + (other ? 'border-orange-300 bg-orange-50' : 'border-gray-300') + ' rounded p-2 text-sm" placeholder="' + g[0] + '.' + n + '">';
+                        }).join('');
+                    }).join('') + '</div>';
+                const html = '<div class="border border-violet-300 rounded-lg overflow-hidden" data-area="' + aid + '">' +
+                    '<div class="bg-violet-600 text-white px-3 py-2 flex items-center justify-between gap-2"><b class="text-sm">📦 <span data-aid-label>' + hfaEsc(_hfaBranch() + '-' + aid) + '</span> <span class="font-normal" data-out="aname"></span></b>' +
+                        '<span class="ml-auto text-xs font-bold bg-white text-violet-700 px-2 py-0.5 rounded-full"><span data-out="asqm">0</span> ตร.ม. · ~<span data-out="apcs">0</span> ชิ้น</span>' +
+                        '<button type="button" onclick="hfaRemove(\'' + aid + '\')" class="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5">ลบ</button></div>' +
+                    '<div class="p-3 space-y-3 bg-white">' +
+                        '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">' +
+                            '<div class="col-span-2 sm:col-span-1"><label class="block text-xs font-semibold text-gray-600 mb-1">ชื่อพื้นที่ *</label><input data-r="name" value="' + hfaEsc(a.name || '') + '" oninput="hfaRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น ห้อง Fixture หลังร้าน, ลานจอด ชั้น 2 โซน A"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทพื้นที่ *</label>' + sel('type', C.areaTypes, a.type) + '</div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ชั้น</label><input data-r="floor" value="' + hfaEsc(a.floor || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น G, 2, ดาดฟ้า"></div>' +
+                        '</div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2"><p class="text-xs font-bold text-gray-700 mb-1">📐 ขนาดพื้นที่ (กรอกอย่างใดอย่างหนึ่ง หรือทั้งสอง) *</p><div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' +
+                            '<div><label class="block text-[11px] font-semibold text-gray-600 mb-1">พื้นที่ (ตร.ม.)</label><input data-r="sqm" type="number" min="0" inputmode="decimal" value="' + (a.sqm || '') + '" oninput="hfaRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="กว้าง × ยาว"></div>' +
+                            '<div><label class="block text-[11px] font-semibold text-gray-600 mb-1">ช่องจอดรถที่ใช้เก็บ (ช่อง)</label><input data-r="bays" type="number" min="0" inputmode="numeric" value="' + (a.bays || '') + '" oninput="hfaRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>' +
+                            '<div><label class="block text-[11px] font-semibold text-gray-600 mb-1">ของเต็มพื้นที่ *</label>' + sel('fill', C.fill, a.fill) + '</div>' +
+                            '<div><label class="block text-[11px] font-semibold text-gray-600 mb-1">ความสูงกอง *</label>' + sel('height', C.height, a.height) + '</div>' +
+                        '</div></div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2"><p class="text-xs font-bold text-gray-700 mb-1">🔢 จำนวนชิ้น แยกกลุ่ม (ไม่มีเว้นว่าง) *</p>' + cntInputs +
+                            '<div class="grid grid-cols-2 gap-2 mt-2">' +
+                                '<div><label class="block text-[11px] font-semibold text-gray-600 mb-1">ในนี้เป็นของหนัก / ชิ้นใหญ่ (ตู้แช่, เครื่องจักร, ชั้นเหล็ก) — ชิ้น</label><input data-r="heavy" type="number" min="0" inputmode="numeric" value="' + (a.heavy || '') + '" oninput="hfaRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>' +
+                                '<div><label class="block text-[11px] font-semibold text-gray-600 mb-1">ของไม่ใช้งาน (C) ที่น่าจะซ่อม / นำกลับมาใช้ได้ — ชิ้น</label><input data-r="reuse" type="number" min="0" inputmode="numeric" value="' + (a.reuse || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>' +
+                            '</div><p class="text-[11px] text-orange-700 font-semibold mt-1" data-out="aother"></p></div>' +
+                        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">🏷️ ของในพื้นที่นี้มี Barcode Tag อ่านได้ *</label>' + sel('tag', _hfaTagLabels(), a.tag) + '</div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">🚪 การเข้าถึง *</label>' + sel('access', C.access, a.access) + '</div>' +
+                        '</div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2"><p class="text-xs font-bold text-gray-700 mb-1">🛠️ ต้องใช้อุปกรณ์ในการคัดแยก / ขนย้าย</p>' + _hfaChecks(C.equip, a.equip, 'equip') + '</div>' +
+                        '<div class="border border-red-200 rounded-lg p-2 bg-red-50/40"><p class="text-xs font-bold text-red-700 mb-1">⚠️ ความเสี่ยง / สภาพพื้นที่</p>' + _hfaChecks(C.hazard, a.hazard, 'hazard') + '</div>' +
+                        '<div><label class="block text-xs font-semibold text-gray-600 mb-1">หมายเหตุ (ของที่พบ, Supplier, ข้อสังเกต)</label><textarea data-r="nt" rows="2" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น ตู้แช่เก่า 8 ตู้, Checkout 4 ชุด, ชั้นวางเหล็ก 1 กอง">' + hfaEsc(a.nt || '') + '</textarea></div>' +
+                        photoUpload('ภาพ Asset พื้นที่ ' + aid + ' (ภาพมุมกว้าง + ภาพใกล้)', 'hfa_area_' + aid) +
+                    '</div></div>';
+                document.getElementById('hfa-areas').insertAdjacentHTML('beforeend', html);
+                hfaRecalc();
+            }
+            function hfaRemove(aid) {
+                if (!confirm('ลบพื้นที่ ' + aid + '?')) return;
+                delete _accumulatedFiles['hfa_area_' + aid];
+                document.querySelector('[data-area="' + aid + '"]').remove();
+                hfaRecalc();
+            }
+            function _hfaArea(el) {
+                const g = function(k) { const x = el.querySelector('[data-r="' + k + '"]'); return x ? x.value : ''; };
+                const picks = function(k) { return Array.from(el.querySelectorAll('[data-' + k + ']:checked')).map(function(c) { return c.value; }); };
+                const cnt = {};
+                HYPER_FA_CONFIG.classes.forEach(function(c) { cnt[c.k] = parseInt(el.querySelector('[data-cnt="' + c.k + '"]').value, 10) || 0; });
+                return { aid: el.dataset.area, name: g('name'), type: g('type'), floor: g('floor'), sqm: g('sqm'), bays: g('bays'), fill: g('fill'), height: g('height'), access: g('access'),
+                         cnt: cnt, heavy: g('heavy'), reuse: g('reuse'), tag: g('tag'), equip: picks('equip'), hazard: picks('hazard'), nt: g('nt'), pk: 'hfa_area_' + el.dataset.area };
+            }
+            function collectHyperFa() {
+                const v = function(id) { return document.getElementById(id).value; };
+                return {
+                    areas: Array.from(document.querySelectorAll('#hfa-areas [data-area]')).map(_hfaArea),
+                    floor: { tag: v('hfa-f-tag'), a2: v('hfa-f-a2'), staff: v('hfa-f-staff'), nt: v('hfa-f-nt') },
+                    sup: { names: v('hfa-s-names'), notified: v('hfa-s-notified') },
+                    pipe: { items: v('hfa-p-items') },
+                    propose: { color: v('hfa-p-color'), reason: v('hfa-p-reason') },
+                    src: { n: v('hfa-src-n'), names: v('hfa-src-names') },
+                    mis: Array.from(document.querySelectorAll('#hfa-mis [data-mis-row]')).map(function(row) {
+                        const o = {};
+                        row.querySelectorAll('[data-mis]').forEach(function(el) { o[el.dataset.mis] = el.value; });
+                        return o;
+                    })
+                };
+            }
+            // Same rules as hyperFaProfile_() in HyperFixedAssetSurvey.gs (row cols 14 size, 15 GO date, 16 levels, 17 buildings)
+            function hfaProfile(st) {
+                const f = [], miss = [];
+                if (!st) return { factors: f, missing: ['ไม่พบสาขาในข้อมูล'], age: '' };
+                if (!st[14]) miss.push('ขนาดสาขา'); else if (/^Standard/i.test(st[14])) f.push('ขนาด ' + st[14]);
+                let age = '';
+                if (st[15]) { age = Math.floor((new Date() - new Date(st[15] + 'T00:00:00')) / (365.25 * 864e5)); if (age >= HYPER_FA_CONFIG.profileAge) f.push('อายุ ' + age + ' ปี'); }
+                else miss.push('วันเปิดสาขา');
+                if ((parseInt(st[16], 10) || 0) >= 2 || (parseInt(st[17], 10) || 0) >= 2) f.push(st[16] + ' ชั้น' + ((parseInt(st[17], 10) || 0) >= 2 ? ' / ' + st[17] + ' อาคาร' : ''));
+                else if (st[16] === '') miss.push('จำนวนชั้น');
+                return { factors: f, missing: miss, age: age };
+            }
+            function _hfaCurStore() { const c = document.getElementById('hyper-fa-form').branchCode.value; return HYPER_FA_STORES.find(function(s) { return s[0] === c; }) || null; }
+            function hfaBandText() { const C = HYPER_FA_CONFIG.colors; return C.map(function(c, i) { return c.l + ' ' + c.min + '–' + (i < C.length - 1 ? C[i + 1].min - 1 : 18); }).join(' · '); }
+            // Mirrors _hfaParse_ + hyperFaScore_ in HyperFixedAssetSurvey.gs (the server recomputes on submit)
+            function hfaScore(d, st) {
+                const C = HYPER_FA_CONFIG;
+                let sqm = 0, pieces = 0, other = 0, heavy = 0, tagW = 0, tagSum = 0;
+                const areas = d.areas.map(function(a) {
+                    const asqm = (parseFloat(a.sqm) || 0) + (parseInt(a.bays, 10) || 0) * C.sqmPerBay;
+                    const apcs = C.classes.reduce(function(s, c) { return s + a.cnt[c.k]; }, 0);
+                    const aoth = C.classes.reduce(function(s, c) { return s + (c.other ? a.cnt[c.k] : 0); }, 0);
+                    sqm += asqm; pieces += apcs; other += aoth; heavy += parseInt(a.heavy, 10) || 0;
+                    const tv = _hfaTagVal(a.tag); if (tv !== null && apcs) { tagW += apcs; tagSum += tv * apcs; }
+                    return { a: a, sqm: asqm, pcs: apcs, other: aoth };
+                });
+                const tagPct = tagW ? Math.round(tagSum / tagW) : (pieces ? 0 : 100);
+                const otherPct = pieces ? Math.round(other / pieces * 100) : 0;
+                const sources = Math.max(parseInt((d.src || {}).n, 10) || 0, other ? 1 : 0);
+                const factors = [];
+                if (d.areas.length >= 4) factors.push('พื้นที่เก็บ ' + d.areas.length + ' จุด');
+                if (heavy >= 20) factors.push('ของหนัก/ชิ้นใหญ่ ' + heavy + ' ชิ้น');
+                if (d.areas.some(function(a) { return a.equip.some(function(e) { return C.heavyEquip.indexOf(e) > -1; }); })) factors.push('ต้องใช้เครื่องมือหนัก');
+                if (d.areas.some(function(a) { return a.height === C.height[2] || a.access === C.access[2]; })) factors.push('กองสูง / ซ้อนทับ');
+                sqm = Math.round(sqm * 10) / 10;
+                const prof = hfaProfile(st);
+                const vals = { K1: sqm, K2: pieces, K3: sources, K4: 100 - tagPct, K5: factors.length, K6: prof.factors.length }, scores = {};
+                let total = 0;
+                C.criteria.forEach(function(c) { let s = 0; c.cuts.forEach(function(cut) { if (vals[c.k] >= cut) s++; }); scores[c.k] = s; total += s; });
+                let color = 'GRE';
+                C.colors.forEach(function(b) { if (total >= b.min) color = b.k; });
+                const override = sqm >= C.redOverride.sqm || pieces >= C.redOverride.pieces;
+                if (override) color = 'RED';
+                return { areas: areas, sqm: sqm, pieces: pieces, other: other, heavy: heavy, tagPct: tagPct, otherPct: otherPct, sources: sources, factors: factors, profile: prof, vals: vals, scores: scores, total: total, color: color, override: override };
+            }
+            function hfaRecalc() {
+                const C = HYPER_FA_CONFIG, d = collectHyperFa(), r = hfaScore(d, _hfaCurStore());
+                const set = function(id, v) { document.getElementById(id).textContent = v; };
+                document.querySelectorAll('#hfa-areas [data-area]').forEach(function(el, i) {
+                    const x = r.areas[i];
+                    el.querySelector('[data-aid-label]').textContent = _hfaBranch() + '-' + el.dataset.area;
+                    el.querySelector('[data-out="aname"]').textContent = x.a.name ? '· ' + x.a.name : '';
+                    el.querySelector('[data-out="asqm"]').textContent = Math.round(x.sqm * 10) / 10;
+                    el.querySelector('[data-out="apcs"]').textContent = x.pcs;
+                    el.querySelector('[data-out="aother"]').textContent = x.other ? 'จากสาขาอื่น / ไม่ทราบที่มา / Supplier ' + x.other + ' ชิ้น (' + Math.round(x.other / x.pcs * 100) + '%) — ระบุจำนวนแหล่งที่มาในข้อ 4' : '';
+                });
+                document.getElementById('hfa-src-req').classList.toggle('hidden', !r.other);
+                const mt = d.mis.reduce(function(s, m) { return s + (parseInt(m.a, 10) || 0) + (parseInt(m.b, 10) || 0) + (parseInt(m.c, 10) || 0); }, 0);
+                document.getElementById('hfa-mis-total').textContent = mt ? 'รวม MIS ' + mt.toLocaleString() + ' ชิ้น' : '';
+                const col = _hfaColor(r.color);
+                const pill = document.getElementById('hfa-sum-color');
+                pill.textContent = col.k + ' ' + col.l; pill.style.background = col.hex; pill.className = 'px-3 py-0.5 rounded-full font-bold text-white';
+                document.getElementById('hfa-sticky').style.borderColor = col.hex;
+                set('hfa-sum-score', r.total); set('hfa-sum-areas', d.areas.length); set('hfa-sum-sqm', r.sqm.toLocaleString()); set('hfa-sum-pieces', r.pieces.toLocaleString());
+                set('hfa-sum-labor', col.people ? col.people + ' คน × ' + col.days + ' วัน' : 'ไม่ต้องเพิ่มคน'); set('hfa-sum-cost', col.cost.toLocaleString());
+                // criteria table: value, cut points, score
+                const fmtV = function(c, v) { return (typeof v === 'number' ? v.toLocaleString() : v) + ' ' + c.unit; };
+                let h = '<tr class="bg-gray-50"><th class="p-1.5 border text-left">เกณฑ์</th><th class="p-1.5 border text-right">ค่าที่วัดได้</th><th class="p-1.5 border text-center">1 คะแนน</th><th class="p-1.5 border text-center">2 คะแนน</th><th class="p-1.5 border text-center">3 คะแนน</th><th class="p-1.5 border text-center">คะแนน</th></tr>';
+                C.criteria.forEach(function(c) {
+                    const s = r.scores[c.k];
+                    h += '<tr><td class="p-1.5 border"><b>' + c.k + '</b> ' + hfaEsc(c.l) + '<div class="text-[10px] text-gray-500">' + hfaEsc(c.hint) + '</div>' +
+                        (c.k === 'K5' && r.factors.length ? '<div class="text-[10px] text-orange-700">' + hfaEsc(r.factors.join(' · ')) + '</div>' : '') +
+                        (c.k === 'K6' ? '<div class="text-[10px] text-orange-700">' + hfaEsc(r.profile.factors.join(' · ') || 'ไม่เข้าเงื่อนไข') + '</div>' + (r.profile.missing.length ? '<div class="text-[10px] text-gray-400">ไม่มีข้อมูล: ' + hfaEsc(r.profile.missing.join(', ')) + '</div>' : '') : '') + '</td>' +
+                        '<td class="p-1.5 border text-right font-semibold whitespace-nowrap">' + fmtV(c, r.vals[c.k]) + '</td>' +
+                        c.cuts.map(function(cut, i) { return '<td class="p-1.5 border text-center whitespace-nowrap ' + (s > i ? 'bg-violet-100 font-bold' : 'text-gray-400') + '">≥ ' + cut.toLocaleString() + '</td>'; }).join('') +
+                        '<td class="p-1.5 border text-center font-bold text-lg">' + s + '</td></tr>';
+                });
+                h += '<tr class="bg-violet-50 font-bold"><td class="p-1.5 border" colspan="5">รวม (0–18) → ' + hfaBandText() + '</td><td class="p-1.5 border text-center text-lg">' + r.total + '</td></tr>';
+                document.getElementById('hfa-criteria').innerHTML = h;
+                // result vs the VP's own rating from the asset register
+                const st = _hfaCurStore();
+                const vpK = st ? hfaVpColor(st[8]) : '';
+                const idx = function(k) { return C.colors.findIndex(function(c) { return c.k === k; }); };
+                let res = '<div class="flex flex-wrap items-center gap-2 text-sm"><span>ผลจากเกณฑ์:</span>' + hfaPill(r.color) +
+                    '<span class="text-gray-600">แรงงาน <b>' + (col.people ? col.people + ' คน × ' + col.days + ' วัน' : 'ไม่ต้องเพิ่มคน') + '</b> · ประมาณการ <b>' + col.cost.toLocaleString() + ' ฿</b></span></div>';
+                if (r.override) res += '<p class="text-xs text-red-700 font-semibold mt-1">⚠️ ปรับเป็นแดงอัตโนมัติ: พื้นที่ ≥ ' + C.redOverride.sqm.toLocaleString() + ' ตร.ม. หรือ ≥ ' + C.redOverride.pieces.toLocaleString() + ' ชิ้น</p>';
+                if (vpK) {
+                    const gap = idx(r.color) - idx(vpK);
+                    res += '<div class="flex flex-wrap items-center gap-2 text-sm mt-1"><span>VP ประเมินเดิม (' + st[8] + ' คน):</span>' + hfaPill(vpK) +
+                        (gap > 0 ? '<span class="text-xs font-bold text-red-700">▲ เกณฑ์ประเมินยากกว่า VP ' + gap + ' ระดับ</span>' : gap < 0 ? '<span class="text-xs font-bold text-blue-700">▼ เกณฑ์ประเมินง่ายกว่า VP ' + (-gap) + ' ระดับ</span>' : '<span class="text-xs font-bold text-green-700">✔ ตรงกับ VP</span>') + '</div>';
+                }
+                document.getElementById('hfa-result').innerHTML = res;
+                const pc = document.getElementById('hfa-p-color').value;
+                document.getElementById('hfa-p-req').classList.toggle('hidden', !pc || pc === r.color);
+                return r;
+            }
+
+            function _hfaFmtM(n) { return n ? (n / 1e6).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' ลบ.' : '-'; }
+            // s[19] = current store-DB code(s) when the asset register still uses an old one (e.g. 15076 สนามบินน้ำ = 17007) — searchable
+            function _hfaStoreLabel(s) { return s[0] + ' ' + [s[3], s[2]].filter(Boolean).join(' / ') + ' · ' + s[4] + (s[19] ? ' (รหัสปัจจุบัน ' + s[19].split(' ')[0] + ')' : ''); }
+            function _applyHyperFaStore(s) {
+                const form = document.getElementById('hyper-fa-form');
+                form.branchCode.value = s[0]; form.branchName.value = s[3] || s[2]; form.storeFormat.value = s[4] || ''; form.region.value = s[7] || '';
+                form.dmArea.value = s[6] || ''; form.ammMtn.value = ''; form.cmArea.value = '';
+                const vpK = hfaVpColor(s[8]);
+                const ref = document.getElementById('hyper-fa-store-ref');
+                ref.innerHTML = '<div class="text-xs bg-gray-50 border rounded-lg p-2 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1">' +
+                    '<div><span class="text-gray-500">รูปแบบ</span> <b>' + hfaEsc(s[4]) + '</b></div><div><span class="text-gray-500">VP</span> <b>' + hfaEsc(s[5] || '-') + '</b></div>' +
+                    '<div class="col-span-2"><span class="text-gray-500">SGM/DM</span> ' + hfaEsc(s[6] || '-') + '</div>' +
+                    '<div><span class="text-gray-500">ทะเบียน Cost</span> <b>' + _hfaFmtM(s[10]) + '</b></div><div><span class="text-gray-500">NBV</span> <b>' + _hfaFmtM(s[11]) + '</b></div>' +
+                    '<div><span class="text-gray-500">NBV&lt;1 (Cost)</span> <b>' + _hfaFmtM(s[12]) + '</b></div>' +
+                    '<div><span class="text-gray-500">VP ประเมิน</span> ' + (vpK ? hfaPill(vpK, ' · ' + s[8] + ' คน') : '<span class="text-gray-400">ยังไม่ระบุ</span>') + '</div>' +
+                    '<div><span class="text-gray-500">ขนาด</span> <b>' + hfaEsc(s[14] || '-') + '</b></div><div><span class="text-gray-500">เปิด</span> <b>' + hfaEsc(s[15] || '-') + '</b>' + (hfaProfile(s).age !== '' ? ' (' + hfaProfile(s).age + ' ปี)' : '') + '</div>' +
+                    '<div><span class="text-gray-500">ชั้น/อาคาร</span> <b>' + (s[16] !== '' && s[16] != null ? s[16] + ' / ' + s[17] : '-') + '</b></div><div><span class="text-gray-500">กรรมสิทธิ์</span> ' + hfaEsc(s[18] || '-') + '</div></div>';
+                ref.classList.remove('hidden');
+                document.getElementById('hyper-fa-rest-form').classList.remove('hidden');
+                if (!document.querySelector('#hfa-areas [data-area]')) hfaAddArea();
+                hfaRecalc();
+                if (typeof sdsCheck === 'function') sdsCheck('hyperFa');
+            }
+            function _clearHyperFaStore() {
+                const form = document.getElementById('hyper-fa-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('hyper-fa-store-ref').classList.add('hidden');
+                document.getElementById('hyper-fa-rest-form').classList.add('hidden');
+            }
+            function handleHyperFaStationInput(input) {
+                const val = input.value.toLowerCase().trim();
+                const dd = document.getElementById('hyper-fa-station-dropdown');
+                if (val.length < 1) { dd.classList.add('hidden'); dd.innerHTML = ''; _clearHyperFaStore(); return; }
+                const matches = HYPER_FA_STORES.filter(function(s) { return (_hfaStoreLabel(s) + ' ' + s[1] + ' ' + (s[19] || '')).toLowerCase().indexOf(val) !== -1; });
+                renderStationDropdown('hyper-fa-station-dropdown', matches.map(_hfaStoreLabel), function(sel) {
+                    input.value = sel;
+                    const s = HYPER_FA_STORES.find(function(x) { return _hfaStoreLabel(x) === sel; });
+                    if (s) _applyHyperFaStore(s);
+                });
+                const exact = HYPER_FA_STORES.find(function(s) { return _hfaStoreLabel(s).toLowerCase() === val || s[0] === val || s[1] === val || (s[19] || '').split(' ').indexOf(val) > -1; });
+                if (exact) _applyHyperFaStore(exact); else _clearHyperFaStore();
+            }
+            document.addEventListener('click', function(e) { const d = document.getElementById('hyper-fa-station-dropdown'); if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden'); });
+
+            function _hyperFaFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+            function _clearHyperFaCards() {
+                document.querySelectorAll('#hfa-areas [data-area]').forEach(function(r) { delete _accumulatedFiles['hfa_area_' + r.dataset.area]; r.remove(); });
+                HFA.seq = 0;
+            }
+            function _applyHyperFaStoreLevel(d) {
+                const set = function(id, v) { document.getElementById(id).value = v == null ? '' : v; };
+                const f = d.floor || {}, s = d.sup || {}, p = d.pipe || {}, pr = d.propose || {};
+                set('hfa-f-tag', f.tag); set('hfa-f-a2', f.a2); set('hfa-f-staff', f.staff); set('hfa-f-nt', f.nt);
+                set('hfa-s-names', s.names); set('hfa-s-notified', s.notified); set('hfa-p-items', p.items);
+                set('hfa-p-color', pr.color); set('hfa-p-reason', pr.reason);
+                const sr = d.src || {};
+                set('hfa-src-n', sr.n); set('hfa-src-names', sr.names);
+                document.querySelectorAll('#hfa-mis [data-mis-row]').forEach(function(row, i) {
+                    const m = (d.mis || [])[i] || {};
+                    row.querySelectorAll('[data-mis]').forEach(function(el) { const v = m[el.dataset.mis]; el.value = v == null || v === 0 ? '' : v; });
+                });
+            }
+            // Draft object shared by the on-device draft and the server draft (SurveyDraftStore.gs)
+            function _buildHyperFaDraft() {
+                const form = document.getElementById('hyper-fa-form');
+                return Object.assign({ savedAt: new Date().toISOString(), search: document.getElementById('hyper-fa-station-search').value, fields: _hyperFaFields(form) }, collectHyperFa());
+            }
+            function saveHyperFaDraft() {
+                const form = document.getElementById('hyper-fa-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                try {
+                    localStorage.setItem(HYPER_FA_DRAFT_KEY, JSON.stringify(_buildHyperFaDraft()));
+                    if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (Fixed Asset)');
+                } catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('hyperFa', null);
+            }
+            function _readHyperFaDraft() { try { return JSON.parse(localStorage.getItem(HYPER_FA_DRAFT_KEY) || 'null'); } catch (e) { return null; } }
+            function checkHyperFaDraft() {
+                const d = _readHyperFaDraft(), b = document.getElementById('hyper-fa-draft-banner');
+                if (!d || !d.fields) { b.classList.add('hidden'); return; }
+                document.getElementById('hyper-fa-draft-info').textContent = (d.fields.branchCode || '') + ' ' + (d.fields.branchName || '') + ' · ' + new Date(d.savedAt).toLocaleString('en-GB');
+                b.classList.remove('hidden');
+            }
+            function restoreHyperFaDraft(fromServer) {
+                const d = fromServer || _readHyperFaDraft();
+                if (!d) return;
+                const form = document.getElementById('hyper-fa-form');
+                const s = HYPER_FA_STORES.find(function(x) { return x[0] === (d.fields || {}).branchCode; });
+                _clearHyperFaCards();
+                if (s) { document.getElementById('hyper-fa-station-search').value = d.search || _hfaStoreLabel(s); _applyHyperFaStore(s); }
+                _clearHyperFaCards();   // _applyHyperFaStore seeds a starter card — replace it with the draft's
+                Object.keys(d.fields || {}).forEach(function(n) {
+                    const el = form.elements[n];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList) Array.from(el).forEach(function(r) { r.checked = r.value === d.fields[n]; });
+                    else el.value = d.fields[n];
+                });
+                document.getElementById('hfa-broken-section').classList.toggle('hidden', (d.fields || {}).hasBroken !== 'Yes');
+                _applyHyperFaStoreLevel(d);
+                (d.areas || []).forEach(function(a) { hfaAddArea(a); });
+                hfaRecalc();
+                document.getElementById('hyper-fa-draft-banner').classList.add('hidden');
+            }
+            function discardHyperFaDraft() { if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return; try { localStorage.removeItem(HYPER_FA_DRAFT_KEY); } catch (e) {} checkHyperFaDraft(); }
+            function resetHyperFaForm(ask) {
+                if (ask && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('hyperFa');
+                const form = document.getElementById('hyper-fa-form');
+                const rn = form.reporterName.value, rp = form.reporterPhone.value;
+                form.reset(); form.reporterName.value = rn; form.reporterPhone.value = rp;
+                document.querySelectorAll('#content-hyper-fa-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                delete _accumulatedFiles['hfa_paper'];
+                _clearHyperFaCards();
+                _applyHyperFaStoreLevel({});
+                document.getElementById('hyper-fa-station-search').value = '';
+                document.getElementById('hfa-broken-section').classList.add('hidden');
+                _clearHyperFaStore();
+            }
+
+            function _hfaFlash(el, msg) {
+                alert(msg);
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-2', 'ring-red-400'); setTimeout(function() { el.classList.remove('ring-2', 'ring-red-400'); }, 2000);
+            }
+            async function handleHyperFaSurveySubmit(e) {
+                e.preventDefault();
+                const form = e.target;
+                if (!form.reporterName.value.trim()) { alert('กรุณากรอกชื่อผู้สำรวจ'); form.reporterName.focus(); return; }
+                if (!form.reporterPhone.value.trim()) { alert('กรุณากรอกเบอร์โทรศัพท์'); form.reporterPhone.focus(); return; }
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน'); return; }
+                const d = collectHyperFa(), needPhoto = _equipmentPhotoRequired.hyperFa;
+                const hasPhoto = function(k) { return (_accumulatedFiles[k] || []).filter(Boolean).length > 0; };
+                const C = HYPER_FA_CONFIG;
+                for (const el of document.querySelectorAll('#hfa-areas [data-area]')) {
+                    const a = _hfaArea(el), pcs = C.classes.reduce(function(s, c) { return s + a.cnt[c.k]; }, 0);
+                    const msg = !a.name.trim() ? 'ยังไม่ได้ระบุชื่อพื้นที่' : !a.type ? 'ยังไม่ได้เลือกประเภทพื้นที่'
+                        : !(parseFloat(a.sqm) > 0) && !(parseInt(a.bays, 10) > 0) ? 'ยังไม่ได้กรอกขนาดพื้นที่ (ตร.ม. หรือจำนวนช่องจอด)'
+                        : !a.fill ? 'ยังไม่ได้เลือกระดับของเต็มพื้นที่' : !a.height ? 'ยังไม่ได้เลือกความสูงกอง'
+                        : !pcs ? 'ยังไม่ได้กรอกจำนวนชิ้นโดยประมาณ' : !a.tag ? 'ยังไม่ได้เลือกสัดส่วนของที่มี Tag' : !a.access ? 'ยังไม่ได้เลือกการเข้าถึง'
+                        : needPhoto && !hasPhoto(a.pk) ? 'ยังไม่ได้แนบรูปถ่าย' : '';
+                    if (msg) { _hfaFlash(el, 'พื้นที่ ' + a.aid + ': ' + msg); return; }
+                }
+                const misBad = d.mis.findIndex(function(m) { return (parseInt(m.oth, 10) || 0) > (parseInt(m.a, 10) || 0) + (parseInt(m.b, 10) || 0) + (parseInt(m.c, 10) || 0); });
+                if (misBad > -1) { _hfaFlash(document.querySelector('#hfa-mis [data-mis-row="' + misBad + '"]'), 'ข้อ 3 MIS: ' + C.misTypes[misBad] + ' — จำนวน "จากที่อื่น" ต้องไม่เกิน A + B + C'); return; }
+                const otherPcs = d.areas.reduce(function(s, a) { return s + C.classes.reduce(function(t, c) { return t + (c.other ? a.cnt[c.k] : 0); }, 0); }, 0);
+                if (otherPcs && !(parseInt(d.src.n, 10) > 0)) { _hfaFlash(document.getElementById('hfa-src-n').closest('.border'), 'ข้อ 4: มีของกลุ่ม .2 / .3 ' + otherPcs + ' ชิ้น — กรุณาระบุจำนวนแหล่งที่มาอื่น (ที่)'); return; }
+                if (!d.floor.tag) { _hfaFlash(document.getElementById('hfa-f-tag').closest('.bg-white'), 'ข้อ 4: กรุณาเลือกสัดส่วนทรัพย์สินในพื้นที่ขายที่มี Tag'); return; }
+                if (!d.areas.length && !confirm('ยังไม่มีพื้นที่เก็บทรัพย์สินเลย — ยืนยันว่าสาขานี้ "ไม่มีพื้นที่เก็บ Fixed Asset นอกพื้นที่ขาย" (ระดับสีเขียว) ใช่หรือไม่?')) return;
+                const r = hfaRecalc();
+                if (d.propose.color && d.propose.color !== r.color && !d.propose.reason.trim()) { _hfaFlash(document.getElementById('hfa-p-reason'), 'กรุณาระบุเหตุผลที่เสนอสีต่างจากผลคำนวณ'); return; }
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุจุดอันตราย'); form.brokenDetail.focus(); return; }
+                if (!hasPhoto('hfa_paper')) { _hfaFlash(document.getElementById('hfa-paper-box'), 'ข้อ 8: กรุณาแนบรูปแบบฟอร์มกระดาษที่กรอกแล้ว (หลักฐาน)'); return; }
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    const tasks = [], seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('HFA', form.branchCode.value, tasks, function() { return [1024, 1024, 0.65]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+                    const data = _hyperFaFields(form);
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('hyperFa');
+                    data.assetJson = JSON.stringify(d);
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) { showSuccess(); sdsReset('hyperFa'); try { localStorage.removeItem(HYPER_FA_DRAFT_KEY); } catch (e2) {} checkHyperFaDraft(); resetHyperFaForm(false); }
+                            else alert('Error: ' + (res && res.error));
+                        })
+                        .withFailureHandler(function(err) { hideLoading(); alert('Server Error: ' + err.message); })
+                        .processHyperFaSurveyForm(data);
+                } catch (err) { hideLoading(); alert('Error processing form: ' + err.message); }
+            }
+        </script>

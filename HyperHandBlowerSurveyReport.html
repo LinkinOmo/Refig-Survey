@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyper Hand Blower Survey Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel { background: rgba(255,255,255,.95); border: 1px solid rgba(226,232,240,.8); box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #0891b2; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: .75rem; font-weight: 600; color: #64748b; min-width: 120px; }
+        .detail-value { font-size: .85rem; color: #1e293b; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap justify-between gap-2 py-3">
+            <div class="flex items-center gap-4">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-slate-500 p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-cyan-600 rounded-full"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">🌬️ รายงานเครื่องเป่ามือ Hyper</h1>
+                    <p class="text-xs text-slate-500 font-medium">Hand Blower · Status · Condition · RCD Safety · Repair / Replace Plan</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="loader" id="mainLoader"></div>
+                <a href="<?= MANUALS_URL ?>?page=hb-manual" target="_blank" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">📖 คู่มือ</a>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-status" target="_blank" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100">🧭 สถานะ</a>
+                <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                <button onclick="downloadToExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
+                <button onclick="window.location.reload()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-500"><p class="text-xs font-semibold text-slate-500 mb-1">สาขาที่สำรวจแล้ว</p><h3 class="text-3xl font-bold"><span id="stStores">0</span><span class="text-base text-slate-400"> / <span id="stTotal">0</span></span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-cyan-500"><p class="text-xs font-semibold text-slate-500 mb-1">เครื่องที่ติดตั้ง · ใช้งานได้ปกติ</p><h3 class="text-3xl font-bold text-cyan-700"><span id="stUnits">0</span><span class="text-base text-slate-400"> · <span id="stOk">0</span></span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500"><p class="text-xs font-semibold text-slate-500 mb-1">เสีย · มีปัญหา</p><h3 class="text-3xl font-bold text-red-600"><span id="stBroken">0</span><span class="text-base text-amber-600"> · <span id="stProb">0</span></span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-400"><p class="text-xs font-semibold text-slate-500 mb-1">จุดที่ควรติดตั้งเพิ่ม</p><h3 class="text-3xl font-bold text-slate-700" id="stMissing">0</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-orange-500"><p class="text-xs font-semibold text-slate-500 mb-1">⚡ ไม่มี RCD (เครื่อง)</p><h3 class="text-3xl font-bold text-orange-600" id="stNoRcd">0</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-indigo-500"><p class="text-xs font-semibold text-slate-500 mb-1">งบประมาณประมาณการ</p><h3 class="text-2xl font-bold text-indigo-700"><span id="stBudget">0</span> <span class="text-sm">฿</span></h3><p class="text-[11px] text-slate-400">เปลี่ยน <b id="stReplace">0</b> · ซ่อม <b id="stRepair">0</b> · ติดตั้งใหม่ <b id="stNew">0</b></p></div>
+        </div>
+        <p class="text-xs text-slate-400 -mt-3">นับจากรายการล่าสุดของแต่ละสาขา</p>
+
+        <div class="glass-panel p-4 rounded-xl grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="text" id="searchInput" placeholder="ค้นหา รหัสสาขา / ชื่อสาขา / ผู้แจ้ง..." class="md:col-span-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="applyFilters()">
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="latestOnly" checked onchange="applyFilters()"> ล่าสุด/สาขา</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="brokenOnly" onchange="applyFilters()"> มีเครื่องเสีย</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="rcdOnly" onchange="applyFilters()"> ไม่มี RCD</label>
+        </div>
+
+        <div class="glass-panel rounded-xl overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">สาขา</th>
+                        <th class="px-4 py-3 text-right">เครื่อง · Jet · ลมร้อน</th>
+                        <th class="px-4 py-3 text-right">ปกติ · มีปัญหา · เสีย</th>
+                        <th class="px-4 py-3 text-right">ไม่มีเครื่อง</th>
+                        <th class="px-4 py-3 text-right">สภาพ · ความสะอาด</th>
+                        <th class="px-4 py-3 text-right">อายุเฉลี่ย · kW</th>
+                        <th class="px-4 py-3 text-right">ไม่มี RCD</th>
+                        <th class="px-4 py-3 text-right">ซ่อม · เปลี่ยน · ใหม่</th>
+                        <th class="px-4 py-3 text-right">งบประมาณ ฿</th>
+                        <th class="px-4 py-3 text-left">ผู้แจ้ง / วันที่</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <div id="emptyState" class="hidden text-center py-12 text-slate-400">ไม่พบข้อมูล</div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div class="bg-white w-full md:max-w-4xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดการสำรวจเครื่องเป่ามือ</h3><button onclick="closeModal()" class="text-slate-400 text-xl">✕</button></div>
+            <div class="p-5 overflow-y-auto" id="modalBody"></div>
+            <div class="px-5 py-3 border-t flex justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ</button>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm border border-slate-300 rounded-lg">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="hidden px-4 py-2 text-sm font-bold text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">บันทึกหมายเหตุ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const HYPER_STORE_TOTAL = <?!= HYPER_REF_STORES.length ?>;
+        let HC = null, allData = [], filtered = [], currentRecord = null, currentId = null;
+        let isAdmin = false, smfCanEdit = false, opsCanEdit = false, _userEmail = '';
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fmt(n) { return Math.round(num(n)).toLocaleString(); }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? '-' : d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }); }
+        function latestPerBranch(rows) { const seen = new Set(); return rows.filter(function(r) { const k = String(r['Branch Code']); if (seen.has(k)) return false; seen.add(k); return true; }); }
+        function sc(v) { return v === '' || v == null ? '-' : v; }
+        function typeLabel(k) { const t = ((HC || {}).types || []).find(function(x) { return x.k === k; }); return t ? t.l : (k || '-'); }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            loadData();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) {
+                if (!f) return;
+                isAdmin = !!(f.isAdmin || f.isScheduleAdmin); smfCanEdit = !!f.smfEditAllowed; opsCanEdit = !!f.opsEditAllowed;
+                document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+            }).getUserFlags(_userEmail);
+        });
+        let _attempt = 0;
+        function loadData() {
+            const my = ++_attempt;
+            google.script.run.withSuccessHandler(function(res) {
+                if (my !== _attempt) return;
+                if (!res) { if (my < 3) setTimeout(loadData, 1500); return; }
+                document.getElementById('mainLoader').classList.add('hidden');
+                if (!res.success) { loadError(res.error); return; }
+                HC = res.hbConfig; allData = res.data || [];
+                renderStats(); applyFilters();
+            }).withFailureHandler(function(err) { document.getElementById('mainLoader').classList.add('hidden'); loadError(err && err.message); }).getHyperHbSurveyList(window.ARCHIVE_ON);
+        }
+        // Inline, not alert(): a load failure must not block the page behind a modal dialog
+        function loadError(msg) {
+            console.error('Hand blower report load failed:', msg);
+            const el = document.getElementById('emptyState');
+            el.innerHTML = '<span class="text-red-600">โหลดข้อมูลไม่สำเร็จ: ' + esc(msg || 'unknown error') + '</span>';
+            el.classList.remove('hidden');
+        }
+        function renderStats() {
+            const l = latestPerBranch(allData);
+            const sum = function(k) { return l.reduce(function(s, r) { return s + num(r[k]); }, 0); };
+            const set = function(id, v) { document.getElementById(id).textContent = v; };
+            set('stStores', l.length); set('stTotal', HYPER_STORE_TOTAL);
+            set('stUnits', sum('Units Installed')); set('stOk', sum('Working')); set('stBroken', sum('Broken')); set('stProb', sum('With Problem'));
+            set('stMissing', sum('Missing Points')); set('stNoRcd', sum('No RCD')); set('stBudget', fmt(sum('Est. Budget (THB)')));
+            set('stReplace', sum('Need Replace')); set('stRepair', sum('Need Repair')); set('stNew', sum('Install New'));
+        }
+        function applyFilters() {
+            const q = document.getElementById('searchInput').value.toLowerCase().trim();
+            const base = document.getElementById('latestOnly').checked ? latestPerBranch(allData) : allData;
+            const br = document.getElementById('brokenOnly').checked, rc = document.getElementById('rcdOnly').checked;
+            filtered = base.filter(function(r) {
+                if (br && !num(r['Broken'])) return false;
+                if (rc && !num(r['No RCD'])) return false;
+                return !q || [r['Branch Code'], r['Branch Name'], r['Reporter Name']].join(' ').toLowerCase().indexOf(q) > -1;
+            });
+            document.getElementById('recordCount').textContent = filtered.length + ' รายการ';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+            document.getElementById('tableBody').innerHTML = filtered.map(function(r) {
+                return '<tr class="hover:bg-cyan-50 cursor-pointer" data-id="' + esc(r['ID']) + '">' +
+                    '<td class="px-4 py-3"><b>' + esc(r['Branch Code']) + '</b> ' + (r['Has Broken'] === 'Yes' ? '<span class="text-xs text-red-600">⚠️ อันตราย</span>' : '') + '<div class="text-xs text-slate-500">' + esc(r['Branch Name']) + '</div></td>' +
+                    '<td class="px-4 py-3 text-right">' + num(r['Units Installed']) + ' · ' + num(r['Jet Type']) + ' · ' + num(r['Warm Air Type']) + '</td>' +
+                    '<td class="px-4 py-3 text-right"><span class="text-green-700">' + num(r['Working']) + '</span> · <span class="text-amber-600">' + num(r['With Problem']) + '</span> · <b class="' + (num(r['Broken']) ? 'text-red-600' : '') + '">' + num(r['Broken']) + '</b></td>' +
+                    '<td class="px-4 py-3 text-right">' + num(r['Missing Points']) + '</td>' +
+                    '<td class="px-4 py-3 text-right">' + sc(r['Avg Condition (0-5)']) + ' · ' + sc(r['Avg Hygiene (0-5)']) + '</td>' +
+                    '<td class="px-4 py-3 text-right">' + sc(r['Avg Age (yrs)']) + ' ปี · ' + sc(r['Installed kW']) + '</td>' +
+                    '<td class="px-4 py-3 text-right ' + (num(r['No RCD']) ? 'text-orange-600 font-bold' : '') + '">' + num(r['No RCD']) + '</td>' +
+                    '<td class="px-4 py-3 text-right">' + num(r['Need Repair']) + ' · ' + num(r['Need Replace']) + ' · ' + num(r['Install New']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono">' + fmt(r['Est. Budget (THB)']) + '</td>' +
+                    '<td class="px-4 py-3 text-xs">' + esc(r['Reporter Name']) + '<div class="text-slate-400">' + fdate(r['Timestamp']) + '</div></td></tr>';
+            }).join('');
+        }
+        document.getElementById('tableBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        function openModal(id) {
+            currentId = id; currentRecord = null;
+            document.getElementById('modalBody').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังโหลด...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            google.script.run.withSuccessHandler(function(res) {
+                if (id !== currentId) return;
+                if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(res && res.error) + '</p>'; return; }
+                currentRecord = res.data; HC = res.hbConfig || HC;
+                renderModal(res.data);
+            }).getHyperHbSurveyRecordById(id);
+        }
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); currentId = null; }
+        function canEdit() { return isAdmin || smfCanEdit || opsCanEdit || (currentRecord && _userEmail && String(currentRecord['Reporter Email']).toLowerCase() === _userEmail.toLowerCase()); }
+        function photos(list) { return (list || []).map(function(u) { return '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" class="w-20 h-20 object-cover rounded border"></a>'; }).join(''); }
+        function scoreCls(v) { return v === '' || v == null ? 'bg-slate-100 text-slate-500' : v <= 1 ? 'bg-red-600 text-white' : v <= 2 ? 'bg-red-100 text-red-700' : v <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'; }
+        const STATUS_CLS = ['bg-green-100 text-green-800', 'bg-amber-100 text-amber-800', 'bg-red-600 text-white', 'bg-slate-200 text-slate-700'];
+
+        function renderModal(r) {
+            const d = r['HandBlower_JSON'] || {}, att = r['Attachments_JSON'] || {}, S = HC.status;
+            let h = '<div class="detail-row"><span class="detail-label">สาขา</span><span class="detail-value">' + esc(r['Branch Code']) + ' - ' + esc(r['Branch Name']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ผู้แจ้ง / วันที่</span><span class="detail-value">' + esc(r['Reporter Name']) + ' · ' + fdate(r['Timestamp']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">สรุป</span><span class="detail-value">ติดตั้ง ' + num(r['Units Installed']) + ' เครื่อง (Jet ' + num(r['Jet Type']) + ' · ลมร้อน ' + num(r['Warm Air Type']) + ' · ' + sc(r['Installed kW']) + ' kW) · ปกติ ' + num(r['Working']) +
+                ' · มีปัญหา ' + num(r['With Problem']) + ' · <b class="text-red-600">เสีย ' + num(r['Broken']) + '</b> · ไม่มีเครื่อง ' + num(r['Missing Points']) + ' จุด · ไม่มี RCD ' + num(r['No RCD']) + ' · งบประมาณประมาณการ <b>' + fmt(r['Est. Budget (THB)']) + ' ฿</b></span></div>';
+            (d.units || []).forEach(function(u) {
+                const si = S.indexOf(u.status), miss = si === 3;
+                const brand = u.brand === 'อื่นๆ' ? (u.brandOther || 'อื่นๆ') : u.brand;
+                h += '<div class="border ' + (si === 2 || u.rcd === HC.rcd[1] ? 'border-red-300' : 'border-cyan-200') + ' rounded-lg p-3 mt-4">' +
+                    '<div class="flex flex-wrap justify-between gap-2"><b>🌬️ ' + esc(r['Branch Code'] + '-' + u.uid + ' · ' + (u.place || '-')) + '</b><span class="text-xs px-2 py-0.5 rounded-full font-bold ' + (STATUS_CLS[si] || 'bg-slate-100') + '">' + esc(u.status || '-') + '</span></div>' +
+                    '<p class="text-xs text-slate-500 mt-1">' + esc([u.loc, u.room, u.floor ? 'ชั้น ' + u.floor : ''].filter(Boolean).join(' · ')) + '</p>' +
+                    (miss ? '' : '<p class="text-xs mt-1">' + esc([brand, u.model, typeLabel(u.type), u.watt ? u.watt + ' W' : '', u.year ? 'ปี ' + u.year + ' (' + (u.calc || {}).age + ' ปี)' : '', u.asset ? 'Asset ' + u.asset : ''].filter(Boolean).join(' · ')) + '</p>' +
+                        '<div class="mt-1 text-xs"><span class="text-slate-500">สภาพ</span> <span class="px-1.5 rounded font-bold ' + scoreCls(u.cond) + '">' + sc(u.cond) + '</span> <span class="text-slate-500 ml-2">ความสะอาด</span> <span class="px-1.5 rounded font-bold ' + scoreCls(u.clean) + '">' + sc(u.clean) + '</span></div>' +
+                        ((u.prob || []).length || u.probOther ? '<p class="text-xs mt-1"><b class="text-red-600">อาการ:</b> ' + esc((u.prob || []).join(', ') + (u.probOther ? ' — ' + u.probOther : '')) + '</p>' : '')) +
+                    '<p class="text-xs mt-1"><b>RCD:</b> <span class="' + (u.rcd === HC.rcd[1] ? 'text-red-600 font-bold' : '') + '">' + esc(u.rcd || '-') + '</span> · <b class="text-cyan-700">ดำเนินการ:</b> ' + esc(u.action || '-') +
+                        ' · <span class="' + (u.prio === HC.priority[0] ? 'text-orange-600 font-bold' : '') + '">' + esc(u.prio || '-') + '</span>' + (u.budget ? ' · ' + fmt(u.budget) + ' ฿' : '') + '</p>' +
+                    (u.nt ? '<p class="text-xs text-slate-600 mt-1">หมายเหตุ: ' + esc(u.nt) + '</p>' : '') +
+                    '<div class="flex flex-wrap gap-2 mt-2">' + photos(att[u.pk]) + '</div></div>';
+            });
+            const ed = canEdit() ? '' : ' disabled';
+            h += '<div class="mt-5 p-3 bg-red-50 border border-red-200 rounded-lg"><label class="flex items-center gap-2 text-xs font-bold text-red-700"><input type="checkbox" id="editHasBroken"' + (r['Has Broken'] === 'Yes' ? ' checked' : '') + ed + '> ⚠️ มีจุดอันตราย / ชำรุดเร่งด่วน</label>' +
+                '<textarea id="editBrokenDetail" rows="2" class="mt-2 w-full border border-red-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Broken Detail'] || '') + '</textarea></div>' +
+                '<div class="mt-3"><label class="text-xs font-semibold text-slate-500">สรุปข้อเสนอภาพรวมสาขา</label><textarea id="editComments" rows="3" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Comments'] || '') + '</textarea></div>' +
+                '<p class="text-[11px] text-slate-400 mt-2">แก้ไขข้อมูลเครื่อง: ส่งแบบสำรวจใหม่ (รายงานใช้รายการล่าสุดของสาขา)</p>';
+            document.getElementById('modalBody').innerHTML = h;
+            document.getElementById('saveBtn').classList.toggle('hidden', !canEdit());
+        }
+        function saveRecord() {
+            const form = { id: currentId, clientEmail: _userEmail, hasBroken: document.getElementById('editHasBroken').checked ? 'Yes' : 'No',
+                           brokenDetail: document.getElementById('editBrokenDetail').value, comments: document.getElementById('editComments').value };
+            if (form.hasBroken === 'Yes' && !form.brokenDetail.trim()) { alert('กรุณาระบุจุดที่ชำรุด'); return; }
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); }).updateHyperHbSurveyRecord(form);
+        }
+        function deleteRecord() {
+            if (!currentId || !confirm('ยืนยันการลบรายการนี้?')) return;
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); }).deleteHyperHbSurveyRecord(currentId, _userEmail);
+        }
+
+        function downloadToExcel(btn) {
+            if (!filtered.length) { alert('ไม่มีข้อมูล'); return; }
+            const cols = ['Timestamp', 'Branch Code', 'Branch Name', 'Reporter Name', 'Units Surveyed', 'Units Installed', 'Working', 'With Problem', 'Broken', 'Missing Points', 'Jet Type', 'Warm Air Type', 'Installed kW',
+                'Avg Age (yrs)', 'Avg Condition (0-5)', 'Avg Hygiene (0-5)', 'No RCD', 'Need PM', 'Need Repair', 'Need Replace', 'Install New', 'High Priority', 'Est. Budget (THB)', 'Has Broken', 'Broken Detail', 'Comments'];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cols].concat(filtered.map(function(r) { return cols.map(function(c) { return c === 'Timestamp' ? fdate(r[c]) : (r[c] == null ? '' : r[c]); }); }))), 'Stores');
+            const units = [['Branch Code', 'Branch Name', 'Survey ID', 'เครื่อง', 'ตำแหน่ง', 'โซน', 'ห้องน้ำ', 'ชั้น', 'สถานะ', 'ยี่ห้อ', 'รุ่น', 'ประเภท', 'W', 'ปีติดตั้ง', 'อายุ (ปี)', 'Asset No.',
+                'อาการ', 'สภาพ (0-5)', 'ความสะอาด (0-5)', 'RCD', 'ดำเนินการ', 'ความเร่งด่วน', 'งบประมาณ ฿', 'หมายเหตุ']];
+            let pending = filtered.length;
+            if (btn) { btn.disabled = true; btn.textContent = 'กำลังเตรียมข้อมูล...'; }
+            const finish = function() {
+                if (--pending > 0) return;
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(units), 'Units');
+                XLSX.writeFile(wb, 'hyper_hand_blower_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+                if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+            };
+            filtered.forEach(function(r) {
+                google.script.run.withSuccessHandler(function(res) {
+                    const d = res && res.success ? res.data['HandBlower_JSON'] || {} : {};
+                    (d.units || []).forEach(function(u) {
+                        units.push([r['Branch Code'], r['Branch Name'], r['ID'], u.uid, u.place, u.loc, u.room, u.floor, u.status, u.brand === 'อื่นๆ' ? u.brandOther : u.brand, u.model, u.type ? typeLabel(u.type) : '', u.watt || '', u.year || '', (u.calc || {}).age,
+                            u.asset, (u.prob || []).join(', ') + (u.probOther ? ' — ' + u.probOther : ''), u.cond, u.clean, u.rcd, u.action, u.prio, u.budget || '', u.nt]);
+                    });
+                    finish();
+                }).withFailureHandler(finish).getHyperHbSurveyRecordById(r['ID']);
+            });
+        }
+    </script>
+    <script>var HYPER_REVIEW_KIND = 'Hb';</script>
+    <?!= include('HyperReviewBar') ?>
+</body>
+</html>

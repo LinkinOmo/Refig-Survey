@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store Closing Checklist Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel { background: rgba(255,255,255,.95); border: 1px solid rgba(226,232,240,.8); box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #be123c; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: .75rem; font-weight: 600; color: #64748b; min-width: 120px; }
+        .detail-value { font-size: .85rem; color: #1e293b; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap justify-between gap-2 py-3">
+            <div class="flex items-center gap-4">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-slate-500 p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-rose-700 rounded-full"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">🏁 รายงานเช็คลิสต์ปิดสาขา</h1>
+                    <p class="text-xs text-slate-500 font-medium">Store Closing · Asset Disposition · Closing Tasks · Cost Roll-up</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <div class="loader" id="mainLoader"></div>
+                <a href="<?= MANUALS_URL ?>?page=sc-manual" target="_blank" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">📖 คู่มือ</a>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=store-close-checklist" target="_blank" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100">🖨️ แบบฟอร์ม</a>
+                <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                <button onclick="downloadToExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
+                <button onclick="window.location.reload()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-rose-600"><p class="text-xs font-semibold text-slate-500 mb-1">สาขาในแผนที่สำรวจแล้ว</p><h3 class="text-3xl font-bold"><span id="stSurveyed">0</span><span class="text-base text-slate-400"> / <span id="stPlan">0</span></span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-500"><p class="text-xs font-semibold text-slate-500 mb-1">ความคืบหน้าเฉลี่ย</p><h3 class="text-3xl font-bold"><span id="stProgress">0</span>%</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500"><p class="text-xs font-semibold text-slate-500 mb-1">งานเลยกำหนด</p><h3 class="text-3xl font-bold text-red-600" id="stOverdue">0</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-amber-500"><p class="text-xs font-semibold text-slate-500 mb-1">ทรัพย์สิน (ชิ้น) · รอตัดสินใจ</p><h3 class="text-2xl font-bold"><span id="stQty">0</span> · <span id="stPending" class="text-amber-600">0</span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-green-500"><p class="text-xs font-semibold text-slate-500 mb-1">มูลค่าซากรวม</p><h3 class="text-2xl font-bold text-green-700"><span id="stScrap">0</span> <span class="text-sm">฿</span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-indigo-500"><p class="text-xs font-semibold text-slate-500 mb-1">ค่าใช้จ่ายสุทธิรวม</p><h3 class="text-2xl font-bold text-indigo-700"><span id="stNet">0</span> <span class="text-sm">฿</span></h3></div>
+        </div>
+        <div class="glass-panel p-4 rounded-xl">
+            <p class="text-sm font-bold text-slate-700 mb-2">การตัดสินใจทรัพย์สิน (ชิ้น, สาขาที่สำรวจแล้ว)</p>
+            <div id="dispoBar" class="flex h-6 rounded overflow-hidden bg-slate-100"></div>
+            <div id="dispoLegend" class="flex flex-wrap gap-x-4 gap-y-1 text-xs mt-2"></div>
+        </div>
+
+        <div class="glass-panel p-4 rounded-xl grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="text" id="searchInput" placeholder="ค้นหา รหัสสาขา / ชื่อสาขา / ผู้แจ้ง..." class="md:col-span-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="applyFilters()">
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="showPlan" checked onchange="applyFilters()"> แสดงสาขาในแผนที่ยังไม่สำรวจ</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="overdueOnly" onchange="applyFilters()"> มีงานเลยกำหนด</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="pendingOnly" onchange="applyFilters()"> มีรายการรอตัดสินใจ</label>
+        </div>
+
+        <div class="glass-panel rounded-xl overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">สาขา</th>
+                        <th class="px-4 py-3 text-left">วันปิด · ส่งมอบพื้นที่</th>
+                        <th class="px-4 py-3 text-left">ความคืบหน้า</th>
+                        <th class="px-4 py-3 text-right">ทรัพย์สิน · รอตัดสินใจ</th>
+                        <th class="px-4 py-3 text-right">โอน · FWH · ขายซาก · ส่งมอบ</th>
+                        <th class="px-4 py-3 text-right">ค่าขนย้าย · รื้อถอน</th>
+                        <th class="px-4 py-3 text-right">Solar · EV</th>
+                        <th class="px-4 py-3 text-right">สุทธิ ฿</th>
+                        <th class="px-4 py-3 text-left">ผู้แจ้ง / วันที่</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <div id="emptyState" class="hidden text-center py-12 text-slate-400">ไม่พบข้อมูล</div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div class="bg-white w-full md:max-w-5xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดเช็คลิสต์ปิดสาขา</h3><button onclick="closeModal()" class="text-2xl text-slate-400 leading-none">&times;</button></div>
+            <div class="p-5 overflow-y-auto" id="modalBody"></div>
+            <div class="px-5 py-3 border-t flex justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ</button>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm border border-slate-300 rounded-lg">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="hidden px-4 py-2 text-sm font-bold text-white bg-rose-700 rounded-lg hover:bg-rose-800">บันทึกหมายเหตุ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let SC = null, allData = [], filtered = [], currentRecord = null, currentId = null;
+        let isAdmin = false, smfCanEdit = false, opsCanEdit = false, _userEmail = '';
+        const DISPO_CLS = { transfer: '#2563eb', fwh: '#7c3aed', scrap: '#16a34a', handover: '#0891b2', 'return': '#64748b', writeoff: '#dc2626', pending: '#f59e0b' };
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fmt(n) { return Math.round(num(n)).toLocaleString(); }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? '-' : d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }); }
+        function latestPerBranch(rows) { const seen = new Set(); return rows.filter(function(r) { const k = String(r['Branch Code']); if (seen.has(k)) return false; seen.add(k); return true; }); }
+        function dispoLabel(k) { const d = ((SC || {}).dispo || []).find(function(x) { return x.k === k; }); return d ? d.l : k; }
+        function bar(p) { return '<div class="flex items-center gap-2"><div class="w-24 h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full ' + (p >= 100 ? 'bg-green-600' : 'bg-rose-600') + '" style="width:' + p + '%"></div></div><b class="text-xs">' + p + '%</b></div>'; }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            loadData();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) {
+                if (!f) return;
+                isAdmin = !!(f.isAdmin || f.isScheduleAdmin); smfCanEdit = !!f.smfEditAllowed; opsCanEdit = !!f.opsEditAllowed;
+                document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+            }).getUserFlags(_userEmail);
+        });
+        let _attempt = 0;
+        function loadData() {
+            const my = ++_attempt;
+            google.script.run.withSuccessHandler(function(res) {
+                if (my !== _attempt) return;
+                if (!res) { if (my < 3) setTimeout(loadData, 1500); return; }
+                document.getElementById('mainLoader').classList.add('hidden');
+                if (!res.success) { loadError(res.error); return; }
+                SC = res.scConfig; allData = res.data || [];
+                renderStats(); applyFilters();
+            }).withFailureHandler(function(err) { document.getElementById('mainLoader').classList.add('hidden'); loadError(err && err.message); }).getStoreCloseList(window.ARCHIVE_ON);
+        }
+        // Inline, not alert(): a load failure must not block the page behind a modal dialog
+        function loadError(msg) {
+            const el = document.getElementById('emptyState');
+            el.innerHTML = '<span class="text-red-600">โหลดข้อมูลไม่สำเร็จ: ' + esc(msg || 'unknown error') + '</span>';
+            el.classList.remove('hidden');
+        }
+        function renderStats() {
+            const l = latestPerBranch(allData), planCodes = SC.plan.map(function(p) { return p[0]; });
+            const sum = function(k) { return l.reduce(function(s, r) { return s + num(r[k]); }, 0); };
+            const set = function(id, v) { document.getElementById(id).textContent = v; };
+            set('stPlan', planCodes.length); set('stSurveyed', l.filter(function(r) { return planCodes.indexOf(String(r['Branch Code'])) > -1; }).length);
+            set('stProgress', l.length ? Math.round(sum('Progress %') / l.length) : 0); set('stOverdue', sum('Overdue Tasks'));
+            set('stQty', fmt(sum('Asset Qty'))); set('stPending', sum('Pending Decisions')); set('stScrap', fmt(sum('Scrap Value (THB)'))); set('stNet', fmt(sum('Net Cost (THB)')));
+            const parts = SC.dispo.map(function(d) { return { d: d, q: sum('Qty ' + d.en) }; }).filter(function(x) { return x.q; }), tot = parts.reduce(function(s, x) { return s + x.q; }, 0);
+            document.getElementById('dispoBar').innerHTML = parts.map(function(x) { return '<div title="' + esc(x.d.l) + ' ' + x.q + '" style="width:' + (x.q / tot * 100) + '%;background:' + DISPO_CLS[x.d.k] + '"></div>'; }).join('');
+            document.getElementById('dispoLegend').innerHTML = parts.length ? parts.map(function(x) { return '<span><span class="inline-block w-3 h-3 rounded-sm align-middle mr-1" style="background:' + DISPO_CLS[x.d.k] + '"></span>' + esc(x.d.l.split(' (')[0]) + ' <b>' + x.q.toLocaleString() + '</b></span>'; }).join('') : '<span class="text-slate-400">ยังไม่มีข้อมูล</span>';
+        }
+        function applyFilters() {
+            const q = document.getElementById('searchInput').value.toLowerCase().trim();
+            const showPlan = document.getElementById('showPlan').checked, od = document.getElementById('overdueOnly').checked, pe = document.getElementById('pendingOnly').checked;
+            const latest = latestPerBranch(allData), byCode = {};
+            latest.forEach(function(r) { byCode[String(r['Branch Code'])] = r; });
+            // plan stores first (surveyed or not), then any other surveyed store
+            let rows = SC.plan.map(function(p) { return { p: p, r: byCode[p[0]] || null }; });
+            latest.forEach(function(r) { if (!SC.plan.some(function(p) { return p[0] === String(r['Branch Code']); })) rows.push({ p: null, r: r }); });
+            filtered = rows.filter(function(x) {
+                if (!x.r && (!showPlan || od || pe)) return false;
+                if (od && !num(x.r['Overdue Tasks'])) return false;
+                if (pe && !num(x.r['Pending Decisions'])) return false;
+                const txt = x.r ? [x.r['Branch Code'], x.r['Branch Name'], x.r['Reporter Name']].join(' ') : [x.p[0], x.p[3], x.p[4]].join(' ');
+                return !q || txt.toLowerCase().indexOf(q) > -1;
+            });
+            document.getElementById('recordCount').textContent = filtered.length + ' สาขา';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+            document.getElementById('tableBody').innerHTML = filtered.map(function(x) {
+                const r = x.r, p = x.p;
+                const name = '<b>' + esc(r ? r['Branch Code'] : p[0]) + '</b> ' + (p ? '<span class="text-xs text-rose-700">🏁</span>' : '') + (r && r['Has Broken'] === 'Yes' ? ' <span class="text-xs text-red-600">⚠️</span>' : '') +
+                    '<div class="text-xs text-slate-500">' + esc(r ? r['Branch Name'] : (p[4] + ' / ' + p[3])) + (p ? ' · ' + esc(p[2].trim()) : '') + '</div>';
+                if (!r) return '<tr class="bg-slate-50/60 text-slate-400"><td class="px-4 py-3">' + name + '</td><td class="px-4 py-3 text-xs">' + esc(p[10]) + '</td><td class="px-4 py-3 text-xs" colspan="6">ยังไม่สำรวจ' + (p[12] ? ' · นัด ' + esc(p[12]) + ' ' + esc(p[13]) : '') + '</td><td></td></tr>';
+                return '<tr class="hover:bg-rose-50 cursor-pointer" data-id="' + esc(r['ID']) + '">' +
+                    '<td class="px-4 py-3">' + name + '</td>' +
+                    '<td class="px-4 py-3 text-xs">' + esc(r['Close Date'] || 'ยังไม่กำหนด') + '<div class="text-slate-500">' + esc(r['Handover Condition'] || '-') + '</div></td>' +
+                    '<td class="px-4 py-3">' + bar(num(r['Progress %'])) + '<div class="text-xs text-slate-500">' + num(r['Tasks Done']) + '/' + num(r['Tasks Total']) + (num(r['Overdue Tasks']) ? ' · <b class="text-red-600">เลย ' + num(r['Overdue Tasks']) + '</b>' : '') + '</div></td>' +
+                    '<td class="px-4 py-3 text-right">' + fmt(r['Asset Qty']) + ' · <b class="' + (num(r['Pending Decisions']) ? 'text-amber-600' : '') + '">' + num(r['Pending Decisions']) + '</b></td>' +
+                    '<td class="px-4 py-3 text-right">' + fmt(r['Qty Transfer']) + ' · ' + fmt(r['Qty FWH']) + ' · ' + fmt(r['Qty Scrap']) + ' · ' + fmt(r['Qty Handover']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono text-xs">' + fmt(r['Moving Cost (THB)']) + '<br>' + fmt(r['Demolition Cost (THB)']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono text-xs">' + fmt(r['Solar Cost (THB)']) + '<br>' + fmt(r['EV Cost (THB)']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono font-bold">' + fmt(r['Net Cost (THB)']) + '</td>' +
+                    '<td class="px-4 py-3 text-xs">' + esc(r['Reporter Name']) + '<div class="text-slate-400">' + fdate(r['Timestamp']) + '</div></td></tr>';
+            }).join('');
+        }
+        document.getElementById('tableBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        function openModal(id) {
+            currentId = id; currentRecord = null;
+            document.getElementById('modalBody').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังโหลด...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            google.script.run.withSuccessHandler(function(res) {
+                if (id !== currentId) return;
+                if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(res && res.error) + '</p>'; return; }
+                currentRecord = res.data; SC = res.scConfig || SC;
+                renderModal(res.data);
+            }).getStoreCloseRecordById(id);
+        }
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); currentId = null; }
+        function canEdit() { return isAdmin || smfCanEdit || opsCanEdit || (currentRecord && _userEmail && String(currentRecord['Reporter Email']).toLowerCase() === _userEmail.toLowerCase()); }
+        function photos(list) { return (list || []).map(function(u) { return '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" class="w-16 h-16 object-cover rounded border"></a>'; }).join(''); }
+
+        function renderModal(r) {
+            const d = r['Close_JSON'] || {}, att = r['Attachments_JSON'] || {}, p = d.plan || {}, t = d.totals || { byDispo: {} }, c = d.cost || {};
+            const row = function(l, v) { return '<div class="detail-row"><span class="detail-label">' + l + '</span><span class="detail-value">' + v + '</span></div>'; };
+            let h = row('สาขา', esc(r['Branch Code']) + ' - ' + esc(r['Branch Name']) + (r['In Closure Plan'] === 'Yes' ? ' <span class="text-rose-700 text-xs font-bold">🏁 ในแผนปิด 2027</span>' : '')) +
+                row('ผู้สำรวจ / วันที่', esc(r['Reporter Name']) + ' · ' + fdate(r['Timestamp'])) +
+                row('แผนปิด', 'ปิด ' + esc(p.closeDate || 'ยังไม่กำหนด') + ' · ' + esc(p.handover || '-') + (p.after ? ' · หลังปิด: ' + esc(p.after) : '')) +
+                row('ผู้ร่วมเดิน', 'VP OPT ' + esc(p.vpOpt || '-') + (p.team ? ' · ' + esc(p.team) : '')) +
+                row('Solar / EV', esc(p.solar || '-') + ' · EV ' + esc(p.ev || '-'));
+            h += '<div class="mt-3">' + bar(num(t.progress)) + '</div>';
+            // assets
+            h += '<h4 class="font-bold mt-5 mb-1">ทรัพย์สิน (' + (d.assets || []).length + ' รายการ · ' + fmt(t.qty) + ' ชิ้น)</h4><div class="overflow-x-auto"><table class="min-w-full text-xs border-collapse"><tr class="bg-slate-50"><th class="p-1.5 border text-left">#</th><th class="p-1.5 border text-left">กลุ่ม / รายการ</th><th class="p-1.5 border">จำนวน</th><th class="p-1.5 border text-left">สภาพ</th><th class="p-1.5 border text-left">การตัดสินใจ → ปลายทาง</th><th class="p-1.5 border text-right">ขนย้าย</th><th class="p-1.5 border text-right">ซาก</th><th class="p-1.5 border">รูป</th></tr>' +
+                (d.assets || []).map(function(a) {
+                    return '<tr class="' + (a.dispo === 'pending' ? 'bg-amber-50' : '') + '"><td class="p-1.5 border">' + esc(a.aid) + '</td><td class="p-1.5 border"><span class="text-slate-500">' + esc(a.grp) + '</span><br><b>' + esc(a.item) + '</b>' + (a.assetNo ? '<br><span class="text-slate-400">' + esc(a.assetNo) + '</span>' : '') + (a.nt ? '<br><span class="text-slate-600">' + esc(a.nt) + '</span>' : '') + '</td>' +
+                        '<td class="p-1.5 border text-center">' + num(a.qty) + '</td><td class="p-1.5 border">' + esc(a.cond) + (a.age ? '<br>' + a.age + ' ปี' : '') + (a.owner ? '<br><span class="text-slate-500">' + esc(a.owner) + '</span>' : '') + '</td>' +
+                        '<td class="p-1.5 border"><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:' + DISPO_CLS[a.dispo] + '"></span>' + esc(dispoLabel(a.dispo)) + (a.target ? ' → <b>' + esc(a.target) + '</b>' : '') + '</td>' +
+                        '<td class="p-1.5 border text-right">' + fmt(a.move) + '</td><td class="p-1.5 border text-right text-green-700">' + fmt(a.scrap) + '</td><td class="p-1.5 border"><div class="flex flex-wrap gap-1">' + photos(att[a.pk]) + '</div></td></tr>';
+                }).join('') + '</table></div>';
+            // tasks
+            const today = new Date().toISOString().slice(0, 10), S = SC.status;
+            h += '<h4 class="font-bold mt-5 mb-1">งานปิดสาขา (' + num(t.tasksDone) + '/' + num(t.tasksTotal) + ')</h4>';
+            SC.tasks.forEach(function(ph) {
+                h += '<p class="text-xs font-bold text-rose-900 bg-rose-50 px-2 py-1 mt-2">' + esc(ph.p) + '</p><table class="min-w-full text-xs border-collapse">' + ph.items.map(function(it) {
+                    const x = (d.tasks || {})[it[0]] || {}, ok = x.s === S[2], na = x.s === S[3], late = !ok && !na && x.due && x.due < today;
+                    return '<tr class="' + (ok ? 'text-green-800' : late ? 'bg-red-50' : na ? 'text-slate-400' : '') + '"><td class="p-1 border w-10">' + it[0] + '</td><td class="p-1 border">' + esc(it[1]) + (x.nt ? '<br><span class="text-slate-500">' + esc(x.nt) + '</span>' : '') + '</td>' +
+                        '<td class="p-1 border whitespace-nowrap font-semibold">' + (ok ? '✔ ' : late ? '⚠️ ' : '') + esc(x.s || S[0]) + '</td><td class="p-1 border whitespace-nowrap">' + esc(x.due || '-') + '</td><td class="p-1 border">' + esc(x.who || '') + '</td></tr>';
+                }).join('') + '</table>';
+            });
+            // costs
+            h += '<div class="border border-rose-200 rounded-lg p-3 mt-5 text-sm"><b>ค่าใช้จ่าย</b> · ขนย้าย ' + fmt(t.move) + ' · รื้อถอน ' + fmt(c.demolish) + ' · Solar ' + fmt(c.solar) + ' · EV ' + fmt(c.ev) + ' · อื่นๆ ' + fmt(c.other) +
+                ' − ซาก <span class="text-green-700">' + fmt(t.scrap) + '</span> = <b class="text-rose-800">สุทธิ ' + fmt(t.net) + ' ฿</b>' + (c.nt ? '<p class="text-xs text-slate-500 mt-1">' + esc(c.nt) + '</p>' : '') + '</div>';
+            const ed = canEdit() ? '' : ' disabled';
+            h += '<div class="mt-5 p-3 bg-red-50 border border-red-200 rounded-lg"><label class="flex items-center gap-2 text-xs font-bold text-red-700"><input type="checkbox" id="editHasBroken"' + (r['Has Broken'] === 'Yes' ? ' checked' : '') + ed + '> ⚠️ ประเด็นเร่งด่วน / ความเสี่ยง</label>' +
+                '<textarea id="editBrokenDetail" rows="2" class="mt-2 w-full border border-red-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Broken Detail'] || '') + '</textarea></div>' +
+                '<div class="mt-3"><label class="text-xs font-semibold text-slate-500">สรุป / ข้อเสนอ</label><textarea id="editComments" rows="3" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Comments'] || '') + '</textarea></div>' +
+                '<p class="text-[11px] text-slate-400 mt-2">อัปเดตทรัพย์สิน / สถานะงาน: เปิดแท็บ 🏁 ปิดสาขา เลือกสาขาเดิม แล้ว Submit ใหม่ (รายงานใช้รายการล่าสุดของสาขา)</p>';
+            document.getElementById('modalBody').innerHTML = h;
+            document.getElementById('saveBtn').classList.toggle('hidden', !canEdit());
+        }
+        function saveRecord() {
+            const form = { id: currentId, clientEmail: _userEmail, hasBroken: document.getElementById('editHasBroken').checked ? 'Yes' : 'No',
+                           brokenDetail: document.getElementById('editBrokenDetail').value, comments: document.getElementById('editComments').value };
+            if (form.hasBroken === 'Yes' && !form.brokenDetail.trim()) { alert('กรุณาระบุประเด็นเร่งด่วน'); return; }
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); }).updateStoreCloseRecord(form);
+        }
+        function deleteRecord() {
+            if (!currentId || !confirm('ยืนยันการลบรายการนี้?')) return;
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); }).deleteStoreCloseRecord(currentId, _userEmail);
+        }
+
+        function downloadToExcel(btn) {
+            if (!filtered.length) { alert('ไม่มีข้อมูล'); return; }
+            const cols = ['Timestamp', 'Branch Code', 'Branch Name', 'Store Format', 'In Closure Plan', 'Reporter Name', 'Close Date', 'Handover Condition', 'After-Close Plan', 'VP OPT',
+                'Progress %', 'Tasks Done', 'Tasks Total', 'Overdue Tasks', 'Asset Groups', 'Asset Qty'].concat(SC.dispo.map(function(d) { return 'Qty ' + d.en; })).concat([
+                'Pending Decisions', 'Transfer / FWH Targets', 'Moving Cost (THB)', 'Demolition Cost (THB)', 'Solar Cost (THB)', 'EV Cost (THB)', 'Other Cost (THB)', 'Scrap Value (THB)', 'Net Cost (THB)',
+                'Has Broken', 'Broken Detail', 'Comments']);
+            const wb = XLSX.utils.book_new(), rows = [cols.concat(['Status'])];
+            filtered.forEach(function(x) {
+                if (x.r) rows.push(cols.map(function(c) { return c === 'Timestamp' ? fdate(x.r[c]) : (x.r[c] == null ? '' : x.r[c]); }).concat(['Surveyed']));
+                else rows.push(cols.map(function(c) { return c === 'Branch Code' ? x.p[0] : c === 'Branch Name' ? x.p[4] + ' / ' + x.p[3] : c === 'Store Format' ? x.p[2].trim() : c === 'In Closure Plan' ? 'Yes' : c === 'Handover Condition' ? x.p[10] : c === 'After-Close Plan' ? x.p[11] : ''; }).concat(['Not surveyed']));
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Stores');
+            const assets = [['Branch Code', 'Branch Name', 'Survey ID', 'รหัส', 'กลุ่มระบบ', 'รายการ', 'จำนวน', 'สภาพ', 'อายุ (ปี)', 'เจ้าของ', 'Asset No.', 'การตัดสินใจ', 'ปลายทาง', 'ค่าขนย้าย', 'มูลค่าซาก', 'หมายเหตุ']];
+            const tasks = [['Branch Code', 'Branch Name', 'Survey ID', 'ขั้นตอน', 'รหัส', 'งาน', 'สถานะ', 'กำหนดเสร็จ', 'ผู้รับผิดชอบ', 'หมายเหตุ']];
+            const surveyed = filtered.filter(function(x) { return x.r; });
+            let pending = surveyed.length;
+            const finish = function() {
+                if (--pending > 0) return;
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(assets), 'Assets');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tasks), 'Tasks');
+                XLSX.writeFile(wb, 'store_closing_checklist_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+                if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+            };
+            if (btn) { btn.disabled = true; btn.textContent = 'กำลังเตรียมข้อมูล...'; }
+            if (!pending) { pending = 1; finish(); return; }
+            surveyed.forEach(function(x) {
+                const r = x.r;
+                google.script.run.withSuccessHandler(function(res) {
+                    const d = res && res.success ? res.data['Close_JSON'] || {} : {};
+                    (d.assets || []).forEach(function(a) {
+                        assets.push([r['Branch Code'], r['Branch Name'], r['ID'], a.aid, a.grp, a.item, a.qty, a.cond, a.age || '', a.owner, a.assetNo, dispoLabel(a.dispo), a.target, a.move || '', a.scrap || '', a.nt]);
+                    });
+                    SC.tasks.forEach(function(ph) { ph.items.forEach(function(it) { const t = (d.tasks || {})[it[0]] || {}; tasks.push([r['Branch Code'], r['Branch Name'], r['ID'], ph.p, it[0], it[1], t.s || '', t.due || '', t.who || '', t.nt || '']); }); });
+                    finish();
+                }).withFailureHandler(finish).getStoreCloseRecordById(r['ID']);
+            });
+        }
+    </script>
+</body>
+</html>

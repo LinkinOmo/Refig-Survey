@@ -1,0 +1,610 @@
+        <!-- CONTENT: HYPER LIGHTING SURVEY — sales floor + town center, zones with installed lighting, lux
+             readings pinned on the layout, and a proposal of lights to add with its monthly OPEX.
+             Reuses HYPER_REF_STORES / _hyperRefStoreLabel / _hyperRefFindStoreDb from HyperRefSurveyTab.html. -->
+        <div id="content-hyper-li-survey" class="tab-content hidden">
+            <form id="hyper-li-form" onsubmit="handleHyperLiSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">💡 สำรวจแสงสว่าง Hyper</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= MANUALS_URL ?>?page=hyper-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_li_survey_report" target="_blank"
+                            class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+
+                <p class="text-xs text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-3 py-2 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>สำรวจแสงสว่าง <b>พื้นที่ขาย (Sales Floor)</b> และ <b>Town Center</b> — แบ่งเป็น <b>โซน</b> แต่ละโซนกรอก <b>ชนิดโคม × วัตต์ × จำนวน</b> (และจำนวนที่เสีย), <b>วัดค่า Lux</b> หลายจุดแล้วปักบนผัง และ <b>เสนอโคมที่ต้องเพิ่ม</b> — ระบบคำนวณ kW และ <b>ค่าไฟที่เพิ่มขึ้นต่อเดือน</b> ให้อัตโนมัติ</span>
+                </p>
+
+                <div id="hyper-li-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="hyper-li-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreHyperLiDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardHyperLiDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <!-- 1. General Info -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เทรนเนอร์ / ผู้แจ้ง (Reporter) *</label>
+                            <input type="text" name="reporterName" class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500" required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20" class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500" required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="hyper-li-station-search" autocomplete="off" class="input-field w-full border p-2 rounded text-sm bg-yellow-50 focus:ring-2 focus:ring-yellow-500"
+                                    placeholder="พิมพ์รหัสสาขา หรือชื่อสาขา (ไทย/อังกฤษ)..." oninput="handleHyperLiStationInput(this)">
+                                <div id="hyper-li-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div id="hyper-li-store-badge" class="hidden self-end text-xs"></div>
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly>
+                            <input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat">
+                            <input type="hidden" name="region">
+                            <input type="hidden" name="ammMtn">
+                            <input type="hidden" name="dmArea">
+                            <input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="hyper-li-rest-form" class="hidden">
+                    <div class="sticky top-0 z-30 bg-white/95 backdrop-blur border border-yellow-300 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span class="text-gray-700">ติดตั้ง <b id="hli-sum-inst">0</b> kW</span>
+                        <span class="text-red-700">ต่ำกว่าเป้า <b id="hli-sum-below">0</b> โซน</span>
+                        <span class="text-indigo-700">เสนอเพิ่ม <b id="hli-sum-prop">0</b> kW</span>
+                        <span class="ml-auto font-bold text-amber-700">ค่าไฟเพิ่ม ≈ <span id="hli-sum-opex">0</span> ฿/เดือน</span>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">ค่าไฟ &amp; เครื่องมือวัด</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">ค่าไฟเฉลี่ย (บาท / kWh) *</label>
+                                <input type="number" name="tariff" id="hli-tariff" step="0.01" min="0" inputmode="decimal" oninput="hliRecalcAll()" class="input-field w-full border border-gray-300 p-2 rounded text-sm">
+                                <p class="text-[11px] text-gray-400 mt-0.5">รวม Demand / Ft แล้ว — ดูจากบิลค่าไฟของสาขา</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">เครื่องมือวัด Lux</label>
+                                <select name="luxMeter" class="input-field w-full border border-gray-300 p-2 rounded text-sm bg-white">
+                                    <option value="Lux Meter">Lux Meter (เครื่องวัดแสง)</option>
+                                    <option value="แอปมือถือ">แอปมือถือ (ค่าประมาณ)</option>
+                                    <option value="อื่นๆ">อื่นๆ</option>
+                                </select>
+                            </div>
+                            <div class="text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded p-2">
+                                📏 วัด Lux ที่ <b>ความสูงระดับชั้นวาง / โต๊ะ (~0.8–1 ม.)</b> หันเซนเซอร์ขึ้น ไม่ให้เงาตัวเองบัง — วัดอย่างน้อย <b>5 จุดต่อโซน</b> กระจายทั่วโซน
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sales floor -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">2. พื้นที่ขาย (Sales Floor)</h3>
+                        <p class="text-xs text-gray-500 mb-1">📐 แนบผังพื้นที่ขาย เพื่อปักหมุดจุดวัด Lux ของแต่ละโซน</p>
+                        <div id="hli-layout-sales"></div>
+                        <div id="hli-zones-sales" class="space-y-4 mt-4"></div>
+                        <button type="button" onclick="hliAddZone('sales')" class="mt-3 w-full border-2 border-dashed border-yellow-400 text-yellow-800 bg-yellow-50 hover:bg-yellow-100 rounded-lg py-2 text-sm font-semibold">＋ เพิ่มโซนพื้นที่ขาย</button>
+                    </div>
+
+                    <!-- Town center -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">3. Town Center / พื้นที่ศูนย์การค้า</h3>
+                        <p class="text-xs text-gray-500 mb-1">📐 แนบผัง Town Center เพื่อปักหมุดจุดวัด Lux</p>
+                        <div id="hli-layout-town"></div>
+                        <div id="hli-zones-town" class="space-y-4 mt-4"></div>
+                        <button type="button" onclick="hliAddZone('town')" class="mt-3 w-full border-2 border-dashed border-yellow-400 text-yellow-800 bg-yellow-50 hover:bg-yellow-100 rounded-lg py-2 text-sm font-semibold">＋ เพิ่มโซน Town Center</button>
+                    </div>
+
+                    <!-- Broken -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">4. โคมไฟเสีย / ต้องซ่อม</h3>
+                        <div class="flex gap-4 mb-3">
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" onchange="document.getElementById('hli-broken-section').classList.remove('hidden')"> <span class="text-sm">มี (Yes)</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" checked onchange="document.getElementById('hli-broken-section').classList.add('hidden')"> <span class="text-sm">ไม่มี (No)</span></label>
+                        </div>
+                        <div id="hli-broken-section" class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ระบุโซน / โคมที่เสีย และอาการ *</label>
+                            <textarea name="brokenDetail" rows="3" class="input-field w-full border border-red-300 p-2 rounded text-sm" placeholder="เช่น Z03 โซนผัก High Bay ดับ 3 โคม / ไฟกะพริบ"></textarea>
+                            <div id="hli-photo-broken"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-2 border-b pb-2">5. สรุปปัญหา / ข้อเสนอแนะ</h3>
+                        <textarea name="comments" rows="3" class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50" placeholder="เช่น เสนอเปลี่ยน Metal Halide เป็น LED High Bay ทั้งโซนสด ... (Optional)"></textarea>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">6. CC Email Notification (Optional)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1 (DM)</label><input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm"></div>
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2 (CM)</label><input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm"></div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetHyperLiForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveHyperLiDraft()" class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 transition text-sm">&#128190; Save Draft</button>
+                            <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-blue-700 transition">Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Lux pin editor (one per area layout) -->
+            <div id="hli-pin-modal" class="hidden fixed inset-0 z-[80] bg-black/60 flex items-end sm:items-center justify-center">
+                <div class="bg-white w-full sm:max-w-3xl sm:rounded-xl rounded-t-xl max-h-[95dvh] flex flex-col">
+                    <div class="px-4 py-3 border-b flex flex-wrap items-center gap-2">
+                        <b class="mr-auto text-sm">📍 ปักจุดวัด Lux บนผัง</b>
+                        <button type="button" onclick="hliClosePins()" class="text-gray-500 text-xl leading-none px-1">✕</button>
+                    </div>
+                    <div class="px-4 py-2 border-b flex flex-wrap items-end gap-2 text-sm">
+                        <div><label class="block text-[11px] text-gray-500">โซน</label><select id="hli-pin-zone" onchange="hliRenderPins()" class="border border-gray-300 rounded p-1.5 text-sm"></select></div>
+                        <div><label class="block text-[11px] text-gray-500">ค่า Lux ของจุดที่จะปัก</label><input id="hli-pin-val" type="number" min="0" inputmode="numeric" class="border border-yellow-400 rounded p-1.5 w-28 text-sm" placeholder="เช่น 450"></div>
+                        <button type="button" onclick="hliUndoPin()" class="text-xs border border-gray-300 rounded px-2 py-1.5">↶ ลบจุดล่าสุดของโซนนี้</button>
+                        <p class="w-full text-[11px] text-gray-500">พิมพ์ค่า Lux แล้ว <b>แตะบนผังตรงจุดที่วัด</b> — จุดสีแดง = ต่ำกว่าเป้าของโซน, เขียว = ผ่าน</p>
+                    </div>
+                    <div class="overflow-auto p-3 bg-gray-100">
+                        <div id="hli-pin-stage" class="relative inline-block max-w-full bg-white border border-gray-300" style="touch-action:manipulation">
+                            <img id="hli-pin-img" class="block max-w-full" alt="layout">
+                            <div id="hli-pin-layer" class="absolute inset-0 pointer-events-none"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End content-hyper-li-survey -->
+
+        <script>
+            const HYPER_LI_CONFIG = <?!= JSON.stringify(getHyperLiConfig_()) ?>;
+            const HYPER_LI_DRAFT_KEY = 'hyper_li_survey_draft_v1';
+            const HLI_ZT = {}, HLI_FX = {};
+            HYPER_LI_CONFIG.zoneTypes.forEach(function(z) { HLI_ZT[z.id] = z; });
+            HYPER_LI_CONFIG.fixtures.forEach(function(f) { HLI_FX[f.id] = f; });
+            // zone state that is not plain inputs: lux points per zone id
+            const HLI = { seq: 0, lux: {}, pinArea: null };
+
+            (function initHyperLiForm() {
+                document.getElementById('hli-tariff').value = HYPER_LI_CONFIG.tariff;
+                document.getElementById('hli-layout-sales').innerHTML = photoUpload('ผังพื้นที่ขาย (Layout)', 'hli_layout_sales');
+                document.getElementById('hli-layout-town').innerHTML = photoUpload('ผัง Town Center (Layout)', 'hli_layout_town');
+                document.getElementById('hli-photo-broken').innerHTML = photoUpload('โคมไฟที่เสีย', 'hli_broken');
+            })();
+
+            function hliEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+            function hliFmt(n) { return Math.round(n).toLocaleString(); }
+
+            function _hliFixtureRowHtml(kind, r) {
+                r = r || {};
+                const ft = r.ft || (kind === 'prop' ? 'ledHighBay' : 'ledPanel');
+                const opts = HYPER_LI_CONFIG.fixtures.map(function(f) { return '<option value="' + f.id + '"' + (f.id === ft ? ' selected' : '') + '>' + f.label + '</option>'; }).join('');
+                return '<div class="grid grid-cols-12 gap-1 items-end" data-fxrow="' + kind + '">' +
+                    '<div class="col-span-12 sm:col-span-5"><select data-fx="ft" onchange="hliFixtureType(this)" class="w-full border border-gray-300 rounded p-1.5 text-xs bg-white">' + opts + '</select>' +
+                        '<input data-fx="fo" value="' + hliEsc(r.fo || '') + '" class="' + (ft === 'other' ? '' : 'hidden ') + 'mt-1 w-full border border-gray-300 rounded p-1.5 text-xs" placeholder="ระบุชนิดโคม"></div>' +
+                    '<div class="col-span-4 sm:col-span-2"><label class="block text-[10px] text-gray-500">W / โคม</label><input data-fx="w" type="number" min="0" step="any" value="' + (r.w != null ? r.w : (HLI_FX[ft] || {}).w || 0) + '" oninput="hliRecalc(this)" class="w-full border border-gray-300 rounded p-1.5 text-xs"></div>' +
+                    '<div class="col-span-3 sm:col-span-2"><label class="block text-[10px] text-gray-500">จำนวน (โคม)</label><input data-fx="qty" type="number" min="0" value="' + (r.qty || '') + '" oninput="hliRecalc(this)" class="w-full border border-gray-300 rounded p-1.5 text-xs"></div>' +
+                    (kind === 'fix' ? '<div class="col-span-3 sm:col-span-2"><label class="block text-[10px] text-red-500">เสีย / ดับ</label><input data-fx="broken" type="number" min="0" value="' + (r.broken || '') + '" oninput="hliRecalc(this)" class="w-full border border-red-200 rounded p-1.5 text-xs"></div>'
+                                    : '<div class="col-span-3 sm:col-span-2"></div>') +
+                    '<div class="col-span-2 sm:col-span-1 text-right"><button type="button" onclick="const z=this.closest(\'[data-zone]\');this.closest(\'[data-fxrow]\').remove();hliRecalcZone(z)" class="text-red-500 text-xs px-1">✕</button></div>' +
+                '</div>';
+            }
+            function hliFixtureType(sel) {
+                const row = sel.closest('[data-fxrow]');
+                row.querySelector('[data-fx="w"]').value = (HLI_FX[sel.value] || {}).w || 0;
+                row.querySelector('[data-fx="fo"]').classList.toggle('hidden', sel.value !== 'other');
+                hliRecalc(sel);
+            }
+
+            function hliAddZone(area, z) {
+                z = z || {};
+                const zid = z.zid || ('Z' + String(++HLI.seq).padStart(2, '0'));
+                const n = parseInt(zid.replace(/\D/g, ''), 10); if (n > HLI.seq) HLI.seq = n;
+                HLI.lux[zid] = (z.lux || []).slice();
+                const types = HYPER_LI_CONFIG.zoneTypes.filter(function(t) { return t.area === area || t.id === 'other'; });
+                const zt = z.zt || types[0].id;
+                const html = '<div class="border border-yellow-300 rounded-lg overflow-hidden" data-zone="' + zid + '" data-area="' + area + '">' +
+                    '<div class="bg-yellow-500 text-white px-3 py-2 flex items-center justify-between"><b class="text-sm">โซน ' + zid + '</b>' +
+                        '<button type="button" onclick="hliRemoveZone(\'' + zid + '\')" class="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5">ลบโซน</button></div>' +
+                    '<div class="p-3 space-y-3 bg-white">' +
+                        '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">' +
+                            '<div class="col-span-2 sm:col-span-1"><label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทโซน *</label><select data-z="zt" onchange="hliZoneType(this)" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' +
+                                types.map(function(t) { return '<option value="' + t.id + '"' + (t.id === zt ? ' selected' : '') + '>' + t.label + '</option>'; }).join('') + '</select></div>' +
+                            '<div class="col-span-2 sm:col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">ชื่อ / ตำแหน่งโซน</label><input data-z="name" value="' + hliEsc(z.name || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น โซนผักผลไม้ ฝั่งทางเข้า 2"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">เป้าหมาย Lux</label><input data-z="target" type="number" min="0" value="' + (z.target || HLI_ZT[zt].lux) + '" oninput="hliRecalc(this)" class="w-full border border-gray-300 rounded p-2 text-sm"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">พื้นที่ (ตร.ม.)</label><input data-z="m2" type="number" min="0" value="' + (z.m2 || '') + '" oninput="hliRecalc(this)" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="ถ้าทราบ"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">เปิดไฟ (ชม./วัน)</label><input data-z="hours" type="number" min="0" max="24" step="0.5" value="' + (z.hours || HYPER_LI_CONFIG.hours) + '" oninput="hliRecalc(this)" class="w-full border border-gray-300 rounded p-2 text-sm"></div>' +
+                            '<div class="col-span-2 sm:col-span-3"><label class="block text-xs font-semibold text-gray-600 mb-1">ระบบควบคุมไฟ</label><select data-z="ctrl" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' +
+                                ['', 'สวิตช์ธรรมดา', 'Timer', 'BMS / ระบบอัตโนมัติ', 'Photocell / Sensor', 'Dimming', 'อื่นๆ'].map(function(o) { return '<option value="' + o + '"' + ((z.ctrl || '') === o ? ' selected' : '') + '>' + (o || '-- เลือก --') + '</option>'; }).join('') + '</select></div>' +
+                        '</div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2"><p class="text-xs font-bold text-gray-700 mb-1">💡 ระบบไฟที่ติดตั้ง (ชนิดโคม × W × จำนวน) *</p><div class="space-y-2" data-fixlist="fix">' +
+                            ((z.fixtures && z.fixtures.length ? z.fixtures : [null]).map(function(r) { return _hliFixtureRowHtml('fix', r); }).join('')) + '</div>' +
+                            '<button type="button" onclick="this.previousElementSibling.insertAdjacentHTML(\'beforeend\', _hliFixtureRowHtml(\'fix\'))" class="mt-2 text-xs text-yellow-800 border border-yellow-300 rounded px-2 py-1">＋ เพิ่มชนิดโคม</button>' +
+                            '<p class="text-[11px] text-gray-600 mt-1" data-out="inst"></p></div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2"><p class="text-xs font-bold text-gray-700 mb-1">📏 ค่าแสงที่วัดได้ (Lux) *</p>' +
+                            '<div class="flex flex-wrap gap-1 mb-2" data-luxlist></div>' +
+                            '<div class="flex flex-wrap gap-2 items-center"><input type="number" min="0" inputmode="numeric" data-luxin class="border border-yellow-400 rounded p-1.5 w-28 text-sm" placeholder="ค่า Lux">' +
+                                '<button type="button" onclick="hliAddLux(\'' + zid + '\')" class="text-xs border border-gray-300 rounded px-2 py-1.5">＋ เพิ่มจุด</button>' +
+                                '<button type="button" onclick="hliOpenPins(\'' + area + '\', \'' + zid + '\')" class="text-xs bg-yellow-500 text-white rounded px-2 py-1.5">📍 ปักจุดบนผัง</button></div>' +
+                            '<p class="text-[11px] mt-1" data-out="lux"></p></div>' +
+                        '<div class="border border-indigo-200 rounded-lg p-2 bg-indigo-50/40"><p class="text-xs font-bold text-indigo-700 mb-1">➕ ข้อเสนอติดตั้งโคมเพิ่ม</p>' +
+                            '<p class="text-[11px] text-indigo-700 mb-1" data-out="need"></p>' +
+                            '<div class="space-y-2" data-fixlist="prop">' + ((z.prop || []).map(function(r) { return _hliFixtureRowHtml('prop', r); }).join('')) + '</div>' +
+                            '<div class="flex flex-wrap gap-2 mt-2"><button type="button" onclick="this.parentElement.previousElementSibling.insertAdjacentHTML(\'beforeend\', _hliFixtureRowHtml(\'prop\'))" class="text-xs text-indigo-700 border border-indigo-300 rounded px-2 py-1 bg-white">＋ เพิ่มรายการเสนอ</button>' +
+                                '<button type="button" onclick="hliSuggest(\'' + zid + '\')" class="text-xs bg-indigo-600 text-white rounded px-2 py-1">⚡ คำนวณจำนวนโคมที่ต้องเพิ่ม</button></div>' +
+                            '<p class="text-[11px] text-indigo-800 font-semibold mt-1" data-out="prop"></p></div>' +
+                        '<div><label class="block text-xs font-semibold text-gray-600 mb-1">หมายเหตุโซน</label><textarea data-z="nt" rows="2" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น ไฟสลัว ชั้นวางบังแสง / หลอดเก่าสีเหลือง">' + hliEsc(z.nt || '') + '</textarea></div>' +
+                        photoUpload('โซน ' + zid, 'hli_zone_' + zid) +
+                    '</div></div>';
+                document.getElementById('hli-zones-' + area).insertAdjacentHTML('beforeend', html);
+                const zone = document.querySelector('[data-zone="' + zid + '"]');
+                hliRenderLux(zid);
+                hliRecalcZone(zone);
+                return zone;
+            }
+
+            function hliRemoveZone(zid) {
+                const zone = document.querySelector('[data-zone="' + zid + '"]');
+                if (!zone || !confirm('ลบโซน ' + zid + ' และข้อมูลทั้งหมดของโซนนี้?')) return;
+                delete _accumulatedFiles['hli_zone_' + zid];
+                delete HLI.lux[zid];
+                zone.remove();
+                hliRecalcAll();
+            }
+
+            function hliZoneType(sel) {
+                const zone = sel.closest('[data-zone]');
+                zone.querySelector('[data-z="target"]').value = (HLI_ZT[sel.value] || {}).lux || 300;
+                hliRecalcZone(zone);
+            }
+
+            function hliAddLux(zid) {
+                const zone = document.querySelector('[data-zone="' + zid + '"]');
+                const inp = zone.querySelector('[data-luxin]');
+                const v = parseFloat(inp.value);
+                if (isNaN(v) || v <= 0) { inp.focus(); return; }
+                HLI.lux[zid].push({ v: Math.round(v) });
+                inp.value = '';
+                inp.focus();
+                hliRenderLux(zid);
+            }
+            function hliDelLux(zid, i) { HLI.lux[zid].splice(i, 1); hliRenderLux(zid); }
+            function hliRenderLux(zid) {
+                const zone = document.querySelector('[data-zone="' + zid + '"]');
+                if (!zone) return;
+                const target = parseFloat(zone.querySelector('[data-z="target"]').value) || 0;
+                zone.querySelector('[data-luxlist]').innerHTML = HLI.lux[zid].map(function(p, i) {
+                    const low = p.v < target;
+                    return '<span class="inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 border ' + (low ? 'bg-red-50 border-red-300 text-red-700' : 'bg-green-50 border-green-300 text-green-700') + '">' +
+                        (p.x != null ? '📍' : '') + p.v + '<button type="button" onclick="hliDelLux(\'' + zid + '\',' + i + ')" class="opacity-60 hover:opacity-100">✕</button></span>';
+                }).join('') || '<span class="text-[11px] text-gray-400">ยังไม่มีจุดวัด</span>';
+                hliRecalcZone(zone);
+                if (HLI.pinArea) hliRenderPins();
+            }
+
+            function _hliRows(zone, kind) {
+                return Array.from(zone.querySelectorAll('[data-fixlist="' + kind + '"] [data-fxrow]')).map(function(r) {
+                    const g = function(k) { const el = r.querySelector('[data-fx="' + k + '"]'); return el ? el.value : ''; };
+                    return { ft: g('ft'), fo: g('fo'), w: parseFloat(g('w')) || 0, qty: parseInt(g('qty'), 10) || 0, broken: Math.min(parseInt(g('broken'), 10) || 0, parseInt(g('qty'), 10) || 0) };
+                }).filter(function(r) { return r.qty > 0; });
+            }
+            function _hliTariff() { return parseFloat(document.getElementById('hli-tariff').value) || 0; }
+            function _hliMonth(w, hours) { const kwh = w / 1000 * hours * HYPER_LI_CONFIG.days; return { kwh: kwh, thb: kwh * _hliTariff() }; }
+
+            // per-zone figures, mirrors _hliZoneCalc_ on the server
+            function hliZoneCalc(zone) {
+                const zid = zone.dataset.zone;
+                const fix = _hliRows(zone, 'fix'), prop = _hliRows(zone, 'prop');
+                let inst = 0, work = 0, propW = 0, workLm = 0;
+                fix.forEach(function(r) { inst += r.w * r.qty; work += r.w * (r.qty - r.broken); workLm += r.w * (r.qty - r.broken) * ((HLI_FX[r.ft] || {}).lm || 80); });
+                prop.forEach(function(r) { propW += r.w * r.qty; });
+                const vals = (HLI.lux[zid] || []).map(function(p) { return p.v; });
+                const avg = vals.length ? vals.reduce(function(a, b) { return a + b; }, 0) / vals.length : 0;
+                const target = parseFloat(zone.querySelector('[data-z="target"]').value) || 0;
+                const hours = parseFloat(zone.querySelector('[data-z="hours"]').value) || 0;
+                const m2 = parseFloat(zone.querySelector('[data-z="m2"]').value) || 0;
+                return { inst: inst, work: work, propW: propW, avg: avg, min: vals.length ? Math.min.apply(null, vals) : 0, n: vals.length, target: target, hours: hours, m2: m2,
+                         below: vals.length > 0 && avg < target, needLm: vals.length && avg > 0 && avg < target ? workLm * (target / avg - 1) : 0 };
+            }
+            function hliRecalc(el) { hliRecalcZone(el.closest('[data-zone]')); }
+            function hliRecalcZone(zone) {
+                if (!zone) return;
+                const c = hliZoneCalc(zone);
+                const now = _hliMonth(c.work, c.hours), add = _hliMonth(c.propW, c.hours);
+                zone.querySelector('[data-out="inst"]').innerHTML = 'ติดตั้ง <b>' + hliFmt(c.inst) + ' W</b> · ใช้งานได้ ' + hliFmt(c.work) + ' W' + (c.m2 ? ' · ' + (c.inst / c.m2).toFixed(1) + ' W/ตร.ม.' : '') +
+                    ' · ค่าไฟแสงสว่างโซนนี้ ≈ ' + hliFmt(now.thb) + ' ฿/เดือน';
+                const lo = zone.querySelector('[data-out="lux"]');
+                lo.innerHTML = c.n ? 'เฉลี่ย <b>' + Math.round(c.avg) + '</b> lux · ต่ำสุด ' + c.min + ' · เป้า ' + c.target + ' · ' + c.n + ' จุด' +
+                    (c.below ? ' — <b class="text-red-600">ต่ำกว่าเป้า ' + Math.round(c.target - c.avg) + ' lux</b>' : ' — <b class="text-green-600">ผ่าน</b>') + (c.n < 5 ? ' <span class="text-amber-600">(ควรวัดอย่างน้อย 5 จุด)</span>' : '') : '<span class="text-gray-400">ยังไม่มีจุดวัด</span>';
+                zone.querySelector('[data-out="need"]').textContent = c.below
+                    ? 'ประมาณการ: ต้องเพิ่มแสงราว ' + hliFmt(c.needLm) + ' lumen เพื่อให้ได้ ' + c.target + ' lux (คิดจากสัดส่วนแสงของโคมที่ใช้งานได้ — ตัวเลขตั้งต้น) · เลือกชนิดโคมด้านล่างแล้วกด ⚡ เพื่อคำนวณจำนวน'
+                    : (c.n ? 'ค่าแสงผ่านเป้าแล้ว — เสนอเพิ่มเฉพาะถ้าจำเป็น' : '');
+                zone.querySelector('[data-out="prop"]').innerHTML = c.propW ? 'เสนอเพิ่ม ' + hliFmt(c.propW) + ' W → ใช้ไฟเพิ่ม ' + hliFmt(add.kwh) + ' kWh/เดือน = <span class="text-amber-700">+' + hliFmt(add.thb) + ' ฿/เดือน</span> (' + c.hours + ' ชม./วัน × ' + HYPER_LI_CONFIG.days + ' วัน × ' + _hliTariff() + ' ฿/kWh)' : '';
+                hliRecalcTotals();
+            }
+            function hliRecalcAll() { document.querySelectorAll('#content-hyper-li-survey [data-zone]').forEach(hliRecalcZone); hliRecalcTotals(); }
+            function hliRecalcTotals() {
+                let inst = 0, prop = 0, below = 0, opex = 0;
+                document.querySelectorAll('#content-hyper-li-survey [data-zone]').forEach(function(z) {
+                    const c = hliZoneCalc(z);
+                    inst += c.inst; prop += c.propW; if (c.below) below++; opex += _hliMonth(c.propW, c.hours).thb;
+                });
+                document.getElementById('hli-sum-inst').textContent = (inst / 1000).toFixed(2);
+                document.getElementById('hli-sum-prop').textContent = (prop / 1000).toFixed(2);
+                document.getElementById('hli-sum-below').textContent = below;
+                document.getElementById('hli-sum-opex').textContent = hliFmt(opex);
+            }
+
+            // Fill one proposal row: chosen fixture type × ceil(needed W / W per fixture)
+            function hliSuggest(zid) {
+                const zone = document.querySelector('[data-zone="' + zid + '"]');
+                const c = hliZoneCalc(zone);
+                if (!c.n) { alert('กรุณาวัดค่า Lux ของโซนนี้ก่อน'); return; }
+                if (!c.below) { alert('ค่าแสงเฉลี่ยผ่านเป้าแล้ว — ไม่จำเป็นต้องเพิ่มโคม'); return; }
+                if (!c.work) { alert('กรุณากรอกระบบไฟที่ติดตั้งก่อน (ใช้คำนวณสัดส่วน)'); return; }
+                const list = zone.querySelector('[data-fixlist="prop"]');
+                let row = list.querySelector('[data-fxrow]');
+                if (!row) { list.insertAdjacentHTML('beforeend', _hliFixtureRowHtml('prop')); row = list.querySelector('[data-fxrow]'); }
+                const w = parseFloat(row.querySelector('[data-fx="w"]').value) || 0;
+                const lm = (HLI_FX[row.querySelector('[data-fx="ft"]').value] || {}).lm || 80;
+                if (!w) { alert('กรุณาระบุ W / โคม ของรายการเสนอ'); return; }
+                row.querySelector('[data-fx="qty"]').value = Math.ceil(c.needLm / (w * lm));
+                hliRecalcZone(zone);
+            }
+
+            // ─── Lux pin editor ─────────────────────────────────────────────────────
+            function hliOpenPins(area, zid) {
+                const files = (_accumulatedFiles['hli_layout_' + area] || []).filter(Boolean);
+                if (!files.length) { alert('กรุณาแนบรูปผัง' + (area === 'sales' ? 'พื้นที่ขาย' : ' Town Center') + 'ก่อน'); return; }
+                HLI.pinArea = area;
+                const img = document.getElementById('hli-pin-img');
+                if (img.dataset.src) URL.revokeObjectURL(img.dataset.src);
+                img.dataset.src = _sdsObjUrl(files[0]);
+                img.src = img.dataset.src;
+                const sel = document.getElementById('hli-pin-zone');
+                sel.innerHTML = Array.from(document.querySelectorAll('#hli-zones-' + area + ' [data-zone]')).map(function(z) {
+                    const name = z.querySelector('[data-z="name"]').value || (HLI_ZT[z.querySelector('[data-z="zt"]').value] || {}).label || '';
+                    return '<option value="' + z.dataset.zone + '">' + z.dataset.zone + ' ' + hliEsc(name) + '</option>';
+                }).join('');
+                sel.value = zid;
+                document.getElementById('hli-pin-modal').classList.remove('hidden');
+                img.onload = hliRenderPins;
+                document.getElementById('hli-pin-val').focus();
+            }
+            function hliClosePins() { document.getElementById('hli-pin-modal').classList.add('hidden'); HLI.pinArea = null; }
+            function hliRenderPins() {
+                const layer = document.getElementById('hli-pin-layer');
+                const cur = document.getElementById('hli-pin-zone').value;
+                let h = '';
+                document.querySelectorAll('#hli-zones-' + HLI.pinArea + ' [data-zone]').forEach(function(z) {
+                    const zid = z.dataset.zone, target = parseFloat(z.querySelector('[data-z="target"]').value) || 0;
+                    (HLI.lux[zid] || []).forEach(function(p) {
+                        if (p.x == null) return;
+                        const low = p.v < target;
+                        h += '<div style="position:absolute;left:' + (p.x * 100) + '%;top:' + (p.y * 100) + '%;transform:translate(-50%,-50%);padding:0 4px;border-radius:9999px;font-size:10px;font-weight:700;white-space:nowrap;' +
+                            'background:' + (low ? '#dc2626' : '#16a34a') + ';color:#fff;border:2px solid ' + (zid === cur ? '#facc15' : '#fff') + ';opacity:' + (zid === cur ? 1 : .55) + '">' + zid.replace('Z', '') + '·' + p.v + '</div>';
+                    });
+                });
+                layer.innerHTML = h;
+            }
+            function hliUndoPin() {
+                const zid = document.getElementById('hli-pin-zone').value;
+                const arr = HLI.lux[zid] || [];
+                for (let i = arr.length - 1; i >= 0; i--) { if (arr[i].x != null) { arr.splice(i, 1); break; } }
+                hliRenderLux(zid);
+            }
+            document.getElementById('hli-pin-stage').addEventListener('click', function(e) {
+                const zid = document.getElementById('hli-pin-zone').value;
+                const valEl = document.getElementById('hli-pin-val');
+                const v = parseFloat(valEl.value);
+                if (!zid) return;
+                if (isNaN(v) || v <= 0) { valEl.focus(); valEl.classList.add('ring-2', 'ring-red-400'); setTimeout(function() { valEl.classList.remove('ring-2', 'ring-red-400'); }, 800); return; }
+                const r = document.getElementById('hli-pin-img').getBoundingClientRect();
+                HLI.lux[zid].push({ v: Math.round(v), x: Math.round((e.clientX - r.left) / r.width * 10000) / 10000, y: Math.round((e.clientY - r.top) / r.height * 10000) / 10000 });
+                valEl.value = '';
+                valEl.focus();
+                hliRenderLux(zid);
+            });
+
+            // ─── Collect / draft / reset ───────────────────────────────────────────
+            function collectHyperLiZones() {
+                return Array.from(document.querySelectorAll('#content-hyper-li-survey [data-zone]')).map(function(z) {
+                    const g = function(k) { return z.querySelector('[data-z="' + k + '"]').value; };
+                    return { zid: z.dataset.zone, area: z.dataset.area, zt: g('zt'), name: g('name'), target: g('target'), m2: g('m2'), hours: g('hours'), ctrl: g('ctrl'), nt: g('nt'),
+                             lux: (HLI.lux[z.dataset.zone] || []).slice(), fixtures: _hliRows(z, 'fix'), prop: _hliRows(z, 'prop'), pk: 'hli_zone_' + z.dataset.zone };
+                });
+            }
+            function _hyperLiCollectFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+            function _clearHyperLiZones() {
+                document.querySelectorAll('#content-hyper-li-survey [data-zone]').forEach(function(z) { delete _accumulatedFiles['hli_zone_' + z.dataset.zone]; z.remove(); });
+                HLI.lux = {}; HLI.seq = 0;
+            }
+
+            function _applyHyperLiStore(s) {
+                const form = document.getElementById('hyper-li-form');
+                form.branchCode.value = s[0];
+                form.branchName.value = s[2] || s[1];
+                form.storeFormat.value = s[3] || '';
+                form.region.value = s[4] || '';
+                const db = _hyperRefFindStoreDb(s[0]);
+                form.ammMtn.value = db ? (db.ammMtn || '') : '';
+                form.dmArea.value = db ? (db.dmName || '') : '';
+                form.cmArea.value = db ? (db.cmName || '') : '';
+                if (db && db.dmEmail && !form.ccEmail1.value) form.ccEmail1.value = db.dmEmail;
+                if (db && db.cmEmail && !form.ccEmail2.value) form.ccEmail2.value = db.cmEmail;
+                const badge = document.getElementById('hyper-li-store-badge');
+                badge.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-semibold">' + (s[3] || '-') + '</span>' + (s[4] ? ' <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">' + s[4] + '</span>' : '');
+                badge.classList.remove('hidden');
+                document.getElementById('hyper-li-rest-form').classList.remove('hidden');
+                if (!document.querySelector('#content-hyper-li-survey [data-zone]')) { hliAddZone('sales'); }
+                if (typeof sdsCheck === 'function') sdsCheck('hyperLi');
+            }
+            function _clearHyperLiStore() {
+                const form = document.getElementById('hyper-li-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('hyper-li-store-badge').classList.add('hidden');
+                document.getElementById('hyper-li-rest-form').classList.add('hidden');
+            }
+            function handleHyperLiStationInput(input) {
+                const val = input.value.toLowerCase().trim();
+                const dropdown = document.getElementById('hyper-li-station-dropdown');
+                if (val.length < 1) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; _clearHyperLiStore(); return; }
+                const matches = HYPER_REF_STORES.filter(function(s) { return _hyperRefStoreLabel(s).toLowerCase().indexOf(val) !== -1; });
+                renderStationDropdown('hyper-li-station-dropdown', matches.map(_hyperRefStoreLabel), function(selected) {
+                    input.value = selected;
+                    const s = HYPER_REF_STORES.find(function(x) { return _hyperRefStoreLabel(x) === selected; });
+                    if (s) _applyHyperLiStore(s);
+                });
+                const exact = HYPER_REF_STORES.find(function(s) { return _hyperRefStoreLabel(s).toLowerCase() === val || s[0] === val; });
+                if (exact) _applyHyperLiStore(exact); else _clearHyperLiStore();
+            }
+            document.addEventListener('click', function(e) {
+                const d = document.getElementById('hyper-li-station-dropdown');
+                if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden');
+            });
+
+                        // Draft object shared by the on-device draft and the server draft (SurveyDraftStore.gs)
+            function _buildHyperLiDraft() {
+                const form = document.getElementById('hyper-li-form');
+                return { savedAt: new Date().toISOString(), search: document.getElementById('hyper-li-station-search').value, fields: _hyperLiCollectFields(form), zones: collectHyperLiZones() };
+            }
+
+            function saveHyperLiDraft() {
+                const form = document.getElementById('hyper-li-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                const draft = { savedAt: new Date().toISOString(), search: document.getElementById('hyper-li-station-search').value, fields: _hyperLiCollectFields(form), zones: collectHyperLiZones() };
+                try {
+                    localStorage.setItem(HYPER_LI_DRAFT_KEY, JSON.stringify(draft));
+                    if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (Hyper Lighting)');
+                } catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('hyperLi', null);
+            }
+            function _readHyperLiDraft() { try { return JSON.parse(localStorage.getItem(HYPER_LI_DRAFT_KEY) || 'null'); } catch (e) { return null; } }
+            function checkHyperLiDraft() {
+                const draft = _readHyperLiDraft();
+                const banner = document.getElementById('hyper-li-draft-banner');
+                if (!draft || !draft.fields) { banner.classList.add('hidden'); return; }
+                document.getElementById('hyper-li-draft-info').textContent = (draft.fields.branchCode || '') + ' ' + (draft.fields.branchName || '') + ' · ' + new Date(draft.savedAt).toLocaleString('en-GB');
+                banner.classList.remove('hidden');
+            }
+            function restoreHyperLiDraft(fromServer) {
+                const draft = fromServer || _readHyperLiDraft();
+                if (!draft) return;
+                const form = document.getElementById('hyper-li-form');
+                _clearHyperLiZones();
+                const s = HYPER_REF_STORES.find(function(x) { return x[0] === draft.fields.branchCode; });
+                if (s) { document.getElementById('hyper-li-station-search').value = draft.search || _hyperRefStoreLabel(s); _applyHyperLiStore(s); }
+                _clearHyperLiZones();
+                Object.keys(draft.fields).forEach(function(name) {
+                    const el = form.elements[name];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList) Array.from(el).forEach(function(r) { r.checked = r.value === draft.fields[name]; });
+                    else el.value = draft.fields[name];
+                });
+                document.getElementById('hli-broken-section').classList.toggle('hidden', draft.fields.hasBroken !== 'Yes');
+                (draft.zones || []).forEach(function(z) { hliAddZone(z.area || 'sales', z); });
+                hliRecalcAll();
+                document.getElementById('hyper-li-draft-banner').classList.add('hidden');
+            }
+            function discardHyperLiDraft() {
+                if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return;
+                try { localStorage.removeItem(HYPER_LI_DRAFT_KEY); } catch (e) {}
+                checkHyperLiDraft();
+            }
+            function resetHyperLiForm(askFirst) {
+                if (askFirst && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('hyperLi');
+                const form = document.getElementById('hyper-li-form');
+                const reporterName = form.reporterName.value, reporterPhone = form.reporterPhone.value;
+                form.reset();
+                form.reporterName.value = reporterName;
+                form.reporterPhone.value = reporterPhone;
+                document.getElementById('hli-tariff').value = HYPER_LI_CONFIG.tariff;
+                ['hli_layout_sales', 'hli_layout_town', 'hli_broken'].forEach(function(k) { delete _accumulatedFiles[k]; });
+                document.querySelectorAll('#content-hyper-li-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                _clearHyperLiZones();
+                document.getElementById('hyper-li-station-search').value = '';
+                document.getElementById('hli-broken-section').classList.add('hidden');
+                _clearHyperLiStore();
+                hliRecalcTotals();
+            }
+
+            async function handleHyperLiSurveySubmit(e) {
+                e.preventDefault();
+                const form = e.target;
+                if (!form.reporterName.value.trim()) { alert("กรุณากรอกชื่อผู้แจ้ง (Reporter)"); form.reporterName.focus(); return; }
+                if (!form.reporterPhone.value.trim()) { alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone)"); form.reporterPhone.focus(); return; }
+                if (!form.branchCode.value) { alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน"); return; }
+                if (!(_hliTariff() > 0)) { alert('กรุณาระบุค่าไฟเฉลี่ย (บาท / kWh)'); form.tariff.focus(); return; }
+                const zones = Array.from(document.querySelectorAll('#content-hyper-li-survey [data-zone]'));
+                if (!zones.length) { alert('กรุณาเพิ่มอย่างน้อย 1 โซน'); return; }
+                // every zone: installed lighting + at least one lux reading
+                for (const z of zones) {
+                    const c = hliZoneCalc(z);
+                    const msg = !_hliRows(z, 'fix').length ? 'ยังไม่ได้กรอกระบบไฟที่ติดตั้ง' : !c.n ? 'ยังไม่ได้วัดค่า Lux' : !c.hours ? 'ยังไม่ได้ระบุชั่วโมงเปิดไฟ' : '';
+                    if (msg) { alert('โซน ' + z.dataset.zone + ': ' + msg); z.scrollIntoView({ behavior: 'smooth', block: 'center' }); z.classList.add('ring-2', 'ring-red-400'); setTimeout(function() { z.classList.remove('ring-2', 'ring-red-400'); }, 2000); return; }
+                }
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุโคมที่เสียและอาการ'); form.brokenDetail.focus(); return; }
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    const tasks = [];
+                    const seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('HLI', form.branchCode.value, tasks, function(cat) { return cat.indexOf('hli_layout') === 0 ? [1600, 1600, 0.72] : [800, 800, 0.60]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+                    const data = _hyperLiCollectFields(form);
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('hyperLi');
+                    data.zonesJson = JSON.stringify(collectHyperLiZones());
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) {
+                                showSuccess(); sdsReset('hyperLi');
+                                try { localStorage.removeItem(HYPER_LI_DRAFT_KEY); } catch (e2) {}
+                                checkHyperLiDraft();
+                                resetHyperLiForm(false);
+                            } else alert('Error: ' + (res && res.error));
+                        })
+                        .withFailureHandler(function(err) { hideLoading(); alert('Server Error: ' + err.message); })
+                        .processHyperLiSurveyForm(data);
+                } catch (err) {
+                    hideLoading();
+                    alert('Error processing form: ' + err.message);
+                }
+            }
+        </script>

@@ -15,6 +15,29 @@ function _acquireWriteLock_(timeoutMs) {
     return lock;
 }
 
+// Appends photo URLs to a record's Attachments_JSON[unitKey] under the write
+// lock. Callers upload to Drive first (slow, unlocked), then call this — it
+// re-locates the row by ID and re-reads the cell, so a concurrent edit/delete
+// between the original lookup and now can't cause a lost update or a write
+// into the wrong row.
+function _appendAttachmentUrls_(sheet, id, idColIdx, attachCol, unitKey, newUrls) {
+    _acquireWriteLock_();
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: false, error: "Record not found." };
+    var ids = sheet.getRange(2, idColIdx + 1, lastRow - 1, 1).getValues();
+    var rowIndex = -1;
+    for (var i = 0; i < ids.length; i++) {
+        if (ids[i][0] == id) { rowIndex = i + 2; break; }
+    }
+    if (rowIndex === -1) return { success: false, error: "Record not found (it may have been deleted)." };
+    var cell = sheet.getRange(rowIndex, attachCol);
+    var existing = {};
+    try { existing = JSON.parse(cell.getValue() || "{}"); } catch (e) {}
+    existing[unitKey] = (existing[unitKey] || []).concat(newUrls);
+    cell.setValue(JSON.stringify(existing));
+    return { success: true };
+}
+
 // ─── Enum field options (Brand/Type/Product dropdowns) ────────────────────────
 // AppSheet-style "enum with add new": each group's dropdown options are the
 // hardcoded defaults below UNION whatever distinct values already exist in
@@ -417,49 +440,11 @@ function cleanupEnumFieldData(dryRun) {
 }
 
 // Helper Functions (needed by getAllSurveysReport)
-function findEmployeeSheet() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Employee_Database");
-    if (sheet) return sheet;
+// findEmployeeSheet() lives in Code01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.
 
-    // Fallback: Search for a sheet that looks like the Employee DB
-    var sheets = ss.getSheets();
-    for (var i = 0; i < sheets.length; i++) {
-        var s = sheets[i];
-        var headers = s.getRange(1, 1, 1, 15).getValues()[0];
-        if (headers.indexOf("Direct Manager") !== -1 || headers.indexOf("Full Name") !== -1) {
-             return s;
-        }
-    }
-    
-    // Last resort: Return first sheet
-    Logger.log("Could not identify Employee Sheet. Using first sheet.");
-    return ss.getSheets()[0];
-}
-
-function findStoreSheet() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Store_Database");
-    if (sheet) return sheet;
-
-    // Fallback: Search for a sheet that looks like the Store DB
-    var sheets = ss.getSheets();
-    for (var i = 0; i < sheets.length; i++) {
-        var s = sheets[i];
-        if (s.getLastRow() < 1) continue;
-        var headers = s.getRange(1, 1, 1, Math.min(10, s.getLastColumn())).getValues()[0];
-        // Look for store-related headers
-        for (var j = 0; j < headers.length; j++) {
-            var header = String(headers[j]).toLowerCase();
-            if (header.indexOf("store") !== -1 || header.indexOf("latitude") !== -1 || header.indexOf("longitude") !== -1) {
-                return s;
-            }
-        }
-    }
-    
-    Logger.log("Could not identify Store Sheet.");
-    return null;
-}
+// findStoreSheet() lives in TripPlan01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.
 
 
 function checkSurveyAdminStatus(clientEmail) {
@@ -476,7 +461,7 @@ function checkSurveyAdminStatus(clientEmail) {
         var _uv = _uc.get(_uk);
         if (_uv) {
             var _uf = JSON.parse(_uv);
-            return { isAdmin: _uf.isAdmin, isSMF: _uf.isSMF, isScheduleAdmin: _uf.isScheduleAdmin, isSysAdmin: _uf.isSysAdmin, smfEditAllowed: _uf.isSMF && _smfSurveyEditToggleOn_(), opsEditAllowed: _opsSurveyEditToggleOn_(), sysAdminDedupAllowed: _uf.isSysAdmin && _sysAdminDupCleanupToggleOn_(), email: email };
+            return { isAdmin: _uf.isAdmin, isSMF: _uf.isSMF, isScheduleAdmin: _uf.isScheduleAdmin, isSysAdmin: _uf.isSysAdmin, smfEditAllowed: _uf.isSMF && _smfSurveyEditToggleOn_(), opsEditAllowed: _opsSurveyEditToggleOn_(), sysAdminDedupAllowed: _uf.isSysAdmin && _sysAdminDupCleanupToggleOn_(), smfDedupAllowed: _uf.isSMF && _smfDupCleanupToggleOn_(), email: email };
         }
     } catch(_uce) {}
     // ─────────────────────────────────────────────────────────────────────
@@ -536,7 +521,7 @@ function checkSurveyAdminStatus(clientEmail) {
         _uc2.put(_uk2, JSON.stringify({ isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin }), 120);
     } catch(_uce2) {}
 
-    return { isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, smfEditAllowed: isSMF && _smfSurveyEditToggleOn_(), opsEditAllowed: _opsSurveyEditToggleOn_(), sysAdminDedupAllowed: isSysAdmin && _sysAdminDupCleanupToggleOn_(), email: email };
+    return { isAdmin: isAdmin, isSMF: isSMF, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, smfEditAllowed: isSMF && _smfSurveyEditToggleOn_(), opsEditAllowed: _opsSurveyEditToggleOn_(), sysAdminDedupAllowed: isSysAdmin && _sysAdminDupCleanupToggleOn_(), smfDedupAllowed: isSMF && _smfDupCleanupToggleOn_(), email: email };
 }
 
 // Independent of SMF_ADMIN_ENABLED (which elevates SMF to full Admin everywhere).
@@ -572,23 +557,8 @@ function getUserFlags(clientEmail) {
     return checkSurveyAdminStatus(clientEmail);
 }
 
-function getEmployeeEmail(empId) {
-    try {
-        var sheet = findEmployeeSheet();
-        var data = sheet.getDataRange().getValues();
-        
-        for (var i = 1; i < data.length; i++) {
-            // Robust ID match
-            if (String(data[i][1]).trim() === String(empId).trim()) { // Col 1 is EmpID
-                return data[i][6]; // Col 6 is Email
-            }
-        }
-        return null;
-    } catch (e) {
-        Logger.log("getEmployeeEmail Error: " + e.toString());
-        return null;
-    }
-}
+// getEmployeeEmail() lives in Code01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.
 
 function getManagerChain(reporterId, reporterEmail) {
     var emails = [];
@@ -1055,6 +1025,11 @@ function processAirConSurveyForm(form) {
                 }
             }
         }
+        // Photos already uploaded one by one by a draft/section save (SurveyDraftStore.gs)
+        var _preLinks = _sdUploadedLinks_(form);
+        Object.keys(_preLinks).forEach(function(cat) {
+            attachmentLinks[cat] = _preLinks[cat].concat(attachmentLinks[cat] || []);
+        });
 
         var dataToSave = {
             "Timestamp": new Date(),
@@ -1359,6 +1334,7 @@ function processAirConSurveyForm(form) {
         });
 
         sheet.appendRow(row);
+        if (!form.isDraft) _closeSurveyDraft_(form.draftId, id);
         
         // --- EMAIL NOTIFICATION LOGIC ---
         if (!form.isDraft) {
@@ -2045,23 +2021,24 @@ function getAirConSurveysReport() {
 function _invalidateAcSlimCache() {
     try {
         var cache = CacheService.getScriptCache();
-        var nStr = cache.get('AC_SLIM_V2_n');
-        var keys = ['AC_SLIM_V2_n', 'COMBINED_TREND_V1'];
-        if (nStr) { for (var i = 0; i < parseInt(nStr, 10); i++) keys.push('AC_SLIM_V2_' + i); }
+        var nStr = cache.get('AC_SLIM_V3_n');
+        var keys = ['AC_SLIM_V3_n', 'COMBINED_TREND_V1'];
+        if (nStr) { for (var i = 0; i < parseInt(nStr, 10); i++) keys.push('AC_SLIM_V3_' + i); }
         cache.removeAll(keys);
     } catch(e) {}
+    try { _cacheClearChunked_('DASH_AIRCON_V3'); } catch(e) {}
 }
 
-function getAirconSurveyListSlim() {
+function getAirconSurveyListSlim(includeArchive) {
     try {
         // Cache check FIRST — before any sheet/auth reads
         try {
             var _sc = CacheService.getScriptCache();
-            var _nStr = _sc.get('AC_SLIM_V2_n');
-            if (_nStr !== null) {
+            var _nStr = _sc.get('AC_SLIM_V3_n');
+            if (_nStr !== null && !includeArchive) {
                 var _n = parseInt(_nStr, 10), _json = '', _ok = true;
                 for (var _ci = 0; _ci < _n; _ci++) {
-                    var _ch = _sc.get('AC_SLIM_V2_' + _ci);
+                    var _ch = _sc.get('AC_SLIM_V3_' + _ci);
                     if (_ch === null) { _ok = false; break; }
                     _json += _ch;
                 }
@@ -2069,7 +2046,7 @@ function getAirconSurveyListSlim() {
             }
         } catch(_scE) {}
 
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Aircon_Survey_Database');
+        var sheet = _archSheetFor_('Aircon_Survey_Database', includeArchive);
         if (!sheet || sheet.getLastRow() < 2) return { success: true, data: [], isAdmin: false, isSMF: false, isScheduleAdmin: false };
 
         var lastCol = sheet.getLastColumn();
@@ -2078,7 +2055,19 @@ function getAirconSurveyListSlim() {
         headers.forEach(function(hdr, i) { h[String(hdr).trim()] = i; });
 
         // Read only up to the furthest needed column (excludes Attachments_JSON and most unit detail cols)
-        var AC_TYPE_CODE = { 'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT' };
+        // "Unit N Type" is a free-text input (datalist suggestions, not a strict
+        // dropdown — see index.html's generateAcInventoryCards) so real submissions
+        // can and do contain values outside the 5 canonical English keys (e.g. a
+        // Thai label typed/picked directly, or a one-off custom entry). Recognizing
+        // ONLY the English keys here silently zeroed out the whole badge for any
+        // branch whose latest submission used a non-English value — real bug found
+        // 2026-08-25, user reported "WT0 HT0 CT0" on every row. Fix: also recognize
+        // the known Thai display labels as aliases, and bucket anything else as
+        // OTHER instead of dropping it, so the total count stays accurate.
+        var AC_TYPE_CODE = {
+            'Wall Type': 'WT', 'Hanging Type': 'HT', 'Cassette Type': 'CT', 'Floor Standing': 'FS', 'Package Type': 'PT',
+            'แอร์ติดผนัง': 'WT', 'แอร์แขวน': 'HT', 'แอร์ฝังฝ้า': 'CT', 'แอร์ตั้งพื้น': 'FS', 'แอร์ตู้ตั้งพื้น': 'PT'
+        };
         var UNIT_TYPE_COLS = [];
         for (var _u = 1; _u <= 20; _u++) UNIT_TYPE_COLS.push('Unit ' + _u + ' Type');
         var NEED = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Broken Units','DM Area','CM Area','AMM MTN','Survey Round'].concat(UNIT_TYPE_COLS);
@@ -2098,10 +2087,12 @@ function getAirconSurveyListSlim() {
             if (ts instanceof Date) ts = ts.toISOString();
             // Unit-type breakdown — every AC type qty, computed from the 20 "Unit N Type" cells
             // rather than stored per-type, since Aircon tracks type per-unit not per-type counts.
-            var typeQty = { WT: 0, HT: 0, CT: 0, FS: 0, PT: 0 };
+            var typeQty = { WT: 0, HT: 0, CT: 0, FS: 0, PT: 0, OTHER: 0 };
             for (var u = 1; u <= 20; u++) {
-                var code = AC_TYPE_CODE[gv('Unit ' + u + ' Type')];
-                if (code) typeQty[code]++;
+                var rawType = String(gv('Unit ' + u + ' Type') || '').trim();
+                if (!rawType) continue;
+                var code = AC_TYPE_CODE[rawType];
+                if (code) typeQty[code]++; else typeQty.OTHER++;
             }
             results.push({
                 id: String(id),
@@ -2114,7 +2105,7 @@ function getAirconSurveyListSlim() {
                 recorderName: String(gv('Reporter Name') || gv('Reporter Email') || ''),
                 status:      String(gv('Status')        || 'Pending'),
                 brokenUnits: String(gv('Broken Units')  || ''),
-                wtQty: typeQty.WT, htQty: typeQty.HT, ctQty: typeQty.CT, fsQty: typeQty.FS, ptQty: typeQty.PT
+                wtQty: typeQty.WT, htQty: typeQty.HT, ctQty: typeQty.CT, fsQty: typeQty.FS, ptQty: typeQty.PT, otherQty: typeQty.OTHER
             });
         }
 
@@ -2140,9 +2131,9 @@ function getAirconSurveyListSlim() {
             var _cj = JSON.stringify(results), _co = CacheService.getScriptCache();
             var _store = {}, _nc = 0;
             for (var _cs = 0; _cs < _cj.length; _cs += 90000)
-                _store['AC_SLIM_V2_' + _nc++] = _cj.substring(_cs, _cs + 90000);
-            _store['AC_SLIM_V2_n'] = String(_nc);
-            _co.putAll(_store, 300);
+                _store['AC_SLIM_V3_' + _nc++] = _cj.substring(_cs, _cs + 90000);
+            _store['AC_SLIM_V3_n'] = String(_nc);
+            if (!includeArchive) _co.putAll(_store, 300);
         } catch(_we) {}
 
         return { success: true, data: results, isAdmin: false, isSMF: false, isScheduleAdmin: false };
@@ -2151,9 +2142,230 @@ function getAirconSurveyListSlim() {
     }
 }
 
+// ─── AC Unit Type data cleanup ──────────────────────────────────────────────
+// One-time (repeatable) historical cleanup: any "Unit N Type" cell that is
+// blank OR not one of the 5 canonical types the form's dropdown now produces
+// (see index.html's generateAcInventoryCards — Type went from free-text to a
+// locked <select> after the WT0/HT0/CT0 badge bug, project_aircon_type_badge_fix)
+// gets overwritten to "Hanging Type". This is a deliberate UNIFORM fallback per
+// explicit Super Admin instruction — NOT a smart per-value remap (e.g. a Thai
+// alias like "แอร์ติดผนัง" does NOT get mapped to its matching "Wall Type"; it's
+// "non-standard" same as anything else and becomes "Hanging Type" too).
+// Super Admin (isAdmin) only. Backs up every touched row (full, pre-cleanup) to
+// "Aircon_Survey_Database_TypeCleanupBackup" before writing, same pattern as
+// DuplicateCleanup.gs's _backupDupRows_.
+//
+// BUG FIXED (same day, before first real use finished): the first version
+// scanned all 20 "Unit N Type" columns for every row regardless of how many
+// AC units that submission actually has — most rows have far fewer than 20,
+// so columns beyond the real count are blank because THE UNIT DOESN'T EXIST,
+// not because its type is missing. That version stamped "Hanging Type" into
+// every one of those non-existent units too, inflating every badge total.
+// Fixed by scoping to each row's own "AC Quantity" (falls back to "does this
+// unit have ANY other data — Brand/Asset No/Status" when AC Quantity itself
+// is blank/unparseable, for older rows without a reliable quantity field).
+function _acStandardTypeSet_() {
+    return { 'Wall Type': true, 'Hanging Type': true, 'Cassette Type': true, 'Floor Standing': true, 'Package Type': true };
+}
+
+function _acTypeCleanupScan_(sheet) {
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var h = {};
+    headers.forEach(function(hd, i) { h[String(hd).trim()] = i; });
+
+    var typeColByUnit = {}; // unit number -> column index
+    for (var u = 1; u <= 20; u++) {
+        var idx = h['Unit ' + u + ' Type'];
+        if (idx !== undefined) typeColByUnit[u] = idx;
+    }
+
+    var nRows = sheet.getLastRow() - 1;
+    var data = nRows > 0 ? sheet.getRange(2, 1, nRows, lastCol).getValues() : [];
+    return { headers: headers, h: h, typeColByUnit: typeColByUnit, qtyIdx: h['AC Quantity'], data: data, lastCol: lastCol };
+}
+
+// Which "Unit N Type" columns are actually IN SCOPE for this row — i.e. this
+// unit genuinely exists on this submission.
+function _acUnitTypeColsInRange_(row, scan) {
+    var qty = scan.qtyIdx !== undefined ? parseInt(row[scan.qtyIdx], 10) : NaN;
+    var cols = [];
+    if (qty && qty > 0) {
+        for (var u = 1; u <= 20 && u <= qty; u++) {
+            if (scan.typeColByUnit[u] !== undefined) cols.push(scan.typeColByUnit[u]);
+        }
+        return cols;
+    }
+    // No usable AC Quantity on this row — only include a unit if it has OTHER
+    // data on file (Brand/Asset No/Status), so an unused trailing column isn't
+    // mistaken for real row data.
+    for (var u2 = 1; u2 <= 20; u2++) {
+        var typeCol = scan.typeColByUnit[u2];
+        if (typeCol === undefined) continue;
+        var brandIdx = scan.h['Unit ' + u2 + ' Brand'];
+        var assetIdx = scan.h['Unit ' + u2 + ' Asset No'];
+        var statusIdx = scan.h['Unit ' + u2 + ' Status'];
+        var hasOther = (brandIdx !== undefined && String(row[brandIdx] || '').trim()) ||
+                        (assetIdx !== undefined && String(row[assetIdx] || '').trim()) ||
+                        (statusIdx !== undefined && String(row[statusIdx] || '').trim());
+        if (hasOther) cols.push(typeCol);
+    }
+    return cols;
+}
+
+function getAcUnitTypeCleanupPreview(clientEmail) {
+    try {
+        var adminCheck = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
+        if (!adminCheck.isAdmin) return { success: false, error: 'Super Admin privileges required.' };
+
+        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Aircon_Survey_Database');
+        if (!sheet || sheet.getLastRow() < 2) return { success: true, affectedRows: 0, affectedCells: 0, totalRows: 0 };
+
+        var scan = _acTypeCleanupScan_(sheet);
+        var standard = _acStandardTypeSet_();
+        var affectedRows = 0, affectedCells = 0;
+        scan.data.forEach(function(row) {
+            var rowAffected = false;
+            _acUnitTypeColsInRange_(row, scan).forEach(function(ci) {
+                var v = String(row[ci] || '').trim();
+                if (!v || !standard[v]) { affectedCells++; rowAffected = true; }
+            });
+            if (rowAffected) affectedRows++;
+        });
+
+        return { success: true, affectedRows: affectedRows, affectedCells: affectedCells, totalRows: scan.data.length };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function runAcUnitTypeCleanup(clientEmail) {
+    try {
+        var adminCheck = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
+        if (!adminCheck.isAdmin) return { success: false, error: 'Super Admin privileges required.' };
+
+        var _wlock = _acquireWriteLock_();
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var sheet = ss.getSheetByName('Aircon_Survey_Database');
+        if (!sheet || sheet.getLastRow() < 2) return { success: true, affectedRows: 0, affectedCells: 0 };
+
+        var scan = _acTypeCleanupScan_(sheet);
+        var standard = _acStandardTypeSet_();
+        var headers = scan.headers, data = scan.data, lastCol = scan.lastCol;
+
+        var touchedIdx = [];
+        var colsInRangeByRow = {};
+        data.forEach(function(row, ri) {
+            var cols = _acUnitTypeColsInRange_(row, scan);
+            colsInRangeByRow[ri] = cols;
+            var rowAffected = cols.some(function(ci) {
+                var v = String(row[ci] || '').trim();
+                return !v || !standard[v];
+            });
+            if (rowAffected) touchedIdx.push(ri);
+        });
+
+        if (touchedIdx.length === 0) return { success: true, affectedRows: 0, affectedCells: 0 };
+
+        // Backup every touched row (full, pre-cleanup) BEFORE any mutation.
+        var backupName = 'Aircon_Survey_Database_TypeCleanupBackup';
+        var backupSheet = ss.getSheetByName(backupName);
+        var auditHeaders = headers.concat(['_BackupTimestamp', '_BackupBy']);
+        if (!backupSheet) {
+            backupSheet = ss.insertSheet(backupName);
+            backupSheet.appendRow(auditHeaders);
+            backupSheet.setFrozenRows(1);
+            var hdrRng = backupSheet.getRange(1, 1, 1, auditHeaders.length);
+            hdrRng.setBackground('#b91c1c');
+            hdrRng.setFontColor('#ffffff');
+            hdrRng.setFontWeight('bold');
+        }
+        var now = new Date();
+        var byEmail = clientEmail || Session.getActiveUser().getEmail();
+        var backupRows = touchedIdx.map(function(ri) { return data[ri].slice().concat([now, byEmail || '']); });
+        backupSheet.getRange(backupSheet.getLastRow() + 1, 1, backupRows.length, auditHeaders.length).setValues(backupRows);
+
+        // Mutate and write back only the touched rows (bounded writes, doesn't
+        // rewrite the whole sheet) — only columns actually in range for that row.
+        var affectedCells = 0;
+        touchedIdx.forEach(function(ri) {
+            var rowVals = data[ri];
+            colsInRangeByRow[ri].forEach(function(ci) {
+                var v = String(rowVals[ci] || '').trim();
+                if (!v || !standard[v]) { rowVals[ci] = 'Hanging Type'; affectedCells++; }
+            });
+            sheet.getRange(ri + 2, 1, 1, lastCol).setValues([rowVals]);
+        });
+
+        _invalidateAcSlimCache();
+
+        return { success: true, affectedRows: touchedIdx.length, affectedCells: affectedCells };
+    } catch (e) {
+        Logger.log('runAcUnitTypeCleanup Error: ' + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─── Restore from Aircon_Survey_Database_TypeCleanupBackup ─────────────────
+// Undoes runAcUnitTypeCleanup by restoring every backed-up row's FULL
+// pre-cleanup contents, matched by ID. If a row was backed up more than once
+// (e.g. cleanup run twice), uses the OLDEST backup entry — the true original
+// state — since backup rows are always appended in chronological order.
+// Super Admin (isAdmin) only.
+function restoreAcUnitTypeCleanupBackup(clientEmail) {
+    try {
+        var adminCheck = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
+        if (!adminCheck.isAdmin) return { success: false, error: 'Super Admin privileges required.' };
+
+        var _wlock = _acquireWriteLock_();
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var backupSheet = ss.getSheetByName('Aircon_Survey_Database_TypeCleanupBackup');
+        var sheet = ss.getSheetByName('Aircon_Survey_Database');
+        if (!backupSheet || backupSheet.getLastRow() < 2) return { success: true, restored: 0 };
+        if (!sheet) return { success: false, error: 'Aircon_Survey_Database not found.' };
+
+        var backupData = backupSheet.getDataRange().getValues();
+        var backupHeaders = backupData[0];
+        var origColCount = backupHeaders.length - 2; // strip _BackupTimestamp, _BackupBy
+        var backupIdIdx = backupHeaders.indexOf('ID');
+        if (backupIdIdx < 0) return { success: false, error: 'ID column not found in backup sheet.' };
+
+        var liveData = sheet.getDataRange().getValues();
+        var liveHeaders = liveData[0];
+        var idIdx = liveHeaders.indexOf('ID');
+        if (idIdx < 0) return { success: false, error: 'ID column not found in live sheet.' };
+
+        var liveRowById = {};
+        for (var i = 1; i < liveData.length; i++) {
+            var id = String(liveData[i][idIdx] || '');
+            if (id) liveRowById[id] = i + 1; // sheet row number
+        }
+
+        var seen = {};
+        var restored = 0;
+        for (var b = 1; b < backupData.length; b++) {
+            var bid = String(backupData[b][backupIdIdx] || '');
+            if (!bid || seen[bid]) continue;
+            seen[bid] = true;
+            var targetRow = liveRowById[bid];
+            if (!targetRow) continue;
+            var origValues = backupData[b].slice(0, origColCount);
+            sheet.getRange(targetRow, 1, 1, origColCount).setValues([origValues]);
+            restored++;
+        }
+
+        _invalidateAcSlimCache();
+
+        return { success: true, restored: restored };
+    } catch (e) {
+        Logger.log('restoreAcUnitTypeCleanupBackup Error: ' + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
 function getAirconSurveyRecordById(id) {
     try {
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Aircon_Survey_Database');
+        var sheet = _archLookupSheet_('Aircon_Survey_Database', id);
         if (!sheet) return { success: false, error: 'Sheet not found' };
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
@@ -3115,6 +3327,23 @@ function processRefSurveyForm(form) {
 
         var id = "RFS-" + new Date().getTime();
 
+        // Module-by-module save: the client sends back the surveyId it got from its
+        // first save, and every later save (one equipment module at a time, then the
+        // final Submit) updates that same Draft row in place instead of appending.
+        // Only a Draft row may be overwritten — a submitted survey is never touched.
+        var _existing = null;
+        var _reqId = String(form.surveyId || '').trim();
+        if (/^RFS-\d+$/.test(_reqId)) {
+            id = _reqId;
+            if (sheet && sheet.getLastRow() >= 2) {
+                _existing = _findSurveyRowById_(sheet, _reqId);
+                if (_existing && String(_existing.rec['Status'] || '').trim() !== 'Draft') {
+                    return { success: false, code: 'ALREADY_SUBMITTED',
+                        error: 'แบบสำรวจนี้ถูกส่งไปแล้ว (ID ' + _reqId + ') ไม่สามารถบันทึกทับได้ — กรุณาเริ่มแบบสำรวจใหม่' };
+                }
+            }
+        }
+
         // Handle Attachments
         var attachmentLinks = {};
         if (form.attachments) {
@@ -3138,6 +3367,23 @@ function processRefSurveyForm(form) {
                     });
                 }
             }
+        }
+
+        // Photos uploaded by earlier module saves stay; this call's new photos are
+        // appended per category, minus any the surveyor removed since (removedAttachments).
+        if (_existing) {
+            var _prevLinks = {};
+            try { _prevLinks = JSON.parse(_existing.rec['Attachments_JSON'] || '{}') || {}; } catch (pe) { _prevLinks = {}; }
+            var _removed = form.removedAttachments || {};
+            Object.keys(_removed).forEach(function(cat) {
+                var drop = _removed[cat] || [];
+                if (_prevLinks[cat]) _prevLinks[cat] = _prevLinks[cat].filter(function(u) { return drop.indexOf(u) === -1; });
+                if (_prevLinks[cat] && _prevLinks[cat].length === 0) delete _prevLinks[cat];
+            });
+            Object.keys(attachmentLinks).forEach(function(cat) {
+                _prevLinks[cat] = (_prevLinks[cat] || []).concat(attachmentLinks[cat]);
+            });
+            attachmentLinks = _prevLinks;
         }
 
         // Build per-unit broken refrigerator data (new format: brokenRefUnit + RefUnitN_*)
@@ -3208,8 +3454,20 @@ function processRefSurveyForm(form) {
             }
         });
 
-        var row = headers.map(function(h) { return dataToSave[h] !== undefined ? dataToSave[h] : ""; });
-        sheet.appendRow(row);
+        if (_existing) {
+            // Rewrite the Draft row with the form's current state. "Ref ..." columns are
+            // per-unit form fields, so one missing from this save means the unit was
+            // removed (qty lowered) and is blanked; other columns keep their value.
+            var row = headers.map(function(h, k) {
+                if (dataToSave[h] !== undefined) return dataToSave[h];
+                if (/^Ref /.test(h)) return "";
+                return _existing.values[k] !== undefined ? _existing.values[k] : "";
+            });
+            sheet.getRange(_existing.rowNum, 1, 1, row.length).setValues([row]);
+        } else {
+            var row = headers.map(function(h) { return dataToSave[h] !== undefined ? dataToSave[h] : ""; });
+            sheet.appendRow(row);
+        }
         _invalidateRefSlimCache();
 
         // Email Notification
@@ -3252,6 +3510,7 @@ function processRefSurveyForm(form) {
             htmlBody += '<p><b>อาหารแช่แข็ง:</b> Plugin ' + (form.refFrozenPluginQty || 0) + ' / Remote ' + (form.refFrozenRemoteQty || 0) + ' / Walk-in ' + (form.refFrozenWalkInQty || 0) + ' ตู้</p>';
             htmlBody += '<p><b>ไอศกรีม:</b> ' + (form.refIceCreamQty || 0) + ' ตู้ | <b>น้ำแข็ง:</b> ' + (form.refIceQty || 0) + ' ตู้</p>';
             htmlBody += '<p><b>ตู้ 4 ประตู Stainless:</b> ' + (form.refSs4DoorQty || 0) + ' ตู้</p>';
+            htmlBody += '<p><b>ตู้ Dump Chiller:</b> ' + (form.refDumpChillerQty || 0) + ' ตู้</p>';
             
             htmlBody += '<hr/><h3>รายละเอียดแต่ละตู้ (Brand, Asset No & Product)</h3>';
 
@@ -3292,6 +3551,8 @@ function processRefSurveyForm(form) {
                     s += '<p style="margin:0 0 4px 0;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">ตู้ที่ ' + (u - start + 1) + '</p>';
                     s += '<table style="border-collapse:collapse;font-size:13px;">';
                     if (supplierDisplay) s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">แบรนด์ไอศกรีม</td><td style="padding:2px 0;font-weight:600;">' + supplierDisplay + '</td></tr>';
+                    var uType = dataToSave[prefixKey + 'Type_' + u] || '';
+                    if (uType) s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">ประเภท (Type)</td><td style="padding:2px 0;font-weight:600;">' + uType + '</td></tr>';
                     s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">' + (supplierDisplay ? 'ยี่ห้อตู้' : 'ยี่ห้อ') + '</td><td style="padding:2px 0;font-weight:600;">' + brand + '</td></tr>';
                     if (asset !== '-') s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">Asset No.</td><td style="padding:2px 0;">' + asset + '</td></tr>';
                     if (product !== '-') s += '<tr><td style="padding:2px 10px 2px 0;color:#64748b;white-space:nowrap;">สินค้า</td><td style="padding:2px 0;">' + product + '</td></tr>';
@@ -3328,6 +3589,7 @@ function processRefSurveyForm(form) {
             var _icecreamQty = parseInt(form.refIceCreamQty)|| 0;
             var _iceQty      = parseInt(form.refIceQty)     || 0;
             var _ss4DoorQty  = parseInt(form.refSs4DoorQty) || 0;
+            var _dumpChillerQty = parseInt(form.refDumpChillerQty) || 0;
 
             // 2.1 OPEN
             if (_openQty > 0)
@@ -3365,7 +3627,12 @@ function processRefSurveyForm(form) {
             // 2.6 Stainless 4 Door
             if (_ss4DoorQty > 0)
                 htmlBody += sectionCard('2.6 ตู้ 4 ประตู Stainless (' + _ss4DoorQty + ' ตู้)', '#475569',
-                    unitRowsHtml('Ref Ss4Door ', _ss4DoorQty, 1, 'ref_ss4door'), null);
+                    unitRowsHtml('Ref Ss4 Door ', _ss4DoorQty, 1, 'ref_ss4door'), null);
+
+            // 2.7 Dump Chiller
+            if (_dumpChillerQty > 0)
+                htmlBody += sectionCard('2.7 ตู้ Dump Chiller (' + _dumpChillerQty + ' ตู้)', '#0d9488',
+                    unitRowsHtml('Ref Dump Chiller ', _dumpChillerQty, 1, 'ref_dumpchiller'), null);
 
             // Other problem photos (ref_problem)
             var _problemPhotos = attachmentLinks['ref_problem'] || [];
@@ -3421,10 +3688,103 @@ function processRefSurveyForm(form) {
         }
         } // end if (!form.isDraft)
 
-        return { success: true, id: id };
+        return { success: true, id: id, status: dataToSave["Status"], attachments: attachmentLinks };
 
     } catch (e) {
         Logger.log("processRefSurveyForm Error: " + e.toString());
+        return { success: false, error: e.toString() };
+    }
+}
+
+// Finds a survey row by its ID column (newest match wins). Reads only the ID
+// column plus the one matching row, so it stays cheap on large sheets.
+function _findSurveyRowById_(sheet, id) {
+    var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+    if (lastRow < 2) return null;
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var idCol = headers.indexOf('ID');
+    if (idCol < 0) return null;
+    var ids = sheet.getRange(2, idCol + 1, lastRow - 1, 1).getValues();
+    var target = String(id).trim();
+    for (var i = ids.length - 1; i >= 0; i--) {
+        if (String(ids[i][0]).trim() !== target) continue;
+        var rowNum = i + 2;
+        var values = sheet.getRange(rowNum, 1, 1, lastCol).getValues()[0];
+        var rec = {};
+        headers.forEach(function(h, k) { rec[h] = values[k]; });
+        return { rowNum: rowNum, headers: headers, values: values, rec: rec };
+    }
+    return null;
+}
+
+// Resume an unfinished (Status = Draft) Ref survey on any device. Matches the
+// branch plus the surveyor (email when signed in, otherwise phone number), within
+// the last 45 days. Returns the fields keyed by their form input names so the
+// client can refill the form, plus the photos already uploaded per category.
+function getRefDraftSurvey(branchCode, reporterEmail, reporterPhone) {
+    try {
+        var code = String(branchCode || '').trim();
+        var email = String(reporterEmail || '').trim().toLowerCase();
+        var phone = String(reporterPhone || '').replace(/\D/g, '').replace(/^0+/, ''); // Sheets may store 081... as the number 81...
+        if (!code || (!email && !phone)) return { success: true, draft: null };
+
+        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Ref_Survey_Database");
+        if (!sheet || sheet.getLastRow() < 2) return { success: true, draft: null };
+        var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+        var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+        function colVals(name) {
+            var c = headers.indexOf(name);
+            return c < 0 ? null : sheet.getRange(2, c + 1, lastRow - 1, 1).getValues();
+        }
+        var codes = colVals('Branch Code'), statuses = colVals('Status'), tss = colVals('Timestamp');
+        var emails = colVals('Reporter Email'), phones = colVals('Reporter Phone');
+        if (!codes || !statuses) return { success: true, draft: null };
+
+        var cutoff = new Date().getTime() - 45 * 24 * 3600 * 1000;
+        var best = -1, bestTs = 0;
+        for (var i = 0; i < codes.length; i++) {
+            if (String(codes[i][0]).trim() !== code) continue;
+            if (String(statuses[i][0]).trim() !== 'Draft') continue;
+            var rowEmail = emails ? String(emails[i][0] || '').trim().toLowerCase() : '';
+            var rowPhone = phones ? String(phones[i][0] || '').replace(/\D/g, '').replace(/^0+/, '') : '';
+            var mine = (email && rowEmail === email) || (!email && phone && rowPhone === phone);
+            if (!mine) continue;
+            var ts = tss && tss[i][0] instanceof Date ? tss[i][0].getTime() : 0;
+            if (ts && ts < cutoff) continue;
+            if (best < 0 || ts >= bestTs) { best = i; bestTs = ts; }
+        }
+        if (best < 0) return { success: true, draft: null };
+
+        var values = sheet.getRange(best + 2, 1, 1, lastCol).getValues()[0];
+        var rec = {};
+        headers.forEach(function(h, k) { rec[h] = values[k] instanceof Date ? values[k].toISOString() : values[k]; });
+
+        // Reverse of processRefSurveyForm's header mapping: "Ref Open Brand_1" -> "refOpenBrand_1"
+        var fields = {};
+        headers.forEach(function(h) {
+            if (/^Ref /.test(h) && rec[h] !== '' && rec[h] !== null) fields['ref' + h.substring(4).replace(/ /g, '')] = rec[h];
+        });
+        var fixed = { reporterName: 'Reporter Name', reporterPhone: 'Reporter Phone', hasBrokenRef: 'Has Broken Ref',
+                      brokenRefUnit: 'Broken Units', comments: 'Comments', surveyRound: 'Survey Round' };
+        Object.keys(fixed).forEach(function(k) { if (rec[fixed[k]] !== undefined && rec[fixed[k]] !== '') fields[k] = rec[fixed[k]]; });
+        try {
+            var detail = JSON.parse(rec['Broken Units Detail'] || '{}') || {};
+            var keyMap = { equipId: 'EquipId', type: 'Type', assetNo: 'AssetNo', temp: 'Temp', frost: 'Frost',
+                           compressor: 'Compressor', evapFan: 'EvapFan', condFan: 'CondFan', gasket: 'Gasket',
+                           drain: 'Drain', refrigerant: 'Refrigerant', condenser: 'Condenser', controller: 'Controller', note: 'Note' };
+            Object.keys(detail).forEach(function(uk) {
+                var n = String(uk).replace(/^unit/, '');
+                Object.keys(keyMap).forEach(function(f) {
+                    if (detail[uk][f]) fields['RefUnit' + n + '_' + keyMap[f]] = detail[uk][f];
+                });
+            });
+        } catch (de) {}
+        var attachments = {};
+        try { attachments = JSON.parse(rec['Attachments_JSON'] || '{}') || {}; } catch (ae) {}
+
+        return { success: true, draft: { id: rec['ID'], savedAt: rec['Timestamp'], fields: fields, attachments: attachments } };
+    } catch (e) {
+        Logger.log("getRefDraftSurvey Error: " + e.toString());
         return { success: false, error: e.toString() };
     }
 }
@@ -3440,6 +3800,7 @@ function _invalidateRefSlimCache() {
         if (nStr) { for (var i = 0; i < parseInt(nStr, 10); i++) keys.push('REF_SLIM_V3_' + i); }
         cache.removeAll(keys);
     } catch(e) {}
+    try { _cacheClearChunked_('DASH_REF_V2'); } catch(e) {}
 }
 
 // Run this from GAS Editor (▶ Run) to debug timing step-by-step.
@@ -3486,13 +3847,13 @@ function debugRefSlim() {
     }
 }
 
-function getRefSurveyListSlim() {
+function getRefSurveyListSlim(includeArchive) {
     try {
         // ── Cache hit: return immediately, no sheet reads at all ──────────────
         try {
             var _sc = CacheService.getScriptCache();
             var _nStr = _sc.get('REF_SLIM_V3_n');
-            if (_nStr !== null) {
+            if (_nStr !== null && !includeArchive) {
                 var _n = parseInt(_nStr, 10), _json = '', _ok = true;
                 for (var _ci = 0; _ci < _n; _ci++) {
                     var _ch = _sc.get('REF_SLIM_V3_' + _ci);
@@ -3505,14 +3866,14 @@ function getRefSurveyListSlim() {
         // ─────────────────────────────────────────────────────────────────────
 
         // Cache miss: read ONLY the columns we need (not getDataRange).
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Ref_Survey_Database');
+        var sheet = _archSheetFor_('Ref_Survey_Database', includeArchive);
         if (!sheet || sheet.getLastRow() < 2) return { success: true, data: [], isAdmin: false, isSMF: false, isScheduleAdmin: false };
 
         var lastCol  = sheet.getLastColumn();
         var lastRow  = sheet.getLastRow();
         var headers  = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 
-        var LIST_KEYS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Has Broken Ref','Broken Units','DM Area','CM Area','AMM MTN','Survey Round','Ref Open Qty','Ref Bev Plugin Qty','Ref Bev Walk In Qty','Ref Bev Remote Qty','Ref Frozen1 Door Qty','Ref Frozen2 Door Qty','Ref Frozen3 Door Qty','Ref Frozen4 Door Qty','Ref Frozen Plugin Qty','Ref Frozen Remote Qty','Ref Frozen Walk In Qty','Ref Ice Cream Qty','Ref Ice Qty','Ref Ss4 Door Qty'];
+        var LIST_KEYS = ['ID','Timestamp','Branch Code','Branch Name','Reporter Name','Reporter Email','Status','Has Broken Ref','Broken Units','DM Area','CM Area','AMM MTN','Survey Round','Ref Open Qty','Ref Bev Plugin Qty','Ref Bev Walk In Qty','Ref Bev Remote Qty','Ref Frozen1 Door Qty','Ref Frozen2 Door Qty','Ref Frozen3 Door Qty','Ref Frozen4 Door Qty','Ref Frozen Plugin Qty','Ref Frozen Remote Qty','Ref Frozen Walk In Qty','Ref Ice Cream Qty','Ref Ice Qty','Ref Ss4 Door Qty','Ref Dump Chiller Qty'];
         var keyIdx = {};
         LIST_KEYS.forEach(function(k) { keyIdx[k] = headers.indexOf(k); });
 
@@ -3543,7 +3904,7 @@ function getRefSurveyListSlim() {
                 _store['REF_SLIM_V3_' + _nc++] = _cj.substring(_cs, _cs + 90000);
             }
             _store['REF_SLIM_V3_n'] = String(_nc);
-            _co.putAll(_store, 300);
+            if (!includeArchive) _co.putAll(_store, 300);
         } catch(_we) {}
 
         return { success: true, data: results, isAdmin: false, isSMF: false, isScheduleAdmin: false };
@@ -3555,7 +3916,7 @@ function getRefSurveyListSlim() {
 // ─── Single full record by ID — used for lazy modal loading ──────────────────
 function getRefSurveyRecordById(id) {
     try {
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Ref_Survey_Database');
+        var sheet = _archLookupSheet_('Ref_Survey_Database', id);
         if (!sheet) return { success: false, error: 'Sheet not found' };
         var lastRow = sheet.getLastRow();
         var lastCol = sheet.getLastColumn();
@@ -4505,11 +4866,13 @@ function addRefSurveyPhotos(id, unitKey, files, clientEmail) {
         }
         if (newUrls.length === 0) return { success: false, error: "No valid files received." };
 
-        var existing = {};
-        try { existing = JSON.parse(data[rowIndex - 1][attachCol - 1] || "{}"); } catch(e) {}
-        existing[unitKey] = (existing[unitKey] || []).concat(newUrls);
+        // Re-read + merge under the write lock: the row was looked up before the
 
-        sheet.getRange(rowIndex, attachCol).setValue(JSON.stringify(existing));
+        // (slow) Drive uploads, so another edit may have changed or moved it since.
+
+        var merged = _appendAttachmentUrls_(sheet, id, idColIdx, attachCol, unitKey, newUrls);
+
+        if (!merged.success) return merged;
         _invalidateRefSlimCache();
         return { success: true, newUrls: newUrls };
     } catch(e) {
@@ -4570,11 +4933,13 @@ function addAcSurveyPhotos(id, unitKey, files, clientEmail) {
         }
         if (newUrls.length === 0) return { success: false, error: "No valid files received." };
 
-        var existing = {};
-        try { existing = JSON.parse(data[rowIndex - 1][attachCol - 1] || "{}"); } catch(e) {}
-        existing[unitKey] = (existing[unitKey] || []).concat(newUrls);
+        // Re-read + merge under the write lock: the row was looked up before the
 
-        sheet.getRange(rowIndex, attachCol).setValue(JSON.stringify(existing));
+        // (slow) Drive uploads, so another edit may have changed or moved it since.
+
+        var merged = _appendAttachmentUrls_(sheet, id, idColIdx, attachCol, unitKey, newUrls);
+
+        if (!merged.success) return merged;
         _invalidateAcSlimCache();
         return { success: true, newUrls: newUrls };
     } catch(e) {
@@ -4745,9 +5110,11 @@ function getRefAcMapData() {
             var rDMCol     = refHeaders.indexOf("DM Area");
             var rCMCol     = refHeaders.indexOf("CM Area");
             var rAMCol     = refHeaders.indexOf("AMM MTN");
+            var rStCol     = refHeaders.indexOf("Status");
             if (rBranchCol > -1) {
                 for (var r = 1; r < refData.length; r++) {
                     var bc = String(refData[r][rBranchCol]).trim();
+                    if (rStCol > -1 && String(refData[r][rStCol] || '').trim() === 'Draft') continue; // unfinished, not yet Submitted
                     if (bc) refBranchMap[bc] = {
                         ts: (rTsCol > -1) ? refData[r][rTsCol] : "",
                         dm: (rDMCol > -1) ? String(refData[r][rDMCol] || "").trim() : "",
@@ -5013,12 +5380,12 @@ function _invalidateNpSlimCache() {
 }
 
 // ── Slim list (cached) ────────────────────────────────────────────────────────
-function getNpSurveyListSlim() {
+function getNpSurveyListSlim(includeArchive) {
     try {
         try {
             var _sc = CacheService.getScriptCache();
             var _nStr = _sc.get('NP_SLIM_V2_n');
-            if (_nStr !== null) {
+            if (_nStr !== null && !includeArchive) {
                 var _n = parseInt(_nStr, 10), _json = '', _ok = true;
                 for (var _ci = 0; _ci < _n; _ci++) {
                     var _ch = _sc.get('NP_SLIM_V2_' + _ci);
@@ -5029,7 +5396,7 @@ function getNpSurveyListSlim() {
             }
         } catch(_scE) {}
 
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
+        var sheet = _archSheetFor_('NewProduct_Survey_Database', includeArchive);
         if (!sheet || sheet.getLastRow() < 2) return { success: true, data: [], isAdmin: false, isSMF: false };
 
         var lastCol  = sheet.getLastColumn();
@@ -5065,7 +5432,7 @@ function getNpSurveyListSlim() {
                 _store['NP_SLIM_V2_' + _nc++] = _cj.substring(_cs, _cs + 90000);
             }
             _store['NP_SLIM_V2_n'] = String(_nc);
-            _co.putAll(_store, 300);
+            if (!includeArchive) _co.putAll(_store, 300);
         } catch(_we) {}
 
         return { success: true, data: results, isAdmin: false, isSMF: false };
@@ -5077,7 +5444,7 @@ function getNpSurveyListSlim() {
 // ── Single full record ────────────────────────────────────────────────────────
 function getNpSurveyRecordById(id) {
     try {
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('NewProduct_Survey_Database');
+        var sheet = _archLookupSheet_('NewProduct_Survey_Database', id);
         if (!sheet) return { success: false, error: 'Sheet not found' };
         var lastRow = sheet.getLastRow();
         if (lastRow < 2) return { success: false, error: 'Record not found' };
@@ -5293,11 +5660,13 @@ function _saveNpPhotos_(id, unitKey, files, folderName) {
     }
     if (newUrls.length === 0) return { success: false, error: 'No valid files received.' };
 
-    var existing = {};
-    try { existing = JSON.parse(data[rowIndex - 1][attachCol - 1] || '{}'); } catch(e) {}
-    existing[unitKey] = (existing[unitKey] || []).concat(newUrls);
+    // Re-read + merge under the write lock: the row was looked up before the
 
-    sheet.getRange(rowIndex, attachCol).setValue(JSON.stringify(existing));
+    // (slow) Drive uploads, so another edit may have changed or moved it since.
+
+    var merged = _appendAttachmentUrls_(sheet, id, idColIdx, attachCol, unitKey, newUrls);
+
+    if (!merged.success) return merged;
     _invalidateNpSlimCache();
     return { success: true, newUrls: newUrls };
 }
@@ -5438,7 +5807,9 @@ function submitNpSurvey(form) {
         setField('Broken Units',  form.brokenUnits || '');
         setField('Broken Units Detail', form.brokenUnitDetail || '');
         setField('Comments',      form.comments || '');
-        setField('Attachments_JSON', '{}');
+        // Photos already uploaded by a draft/section save; the rest are added after
+        // this call by addNpSurveyPhotosOnSubmit (which merges into this JSON).
+        setField('Attachments_JSON', JSON.stringify(_sdUploadedLinks_(form)));
 
         NP_PRODUCTS.forEach(function(p) {
             var qty = parseInt(form[p.code + '_qty']) || 0;
@@ -5465,6 +5836,7 @@ function submitNpSurvey(form) {
             }
         } catch(enrichErr) { Logger.log('NP submit enrich error: ' + enrichErr); }
 
+        _closeSurveyDraft_(form.draftId, id);
         _invalidateNpSlimCache();
         return { success: true, id: id };
     } catch(e) {
@@ -5517,6 +5889,60 @@ function getStoreAssetRegisterForMapping(storeCode) {
                 name:      String(idx.hasOwnProperty('name') ? (row[idx.name] || '') : ''),
                 qty:       idx.hasOwnProperty('qty') ? (row[idx.qty] || '') : '',
                 unitValue: idx.hasOwnProperty('unitvalue') ? (row[idx.unitvalue] || '') : ''
+            });
+        }
+        return { success: true, prebuilt: true, items: items };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Second, SEPARATE asset ledger — CMS Service Asset Inventory (equipment/service
+// register: brand/model/serial/install year, no book value), NOT the same
+// bucket as getStoreAssetRegisterForMapping above (BGCFA fixed-asset/accounting
+// ledger, has qty/unit value, no serial/model). The two systems are not
+// cross-referenced — a physical unit may appear in one, both (under different
+// asset codes), or neither. Per-store CSVs pre-built by
+// `Asset Inventory CMS/Prepare_CMS_Asset_By_Store.ipynb` into Drive folder
+// "Asset Inventory CMS" → "CMS Asset by Store" → "<storeCode>.csv" (same
+// pre-built-CSV-per-store pattern as the BGCFA one, just a different Drive
+// folder/columns). See [[project_web_app_people_mnc]]/notebook markdown for
+// the store-code crosswalk and source-file gotchas.
+// ─────────────────────────────────────────────────────────────────────────────
+var CMS_ASSET_ROOT_FOLDER_ = 'Asset Inventory CMS';
+var CMS_ASSET_SUBFOLDER_ = 'CMS Asset by Store';
+
+function getStoreCmsAssetRegisterForMapping(storeCode) {
+    var code = String(storeCode || '').trim();
+    if (!code) return { success: false, error: 'Missing store code' };
+    try {
+        var rootIt = DriveApp.getFoldersByName(CMS_ASSET_ROOT_FOLDER_);
+        if (!rootIt.hasNext()) return { success: true, prebuilt: false, items: [] };
+        var subIt = rootIt.next().getFoldersByName(CMS_ASSET_SUBFOLDER_);
+        if (!subIt.hasNext()) return { success: true, prebuilt: false, items: [] };
+        var fileIt = subIt.next().getFilesByName(code + '.csv');
+        if (!fileIt.hasNext()) return { success: true, prebuilt: false, items: [] };
+
+        var rows = Utilities.parseCsv(fileIt.next().getBlob().getDataAsString('UTF-8'));
+        if (!rows.length) return { success: true, prebuilt: true, items: [] };
+        var idx = {};
+        rows[0].forEach(function (name, i) { idx[String(name).trim().toLowerCase()] = i; });
+
+        var items = [];
+        for (var r = 1; r < rows.length; r++) {
+            var row = rows[r];
+            if (!row.length || (row.length === 1 && !row[0])) continue; // trailing blank line
+            var assetCode = String(idx.hasOwnProperty('assetcode') ? (row[idx.assetcode] || '') : '').trim();
+            if (!assetCode) continue; // nothing to map without a real tag
+            items.push({
+                assetNo:  assetCode,
+                category: String(idx.hasOwnProperty('category') ? (row[idx.category] || '') : ''),
+                name:     String(idx.hasOwnProperty('name') ? (row[idx.name] || '') : ''),
+                brand:    String(idx.hasOwnProperty('brand') ? (row[idx.brand] || '') : ''),
+                model:    String(idx.hasOwnProperty('model') ? (row[idx.model] || '') : ''),
+                serialNo: String(idx.hasOwnProperty('serialno') ? (row[idx.serialno] || '') : ''),
+                location: String(idx.hasOwnProperty('location') ? (row[idx.location] || '') : '')
             });
         }
         return { success: true, prebuilt: true, items: items };

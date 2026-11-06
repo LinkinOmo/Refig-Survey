@@ -36,6 +36,7 @@
 </head>
 
 <body class="p-6">
+    <?!= include('ArchiveToggle') ?>
 
     <!-- Auth Overlay (Same as work-order-report.html) -->
     <div id="auth-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
@@ -365,7 +366,7 @@
         let charts = {};
 
         window.onload = function () {
-            google.script.run.withSuccessHandler(initDashboard).getAllWorkOrdersReport();
+            google.script.run.withSuccessHandler(initDashboard).getAllWorkOrdersReport(null, window.ARCHIVE_ON);
         };
 
         function initDashboard(data) {

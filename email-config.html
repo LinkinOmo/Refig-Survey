@@ -67,7 +67,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Sender Name</label>
-                            <input id="brevoName" placeholder="Mini Big C Maintenance"
+                            <input id="brevoName" placeholder="Big C Maintenance"
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition">
                         </div>
                     </div>
@@ -87,6 +87,29 @@
                         <span id="brevoStatus" class="text-xs text-gray-400 italic"></span>
                     </div>
                     <p id="brevoQuota" class="text-xs text-gray-400"></p>
+
+                    <div class="pt-3 border-t border-gray-200">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <input id="outboxBypassEnabled" type="checkbox" class="w-4 h-4" onchange="saveOutboxBypass()">
+                            🧪 Force local Outlook queue (skip Gmail/Brevo)
+                        </label>
+                        <p class="text-xs text-gray-400 mt-1">Testing aid — while ON, every email is queued straight to the local-Outlook outbox instead of trying Gmail/Brevo first. Turn OFF again after testing; leaving it on stops all real Gmail/Brevo delivery. If Outlook itself fails to send a queued email, it automatically falls back to Gmail/Brevo for real before giving up. Successfully sent rows are removed from the queue automatically — no manual cleanup needed.</p>
+                        <p id="outboxBypassStatus" class="text-xs text-gray-400 italic mt-1"></p>
+                    </div>
+
+                    <div class="pt-3 border-t border-gray-200">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                            <input id="outboxStaleFallbackEnabled" type="checkbox" class="w-4 h-4" onchange="saveOutboxStaleFallback()">
+                            🔁 Auto-recover via Gmail/Brevo if a row sits queued too long (poller may be off)
+                        </label>
+                        <p class="text-xs text-gray-400 mt-1">Runs on Apps Script's own clock, independent of the local PC — if a genuinely-queued row is still "pending" after <span id="outboxStaleMinutesLabel">15</span> min (e.g. the poller PC is off/asleep/task disabled), it retries Gmail then Brevo automatically instead of waiting forever. Requires the timer below to be installed once.</p>
+                        <div class="flex items-center gap-2 flex-wrap mt-2">
+                            <span id="outboxStaleTriggerStatus" class="text-xs text-gray-400 italic"></span>
+                            <button onclick="installOutboxStaleTrigger()" class="bg-gray-600 hover:bg-gray-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Install/check timer</button>
+                            <button onclick="testOutboxStaleSweepNow()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Test recover now</button>
+                        </div>
+                        <p id="outboxStaleTestResult" class="text-xs text-gray-500 mt-1"></p>
+                    </div>
                 </div>
 
                 <p class="text-center text-xs text-gray-400 mt-6 border-t pt-4">The API key is stored in this app's Script Properties only — never exposed to the browser after saving.</p>
@@ -119,6 +142,92 @@
             if (mainPage) mainPage.classList.remove('hidden');
             if (accessDenied) accessDenied.classList.add('hidden');
             loadBrevoConfig();
+            loadOutboxBypass();
+            loadOutboxStaleSweepStatus();
+        }
+
+        // ── Local Outlook outbox — force-bypass testing toggle ──────
+        function loadOutboxBypass() {
+            var st = document.getElementById('outboxBypassStatus');
+            if (st) st.textContent = 'Loading…';
+            google.script.run
+                .withSuccessHandler(function (enabled) {
+                    document.getElementById('outboxBypassEnabled').checked = !!enabled;
+                    if (st) st.textContent = enabled ? 'Currently ON — every email is being queued to Outlook, not Gmail/Brevo.' : 'Currently OFF (normal delivery).';
+                })
+                .withFailureHandler(function (e) { if (st) st.textContent = 'Load failed: ' + e.message; })
+                .getOutboxForceBypass();
+        }
+
+        function saveOutboxBypass() {
+            var st = document.getElementById('outboxBypassStatus');
+            var enabled = document.getElementById('outboxBypassEnabled').checked;
+            if (st) st.textContent = 'Saving…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (res && res.success) {
+                        if (st) st.textContent = res.enabled ? 'Currently ON — every email is being queued to Outlook, not Gmail/Brevo.' : 'Currently OFF (normal delivery).';
+                    } else {
+                        if (st) st.textContent = (res && res.error) || 'Save failed';
+                        document.getElementById('outboxBypassEnabled').checked = !enabled;
+                    }
+                })
+                .withFailureHandler(function (e) { if (st) st.textContent = 'Save failed: ' + e.message; document.getElementById('outboxBypassEnabled').checked = !enabled; })
+                .setOutboxForceBypass(enabled, _callerEmail());
+        }
+
+        // ── Local Outlook outbox — stale-row fallback (poller may be off) ───────
+        function loadOutboxStaleSweepStatus() {
+            var st = document.getElementById('outboxStaleTriggerStatus');
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (!res) return;
+                    document.getElementById('outboxStaleFallbackEnabled').checked = !!res.enabled;
+                    document.getElementById('outboxStaleMinutesLabel').textContent = res.staleMinutes;
+                    if (st) {
+                        st.textContent = res.installed ? '✓ Timer installed (every 5 min)' : '✗ Timer not installed yet — switch above won\'t run until you install it';
+                    }
+                })
+                .withFailureHandler(function (e) { if (st) st.textContent = 'Load failed: ' + e.message; })
+                .getOutboxStaleSweepStatus();
+        }
+
+        function saveOutboxStaleFallback() {
+            var enabled = document.getElementById('outboxStaleFallbackEnabled').checked;
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (!res || !res.success) document.getElementById('outboxStaleFallbackEnabled').checked = !enabled;
+                })
+                .withFailureHandler(function () { document.getElementById('outboxStaleFallbackEnabled').checked = !enabled; })
+                .setOutboxStaleFallback(enabled, _callerEmail());
+        }
+
+        function installOutboxStaleTrigger() {
+            var st = document.getElementById('outboxStaleTriggerStatus');
+            if (st) st.textContent = 'Installing…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (res && res.success) loadOutboxStaleSweepStatus();
+                    else if (st) st.textContent = (res && res.error) || 'Install failed';
+                })
+                .withFailureHandler(function (e) { if (st) st.textContent = 'Install failed: ' + e.message; })
+                .installOutboxStaleSweepTrigger(_callerEmail());
+        }
+
+        function testOutboxStaleSweepNow() {
+            var box = document.getElementById('outboxStaleTestResult');
+            if (box) box.textContent = 'Checking and recovering…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (!res || !res.success) { if (box) box.textContent = (res && res.error) || 'Test failed'; return; }
+                    var r = res.result || {};
+                    var msg = 'Scanned ' + r.scanned + ' · Recovered ' + r.recovered.length;
+                    if (r.errors.length) msg += ' · Errors ' + r.errors.length;
+                    if (box) box.textContent = msg;
+                    loadOutboxStaleSweepStatus();
+                })
+                .withFailureHandler(function (e) { if (box) box.textContent = 'Test failed: ' + e.message; })
+                .testOutboxStaleSweep(_callerEmail());
         }
 
         function _callerEmail() {

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Executive Summary</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<style>
+  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f1f5f9; }
+  #es-report[contenteditable="true"] { outline: 2px dashed #8b5cf6; outline-offset: 4px; }
+  @media print {
+    body { background: #fff; }
+    .no-print { display: none !important; }
+    #es-report-wrap { box-shadow: none; border: 0; padding: 0; }
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div class="no-print bg-gradient-to-r from-violet-700 to-indigo-900 text-white px-4 py-4 shadow-lg">
+  <div class="max-w-6xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+    <div>
+      <h1 class="text-lg font-bold">✨ AI Executive Summary — ผลสำรวจสาขา</h1>
+      <p class="text-xs text-violet-200 mt-0.5">AI สรุปผลสำรวจให้ผู้บริหารจากตัวเลขจริง · แก้ไข บันทึก ส่งอีเมล หรือส่งออก PPTX ได้</p>
+    </div>
+    <div class="flex items-center gap-3 text-xs">
+      <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-schedule" target="_top" class="text-violet-100 underline">📅 Hyper Upload Schedule</a>
+      <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-status" target="_top" class="text-violet-100 underline">🧭 สถานะส่ง/ตรวจ</a>
+    </div>
+  </div>
+</div>
+
+<div class="max-w-6xl mx-auto px-3 py-4 space-y-4">
+  <div id="es-denied" class="hidden bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm"></div>
+  <div id="es-loading" class="text-sm text-gray-500">กำลังโหลด…</div>
+
+  <div id="es-main" class="hidden space-y-4">
+    <!-- Controls -->
+    <div class="no-print bg-white rounded-xl border p-4 space-y-3">
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <span class="font-semibold text-gray-600">แหล่งข้อมูล:</span>
+        <span id="es-sources" class="flex flex-wrap gap-x-4 gap-y-1"></span>
+      </div>
+      <textarea id="es-note" rows="2" placeholder="ประเด็นที่ต้องการให้ AI เน้น (ไม่บังคับ) เช่น เน้นสาขาที่ต้องเปลี่ยนตู้แช่ หรือเตรียมเสนอประชุม VP" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="es-gen" onclick="esGenerate()" class="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-4 py-2 rounded-lg text-sm">✨ สร้างสรุปด้วย AI</button>
+        <span id="es-msg" class="text-sm text-gray-500"></span>
+        <button id="es-ai-cfg-btn" onclick="esAiCfgToggle()" class="hidden ml-auto text-xs text-violet-700 underline">⚙️ AI</button>
+      </div>
+      <div id="es-ai-cfg" class="hidden bg-violet-50 border border-violet-200 rounded-lg p-2 flex-wrap items-center gap-2 text-xs">
+        <span class="text-gray-600">DeepSeek API key (ใช้ร่วมกับอีเมลติดตาม):</span>
+        <input id="es-ai-key" type="password" autocomplete="off" placeholder="sk-… (เว้นว่าง = ใช้ค่าเดิม)" class="border rounded px-2 py-1 w-56">
+        <input id="es-ai-model" placeholder="deepseek-v4-flash" class="border rounded px-2 py-1 w-40">
+        <button onclick="esAiCfgSave()" class="bg-violet-600 text-white font-semibold px-3 py-1 rounded">บันทึก</button>
+        <span id="es-ai-cfg-msg" class="text-gray-500"></span>
+      </div>
+    </div>
+
+    <!-- Report -->
+    <div id="es-report-wrap" class="bg-white rounded-xl border p-4">
+      <div class="no-print flex flex-wrap items-center gap-2 mb-3">
+        <b class="text-sm text-gray-700 mr-auto" id="es-report-title">รายงาน</b>
+        <button onclick="esToggleEdit()" id="es-edit-btn" class="border px-3 py-1.5 rounded-lg text-xs">✏️ แก้ไขข้อความ</button>
+        <button onclick="esSave()" class="bg-emerald-600 text-white font-semibold px-3 py-1.5 rounded-lg text-xs">💾 บันทึก</button>
+        <button onclick="esEmailToggle()" class="bg-sky-600 text-white font-semibold px-3 py-1.5 rounded-lg text-xs">📧 ส่งอีเมล</button>
+        <button onclick="esPptx()" id="es-pptx-btn" class="bg-orange-600 text-white font-semibold px-3 py-1.5 rounded-lg text-xs">📊 PPTX</button>
+        <button onclick="window.print()" class="border px-3 py-1.5 rounded-lg text-xs">🖨️ พิมพ์ / PDF</button>
+      </div>
+
+      <!-- Email -->
+      <div id="es-email" class="no-print hidden border border-sky-200 bg-sky-50 rounded-lg p-3 mb-3 space-y-2 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-semibold w-12">ถึง:</span>
+          <span class="relative"><input id="es-to-in" autocomplete="off" placeholder="ค้นหาชื่อ/อีเมล หรือพิมพ์แล้วกด Enter" class="border rounded px-2 py-1 w-72" oninput="esSearch('to')" onkeydown="if(event.key==='Enter'){event.preventDefault();esAdd('to',this.value);}">
+            <div id="es-to-dd" class="hidden absolute z-10 left-0 top-full mt-1 w-96 bg-white border rounded-lg shadow-lg max-h-56 overflow-auto"></div></span>
+          <span id="es-to-chips" class="flex flex-wrap gap-1"></span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-semibold w-12">CC:</span>
+          <span class="relative"><input id="es-cc-in" autocomplete="off" placeholder="ค้นหาชื่อ/อีเมล หรือพิมพ์แล้วกด Enter" class="border rounded px-2 py-1 w-72" oninput="esSearch('cc')" onkeydown="if(event.key==='Enter'){event.preventDefault();esAdd('cc',this.value);}">
+            <div id="es-cc-dd" class="hidden absolute z-10 left-0 top-full mt-1 w-96 bg-white border rounded-lg shadow-lg max-h-56 overflow-auto"></div></span>
+          <span id="es-cc-chips" class="flex flex-wrap gap-1"></span>
+        </div>
+        <div id="es-saved-wrap" class="hidden flex-wrap items-center gap-1">
+          <span class="text-gray-500">⭐ อีเมลที่เคยใช้ — คลิก “ถึง” / “CC”:</span><span id="es-saved" class="flex flex-wrap gap-1"></span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-semibold w-12">หัวข้อ:</span>
+          <input id="es-subject" class="border rounded px-2 py-1 flex-1 min-w-[260px]" value="สรุปผลสำรวจสาขาสำหรับผู้บริหาร">
+          <button onclick="esSend()" id="es-send" class="bg-sky-600 text-white font-semibold px-4 py-1.5 rounded">ส่งอีเมล</button>
+          <span id="es-email-msg"></span>
+        </div>
+      </div>
+
+      <div id="es-tiles" class="no-print grid grid-cols-2 md:grid-cols-5 gap-2 mb-3"></div>
+      <div id="es-report" class="text-sm overflow-x-auto"><p class="text-gray-400">ยังไม่มีรายงาน — เลือกแหล่งข้อมูลแล้วกด “✨ สร้างสรุปด้วย AI”</p></div>
+    </div>
+
+    <!-- History -->
+    <div class="no-print bg-white rounded-xl border p-4">
+      <h2 class="font-bold text-sm text-gray-700 mb-2">🗂️ รายงานที่บันทึกไว้</h2>
+      <div id="es-history" class="text-xs text-gray-600 space-y-1"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var ME = '', ES = { sources: [], html: '', tiles: [], dirty: false, to: [], cc: [], saved: [] };
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function $(id) { return document.getElementById(id); }
+try { var u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); ME = (u && u.email) || ''; } catch (e) {}
+
+function esDeny(msg) { $('es-loading').classList.add('hidden'); $('es-denied').textContent = msg; $('es-denied').classList.remove('hidden'); }
+function esInit() {
+  if (!ME) { esDeny('กรุณาเข้าสู่ระบบในแอปหลักก่อน (Admin / Schedule Admin เท่านั้น)'); return; }
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { esDeny((r && r.error) || 'ไม่มีสิทธิ์เข้าถึง'); return; }
+    $('es-loading').classList.add('hidden'); $('es-main').classList.remove('hidden');
+    ES.sources = r.sources || [];
+    $('es-sources').innerHTML = ES.sources.map(function(s) {
+      return '<label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" data-es-src="' + esc(s.key) + '" checked> ' + esc(s.label) + '</label>';
+    }).join('');
+    $('es-ai-cfg-btn').classList.toggle('hidden', !(r.ai && r.ai.canConfigure));
+    if (!(r.ai && r.ai.configured)) $('es-msg').textContent = r.ai && r.ai.canConfigure ? 'ยังไม่ได้ตั้งค่า DeepSeek API key — กด ⚙️ AI' : 'ยังไม่ได้ตั้งค่า AI (ติดต่อ Super Admin)';
+    ES.saved = r.savedCc || []; esChips();
+    esHistory(r.history || []);
+    if (r.latest) esShow(r.latest.html, [], 'ล่าสุด: ' + r.latest.ts + ' · ' + r.latest.by + ' · ' + r.latest.sources);
+  }).withFailureHandler(function(e) { esDeny(e.message); }).getExecSummaryInit(ME);
+}
+function esSel() { var o = {}; document.querySelectorAll('[data-es-src]').forEach(function(c) { if (c.checked) o[c.getAttribute('data-es-src')] = true; }); return o; }
+
+function esShow(html, tiles, title) {
+  ES.html = html; ES.tiles = tiles || []; ES.dirty = false;
+  $('es-report').innerHTML = html;
+  $('es-report-title').textContent = title || 'รายงาน';
+  $('es-tiles').innerHTML = ES.tiles.map(function(t) {
+    return '<div class="bg-slate-50 border rounded-lg p-2" style="border-top:3px solid ' + esc(t.color || '#1e3a8a') + '"><div class="text-lg font-bold" style="color:' + esc(t.color || '#1e3a8a') + '">' + esc(t.value) + '</div><div class="text-[11px] text-gray-600">' + esc(t.label) + '</div></div>';
+  }).join('');
+}
+function esGenerate() {
+  var src = esSel();
+  if (!Object.keys(src).length) { $('es-msg').textContent = 'เลือกแหล่งข้อมูลอย่างน้อย 1 รายการ'; return; }
+  if (ES.dirty && !confirm('ข้อความที่แก้ไขยังไม่ได้บันทึก สร้างใหม่ทับ?')) return;
+  var btn = $('es-gen'); btn.disabled = true; $('es-msg').textContent = 'AI กำลังวิเคราะห์และเขียนรายงาน… (ประมาณ 1–2 นาที)';
+  google.script.run.withSuccessHandler(function(r) {
+    btn.disabled = false;
+    if (!r || !r.success) { $('es-msg').textContent = '❌ ' + ((r && r.error) || 'สร้างไม่สำเร็จ'); return; }
+    $('es-msg').textContent = '✅ สร้างแล้ว (' + r.model + ') — ตรวจทาน/แก้ไข แล้วกด 💾 บันทึก';
+    esShow(r.html, r.tiles, 'ร่างใหม่ · ข้อมูล ณ ' + r.generatedAt);
+    ES.dirty = true;
+  }).withFailureHandler(function(e) { btn.disabled = false; $('es-msg').textContent = '❌ ' + e.message; })
+    .generateExecSurveySummary(ME, src, $('es-note').value);
+}
+function esToggleEdit() {
+  var r = $('es-report'), on = r.getAttribute('contenteditable') !== 'true';
+  r.setAttribute('contenteditable', on ? 'true' : 'false');
+  $('es-edit-btn').textContent = on ? '✅ เสร็จสิ้นการแก้ไข' : '✏️ แก้ไขข้อความ';
+  if (!on) { ES.html = r.innerHTML; ES.dirty = true; }
+}
+function esCurrentHtml() { return $('es-report').innerHTML; }
+function esSave() {
+  var html = esCurrentHtml();
+  if (!html || /ยังไม่มีรายงาน/.test(html)) { alert('ยังไม่มีรายงานให้บันทึก'); return; }
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { alert('❌ ' + ((r && r.error) || 'บันทึกไม่สำเร็จ')); return; }
+    ES.dirty = false; $('es-msg').textContent = '💾 บันทึกแล้ว';
+    google.script.run.withSuccessHandler(function(x) { if (x && x.success) esHistory(x.history || []); }).getExecSummaryInit(ME);
+  }).saveExecSummary(ME, html, esSel(), $('es-note').value);
+}
+function esHistory(list) {
+  $('es-history').innerHTML = list.length ? list.map(function(h) {
+    return '<div><button data-es-snap="' + h.row + '" class="text-indigo-700 underline">' + esc(h.ts) + '</button> · ' + esc(h.by) + ' · <span class="text-gray-400">' + esc(h.sources) + '</span></div>';
+  }).join('') : '<span class="text-gray-400">ยังไม่มี</span>';
+}
+$('es-history') && document.addEventListener('click', function(e) {
+  var b = e.target.closest('[data-es-snap]');
+  if (b) {
+    if (ES.dirty && !confirm('ข้อความที่แก้ไขยังไม่ได้บันทึก เปิดรายงานอื่นทับ?')) return;
+    google.script.run.withSuccessHandler(function(r) { if (r && r.success) esShow(r.html, [], r.ts + ' · ' + r.by + ' · ' + r.sources); })
+      .getExecSummarySnapshot(ME, b.getAttribute('data-es-snap'));
+    return;
+  }
+  var p = e.target.closest('[data-es-pick]');
+  if (p) { esAdd(p.getAttribute('data-es-list'), p.getAttribute('data-es-pick')); return; }
+  var rm = e.target.closest('[data-es-rm]');
+  if (rm) { var l = rm.getAttribute('data-es-list'), v = rm.getAttribute('data-es-rm'); ES[l] = ES[l].filter(function(x) { return x !== v; }); esChips(); return; }
+  var f = e.target.closest('[data-es-forget]');
+  if (f) { google.script.run.withSuccessHandler(function(r) { if (r && r.success) { ES.saved = r.saved; esChips(); } }).removeFollowUpSavedCc(ME, f.getAttribute('data-es-forget')); return; }
+  ['to', 'cc'].forEach(function(l) { if (!e.target.closest('#es-' + l + '-dd') && e.target.id !== 'es-' + l + '-in') $('es-' + l + '-dd').classList.add('hidden'); });
+});
+
+// ── Email (recipient search over both employee lists; addresses used are remembered) ──
+function esEmailToggle() { $('es-email').classList.toggle('hidden'); }
+var ES_T = {};
+function esSearch(list) {
+  clearTimeout(ES_T[list]);
+  var q = $('es-' + list + '-in').value.trim(), dd = $('es-' + list + '-dd');
+  if (q.length < 2) { dd.classList.add('hidden'); return; }
+  ES_T[list] = setTimeout(function() {
+    google.script.run.withSuccessHandler(function(r) {
+      var res = (r && r.success && r.results) || [];
+      dd.innerHTML = res.length ? res.map(function(p) {
+        return '<button data-es-pick="' + esc(p.e) + '" data-es-list="' + list + '" class="block w-full text-left px-3 py-1.5 hover:bg-sky-50"><b>' + esc(p.n || p.e) + '</b> <span class="text-gray-500">' + esc(p.e) + '</span></button>';
+      }).join('') : '<div class="p-2 text-gray-400">ไม่พบ — กด Enter เพื่อใช้อีเมลที่พิมพ์</div>';
+      dd.classList.remove('hidden');
+    }).searchFollowUpPeople(ME, q);
+  }, 300);
+}
+// Accepts one address or a pasted list ("a@x.com, b@y.com; c@z.com") — each becomes its own chip.
+function esAdd(list, v) {
+  var inp = $('es-' + list + '-in');
+  var parts = String(v || '').split(/[\s,;]+/).filter(Boolean);
+  var ok = parts.filter(function(p) { return /^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(p); });
+  var bad = parts.filter(function(p) { return ok.indexOf(p) === -1; });
+  if (!ok.length) { inp.classList.add('border-red-400'); return; }
+  ok.forEach(function(e) { if (ES[list].indexOf(e) === -1) ES[list].push(e); });
+  inp.value = bad.join(', ');   // leave anything that isn't an email in the box to fix
+  inp.classList.toggle('border-red-400', bad.length > 0);
+  $('es-' + list + '-dd').classList.add('hidden');
+  esChips();
+}
+function esChips() {
+  ['to', 'cc'].forEach(function(l) {
+    $('es-' + l + '-chips').innerHTML = ES[l].map(function(e) {
+      return '<span class="' + (l === 'to' ? 'bg-sky-100 text-sky-800' : 'bg-amber-100 text-amber-800') + ' rounded-full px-2 py-0.5">' + esc(e) + ' <button data-es-rm="' + esc(e) + '" data-es-list="' + l + '" class="font-bold">×</button></span>';
+    }).join('');
+  });
+  var saved = (ES.saved || []).filter(function(e) { return ES.to.indexOf(e) === -1 && ES.cc.indexOf(e) === -1; });
+  $('es-saved-wrap').classList.toggle('hidden', !saved.length); $('es-saved-wrap').classList.toggle('flex', saved.length > 0);
+  $('es-saved').innerHTML = saved.map(function(e) {
+    return '<span class="bg-gray-100 rounded-full px-2 py-0.5">⭐ ' + esc(e) + ' <button data-es-pick="' + esc(e) + '" data-es-list="to" class="text-sky-700 underline">ถึง</button> <button data-es-pick="' + esc(e) + '" data-es-list="cc" class="text-amber-700 underline">CC</button> <button data-es-forget="' + esc(e) + '" class="text-gray-400 font-bold" title="ลืมอีเมลนี้">×</button></span>';
+  }).join('');
+}
+function esSend() {
+  var html = esCurrentHtml();
+  if (!ES.to.length) { $('es-email-msg').textContent = 'ระบุผู้รับอย่างน้อย 1 คน'; return; }
+  if (!html || /ยังไม่มีรายงาน/.test(html)) { $('es-email-msg').textContent = 'ยังไม่มีรายงาน'; return; }
+  if (!confirm('ส่งรายงานถึง ' + ES.to.join(', ') + (ES.cc.length ? ' (CC ' + ES.cc.length + ')' : '') + '?')) return;
+  var btn = $('es-send'); btn.disabled = true; $('es-email-msg').textContent = 'กำลังส่ง…';
+  google.script.run.withSuccessHandler(function(r) {
+    btn.disabled = false;
+    if (!r || !r.success) { $('es-email-msg').textContent = '❌ ' + ((r && r.error) || 'ส่งไม่สำเร็จ'); return; }
+    $('es-email-msg').textContent = '✅ ส่งแล้ว' + (r.via ? ' (' + r.via + ')' : '');
+    if (r.savedCc) { ES.saved = r.savedCc; esChips(); }
+  }).withFailureHandler(function(e) { btn.disabled = false; $('es-email-msg').textContent = '❌ ' + e.message; })
+    .sendExecSummaryEmail(ME, ES.to, ES.cc, $('es-subject').value, html);
+}
+
+// ── PPTX: AI outline (bullets) + KPI tiles from the real numbers ──
+function esPptx() {
+  var btn = $('es-pptx-btn'); btn.disabled = true; btn.textContent = 'กำลังสร้าง…';
+  google.script.run.withSuccessHandler(function(r) {
+    btn.disabled = false; btn.textContent = '📊 PPTX';
+    if (!r || !r.success) { alert('❌ ' + ((r && r.error) || 'สร้างไม่สำเร็จ')); return; }
+    try { esBuildPptx(r.outline || {}, r.tiles || [], r.generatedAt); } catch (e) { alert('❌ ' + e.message); }
+  }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = '📊 PPTX'; alert(e.message); })
+    .generateExecSummaryPptx(ME, esSel(), $('es-note').value);
+}
+function esBuildPptx(o, tiles, at) {
+  var pptx = new PptxGenJS(); pptx.layout = 'LAYOUT_WIDE';
+  var F = 'Tahoma', NAVY = '1E3A8A';
+  var head = function(s, t, color) {
+    s.background = { color: 'FFFFFF' };
+    s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: color || NAVY } });
+    s.addText(t, { x: 0.4, y: 0.12, w: 12.5, h: 0.66, fontFace: F, fontSize: 24, bold: true, color: 'FFFFFF' });
+  };
+  var bullets = function(s, list, y) {
+    var items = (list || []).map(function(b) { return { text: String(b), options: { bullet: true, breakLine: true } }; });
+    if (items.length) s.addText(items, { x: 0.6, y: y || 1.2, w: 12.1, h: 5.9 - ((y || 1.2) - 1.2), fontFace: F, fontSize: 18, color: '111827', valign: 'top', paraSpaceAfter: 8 });
+  };
+  var s1 = pptx.addSlide();
+  s1.background = { color: NAVY };
+  s1.addText(o.title || 'สรุปผลสำรวจสาขาสำหรับผู้บริหาร', { x: 0.6, y: 2.4, w: 12.1, h: 1.4, fontFace: F, fontSize: 36, bold: true, color: 'FFFFFF' });
+  s1.addText('ฝ่ายอาคาร (Building Management) · PPT-MTN · ข้อมูล ณ ' + (at || ''), { x: 0.6, y: 3.9, w: 12.1, h: 0.6, fontFace: F, fontSize: 16, color: 'C7D2FE' });
+  var s2 = pptx.addSlide(); head(s2, 'ภาพรวม (Executive Summary)');
+  if (tiles.length) {
+    var w = Math.min(2.4, 12.1 / tiles.length - 0.15);
+    tiles.forEach(function(t, i) {
+      var x = 0.6 + i * (w + 0.15), c = String(t.color || '#1e3a8a').replace('#', '');
+      s2.addShape(pptx.ShapeType.rect, { x: x, y: 1.15, w: w, h: 1.25, fill: { color: 'F8FAFC' }, line: { color: 'E2E8F0' } });
+      s2.addShape(pptx.ShapeType.rect, { x: x, y: 1.15, w: w, h: 0.07, fill: { color: c } });
+      s2.addText(String(t.value), { x: x, y: 1.3, w: w, h: 0.6, align: 'center', fontFace: F, fontSize: 22, bold: true, color: c });
+      s2.addText(String(t.label), { x: x, y: 1.9, w: w, h: 0.45, align: 'center', fontFace: F, fontSize: 11, color: '111827' });
+    });
+  }
+  bullets(s2, o.overall, tiles.length ? 2.7 : 1.2);
+  if ((o.risks || []).length) { var s3 = pptx.addSlide(); head(s3, '⚠️ ความเสี่ยงสำคัญ', '991B1B'); bullets(s3, o.risks); }
+  (o.sections || []).forEach(function(sec) { var s = pptx.addSlide(); head(s, sec.title || ''); bullets(s, sec.bullets); });
+  if ((o.recommendations || []).length) { var s4 = pptx.addSlide(); head(s4, '💡 ข้อเสนอแนะ & สิ่งที่ต้องทำต่อ', '166534'); bullets(s4, o.recommendations); }
+  pptx.writeFile({ fileName: 'Executive_Survey_Summary_' + new Date().toISOString().slice(0, 10) + '.pptx' });
+}
+
+// ── AI settings (Super Admin) — same key/model as the follow-up emails ──
+function esAiCfgToggle() {
+  var b = $('es-ai-cfg'); b.classList.toggle('hidden'); b.classList.toggle('flex', !b.classList.contains('hidden'));
+  if (b.classList.contains('hidden')) return;
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { $('es-ai-cfg-msg').textContent = (r && r.error) || ''; return; }
+    $('es-ai-cfg-msg').textContent = r.configured ? 'ตั้งค่าแล้ว: ' + r.masked : 'ยังไม่ได้ตั้งค่า';
+    $('es-ai-model').value = r.model;
+  }).getFollowUpAiConfig(ME);
+}
+function esAiCfgSave() {
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { $('es-ai-cfg-msg').textContent = '❌ ' + ((r && r.error) || ''); return; }
+    $('es-ai-key').value = ''; $('es-ai-cfg-msg').textContent = '✅ บันทึกแล้ว (' + r.model + ')'; $('es-msg').textContent = '';
+  }).saveFollowUpAiConfig(ME, $('es-ai-key').value, $('es-ai-model').value);
+}
+window.addEventListener('beforeunload', function(e) { if (ES.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+esInit();
+</script>
+</body>
+</html>

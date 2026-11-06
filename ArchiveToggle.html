@@ -1,0 +1,54 @@
+<!-- "Include archive" toggle for report pages. Include right after the body tag
+     so window.ARCHIVE_ON is set before any loader runs; loaders pass it as their
+     last argument. Toggling remembers the choice per page (localStorage) and
+     reloads the page through the top window. -->
+<style>
+    #arcTogglePill { position: fixed; left: 12px; bottom: 12px; z-index: 9999; font: 600 12px/1 'Roboto', sans-serif;
+        padding: 8px 12px; border-radius: 9999px; border: 1px solid #d1d5db; background: #fff; color: #4b5563;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.12); cursor: pointer; }
+    #arcTogglePill.on { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+    #arcTogglePill:disabled { opacity: 0.6; cursor: default; }
+    #arcToggleBanner { background: #fef3c7; color: #92400e; border-bottom: 1px solid #fcd34d; font: 500 12px/1.4 'Roboto', sans-serif;
+        padding: 6px 12px; text-align: center; }
+</style>
+<script>
+    (function() {
+        var key = 'ARCHIVE_ON_' + (document.title || 'report');
+        var on = false;
+        try { on = localStorage.getItem(key) === '1'; } catch (e) {}
+        window.ARCHIVE_ON = on;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (on) {
+                var banner = document.createElement('div');
+                banner.id = 'arcToggleBanner';
+                banner.textContent = '📦 กำลังแสดงข้อมูลที่เก็บถาวรด้วย (Including archived records) — archived records are read-only and loading is slower.';
+                document.body.insertBefore(banner, document.body.firstChild);
+            }
+            var btn = document.createElement('button');
+            btn.id = 'arcTogglePill';
+            btn.type = 'button';
+            btn.className = on ? 'on' : '';
+            btn.textContent = on ? '📦 Archive: ON' : '📦 Include archive';
+            btn.title = on ? 'Hide archived (older) records' : 'Also show older records that were flushed to the Drive archive';
+            btn.addEventListener('click', function() {
+                try { localStorage.setItem(key, on ? '0' : '1'); } catch (e) {}
+                btn.disabled = true;
+                btn.textContent = 'Reloading…';
+                var base = '<?= ScriptApp.getService().getUrl() ?>';
+                var go = function(qs) { window.open(base + (qs ? '?' + qs : ''), '_top'); };
+                try {
+                    google.script.url.getLocation(function(loc) {
+                        var parts = [];
+                        var ps = loc.parameters || {};
+                        Object.keys(ps).forEach(function(k) {
+                            [].concat(ps[k]).forEach(function(v) { parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); });
+                        });
+                        go(parts.join('&'));
+                    });
+                } catch (e) { go(''); }
+            });
+            document.body.appendChild(btn);
+        });
+    })();
+</script>

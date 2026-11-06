@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyper Lighting Survey Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel { background: rgba(255,255,255,.95); border: 1px solid rgba(226,232,240,.8); box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #ca8a04; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: .75rem; font-weight: 600; color: #64748b; min-width: 120px; }
+        .detail-value { font-size: .85rem; color: #1e293b; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16">
+            <div class="flex items-center gap-4">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-slate-500 hover:text-yellow-700 p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-yellow-500 rounded-full"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">💡 รายงานสำรวจแสงสว่าง Hyper</h1>
+                    <p class="text-xs text-slate-500 font-medium">Sales Floor &amp; Town Center — Lux · Installed kW · Proposal OPEX</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="loader" id="mainLoader"></div>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-status" target="_blank" title="สถานะการส่ง &amp; การตรวจรับ ทุกแบบสำรวจ Hyper" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100">🧭 สถานะ</a>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=survey_dashboard&type=hyperLi" target="_blank" class="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">📊 Dashboard</a>
+                    <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                <button onclick="downloadLiExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
+                <button onclick="window.location.reload()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-500"><p class="text-xs font-semibold text-slate-500 mb-1">สาขาที่สำรวจแล้ว</p><h3 class="text-3xl font-bold"><span id="stStores">0</span><span class="text-base text-slate-400"> / <span id="stTotal">0</span></span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-yellow-500"><p class="text-xs font-semibold text-slate-500 mb-1">กำลังไฟแสงสว่างติดตั้ง</p><h3 class="text-3xl font-bold text-yellow-700"><span id="stKw">0</span> <span class="text-base">kW</span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-amber-500"><p class="text-xs font-semibold text-slate-500 mb-1">ค่าไฟแสงสว่างปัจจุบัน</p><h3 class="text-2xl font-bold text-amber-700"><span id="stNow">0</span> <span class="text-sm">฿/ด.</span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500"><p class="text-xs font-semibold text-slate-500 mb-1">โซนต่ำกว่าเป้า Lux</p><h3 class="text-3xl font-bold text-red-600" id="stBelow">0</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-indigo-500"><p class="text-xs font-semibold text-slate-500 mb-1">ข้อเสนอเพิ่ม</p><h3 class="text-3xl font-bold text-indigo-700"><span id="stProp">0</span> <span class="text-base">kW</span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-rose-500"><p class="text-xs font-semibold text-slate-500 mb-1">OPEX เพิ่มจากข้อเสนอ</p><h3 class="text-2xl font-bold text-rose-600">+<span id="stOpex">0</span> <span class="text-sm">฿/ด.</span></h3></div>
+        </div>
+        <p class="text-xs text-slate-400 -mt-3">นับจากรายการล่าสุดของแต่ละสาขา · OPEX = kW × ชม.เปิดไฟ/วัน × 30 วัน × ค่าไฟของสาขา</p>
+
+        <div class="glass-panel p-4 rounded-xl grid grid-cols-1 md:grid-cols-4 gap-3">
+            <input type="text" id="searchInput" placeholder="ค้นหา รหัสสาขา / ชื่อสาขา / ผู้แจ้ง..." class="md:col-span-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="applyFilters()">
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="latestOnly" checked onchange="applyFilters()"> ล่าสุด/สาขา</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="belowOnly" onchange="applyFilters()"> เฉพาะสาขาที่มีโซนต่ำกว่าเป้า</label>
+        </div>
+
+        <div class="glass-panel rounded-xl overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">สาขา</th>
+                        <th class="px-4 py-3 text-right">โซน</th>
+                        <th class="px-4 py-3 text-right">ต่ำกว่าเป้า</th>
+                        <th class="px-4 py-3 text-right">ติดตั้ง kW (ขาย / TC)</th>
+                        <th class="px-4 py-3 text-right">โคมเสีย</th>
+                        <th class="px-4 py-3 text-right">ค่าไฟปัจจุบัน ฿/ด.</th>
+                        <th class="px-4 py-3 text-right">เสนอเพิ่ม kW</th>
+                        <th class="px-4 py-3 text-right">OPEX เพิ่ม ฿/ด.</th>
+                        <th class="px-4 py-3 text-left">ผู้แจ้ง / วันที่</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <div id="emptyState" class="hidden text-center py-12 text-slate-400">ไม่พบข้อมูล</div>
+        </div>
+    </div>
+
+    <!-- Detail modal -->
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div class="bg-white w-full md:max-w-4xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดการสำรวจแสงสว่าง</h3><button onclick="closeModal()" class="text-slate-400 text-xl">✕</button></div>
+            <div class="p-5 overflow-y-auto" id="modalBody"></div>
+            <div class="px-5 py-3 border-t flex justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ</button>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm border border-slate-300 rounded-lg">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="hidden px-4 py-2 text-sm font-bold text-white bg-yellow-600 rounded-lg hover:bg-yellow-700">บันทึกหมายเหตุ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const HYPER_STORE_TOTAL = <?!= HYPER_REF_STORES.length ?>;
+        let LI = null, allData = [], filtered = [], currentRecord = null, currentId = null;
+        let isAdmin = false, smfCanEdit = false, opsCanEdit = false, _userEmail = '';
+
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fmt(n) { return Math.round(num(n)).toLocaleString(); }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? '-' : d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }); }
+        function latestPerBranch(rows) { const seen = new Set(); return rows.filter(function(r) { const k = String(r['Branch Code']); if (seen.has(k)) return false; seen.add(k); return true; }); }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            loadData();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) {
+                if (!f) return;
+                isAdmin = !!(f.isAdmin || f.isScheduleAdmin); smfCanEdit = !!f.smfEditAllowed; opsCanEdit = !!f.opsEditAllowed;
+                document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+            }).getUserFlags(_userEmail);
+        });
+
+        let _attempt = 0;
+        function loadData() {
+            const my = ++_attempt;
+            google.script.run.withSuccessHandler(function(res) {
+                if (my !== _attempt) return;
+                if (!res) { if (my < 3) setTimeout(loadData, 1500); return; }
+                document.getElementById('mainLoader').classList.add('hidden');
+                if (!res.success) { alert('โหลดข้อมูลไม่สำเร็จ: ' + res.error); return; }
+                LI = res.liConfig; allData = res.data || [];
+                renderStats(); applyFilters();
+            }).withFailureHandler(function(err) { document.getElementById('mainLoader').classList.add('hidden'); alert('Error: ' + err.message); }).getHyperLiSurveyList(window.ARCHIVE_ON);
+        }
+
+        function renderStats() {
+            const l = latestPerBranch(allData);
+            const sum = function(k) { return l.reduce(function(s, r) { return s + num(r[k]); }, 0); };
+            document.getElementById('stStores').textContent = l.length;
+            document.getElementById('stTotal').textContent = HYPER_STORE_TOTAL;
+            document.getElementById('stKw').textContent = (sum('Sales Floor Installed kW') + sum('Town Center Installed kW')).toFixed(1);
+            document.getElementById('stNow').textContent = fmt(sum('Lighting OPEX Now (THB/month)'));
+            document.getElementById('stBelow').textContent = sum('Zones Below Target');
+            document.getElementById('stProp').textContent = sum('Proposed Added kW').toFixed(1);
+            document.getElementById('stOpex').textContent = fmt(sum('Proposed Added OPEX (THB/month)'));
+        }
+
+        function applyFilters() {
+            const q = document.getElementById('searchInput').value.toLowerCase().trim();
+            const base = document.getElementById('latestOnly').checked ? latestPerBranch(allData) : allData;
+            const below = document.getElementById('belowOnly').checked;
+            filtered = base.filter(function(r) {
+                if (below && !num(r['Zones Below Target'])) return false;
+                return !q || [r['Branch Code'], r['Branch Name'], r['Reporter Name']].join(' ').toLowerCase().indexOf(q) > -1;
+            });
+            document.getElementById('recordCount').textContent = filtered.length + ' รายการ';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+            document.getElementById('tableBody').innerHTML = filtered.map(function(r) {
+                return '<tr class="hover:bg-yellow-50 cursor-pointer" data-id="' + esc(r['ID']) + '">' +
+                    '<td class="px-4 py-3"><b>' + esc(r['Branch Code']) + '</b> ' + (r['Has Broken'] === 'Yes' ? '<span class="text-xs text-red-600">⚠️ ชำรุด</span>' : '') + '<div class="text-xs text-slate-500">' + esc(r['Branch Name']) + '</div></td>' +
+                    '<td class="px-4 py-3 text-right">' + num(r['Zones']) + '</td>' +
+                    '<td class="px-4 py-3 text-right ' + (num(r['Zones Below Target']) ? 'text-red-600 font-bold' : '') + '">' + num(r['Zones Below Target']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono text-xs">' + num(r['Sales Floor Installed kW']).toFixed(2) + ' / ' + num(r['Town Center Installed kW']).toFixed(2) + '</td>' +
+                    '<td class="px-4 py-3 text-right">' + num(r['Fixtures Broken']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono">' + fmt(r['Lighting OPEX Now (THB/month)']) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono text-indigo-700">' + num(r['Proposed Added kW']).toFixed(2) + '</td>' +
+                    '<td class="px-4 py-3 text-right font-mono text-rose-600 font-semibold">+' + fmt(r['Proposed Added OPEX (THB/month)']) + '</td>' +
+                    '<td class="px-4 py-3 text-xs">' + esc(r['Reporter Name']) + '<div class="text-slate-400">' + fdate(r['Timestamp']) + '</div></td></tr>';
+            }).join('');
+        }
+        document.getElementById('tableBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        function openModal(id) {
+            currentId = id; currentRecord = null;
+            document.getElementById('modalBody').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังโหลด...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            google.script.run.withSuccessHandler(function(res) {
+                if (id !== currentId) return;
+                if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(res && res.error) + '</p>'; return; }
+                currentRecord = res.data; LI = res.liConfig || LI;
+                renderModal(res.data);
+            }).getHyperLiSurveyRecordById(id);
+        }
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); currentId = null; }
+
+        function canEdit() { return isAdmin || smfCanEdit || opsCanEdit || (currentRecord && _userEmail && String(currentRecord['Reporter Email']).toLowerCase() === _userEmail.toLowerCase()); }
+
+        function zoneLabel(z) { const t = (LI.zoneTypes.find(function(x) { return x.id === z.zt; }) || {}).label || z.zt; return z.zid + ' · ' + (z.name ? esc(z.name) + ' (' + esc(t) + ')' : esc(t)); }
+        function fxLabel(r) { const f = LI.fixtures.find(function(x) { return x.id === r.ft; }); return r.ft === 'other' && r.fo ? esc(r.fo) : esc(f ? f.label : r.ft); }
+        function month(w, h) { const t = num(currentRecord['Tariff (THB/kWh)']); const kwh = w / 1000 * h * LI.days; return { kwh: kwh, thb: kwh * t }; }
+
+        function layoutHtml(area, zones, att) {
+            const imgs = att['hli_layout_' + area] || [];
+            if (!imgs.length) return '<p class="text-xs text-slate-400">ไม่มีรูปผัง</p>';
+            let dots = '';
+            zones.filter(function(z) { return z.area === area; }).forEach(function(z) {
+                (z.lux || []).forEach(function(p) {
+                    if (p.x == null) return;
+                    dots += '<div title="' + esc(z.zid + ' ' + p.v + ' lux (เป้า ' + z.target + ')') + '" style="position:absolute;left:' + (p.x * 100) + '%;top:' + (p.y * 100) + '%;transform:translate(-50%,-50%);padding:0 4px;border-radius:9999px;font-size:10px;font-weight:700;white-space:nowrap;background:' + (p.v < z.target ? '#dc2626' : '#16a34a') + ';color:#fff;border:2px solid #fff;box-shadow:0 1px 2px rgba(0,0,0,.4)">' + z.zid.replace('Z', '') + '·' + p.v + '</div>';
+                });
+            });
+            return '<div class="relative inline-block max-w-full border border-slate-300"><a href="' + esc(imgs[0]) + '" target="_blank"><img src="' + esc(imgs[0]) + '" class="block max-w-full"></a>' + dots + '</div>' +
+                '<p class="text-[11px] text-slate-500">จุด = โซน·lux · <span style="color:#dc2626">●</span> ต่ำกว่าเป้า · <span style="color:#16a34a">●</span> ผ่าน</p>';
+        }
+        function photos(list) { return (list || []).map(function(u) { return '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" class="w-16 h-16 object-cover rounded border"></a>'; }).join(''); }
+
+        function renderModal(r) {
+            const zones = r['Zones_JSON'] || [], att = r['Attachments_JSON'] || {};
+            let h = '<div class="detail-row"><span class="detail-label">สาขา</span><span class="detail-value">' + esc(r['Branch Code']) + ' - ' + esc(r['Branch Name']) + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">ผู้แจ้ง / วันที่</span><span class="detail-value">' + esc(r['Reporter Name']) + ' · ' + fdate(r['Timestamp']) + ' · ' + esc(r['Lux Meter'] || '') + '</span></div>' +
+                '<div class="detail-row"><span class="detail-label">สรุป</span><span class="detail-value">ค่าไฟ ' + num(r['Tariff (THB/kWh)']) + ' ฿/kWh · ติดตั้ง ' + (num(r['Sales Floor Installed kW']) + num(r['Town Center Installed kW'])).toFixed(2) + ' kW · ค่าไฟแสงสว่างปัจจุบัน ' + fmt(r['Lighting OPEX Now (THB/month)']) + ' ฿/เดือน<br>' +
+                '<b class="text-indigo-700">ข้อเสนอเพิ่ม ' + num(r['Proposed Added kW']).toFixed(2) + ' kW → ' + fmt(r['Proposed Added kWh/month']) + ' kWh/เดือน = +' + fmt(r['Proposed Added OPEX (THB/month)']) + ' ฿/เดือน</b></span></div>';
+            [['sales', 'พื้นที่ขาย (Sales Floor)'], ['town', 'Town Center']].forEach(function(a) {
+                const zs = zones.filter(function(z) { return z.area === a[0]; });
+                if (!zs.length && !(att['hli_layout_' + a[0]] || []).length) return;
+                h += '<h4 class="mt-5 mb-2 font-bold text-yellow-800">' + a[1] + '</h4>' + layoutHtml(a[0], zones, att);
+                zs.forEach(function(z) {
+                    const c = z.calc || {}, now = month(c.workW || 0, z.hours), add = month(c.propW || 0, z.hours);
+                    h += '<div class="border ' + (c.below ? 'border-red-300' : 'border-slate-200') + ' rounded-lg p-3 mt-3">' +
+                        '<div class="flex flex-wrap justify-between gap-2 text-sm"><b>' + zoneLabel(z) + '</b><span class="text-xs text-slate-500">' + (z.m2 ? z.m2 + ' ตร.ม. · ' : '') + z.hours + ' ชม./วัน' + (z.ctrl ? ' · ' + esc(z.ctrl) : '') + '</span></div>' +
+                        '<p class="text-sm mt-1">Lux เฉลี่ย <b class="' + (c.below ? 'text-red-600' : 'text-green-700') + '">' + (c.luxAvg === '' ? '-' : c.luxAvg) + '</b> / เป้า ' + z.target + ' · ต่ำสุด ' + (c.luxMin === '' ? '-' : c.luxMin) + ' · Uniformity ' + (c.uniform === '' ? '-' : c.uniform) + ' · ' + (z.lux || []).length + ' จุด (' + (z.lux || []).map(function(p) { return p.v; }).join(', ') + ')</p>' +
+                        '<table class="w-full text-xs mt-2 border-collapse"><tr class="bg-slate-50 text-left"><th class="p-1">โคมที่ติดตั้ง</th><th class="p-1 text-right">W/โคม</th><th class="p-1 text-right">จำนวน</th><th class="p-1 text-right">เสีย</th><th class="p-1 text-right">รวม W</th></tr>' +
+                        (z.fixtures || []).map(function(f) { return '<tr class="border-t"><td class="p-1">' + fxLabel(f) + '</td><td class="p-1 text-right">' + f.w + '</td><td class="p-1 text-right">' + f.qty + '</td><td class="p-1 text-right ' + (f.broken ? 'text-red-600' : '') + '">' + f.broken + '</td><td class="p-1 text-right">' + fmt(f.w * f.qty) + '</td></tr>'; }).join('') +
+                        '<tr class="border-t font-semibold"><td class="p-1" colspan="4">ติดตั้ง ' + fmt(c.instW) + ' W · ใช้งานได้ ' + fmt(c.workW) + ' W' + (c.lpd !== '' && c.lpd != null ? ' · ' + c.lpd + ' W/ตร.ม.' : '') + '</td><td class="p-1 text-right">' + fmt(now.thb) + ' ฿/ด.</td></tr></table>' +
+                        ((z.prop || []).length ? '<table class="w-full text-xs mt-2 border-collapse"><tr class="bg-indigo-50 text-left"><th class="p-1">เสนอติดตั้งเพิ่ม</th><th class="p-1 text-right">W/โคม</th><th class="p-1 text-right">จำนวน</th><th class="p-1 text-right">รวม W</th></tr>' +
+                            z.prop.map(function(f) { return '<tr class="border-t"><td class="p-1">' + fxLabel(f) + '</td><td class="p-1 text-right">' + f.w + '</td><td class="p-1 text-right">' + f.qty + '</td><td class="p-1 text-right">' + fmt(f.w * f.qty) + '</td></tr>'; }).join('') +
+                            '<tr class="border-t font-semibold text-indigo-800"><td class="p-1" colspan="3">+' + fmt(c.propW) + ' W → ' + fmt(add.kwh) + ' kWh/เดือน</td><td class="p-1 text-right">+' + fmt(add.thb) + ' ฿/ด.</td></tr></table>'
+                            : (c.below ? '<p class="text-xs text-red-600 mt-2">ต่ำกว่าเป้าแต่ยังไม่มีข้อเสนอเพิ่มโคม (ประมาณต้องเพิ่มแสง ~' + fmt(c.needLm || 0) + ' lumen)</p>' : '')) +
+                        (z.nt ? '<p class="text-xs text-slate-600 mt-2">หมายเหตุ: ' + esc(z.nt) + '</p>' : '') +
+                        '<div class="flex flex-wrap gap-2 mt-2">' + photos(att[z.pk]) + '</div></div>';
+                });
+            });
+            const ed = canEdit() ? '' : ' disabled';
+            h += '<div class="mt-5 p-3 bg-red-50 border border-red-200 rounded-lg"><label class="flex items-center gap-2 text-xs font-bold text-red-700"><input type="checkbox" id="editHasBroken"' + (r['Has Broken'] === 'Yes' ? ' checked' : '') + ed + '> ⚠️ มีโคมไฟเสีย / ต้องซ่อม</label>' +
+                '<textarea id="editBrokenDetail" rows="2" class="mt-2 w-full border border-red-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Broken Detail'] || '') + '</textarea><div class="flex gap-2 mt-2">' + photos(att.hli_broken) + '</div></div>' +
+                '<div class="mt-3"><label class="text-xs font-semibold text-slate-500">สรุปปัญหา / ข้อเสนอแนะ</label><textarea id="editComments" rows="3" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Comments'] || '') + '</textarea></div>' +
+                '<p class="text-[11px] text-slate-400 mt-2">แก้ไขโซน / จุดวัด / ข้อเสนอ: ส่งแบบสำรวจใหม่ (รายงานใช้รายการล่าสุดของสาขา)</p>';
+            document.getElementById('modalBody').innerHTML = h;
+            document.getElementById('saveBtn').classList.toggle('hidden', !canEdit());
+        }
+
+        function saveRecord() {
+            const form = { id: currentId, clientEmail: _userEmail, hasBroken: document.getElementById('editHasBroken').checked ? 'Yes' : 'No',
+                           brokenDetail: document.getElementById('editBrokenDetail').value, comments: document.getElementById('editComments').value };
+            if (form.hasBroken === 'Yes' && !form.brokenDetail.trim()) { alert('กรุณาระบุโคมที่เสีย'); return; }
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); }).updateHyperLiSurveyRecord(form);
+        }
+        function deleteRecord() {
+            if (!currentId || !confirm('ยืนยันการลบรายการนี้?')) return;
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); })
+                .deleteHyperLiSurveyRecord(currentId, _userEmail);
+        }
+
+        // Excel: one row per store survey + one row per zone (fixtures / proposal as text) — zones come from each record
+        function downloadLiExcel(btn) {
+            if (!filtered.length) { alert('ไม่มีข้อมูล'); return; }
+            const cols = ['Timestamp', 'Branch Code', 'Branch Name', 'Reporter Name', 'Tariff (THB/kWh)', 'Zones', 'Zones Below Target', 'Fixtures Total', 'Fixtures Broken',
+                'Sales Floor Installed kW', 'Town Center Installed kW', 'Working kW', 'Lighting OPEX Now (THB/month)', 'Proposed Added kW', 'Proposed Added kWh/month', 'Proposed Added OPEX (THB/month)', 'Has Broken', 'Broken Detail', 'Comments'];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cols].concat(filtered.map(function(r) { return cols.map(function(c) { return c === 'Timestamp' ? fdate(r[c]) : (r[c] == null ? '' : r[c]); }); }))), 'Stores');
+            const zrows = [['Branch Code', 'Branch Name', 'Survey ID', 'พื้นที่', 'โซน', 'ประเภทโซน', 'ชื่อโซน', 'ตร.ม.', 'ชม./วัน', 'ระบบควบคุม', 'เป้า Lux', 'Lux เฉลี่ย', 'Lux ต่ำสุด', 'จำนวนจุด', 'ค่า Lux ทุกจุด',
+                'โคมที่ติดตั้ง', 'ติดตั้ง W', 'ใช้งานได้ W', 'W/ตร.ม.', 'ข้อเสนอเพิ่ม', 'เสนอเพิ่ม W', 'OPEX เพิ่ม ฿/เดือน', 'หมายเหตุ']];
+            let pending = filtered.length;
+            if (btn) { btn.disabled = true; btn.textContent = 'กำลังเตรียมข้อมูลโซน...'; }
+            const finish = function() {
+                if (--pending > 0) return;
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(zrows), 'Zones');
+                XLSX.writeFile(wb, 'hyper_lighting_survey_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+                if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+            };
+            filtered.forEach(function(r) {
+                google.script.run.withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        const t = num(res.data['Tariff (THB/kWh)']);
+                        (res.data['Zones_JSON'] || []).forEach(function(z) {
+                            const c = z.calc || {};
+                            const zt = (LI.zoneTypes.find(function(x) { return x.id === z.zt; }) || {}).label || z.zt;
+                            const fx = function(list) { return (list || []).map(function(f) { const lab = f.ft === 'other' && f.fo ? f.fo : ((LI.fixtures.find(function(x) { return x.id === f.ft; }) || {}).label || f.ft); return lab + ' ' + f.w + 'W×' + f.qty + (f.broken ? ' (เสีย ' + f.broken + ')' : ''); }).join('; '); };
+                            zrows.push([r['Branch Code'], r['Branch Name'], r['ID'], z.area === 'town' ? 'Town Center' : 'Sales Floor', z.zid, zt, z.name, z.m2 || '', z.hours, z.ctrl, z.target, c.luxAvg, c.luxMin, (z.lux || []).length,
+                                (z.lux || []).map(function(p) { return p.v; }).join(', '), fx(z.fixtures), c.instW, c.workW, c.lpd, fx(z.prop), c.propW, Math.round((c.propW || 0) / 1000 * z.hours * LI.days * t), z.nt]);
+                        });
+                    }
+                    finish();
+                }).withFailureHandler(finish).getHyperLiSurveyRecordById(r['ID']);
+            });
+        }
+    </script>
+    <script>var HYPER_REVIEW_KIND = 'Li';</script>
+    <?!= include('HyperReviewBar') ?>
+</body>
+</html>

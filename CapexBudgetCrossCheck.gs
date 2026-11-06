@@ -256,7 +256,8 @@ var OTHER_REF_TYPE_QTY_COLS = {
     'ตู้แช่แข็ง 4 ประตูขึ้นไป (เก่า)': 'Ref Frozen4 Door Qty',
     'ตู้ไอศกรีม':            'Ref Ice Cream Qty',
     'ตู้น้ำแข็ง':             'Ref Ice Qty',
-    'ตู้ 4 ประตู Stainless': 'Ref Ss4 Door Qty'
+    'ตู้ 4 ประตู Stainless': 'Ref Ss4 Door Qty',
+    'ตู้ Dump Chiller':      'Ref Dump Chiller Qty'
 };
 
 // ── Latest non-Draft survey snapshot for a branch, incl. per-unit condition ──

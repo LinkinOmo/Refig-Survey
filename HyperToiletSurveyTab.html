@@ -1,0 +1,503 @@
+        <!-- CONTENT: HYPER TOILET SURVEY — toilet improvement project, one card per toilet room.
+             v2 (30 ต.ค. 2569): rooms scored on the MTN monthly restroom form (20 items, 1–5 / N/A), store-level
+             overall scores (อุปกรณ์ / สุขภัณฑ์ / ระบบท่อ / ระบบปรับอากาศ), Ready / Touch Up / Improvement per room and the
+             store's Restroom Tracking row (Readiness, TOTAL SCORE, HAS) shown next to the branch.
+             Reuses HYPER_REF_STORES / _hyperRefStoreLabel / _hyperRefFindStoreDb from HyperRefSurveyTab.html. -->
+        <div id="content-hyper-to-survey" class="tab-content hidden">
+            <form id="hyper-to-form" onsubmit="handleHyperToSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">🚻 สำรวจห้องน้ำ Hyper</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= MANUALS_URL ?>?page=hyper-manual" target="_blank" class="text-emerald-600 hover:underline text-sm font-medium">📖 คู่มือการใช้งาน</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_to_survey_report" target="_blank" class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+                <p class="text-xs text-teal-800 bg-teal-50 border border-teal-200 rounded px-3 py-2 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>เพิ่ม <b>การ์ดทีละห้องน้ำ</b> (ลูกค้า / พนักงาน, ชาย / หญิง / ห้องน้ำเสมอภาค) · ให้คะแนน <b>20 รายการตามแบบตรวจห้องน้ำ MTN (1–5 หรือ N/A)</b> · รายการที่ได้ ≤2 ระบุอะไรเสีย + กำหนดเสร็จ ·
+                    เลือก <b>Ready / Touch Up / Improvement</b> ทุกห้อง · ปิดท้ายด้วย <b>คะแนนภาพรวม 4 ด้าน</b> ของสาขา</span>
+                </p>
+                <div id="hyper-to-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="hyper-to-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreHyperToDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardHyperToDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">เทรนเนอร์ / ผู้แจ้ง (Reporter) *</label><input type="text" name="reporterName" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label><input type="tel" name="reporterPhone" inputmode="tel" maxlength="20" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="hyper-to-station-search" autocomplete="off" class="input-field w-full border p-2 rounded text-sm bg-teal-50" placeholder="พิมพ์รหัสสาขา หรือชื่อสาขา (ไทย/อังกฤษ)..." oninput="handleHyperToStationInput(this)">
+                                <div id="hyper-to-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div id="hyper-to-store-badge" class="hidden self-end text-xs"></div>
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly><input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat"><input type="hidden" name="region"><input type="hidden" name="ammMtn"><input type="hidden" name="dmArea"><input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                    <!-- Restroom Tracking row of this store (HyperToiletTracking.gs) -->
+                    <div id="hto-track" class="hidden"></div>
+                </div>
+
+                <div id="hyper-to-rest-form" class="hidden">
+                    <div class="sticky top-0 z-30 bg-white/95 backdrop-blur border border-teal-300 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span>ห้องน้ำ <b id="hto-sum-rooms">0</b></span>
+                        <span>คะแนน <b id="hto-sum-score">-</b></span>
+                        <span class="text-red-700">รายการ ≤2 <b id="hto-sum-low">0</b></span>
+                        <span class="text-amber-700">Touch Up <b id="hto-sum-touch">0</b></span>
+                        <span class="text-purple-700">Improvement <b id="hto-sum-impr">0</b></span>
+                        <span class="ml-auto font-bold text-teal-800">งบประมาณ <span id="hto-sum-budget">0</span> ฿</span>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">2. ห้องน้ำ (การ์ดทีละห้อง)</h3>
+                        <p class="text-xs text-gray-500 mb-1">ห้องน้ำชาย / หญิง ที่อยู่ติดกันให้แยกเป็นคนละการ์ด · ถ่ายรูปภาพรวมห้อง + จุดที่ชำรุด</p>
+                        <details class="text-[11px] text-gray-600 bg-gray-50 border rounded p-2 mt-2"><summary class="cursor-pointer font-semibold text-gray-700">เกณฑ์คะแนน 1–5 (เหมือนแบบตรวจห้องน้ำ MTN)</summary><div id="hto-scale-legend" class="mt-1 space-y-0.5"></div></details>
+                        <div class="mt-2"><label class="block text-xs font-semibold text-gray-500 mb-1">📐 ผัง / ตำแหน่งห้องน้ำของสาขา (ถ้ามี)</label><div id="hto-layout"></div></div>
+                        <div id="hto-rooms" class="space-y-4 mt-4"></div>
+                        <button type="button" onclick="htoAddRoom()" class="mt-3 w-full border-2 border-dashed border-teal-400 text-teal-800 bg-teal-50 hover:bg-teal-100 rounded-lg py-2 text-sm font-semibold">＋ เพิ่มห้องน้ำ</button>
+                    </div>
+
+                    <div id="hto-overall-box" class="bg-white p-4 rounded-lg border-2 border-teal-300 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">3. คะแนนภาพรวมสาขา (Maintenance Score 1–5) *</h3>
+                        <p class="text-xs text-gray-500 mb-2">ให้คะแนนภาพรวมทุกห้องของสาขา 4 ด้าน — ระบบแนะนำจากข้อมูลในการ์ด (เลือกต่างได้)</p>
+                        <div id="hto-overall" class="space-y-3"></div>
+                        <div class="mt-3"><label class="block text-xs font-semibold text-gray-600 mb-1">ใบรับรอง HAS (กรมอนามัย) ที่หน้างาน *</label><select id="hto-has" class="w-full sm:w-1/2 border border-gray-300 rounded p-2 text-sm bg-white"></select></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">4. จุดชำรุดที่ต้องซ่อมทันที (ก่อนโครงการปรับปรุง)</h3>
+                        <div class="flex gap-4 mb-3">
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" onchange="document.getElementById('hto-broken-section').classList.remove('hidden')"> <span class="text-sm">มี (Yes)</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" checked onchange="document.getElementById('hto-broken-section').classList.add('hidden')"> <span class="text-sm">ไม่มี (No)</span></label>
+                        </div>
+                        <div id="hto-broken-section" class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ระบุห้อง / จุดที่ชำรุด และอาการ *</label>
+                            <textarea name="brokenDetail" rows="3" class="input-field w-full border border-red-300 p-2 rounded text-sm" placeholder="เช่น T02 ห้องน้ำหญิง Town Center ชักโครกห้อง 3 น้ำไหลไม่หยุด"></textarea>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-2 border-b pb-2">5. สรุปข้อเสนอปรับปรุงภาพรวมสาขา</h3>
+                        <textarea name="comments" rows="3" class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50" placeholder="เช่น ควรปรับปรุงห้องน้ำลูกค้า Town Center ทั้งชุด + เพิ่มห้องผู้พิการ 1 ห้อง (Optional)"></textarea>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">6. CC Email Notification (Optional)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1</label><input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm"></div>
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2</label><input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetHyperToForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveHyperToDraft()" class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 text-sm">&#128190; Save Draft</button>
+                            <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-blue-700">Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div> <!-- End content-hyper-to-survey -->
+
+        <script>
+            const HYPER_TO_CONFIG = <?!= JSON.stringify(getHyperToConfig_()) ?>;
+            const HYPER_TO_DRAFT_KEY = 'hyper_to_survey_draft_v1';
+            const HTO = { seq: 0, track: null, trackCode: '' };
+            (function() {
+                const C = HYPER_TO_CONFIG;
+                document.getElementById('hto-layout').innerHTML = photoUpload('ผังตำแหน่งห้องน้ำ', 'hto_layout');
+                document.getElementById('hto-scale-legend').innerHTML = C.scale.map(function(s) { return '<div><b class="inline-block w-5 text-center rounded ' + _htoScoreCls(s.v) + '">' + s.v + '</b> ' + s.l + ' — ' + s.d + '</div>'; }).join('') +
+                    '<div><b class="inline-block px-1 rounded bg-gray-200 text-gray-600">N/A</b> ไม่มีรายการนี้ในห้อง (เช่น โถปัสสาวะในห้องหญิง)</div><div class="text-red-700">ได้ ≤2 → ระบุอะไรเสีย และกำหนดเสร็จ</div>';
+                document.getElementById('hto-has').innerHTML = _htoOpts(C.hasOnsite);
+                document.getElementById('hto-overall').innerHTML = C.overall.map(function(o) {
+                    return '<div class="border border-gray-200 rounded-lg p-2" data-ov="' + o.k + '" data-val=""><div class="flex flex-wrap items-center justify-between gap-2"><span class="text-sm font-semibold text-gray-700">' + o.l + '</span>' +
+                        '<span class="text-[11px] text-teal-700" data-ovhint></span></div><div class="flex gap-1 mt-1.5">' +
+                        [1, 2, 3, 4, 5].map(function(s) { return '<button type="button" onclick="htoOverall(this,' + s + ')" class="hto-ov w-9 h-9 rounded-full border text-sm font-bold bg-white text-gray-500 border-gray-300">' + s + '</button>'; }).join('') +
+                        '</div><p class="text-[11px] text-gray-500 mt-1" data-ovtxt>1 = ' + o.c[0] + ' · 5 = ' + o.c[4] + '</p></div>';
+                }).join('');
+            })();
+            function htoEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+            function _htoOpts(list, sel, ph) { return '<option value="">' + (ph || '-- เลือก --') + '</option>' + list.map(function(o) { return '<option' + (o === sel ? ' selected' : '') + '>' + htoEsc(o) + '</option>'; }).join(''); }
+            function _htoScoreCls(v) { return v === 'NA' ? 'bg-gray-200 text-gray-600' : v <= 1 ? 'bg-red-600 text-white' : v <= 2 ? 'bg-red-100 text-red-700' : v <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'; }
+            function _htoChecks(list, picked, key, onch) {
+                return '<div class="flex flex-wrap gap-1.5">' + list.map(function(o) {
+                    const on = (picked || []).indexOf(o) > -1;
+                    return '<label class="inline-flex items-center gap-1 text-xs border rounded-full px-2 py-1 cursor-pointer ' + (on ? 'bg-teal-50 border-teal-400' : 'bg-white border-gray-300') + '">' +
+                        '<input type="checkbox" data-' + key + ' value="' + htoEsc(o) + '"' + (on ? ' checked' : '') + ' onchange="htoChip(this);' + (onch || '') + '"> ' + htoEsc(o) + '</label>';
+                }).join('') + '</div>';
+            }
+            function htoChip(cb) { const l = cb.closest('label'); l.classList.toggle('bg-teal-50', cb.checked); l.classList.toggle('border-teal-400', cb.checked); l.classList.toggle('bg-white', !cb.checked); l.classList.toggle('border-gray-300', !cb.checked); }
+
+            // one MTN item row: 1–5 / N/A buttons; ≤2 reveals "what is broken" + fix-by date
+            function _htoItemRow(x, o) {
+                o = o || {};
+                const v = o.s === undefined ? '' : o.s, low = v !== '' && v !== 'NA' && v <= 2;
+                const btn = function(s) { const on = String(v) === String(s); return '<button type="button" onclick="htoItem(this,\'' + s + '\')" class="hto-it ' + (s === 'NA' ? 'px-1.5' : 'w-7') + ' h-7 rounded-full border text-xs font-bold ' + (on ? _htoScoreCls(s === 'NA' ? 'NA' : s) + ' border-transparent' : 'bg-white text-gray-500 border-gray-300') + '" data-s="' + s + '">' + s + '</button>'; };
+                return '<div class="py-1 border-b border-gray-100" data-it="' + x.k + '" data-val="' + v + '"><div class="flex flex-wrap items-center justify-between gap-1"><span class="text-xs text-gray-700">' + htoEsc(x.l) + (x.extra ? ' <span class="text-gray-400">(เพิ่ม)</span>' : '') + '</span>' +
+                    '<div class="flex gap-1">' + [1, 2, 3, 4, 5].map(btn).join('') + btn('NA') + '</div></div>' +
+                    '<div class="grid grid-cols-3 gap-1 mt-1' + (low ? '' : ' hidden') + '" data-itlow><input data-itnt value="' + htoEsc(o.nt || '') + '" class="col-span-2 border border-red-300 rounded p-1 text-xs" placeholder="อะไรเสีย *"><input data-itdue type="date" value="' + htoEsc(o.due || '') + '" class="border border-gray-300 rounded p-1 text-xs" title="กำหนดซ่อมเสร็จ"></div></div>';
+            }
+            function htoItem(btn, s) {
+                const row = btn.closest('[data-it]');
+                row.dataset.val = s;
+                row.querySelectorAll('.hto-it').forEach(function(b) {
+                    const on = b.dataset.s === s;
+                    b.className = 'hto-it ' + (b.dataset.s === 'NA' ? 'px-1.5' : 'w-7') + ' h-7 rounded-full border text-xs font-bold ' + (on ? _htoScoreCls(s === 'NA' ? 'NA' : parseInt(s, 10)) + ' border-transparent' : 'bg-white text-gray-500 border-gray-300');
+                });
+                row.querySelector('[data-itlow]').classList.toggle('hidden', !(s !== 'NA' && parseInt(s, 10) <= 2));
+                htoRecalc();
+            }
+
+            function htoAddRoom(r) {
+                r = r || {};
+                const rid = r.rid || ('T' + String(++HTO.seq).padStart(2, '0'));
+                const n = parseInt(rid.replace(/\D/g, ''), 10); if (n > HTO.seq) HTO.seq = n;
+                const C = HYPER_TO_CONFIG;
+                const fxRows = C.fixtures.map(function(f) {
+                    const v = (r.fx || {})[f.k] || {};
+                    return '<div class="grid grid-cols-12 gap-1 items-center"><span class="col-span-6 text-xs text-gray-700">' + f.l + '</span>' +
+                        '<input type="number" min="0" data-fxq="' + f.k + '" value="' + (v.q || '') + '" oninput="htoRecalc()" class="col-span-3 border border-gray-300 rounded p-1 text-xs" placeholder="จำนวน">' +
+                        '<input type="number" min="0" data-fxb="' + f.k + '" value="' + (v.b || '') + '" oninput="htoRecalc()" class="col-span-3 border border-red-200 rounded p-1 text-xs" placeholder="เสีย"></div>';
+                }).join('');
+                const itRows = C.items.map(function(x) { return _htoItemRow(x, (r.it || {})[x.k]); }).join('');
+                const html = '<div class="border border-teal-300 rounded-lg overflow-hidden" data-room="' + rid + '">' +
+                    '<div class="bg-teal-600 text-white px-3 py-2 flex items-center justify-between"><b class="text-sm">ห้องน้ำ ' + rid + '</b><button type="button" onclick="htoRemove(\'' + rid + '\')" class="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5">ลบห้อง</button></div>' +
+                    '<div class="p-3 space-y-3 bg-white">' +
+                        '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทห้อง *</label><select data-r="type" onchange="htoTypeChange(this)" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _htoOpts(C.types, r.type) + '</select></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ตำแหน่ง *</label><select data-r="loc" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _htoOpts(C.locations, r.loc) + '</select></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ชั้น</label><input data-r="floor" value="' + htoEsc(r.floor || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น G, 1"></div>' +
+                            '<div class="col-span-2 sm:col-span-3"><label class="block text-xs font-semibold text-gray-600 mb-1">ชื่อ / จุดสังเกต</label><input data-r="name" value="' + htoEsc(r.name || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น ข้าง Food Court ใกล้ลิฟต์ฝั่งทิศเหนือ"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">พื้นที่ (ตร.ม.)</label><input data-r="m2" type="number" min="0" value="' + (r.m2 || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ปริมาณผู้ใช้</label><select data-r="usage" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _htoOpts(C.usage, r.usage) + '</select></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ค่าแสง (Lux)</label><input data-r="lux" type="number" min="0" value="' + (r.lux || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="ถ้าวัดได้ (เป้า 200)"></div>' +
+                        '</div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2"><p class="text-xs font-bold text-gray-700 mb-1">🚽 สุขภัณฑ์ &amp; อุปกรณ์ (จำนวนทั้งหมด / จำนวนที่เสีย) *</p><div class="space-y-1">' + fxRows + '</div></div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2" data-itbox><p class="text-xs font-bold text-gray-700 mb-1">⭐ แบบตรวจห้องน้ำ MTN — ให้คะแนนทุกรายการ (1–5 / N/A) *</p>' + itRows +
+                            '<p class="text-[11px] text-teal-800 font-semibold mt-1" data-out="score"></p></div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2"><p class="text-xs font-bold text-gray-700 mb-1">⚠️ ปัญหาที่พบ</p>' + _htoChecks(C.problems, r.prob, 'prob') +
+                            '<input data-r="probOther" value="' + htoEsc(r.probOther || '') + '" class="mt-2 w-full border border-gray-300 rounded p-2 text-xs" placeholder="รายละเอียดปัญหาเพิ่มเติม"></div>' +
+                        '<div class="border border-indigo-200 rounded-lg p-2 bg-indigo-50/40' + (r.type === C.types[2] ? '' : ' hidden') + '" data-accbox><p class="text-xs font-bold text-indigo-700 mb-1">♿ ห้องน้ำเสมอภาค / ผู้พิการ — ติ๊กสิ่งที่มีแล้ว</p>' + _htoChecks(C.access, r.acc, 'acc') + '</div>' +
+                        '<div class="border border-teal-200 rounded-lg p-2 bg-teal-50/40"><p class="text-xs font-bold text-teal-800 mb-1">🛠️ ขอบเขตที่ควรปรับปรุง</p>' + _htoChecks(C.scope, r.scope, 'scope') +
+                            '<div class="grid grid-cols-2 gap-2 mt-2"><div><label class="block text-xs font-semibold text-gray-600 mb-1">ความเร่งด่วน *</label><select data-r="prio" onchange="htoRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _htoOpts(C.priority, r.prio) + '</select></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">งบประมาณประมาณการ (บาท)</label><input data-r="budget" type="number" min="0" value="' + (r.budget || '') + '" oninput="htoRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="ถ้าทราบ"></div></div>' +
+                            // Ready / Touch Up / Improvement — same classes as the Parking survey (in-house vs contractor Pool Bid)
+                            '<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2"><div><label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทงาน *</label><select data-r="cls" onchange="htoRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _htoOpts(C.workClass, r.cls) + '</select></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ปริมาณงาน</label><input data-r="qty" type="number" min="0" step="0.1" value="' + (r.qty || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น 3"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">หน่วย</label><select data-r="unit" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _htoOpts(C.qtyUnits, r.unit) + '</select></div></div>' +
+                            '<p class="text-[11px] mt-1" data-out="clshint"></p></div>' +
+                        '<div><label class="block text-xs font-semibold text-gray-600 mb-1">หมายเหตุ</label><textarea data-r="nt" rows="2" class="w-full border border-gray-300 rounded p-2 text-sm">' + htoEsc(r.nt || '') + '</textarea></div>' +
+                        photoUpload('ห้องน้ำ ' + rid + ' (ภาพรวม + จุดชำรุด)', 'hto_room_' + rid) +
+                    '</div></div>';
+                document.getElementById('hto-rooms').insertAdjacentHTML('beforeend', html);
+                htoRecalc();
+            }
+            function htoRemove(rid) {
+                if (!confirm('ลบห้องน้ำ ' + rid + '?')) return;
+                delete _accumulatedFiles['hto_room_' + rid];
+                document.querySelector('[data-room="' + rid + '"]').remove();
+                htoRecalc();
+            }
+            function htoTypeChange(sel) { sel.closest('[data-room]').querySelector('[data-accbox]').classList.toggle('hidden', sel.value !== HYPER_TO_CONFIG.types[2]); }
+            function htoOverall(btn, v) {
+                const box = btn.closest('[data-ov]'), o = HYPER_TO_CONFIG.overall.find(function(x) { return x.k === box.dataset.ov; });
+                box.dataset.val = v;
+                box.querySelectorAll('.hto-ov').forEach(function(b, i) { b.className = 'hto-ov w-9 h-9 rounded-full border text-sm font-bold ' + (i + 1 === v ? _htoScoreCls(v) + ' border-transparent' : 'bg-white text-gray-500 border-gray-300'); });
+                box.querySelector('[data-ovtxt]').innerHTML = '<b>' + v + '</b> = ' + htoEsc(o.c[v - 1]);
+            }
+            function _htoRoom(el) {
+                const g = function(k) { const x = el.querySelector('[data-r="' + k + '"]'); return x ? x.value : ''; };
+                const fx = {};
+                el.querySelectorAll('[data-fxq]').forEach(function(q) {
+                    const n = parseInt(q.value, 10) || 0;
+                    if (n > 0) fx[q.dataset.fxq] = { q: n, b: Math.min(parseInt(el.querySelector('[data-fxb="' + q.dataset.fxq + '"]').value, 10) || 0, n) };
+                });
+                const it = {};
+                el.querySelectorAll('[data-it]').forEach(function(x) {
+                    const v = x.dataset.val;
+                    if (v === '') return;
+                    const rec = { s: v === 'NA' ? 'NA' : parseInt(v, 10) };
+                    if (rec.s !== 'NA' && rec.s <= 2) { rec.nt = x.querySelector('[data-itnt]').value.trim(); rec.due = x.querySelector('[data-itdue]').value; }
+                    it[x.dataset.it] = rec;
+                });
+                const picks = function(k) { return Array.from(el.querySelectorAll('[data-' + k + ']:checked')).map(function(c) { return c.value; }); };
+                return { v: 2, rid: el.dataset.room, type: g('type'), loc: g('loc'), floor: g('floor'), name: g('name'), m2: g('m2'), usage: g('usage'), lux: g('lux'),
+                         fx: fx, it: it, prob: picks('prob'), probOther: g('probOther'), acc: picks('acc'), scope: picks('scope'), prio: g('prio'), budget: g('budget'),
+                         cls: g('cls'), qty: g('qty'), unit: g('unit'), nt: g('nt'), pk: 'hto_room_' + el.dataset.room };
+            }
+            function collectHyperToRooms() { return Array.from(document.querySelectorAll('#hto-rooms [data-room]')).map(_htoRoom); }
+            function collectHyperToStore() {
+                const ov = {};
+                document.querySelectorAll('#hto-overall [data-ov]').forEach(function(b) { if (b.dataset.val) ov[b.dataset.ov] = parseInt(b.dataset.val, 10); });
+                return { ov: ov, has: document.getElementById('hto-has').value };
+            }
+            function _htoScoreOf(r) {
+                const vals = Object.keys(r.it).map(function(k) { return r.it[k].s; }).filter(function(s) { return s !== 'NA'; });
+                return vals.length ? vals.reduce(function(a, b) { return a + b; }, 0) / vals.length : null;
+            }
+            // broken share → suggested 1–5 (same bands as the written criteria of อุปกรณ์ / สุขภัณฑ์)
+            function _htoBand(b, q) { if (!q) return null; const p = b / q; return p === 0 ? 5 : p <= 0.10 ? 4 : p <= 0.25 ? 3 : p <= 0.50 ? 2 : 1; }
+            const HTO_FX_GROUP = { wcSit: 'san', wcSquat: 'san', urinal: 'san', basin: 'san', flushValve: 'san', spray: 'san', tapSensor: 'equip', tapManual: 'equip', dryer: 'equip', paper: 'equip', soap: 'equip', mirror: 'equip', exhaust: 'equip', light: 'equip' };
+            function _htoClsHint(el, r) {
+                const C = HYPER_TO_CONFIG, out = el.querySelector('[data-out="clshint"]'), b = parseFloat(r.budget) || 0;
+                let t = '', cls = 'text-gray-500';
+                if (r.cls === C.workClass[1]) {
+                    t = 'ช่างสาขาทำเอง คงรูปแบบเดิม · จัดซื้อหน้าไซต์ได้ไม่เกิน ' + C.touchUpLimit.toLocaleString() + ' ฿ · ต้องแนบรูปจริง';
+                    if (b > C.touchUpLimit) { t = '⚠️ งบประมาณเกิน ' + C.touchUpLimit.toLocaleString() + ' ฿ — ควรเป็น Improvement (Pool Bid)'; cls = 'text-red-600 font-semibold'; }
+                } else if (r.cls === C.workClass[2]) t = 'รวมเข้าชุดประมูล Pool Bid กับสาขาอื่น · ต้องแนบรูปจริง + ระบุปริมาณงาน';
+                out.className = 'text-[11px] mt-1 ' + cls; out.textContent = t;
+            }
+            function htoRecalc() {
+                const C = HYPER_TO_CONFIG;
+                let low = 0, touch = 0, impr = 0, budget = 0, fixWc = 0;
+                const scores = [], grp = { equip: [0, 0], san: [0, 0] }, items = { pipe: [], air: [] };
+                document.querySelectorAll('#hto-rooms [data-room]').forEach(function(el) {
+                    const r = _htoRoom(el);
+                    Object.keys(r.fx).forEach(function(k) { const g = HTO_FX_GROUP[k]; if (g) { grp[g][0] += r.fx[k].b; grp[g][1] += r.fx[k].q; } if (k === 'wcSit' || k === 'wcSquat' || k === 'urinal') fixWc += r.fx[k].q; });
+                    C.items.forEach(function(x) { const o = r.it[x.k]; if (o && o.s !== 'NA' && items[x.g]) items[x.g].push(o.s); });
+                    Object.keys(r.it).forEach(function(k) { if (r.it[k].s !== 'NA' && r.it[k].s <= 2) low++; });
+                    if (r.cls === C.workClass[1]) touch++;
+                    if (r.cls === C.workClass[2]) impr++;
+                    budget += parseFloat(r.budget) || 0;
+                    const avg = _htoScoreOf(r);
+                    if (avg !== null) scores.push(avg);
+                    el.querySelector('[data-out="score"]').innerHTML = avg === null ? '' : 'คะแนนเฉลี่ย <b class="' + (avg <= 2 ? 'text-red-600' : '') + '">' + avg.toFixed(1) + '</b> / 5 (' + Math.round(avg / 5 * 100) + '%) · ให้คะแนนแล้ว ' + Object.keys(r.it).length + '/' + C.items.length;
+                    _htoClsHint(el, r);
+                });
+                const avgAll = scores.length ? scores.reduce(function(a, b) { return a + b; }, 0) / scores.length : null;
+                document.getElementById('hto-sum-rooms').textContent = document.querySelectorAll('#hto-rooms [data-room]').length;
+                document.getElementById('hto-sum-score').textContent = avgAll === null ? '-' : avgAll.toFixed(1) + ' (' + Math.round(avgAll / 5 * 100) + '%)';
+                document.getElementById('hto-sum-low').textContent = low;
+                document.getElementById('hto-sum-touch').textContent = touch;
+                document.getElementById('hto-sum-impr').textContent = impr;
+                document.getElementById('hto-sum-budget').textContent = Math.round(budget).toLocaleString();
+                // overall-score hints: อุปกรณ์ / สุขภัณฑ์ from the broken share, ระบบท่อ / ปรับอากาศ from the item averages
+                const avgOf = function(a) { return a.length ? Math.round(a.reduce(function(x, y) { return x + y; }, 0) / a.length) : null; };
+                const hint = { equip: _htoBand(grp.equip[0], grp.equip[1]), san: _htoBand(grp.san[0], grp.san[1]), pipe: avgOf(items.pipe), air: avgOf(items.air) };
+                const why = { equip: 'อุปกรณ์เสีย ' + grp.equip[0] + '/' + grp.equip[1], san: 'สุขภัณฑ์เสีย ' + grp.san[0] + '/' + grp.san[1], pipe: 'เฉลี่ยท่อน้ำดี / ท่อน้ำทิ้ง', air: 'เฉลี่ยแอร์ / พัดลม / กลิ่น' };
+                document.querySelectorAll('#hto-overall [data-ov]').forEach(function(b) { const h = hint[b.dataset.ov]; b.querySelector('[data-ovhint]').textContent = h ? 'ระบบแนะนำ ' + h + ' (' + why[b.dataset.ov] + ')' : ''; });
+                _htoRenderTrack(fixWc);
+            }
+
+            // ── Restroom Tracking card (store context from the LCD / Operation tracking file) ──
+            function _htoLoadTrack(code) {
+                HTO.track = null; HTO.trackCode = code;
+                const box = document.getElementById('hto-track');
+                box.classList.remove('hidden');
+                box.innerHTML = '<p class="text-xs text-gray-400">กำลังโหลดข้อมูล Restroom Tracking...</p>';
+                google.script.run.withSuccessHandler(function(res) {
+                    if (HTO.trackCode !== code) return;
+                    HTO.track = res && res.success ? (res.t || false) : false;
+                    HTO.trackSource = res && res.source;
+                    htoRecalc();
+                }).withFailureHandler(function() { if (HTO.trackCode === code) { HTO.track = false; htoRecalc(); } }).getHyperToTrackingFor(code);
+            }
+            function _htoRenderTrack(fixWc) {
+                const box = document.getElementById('hto-track'), t = HTO.track, C = HYPER_TO_CONFIG;
+                if (!HTO.trackCode || t === null) return;
+                if (t === false) { box.innerHTML = '<p class="text-xs text-gray-400">ไม่พบสาขานี้ในไฟล์ Restroom Tracking</p>'; return; }
+                const rc = { 'Ready': 'bg-green-600', 'Improve': 'bg-amber-500', 'Urgent Action': 'bg-red-600' }[t.ready] || 'bg-gray-400';
+                const sc = function(l, v) { return '<span class="whitespace-nowrap">' + l + ' <b>' + (v === '' || v == null ? '-' : v) + '</b></span>'; };
+                box.innerHTML = '<div class="border border-sky-200 bg-sky-50/60 rounded-lg p-3 text-xs space-y-1.5">' +
+                    '<div class="flex flex-wrap items-center gap-2"><b class="text-sky-900">📋 Restroom Tracking</b><span class="px-2 py-0.5 rounded-full text-white font-bold ' + rc + '">' + htoEsc(t.ready || '-') + '</span>' +
+                        '<span class="px-2 py-0.5 rounded-full font-bold ' + (t.total !== '' && t.total < C.kpi ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-800') + '">TOTAL ' + (t.total === '' ? '-' : t.total + '%') + (t.total !== '' && t.total < C.kpi ? ' · ต่ำกว่า KPI ' + C.kpi + '%' : '') + '</span>' +
+                        '<span class="text-gray-500">HAS ' + htoEsc(t.hasCert || '-') + (t.hasColor ? ' (' + (t.hasColor === 'G' ? 'Green' : t.hasColor === 'B' ? 'Blue' : htoEsc(t.hasColor)) + ')' : '') + '</span></div>' +
+                    '<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-gray-700">' + sc('Adopter', t.adopter) + sc('Area MTN', t.areaMtn) + sc('HO', t.ho) + sc('Customer', t.customer) + '</div>' +
+                    '<div class="flex flex-wrap gap-x-3 gap-y-0.5 text-gray-700">' + sc('ห้องน้ำ (ทะเบียน)', t.rooms) + sc('จุดลูกค้า', t.custPts) + sc('จุดพนักงาน', t.staffPts) + sc('แม่บ้าน', t.keepers) + sc('Improvement Plan', t.plan ? t.plan + (t.planSent ? ' (' + t.planSent + ')' : '') : '') + '</div>' +
+                    (fixWc && t.rooms ? '<div class="' + (Math.abs(fixWc - t.rooms) / t.rooms > 0.2 ? 'text-orange-700 font-semibold' : 'text-gray-500') + '">สำรวจแล้ว: ชักโครก + โถส้วม + โถปัสสาวะ ' + fixWc + ' ชิ้น · ทะเบียน ' + t.rooms + (Math.abs(fixWc - t.rooms) / t.rooms > 0.2 ? ' — ต่างกันเกิน 20% ตรวจว่าสำรวจครบทุกจุด' : '') + '</div>' : '') +
+                    '<div class="text-[10px] text-gray-400">' + htoEsc(HTO.trackSource || '') + '</div></div>';
+            }
+
+            function _applyHyperToStore(s) {
+                const form = document.getElementById('hyper-to-form');
+                form.branchCode.value = s[0]; form.branchName.value = s[2] || s[1]; form.storeFormat.value = s[3] || ''; form.region.value = s[4] || '';
+                const db = _hyperRefFindStoreDb(s[0]);
+                form.ammMtn.value = db ? (db.ammMtn || '') : ''; form.dmArea.value = db ? (db.dmName || '') : ''; form.cmArea.value = db ? (db.cmName || '') : '';
+                if (db && db.dmEmail && !form.ccEmail1.value) form.ccEmail1.value = db.dmEmail;
+                if (db && db.cmEmail && !form.ccEmail2.value) form.ccEmail2.value = db.cmEmail;
+                const badge = document.getElementById('hyper-to-store-badge');
+                badge.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-semibold">' + (s[3] || '-') + '</span>' + (s[4] ? ' <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">' + s[4] + '</span>' : '');
+                badge.classList.remove('hidden');
+                document.getElementById('hyper-to-rest-form').classList.remove('hidden');
+                if (HTO.trackCode !== s[0]) _htoLoadTrack(s[0]);
+                if (!document.querySelector('#hto-rooms [data-room]')) htoAddRoom();
+                if (typeof sdsCheck === 'function') sdsCheck('hyperTo');
+            }
+            function _clearHyperToStore() {
+                const form = document.getElementById('hyper-to-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('hyper-to-store-badge').classList.add('hidden');
+                document.getElementById('hyper-to-rest-form').classList.add('hidden');
+                document.getElementById('hto-track').classList.add('hidden');
+                HTO.track = null; HTO.trackCode = '';
+            }
+            function handleHyperToStationInput(input) {
+                const val = input.value.toLowerCase().trim();
+                const dd = document.getElementById('hyper-to-station-dropdown');
+                if (val.length < 1) { dd.classList.add('hidden'); dd.innerHTML = ''; _clearHyperToStore(); return; }
+                const matches = HYPER_REF_STORES.filter(function(s) { return _hyperRefStoreLabel(s).toLowerCase().indexOf(val) !== -1; });
+                renderStationDropdown('hyper-to-station-dropdown', matches.map(_hyperRefStoreLabel), function(sel) {
+                    input.value = sel;
+                    const s = HYPER_REF_STORES.find(function(x) { return _hyperRefStoreLabel(x) === sel; });
+                    if (s) _applyHyperToStore(s);
+                });
+                const exact = HYPER_REF_STORES.find(function(s) { return _hyperRefStoreLabel(s).toLowerCase() === val || s[0] === val; });
+                if (exact) _applyHyperToStore(exact); else _clearHyperToStore();
+            }
+            document.addEventListener('click', function(e) { const d = document.getElementById('hyper-to-station-dropdown'); if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden'); });
+
+            function _hyperToFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+            function _clearHyperToRooms() { document.querySelectorAll('#hto-rooms [data-room]').forEach(function(r) { delete _accumulatedFiles['hto_room_' + r.dataset.room]; r.remove(); }); HTO.seq = 0; }
+            function _applyHyperToStoreLevel(st) {
+                st = st || {};
+                document.querySelectorAll('#hto-overall [data-ov]').forEach(function(b) {
+                    const v = (st.ov || {})[b.dataset.ov];
+                    if (v) htoOverall(b.querySelectorAll('.hto-ov')[v - 1], v);
+                    else { b.dataset.val = ''; b.querySelectorAll('.hto-ov').forEach(function(x) { x.className = 'hto-ov w-9 h-9 rounded-full border text-sm font-bold bg-white text-gray-500 border-gray-300'; }); }
+                });
+                document.getElementById('hto-has').value = st.has || '';
+            }
+            // Draft object shared by the on-device draft and the server draft (SurveyDraftStore.gs)
+            function _buildHyperToDraft() {
+                const form = document.getElementById('hyper-to-form');
+                return { savedAt: new Date().toISOString(), search: document.getElementById('hyper-to-station-search').value, fields: _hyperToFields(form), rooms: collectHyperToRooms(), store: collectHyperToStore() };
+            }
+
+            function saveHyperToDraft() {
+                const form = document.getElementById('hyper-to-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                try {
+                    localStorage.setItem(HYPER_TO_DRAFT_KEY, JSON.stringify(_buildHyperToDraft()));
+                    if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (Hyper Toilet)');
+                } catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('hyperTo', null);
+            }
+            function _readHyperToDraft() { try { return JSON.parse(localStorage.getItem(HYPER_TO_DRAFT_KEY) || 'null'); } catch (e) { return null; } }
+            function checkHyperToDraft() {
+                const d = _readHyperToDraft(), b = document.getElementById('hyper-to-draft-banner');
+                if (!d || !d.fields) { b.classList.add('hidden'); return; }
+                document.getElementById('hyper-to-draft-info').textContent = (d.fields.branchCode || '') + ' ' + (d.fields.branchName || '') + ' · ' + new Date(d.savedAt).toLocaleString('en-GB');
+                b.classList.remove('hidden');
+            }
+            function restoreHyperToDraft(fromServer) {
+                const d = fromServer || _readHyperToDraft();
+                if (!d) return;
+                const form = document.getElementById('hyper-to-form');
+                const s = HYPER_REF_STORES.find(function(x) { return x[0] === d.fields.branchCode; });
+                if (s) { document.getElementById('hyper-to-station-search').value = d.search || _hyperRefStoreLabel(s); _applyHyperToStore(s); }
+                _clearHyperToRooms();
+                Object.keys(d.fields).forEach(function(n) {
+                    const el = form.elements[n];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList) Array.from(el).forEach(function(r) { r.checked = r.value === d.fields[n]; });
+                    else el.value = d.fields[n];
+                });
+                document.getElementById('hto-broken-section').classList.toggle('hidden', d.fields.hasBroken !== 'Yes');
+                // drafts saved before v2 have 0–5 `el` ratings only — the rooms come back with the MTN items to rate again
+                (d.rooms || []).forEach(function(r) { htoAddRoom(r); });
+                _applyHyperToStoreLevel(d.store);
+                htoRecalc();
+                document.getElementById('hyper-to-draft-banner').classList.add('hidden');
+            }
+            function discardHyperToDraft() { if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return; try { localStorage.removeItem(HYPER_TO_DRAFT_KEY); } catch (e) {} checkHyperToDraft(); }
+            function resetHyperToForm(ask) {
+                if (ask && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('hyperTo');
+                const form = document.getElementById('hyper-to-form');
+                const rn = form.reporterName.value, rp = form.reporterPhone.value;
+                form.reset(); form.reporterName.value = rn; form.reporterPhone.value = rp;
+                delete _accumulatedFiles['hto_layout'];
+                document.querySelectorAll('#content-hyper-to-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                _clearHyperToRooms();
+                _applyHyperToStoreLevel({});
+                document.getElementById('hyper-to-station-search').value = '';
+                document.getElementById('hto-broken-section').classList.add('hidden');
+                _clearHyperToStore();
+                htoRecalc();
+            }
+
+            function _htoFlash(el, msg) {
+                alert(msg);
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-2', 'ring-red-400'); setTimeout(function() { el.classList.remove('ring-2', 'ring-red-400'); }, 2000);
+            }
+            async function handleHyperToSurveySubmit(e) {
+                e.preventDefault();
+                const form = e.target, C = HYPER_TO_CONFIG;
+                if (!form.reporterName.value.trim()) { alert('กรุณากรอกชื่อผู้แจ้ง (Reporter)'); form.reporterName.focus(); return; }
+                if (!form.reporterPhone.value.trim()) { alert('กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone)'); form.reporterPhone.focus(); return; }
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน'); return; }
+                const rooms = Array.from(document.querySelectorAll('#hto-rooms [data-room]'));
+                if (!rooms.length) { alert('กรุณาเพิ่มอย่างน้อย 1 ห้องน้ำ'); return; }
+                const hasPhoto = function(k) { return (_accumulatedFiles[k] || []).filter(Boolean).length > 0; };
+                let overTouch = [];
+                for (const el of rooms) {
+                    const r = _htoRoom(el);
+                    const lowNoNote = C.items.find(function(x) { const o = r.it[x.k]; return o && o.s !== 'NA' && o.s <= 2 && !o.nt; });
+                    const msg = !r.type ? 'ยังไม่ได้เลือกประเภทห้อง' : !r.loc ? 'ยังไม่ได้เลือกตำแหน่ง' : !Object.keys(r.fx).length ? 'ยังไม่ได้กรอกจำนวนสุขภัณฑ์ / อุปกรณ์'
+                        : Object.keys(r.it).length < C.items.length ? 'ยังให้คะแนนแบบตรวจไม่ครบ (' + Object.keys(r.it).length + '/' + C.items.length + ' — ไม่มีรายการนั้นให้กด N/A)'
+                        : lowNoNote ? '“' + lowNoNote.l + '” ได้ ≤2 — กรุณาระบุอะไรเสีย'
+                        : !r.prio ? 'ยังไม่ได้เลือกความเร่งด่วน' : !r.cls ? 'ยังไม่ได้เลือกประเภทงาน (Ready / Touch Up / Improvement)'
+                        : (r.cls === C.workClass[1] || r.cls === C.workClass[2]) && !hasPhoto('hto_room_' + r.rid) ? 'งาน ' + r.cls.split(' — ')[0] + ' ต้องแนบรูปถ่ายจริง'
+                        : _equipmentPhotoRequired.hyperTo && !hasPhoto('hto_room_' + r.rid) ? 'ยังไม่ได้แนบรูปถ่าย' : '';
+                    if (msg) { _htoFlash(el, 'ห้องน้ำ ' + r.rid + ': ' + msg); return; }
+                    if (r.cls === C.workClass[1] && (parseFloat(r.budget) || 0) > C.touchUpLimit) overTouch.push(r.rid);
+                }
+                const st = collectHyperToStore();
+                const missOv = C.overall.find(function(o) { return !st.ov[o.k]; });
+                if (missOv) { _htoFlash(document.getElementById('hto-overall-box'), 'ข้อ 3: กรุณาให้คะแนนภาพรวม “' + missOv.l.split(' (')[0] + '”'); return; }
+                if (!st.has) { _htoFlash(document.getElementById('hto-overall-box'), 'ข้อ 3: กรุณาเลือกสถานะใบรับรอง HAS ที่หน้างาน'); return; }
+                if (overTouch.length && !confirm('ห้อง ' + overTouch.join(', ') + ' เป็น Touch Up แต่งบประมาณเกิน ' + C.touchUpLimit.toLocaleString() + ' ฿ (ควรเป็น Improvement)\n\nยืนยันส่งตามนี้?')) return;
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุจุดที่ชำรุด'); form.brokenDetail.focus(); return; }
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    const tasks = [], seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('HTO', form.branchCode.value, tasks, function(cat) { return cat === 'hto_layout' ? [1600, 1600, 0.72] : [800, 800, 0.60]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+                    const data = _hyperToFields(form);
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('hyperTo');
+                    data.roomsJson = JSON.stringify(collectHyperToRooms());
+                    data.storeJson = JSON.stringify(st);
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) { showSuccess(); sdsReset('hyperTo'); try { localStorage.removeItem(HYPER_TO_DRAFT_KEY); } catch (e2) {} checkHyperToDraft(); resetHyperToForm(false); }
+                            else alert('Error: ' + (res && res.error));
+                        })
+                        .withFailureHandler(function(err) { hideLoading(); alert('Server Error: ' + err.message); })
+                        .processHyperToSurveyForm(data);
+                } catch (err) { hideLoading(); alert('Error processing form: ' + err.message); }
+            }
+        </script>

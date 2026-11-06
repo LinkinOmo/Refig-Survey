@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>คู่มือแบบสำรวจกล้องวงจรปิด (CCTV)</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --navy:#1e3a8a; --ink:#1e293b; --mute:#64748b; --line:#e2e8f0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Prompt', sans-serif; color: var(--ink); background: #f1f5f9; margin: 0; font-size: 13.5px; line-height: 1.55; }
+  .page { background: #fff; max-width: 210mm; margin: 0 auto; padding: 14mm 14mm 12mm; }
+  h1 { font-size: 26px; margin: 0; line-height: 1.25; }
+  h2 { font-size: 19px; margin: 6mm 0 4mm; padding: 2.5mm 4mm; border-radius: 6px; color: #fff; background: var(--navy); }
+  h2.gen { background: #334155; } h2.ok { background: #047857; }
+  h3 { font-size: 15px; margin: 0 0 1.5mm; }
+  p { margin: 0 0 2mm; }
+  ul, ol { margin: 0 0 2mm; padding-left: 5mm; }
+  li { margin-bottom: 1mm; }
+  .muted { color: var(--mute); }
+  .cover { border: 3px solid var(--navy); border-radius: 10px; padding: 12mm; }
+  .cover .tag { display: inline-block; background: #dbeafe; color: var(--navy); font-weight: 600; padding: 1mm 4mm; border-radius: 99px; font-size: 13px; }
+  .cover .big { font-size: 32px; font-weight: 700; line-height: 1.2; margin: 6mm 0 3mm; }
+  .cover .sub { font-size: 16px; color: var(--mute); }
+  .cover-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin-top: 8mm; }
+  .cover-card { border: 1px solid var(--line); border-radius: 8px; padding: 4mm; }
+  .cover-card b { display: block; font-size: 15px; margin-bottom: 1mm; }
+  .step { padding: 3mm 0; border-top: 1px solid var(--line); break-inside: avoid; page-break-inside: avoid; }
+  .num { display: inline-flex; align-items: center; justify-content: center; width: 7mm; height: 7mm; border-radius: 50%; color: #fff; font-weight: 700; font-size: 13px; margin-right: 2mm; vertical-align: middle; background: var(--navy); }
+  .num.ok { background: #047857; }
+  .tip { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 2mm 3mm; border-radius: 4px; margin: 2mm 0; }
+  .warn { background: #fff7ed; border-left: 4px solid #f97316; padding: 2mm 3mm; border-radius: 4px; margin: 2mm 0; }
+  .must { background: #fef2f2; border-left: 4px solid #ef4444; padding: 2mm 3mm; border-radius: 4px; margin: 2mm 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 2mm 0 3mm; }
+  th, td { border: 1px solid var(--line); padding: 1.6mm 2mm; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; }
+  .break { break-before: page; page-break-before: always; }
+  .foot { margin-top: 6mm; font-size: 11px; color: var(--mute); text-align: center; }
+  .checklist li { list-style: none; margin-left: -5mm; }
+  .checklist li::before { content: '☐ '; font-size: 15px; }
+  .printbar { position: sticky; top: 0; z-index: 5; background: #1e293b; color: #fff; text-align: center; padding: 2.5mm; font-size: 13px; }
+  .printbar button { font-family: inherit; margin-left: 3mm; background: #22c55e; color: #fff; border: 0; border-radius: 6px; padding: 1.5mm 4mm; font-weight: 600; cursor: pointer; }
+  @page { size: A4; margin: 0; }
+  @media print { body { background: #fff; } .page { margin: 0; max-width: none; padding: 12mm 13mm 10mm; } .noprint { display: none !important; } }
+  @media screen and (max-width: 640px) { .page { padding: 5mm 4mm; } .cover-grid { grid-template-columns: 1fr; } .cover { padding: 6mm; } }
+</style>
+</head>
+<body>
+<div class="printbar noprint">📄 คู่มือแบบสำรวจกล้องวงจรปิด (CCTV) v1.0 <button onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button></div>
+<div class="page">
+
+<div class="cover">
+  <span class="tag">📹 CCTV Survey · v1.0 · ต.ค. 2026</span>
+  <div class="big">คู่มือแบบสำรวจคำขอ<br>กล้องวงจรปิด (CCTV)</div>
+  <div class="sub">สาขาแจ้งจุดที่ต้องการ → LP / Area คัดกรองจากรูปหน้างาน → เหลือเฉพาะ <b>Must have</b> ที่ช่วยลด Shrink เข้าคำของบ</div>
+  <div class="cover-grid">
+    <div class="cover-card"><b>👷 ผู้แจ้ง (ผจก.สาขา / M1)</b>เมนู <b>📹 กล้องวงจรปิด (CCTV)</b> ในหน้าแบบสำรวจ → กรอกกล้องปัจจุบัน + Shrink → เพิ่มการ์ดทีละจุด พร้อมรูป</div>
+    <div class="cover-card"><b>🛡️ ผู้คัดกรอง (LP / Area / Admin)</b>หน้า <b>รายงาน CCTV</b> → เปิดสาขา → ใส่ผลคัดกรองรายจุด (อนุมัติ / ลดจำนวน / ตัด / รอข้อมูล)</div>
+    <div class="cover-card"><b>💰 งบประมาณ</b>ประมาณ <b>33,000 ฿ / จุด</b> รวมระบบ + ติดตั้ง (ราคาจริงขึ้นกับความสูง ระยะเดินสาย และเวลาทำงานกลางคืน)</div>
+    <div class="cover-card"><b>🎯 หลักการ</b>ไม่อนุมัติตามจำนวนที่ขอ — ทุกจุดต้องตอบได้ว่า <b>ป้องกันความเสี่ยงอะไร</b> และ<b>มีกล้องเดิมครอบคลุมหรือยัง</b></div>
+  </div>
+</div>
+
+<h2 class="gen">1. ทำไมต้องคัดกรอง</h2>
+<ul>
+  <li>คำขอเพิ่มจากสาขารอบแรกมีราว <b>2,300 ตัว</b> (Hyper ~1,500 · อื่นๆ ~800) — ถ้าอนุมัติทั้งหมดจะใช้งบเพิ่มประมาณ <b>150 ล้านบาท</b></li>
+  <li>เป้าหมายองค์กร: ลด Shrink ให้เหลือ <b>1.2 – 1.3%</b> → กล้องต้องเป็นเครื่องมือลด Loss ไม่ใช่ติดตามคำขอแบบกว้างๆ</li>
+  <li>คำของบยังต้องผ่านการกลั่นกรองรอบถัดไป ส่งเฉพาะ <b>Must have</b> ที่มีข้อมูลรองรับ</li>
+  <li><b>กล้องเสีย</b> แยกเรื่องจากการเพิ่มกล้องใหม่ — ให้เลือกประเภท "ทดแทนกล้องเสีย" หรือแจ้งในหัวข้อ 4</li>
+</ul>
+<div class="tip">⭐ <b>จุดเสี่ยงหลักที่ LP ให้ความสำคัญ</b> (ขึ้นกลุ่มแรกในรายการพื้นที่):<br>
+1) <b>จุดรับสินค้า Receiving / PR</b> — ควรมี ≥ 2 กล้อง ไม่ใช่ตัวเดียวที่หันไป Loading B2B<br>
+2) <b>Backroom / ทางเดินหลังร้าน / Stockroom</b> — จุดซ่อน / เคลื่อนย้ายสินค้าโดยไม่ถูกบันทึก<br>
+3) <b>SBA (ตาเขียว) / HBA</b> — พบความเสี่ยงบ่อย<br>
+4) <b>Cashier / ช่องทางออก</b> — ภาพต่อเนื่องของลูกค้าที่ถือสินค้าออก (ส่งให้ Command Center ติดตามได้)</div>
+
+<h2>2. วิธีกรอกแบบสำรวจ (ผู้แจ้ง)</h2>
+<div class="step"><h3><span class="num">1</span>เปิดแท็บ 📹 กล้องวงจรปิด (CCTV)</h3>
+  <p>เข้าสู่ระบบ → เลือกแท็บ <b>📹 กล้องวงจรปิด (CCTV)</b> → กรอก <b>ชื่อผู้แจ้ง</b> + <b>เบอร์โทร</b> → พิมพ์รหัส / ชื่อสาขาแล้วเลือกจากรายการ (ใช้ได้ทุก Format: Hyper, Mini, Market ฯลฯ)</p>
+  <p class="muted">อีเมล DM / CM จะถูกเติมให้อัตโนมัติในช่อง CC</p></div>
+<div class="step"><h3><span class="num">2</span>กล้องปัจจุบัน &amp; Shrink ของสาขา</h3>
+  <table><tr><th>ช่อง</th><th>กรอกอะไร</th></tr>
+    <tr><td>กล้อง Online / Analog-Offline / เสีย *</td><td>จำนวนกล้องทั้งสาขา (ใส่ 0 ถ้าไม่มี)</td></tr>
+    <tr><td>ประตูเข้า-ออก / มีกล้องนับคนแล้ว</td><td>ใช้ประเมินจุดที่ยังขาดกล้องนับคน</td></tr>
+    <tr><td>Shrink ปัจจุบัน (%) *</td><td>% ของยอดขาย เช่น 1.35</td></tr>
+    <tr><td>Shrink Act 2026 (% / บาท)</td><td>ตัวเลขจริงปี 2026</td></tr>
+    <tr><td>Shrink Estimate (% / บาท)</td><td>คาดการณ์หลังติดกล้อง — ใช้ดูความคุ้มค่า</td></tr>
+    <tr><td>แผนกที่มีความเสี่ยงสูง</td><td>เลือกได้หลายแผนก</td></tr></table></div>
+<div class="step"><h3><span class="num">3</span>เพิ่มการ์ดจุดกล้อง (1 การ์ด = 1 ตำแหน่ง)</h3>
+  <ul>
+    <li><b>พื้นที่ / Zone *</b> — กลุ่ม ⭐ จุดเสี่ยงหลักอยู่ด้านบน</li>
+    <li><b>ตำแหน่ง / จุดสังเกต *</b> — เช่น "ประตูรับสินค้าฝั่งขวา มองเข้าโต๊ะตรวจรับ"</li>
+    <li><b>ประเภทคำขอ *</b> — เพิ่มจุดใหม่ / ย้าย-ปรับมุมกล้องเดิม / ทดแทนกล้องเสีย</li>
+    <li><b>จำนวนกล้องที่ขอ *</b> — ตำแหน่งเดียวกันต้องการ 2 ตัว ใส่ 2</li>
+    <li><b>กล้องเดิมที่จุดนี้ *</b> — ไม่มีเลย / มีแต่มุมไม่เห็นจุดเสี่ยง / มีแต่เสีย / ครอบคลุมแล้ว (ขอเสริม)</li>
+    <li><b>ความเสี่ยงที่ป้องกัน *</b> + แผนก + จำนวนเคสที่จุดนี้ใน 12 เดือน</li>
+    <li><b>ต้องการนับคน</b> — เฉพาะประตูที่มีทิศทางเข้า-ออกชัดเจน (Food Court เข้าได้ 4 ทิศ ไม่เหมาะ)</li>
+    <li><b>เหตุผล *</b> และ <b>ความจำเป็น *</b> Must have / Nice to have</li>
+  </ul>
+  <div class="must">📷 <b>บังคับแนบรูปทุกจุด</b> — ถ่าย <b>ตำแหน่งที่จะติด</b> + <b>มุมที่ต้องการให้กล้องเห็น</b> เพื่อให้ LP ตรวจได้ว่าครอบคลุมจุดเสี่ยงจริง</div>
+  <p class="muted">แถบสรุปด้านบนแสดง จำนวนจุด · กล้องที่ขอ · Must have · ⭐ จุดเสี่ยงหลัก · งบประมาณประมาณการ แบบ real-time</p></div>
+<div class="step"><h3><span class="num">4</span>กล้องเสีย / สรุป / ส่ง</h3>
+  <p>หัวข้อ 4: กล้องเสียที่ต้องซ่อมทันที (แยกจากคำขอเพิ่ม) · หัวข้อ 5: สรุปความจำเป็นภาพรวม · กด <b>💾 Save Draft</b> เพื่อทำต่อภายหลัง (เปิดต่อได้ทุกเครื่อง) → กด <b>Submit</b></p>
+  <div class="warn">ต้องการแก้ไขจุดกล้องหลังส่งแล้ว → ส่งแบบสำรวจใหม่ (รายงานใช้รายการล่าสุดของสาขา) ผลคัดกรองของรายการเดิมจะไม่ย้ายตามมา</div></div>
+
+<h2 class="ok">3. การคัดกรอง (LP / Area / Admin)</h2>
+<div class="step"><h3><span class="num ok">1</span>เปิดรายงาน</h3>
+  <p>ลิงก์ <b>View All Reports</b> ในแท็บ หรือ <code>?page=cctv_survey_report</code> · ด้านบนมีการ์ดสรุป: สาขาที่ส่ง · กล้องที่ขอ (ใหม่ / ย้าย / ทดแทน) · Must have · ⭐ จุดเสี่ยงหลัก · งบตามคำขอ · <b>ผ่านคัดกรอง</b></p>
+  <p>กรองได้ตาม Format · สถานะคัดกรอง · เฉพาะสาขาที่มี Must have · แท็บ <b>📍 สรุปตามพื้นที่</b> แสดงจำนวนสาขา / กล้องที่ขอ / ผ่านคัดกรอง แยกตาม Zone (เช่น Dry Food กี่สาขา กี่ตัว)</p></div>
+<div class="step"><h3><span class="num ok">2</span>คัดกรองรายจุด</h3>
+  <p>คลิกสาขา → ดูรูป / เหตุผล / กล้องเดิมของแต่ละจุด → เลือกผล:</p>
+  <table><tr><th>ผล</th><th>ความหมาย</th><th>จำนวนที่นับ</th></tr>
+    <tr><td>อนุมัติ</td><td>จำเป็น ช่วยลด Shrink</td><td>เต็มจำนวนที่ขอ</td></tr>
+    <tr><td>อนุมัติบางส่วน (ลดจำนวน)</td><td>จำเป็นแต่ไม่ต้องเท่าที่ขอ *ต้องใส่เหตุผล</td><td>ตามที่กรอก</td></tr>
+    <tr><td>ตัดออก</td><td>มีกล้องครอบคลุมแล้ว / Nice to have *ต้องใส่เหตุผล</td><td>0</td></tr>
+    <tr><td>รอข้อมูลเพิ่ม</td><td>รูปไม่ชัด / ไม่มีเหตุผลรองรับ *ต้องใส่เหตุผล</td><td>0 (ยังนับว่ายังไม่คัดกรอง)</td></tr></table>
+  <p>ปุ่มลัด: <b>อนุมัติทุกจุด Must have</b> · <b>ตัดทุกจุด Nice to have</b> → ใส่ความเห็นรวม → <b>✔ บันทึกผลคัดกรอง</b></p></div>
+<div class="step"><h3><span class="num ok">3</span>Export</h3>
+  <p><b>⬇ Export Excel</b> ได้ 2 ชีท: <b>Stores</b> (รายสาขา + Shrink + สรุปคำขอ / อนุมัติ) และ <b>Points</b> (รายจุด + ผลคัดกรอง + ลิงก์รูป) — ใช้แนบคำของบรอบถัดไป</p></div>
+
+<h2 class="gen">4. Checklist ก่อนกดส่ง</h2>
+<ul class="checklist">
+  <li>กรอกกล้องปัจจุบัน + Shrink ปัจจุบันครบ</li>
+  <li>ทุกจุดมีรูปตำแหน่ง + มุมกล้อง</li>
+  <li>ทุกจุดตอบได้ว่าป้องกันความเสี่ยงอะไร และกล้องเดิมยังไม่ครอบคลุม</li>
+  <li>แยกกล้องเสียออกจากคำขอเพิ่ม</li>
+  <li>เลือก Must have เฉพาะจุดที่จำเป็นจริง</li>
+</ul>
+<div class="foot">Building Management Department · Big C · CCTV Survey v1.0</div>
+</div>
+</body>
+</html>

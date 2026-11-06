@@ -63,6 +63,13 @@
             border: 1px solid #fecdd3;
         }
 
+        /* Draft = survey saved module-by-module, not yet Submitted */
+        .status-Draft {
+            background-color: #f8fafc;
+            color: #64748b;
+            border: 1px dashed #94a3b8;
+        }
+
         .loader {
             border: 3px solid #f3f3f3;
             border-radius: 50%;
@@ -165,6 +172,7 @@
 </head>
 
 <body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
 
     <!-- Top Navigation Bar -->
     <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 backdrop-blur-sm bg-opacity-95">
@@ -192,6 +200,8 @@
                 <div class="flex items-center gap-4">
                     <div class="loader" id="mainLoader"></div>
                     <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=survey_dashboard&type=ref"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all shadow-sm">📊 Dashboard</a>
                     <button onclick="window.location.reload()"
                         class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-sky-600 transition-all shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -460,7 +470,7 @@
                         <th class="p-4">รหัส / ชื่อสาขา</th>
                         <th class="p-4">ผู้รายงาน</th>
                         <th class="p-4">ตู้ชำรุด</th>
-                        <th class="p-4" title="O = Open, R = Bev Remote, P = Bev Plugin, W = Bev Walk-in, F = Frozen, IC = Ice Cream, IM = Ice, SS = Stainless 4-Door (ยอดล่าสุดของทั้งสาขา)">ประเภทตู้แช่</th>
+                        <th class="p-4" title="O = Open, R = Bev Remote, P = Bev Plugin, W = Bev Walk-in, F = Frozen, IC = Ice Cream, IM = Ice, SS = Stainless 4-Door, DC = Dump Chiller (ยอดล่าสุดของทั้งสาขา)">ประเภทตู้แช่</th>
                         <th class="p-4">สถานะ</th>
                         <th class="p-4 text-right">รายละเอียด</th>
                     </tr>
@@ -912,7 +922,7 @@
                             isSMF = !!flags.isSMF;
                             smfCanEdit = !!flags.smfEditAllowed;
                             opsCanEdit = !!flags.opsEditAllowed;
-                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed));
+                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed || flags.smfDedupAllowed));
                         })
                         .getUserFlags(_refUserEmail);
                 }
@@ -1016,7 +1026,7 @@
                             '<button onclick="location.reload()" class="px-4 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700 transition">โหลดซ้ำ</button>' +
                             '</td></tr>';
                     })
-                    .getRefSurveyListSlim();
+                    .getRefSurveyListSlim(window.ARCHIVE_ON);
             }
 
             _fetchRefSlim(1);
@@ -1373,7 +1383,7 @@
             const _latestBevByBranch = {};
             allData.forEach(function(r) {
                 const code = r['Branch Code'];
-                if (!code) return;
+                if (!code || r['Status'] === 'Draft') return; // unfinished survey, not the store's current count
                 const existing = _latestBevByBranch[code];
                 if (!existing || new Date(r['Timestamp']) > new Date(existing['Timestamp'])) {
                     _latestBevByBranch[code] = r;
@@ -1406,6 +1416,7 @@
                 const ts = formatRecordDate(d["Timestamp"]);
                 const hasBroken = d["Has Broken Ref"] === 'Yes';
                 const status = d["Status"] || 'Pending';
+                const statusLabel = status === 'Draft' ? '📝 กำลังสำรวจ' : htmlEscape(status);
                 const branchCode = htmlEscape(d["Branch Code"] || '-');
                 const branchName = htmlEscape(d["Branch Name"] || '-');
                 const reporter = htmlEscape(d["Reporter Name"] || d["Reporter Email"] || '-');
@@ -1436,11 +1447,12 @@
                 const refIceCreamQty = parseInt(_bevSrc['Ref Ice Cream Qty']) || 0;
                 const refIceQty = parseInt(_bevSrc['Ref Ice Qty']) || 0;
                 const refSs4Qty = parseInt(_bevSrc['Ref Ss4 Door Qty']) || 0;
+                const refDumpQty = parseInt(_bevSrc['Ref Dump Chiller Qty']) || 0;
                 // Every type always shown (dimmed when 0), so triage/coverage gaps are visible at a glance.
                 const _refChip = function(label, qty, color) {
                     return '<span class="' + (qty > 0 ? color + ' font-bold' : 'text-slate-300') + '">' + label + qty + '</span>';
                 };
-                const refTotalQty = refOpenQty + bevRemoteQty + bevPluginQty + bevWalkInQty + refFrozenQty + refIceCreamQty + refIceQty + refSs4Qty;
+                const refTotalQty = refOpenQty + bevRemoteQty + bevPluginQty + bevWalkInQty + refFrozenQty + refIceCreamQty + refIceQty + refSs4Qty + refDumpQty;
                 const bevBadge = '<div class="flex flex-col gap-0.5">' +
                       '<span class="text-xs font-bold text-slate-700">รวม ' + refTotalQty + ' ตู้</span>' +
                       '<span class="text-[11px] font-mono leading-tight flex flex-wrap gap-x-1.5 gap-y-0.5">' +
@@ -1452,6 +1464,7 @@
                         _refChip('IC', refIceCreamQty, 'text-rose-700') +
                         _refChip('IM', refIceQty, 'text-cyan-700') +
                         _refChip('SS', refSs4Qty, 'text-slate-700') +
+                        _refChip('DC', refDumpQty, 'text-teal-700') +
                       '</span>' +
                       '</div>';
 
@@ -1468,7 +1481,7 @@
                     '<td class="p-4 text-slate-700">' + reporter + '</td>' +
                     '<td class="p-4">' + (hasBroken ? '<span class="inline-block bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full border border-red-200">\u0e21\u0e35\u0e15\u0e39\u0e49\u0e0a\u0e33\u0e23\u0e38\u0e14</span>' : '<span class="text-slate-300 text-xs">\u2014</span>') + '</td>' +
                     '<td class="p-4">' + bevBadge + '</td>' +
-                    '<td class="p-4"><span class="status-badge status-' + htmlEscape(status) + '">' + htmlEscape(status) + '</span></td>' +
+                    '<td class="p-4"><span class="status-badge status-' + htmlEscape(status) + '">' + statusLabel + '</span></td>' +
                     '<td class="p-4 text-right">' +
                         '<button onclick="event.stopPropagation(); openModal(\'' + safeId + '\')" class="text-sky-600 hover:text-sky-800 font-medium text-sm hover:bg-sky-50 px-3 py-1.5 rounded-lg transition border border-transparent hover:border-sky-100 shadow-sm">\u0e23\u0e32\u0e22\u0e25\u0e30\u0e40\u0e2d\u0e35\u0e22\u0e14</button>' +
                     '</td>';
@@ -1484,7 +1497,7 @@
                             '<h3 class="font-bold text-slate-800 leading-tight">' + branchCode + ' \u2014 ' + branchName + '</h3>' +
                             (hasBroken ? '<span class="inline-block mt-1 bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200">\u0e21\u0e35\u0e15\u0e39\u0e49\u0e0a\u0e33\u0e23\u0e38\u0e14</span>' : '') +
                         '</div>' +
-                        '<span class="status-badge status-' + htmlEscape(status) + ' text-[10px] shrink-0">' + htmlEscape(status) + '</span>' +
+                        '<span class="status-badge status-' + htmlEscape(status) + ' text-[10px] shrink-0">' + statusLabel + '</span>' +
                     '</div>' +
                     (hierarchyInfo ? '<p class="text-xs text-slate-400 mb-1">' + hierarchyInfo + '</p>' : '') +
                     '<div class="mb-1">' + bevBadge + '</div>' +
@@ -1577,6 +1590,7 @@
         // ── Broken-unit helpers (module-scope to avoid strict-mode SyntaxError) ───────
         function brokenTypeCode(type) {
             const t = (type || '').toLowerCase();
+            if (t.includes('dump'))                                             return 'DC';
             if (t.includes('open'))                                             return 'OC';
             if (t.includes('plugin') || t.includes('plug-in'))                  return 'BP';
             if (t.includes('walk'))                                             return 'BW';
@@ -1694,6 +1708,8 @@
                     if (assetNo !== '-') rows += detailRow('Asset No.', assetNo);
                     const doorCount = d[keyPrefix + 'Door Count_' + u];
                     if (doorCount !== undefined && doorCount !== '') rows += detailRow('🚪 จำนวนประตู', String(doorCount));
+                    const unitType = d[keyPrefix + 'Type_' + u];
+                    if (unitType) rows += detailRow('❄️ ประเภท (Type)', String(unitType));
                     rows += `<div class="flex items-center gap-2 py-0.5 text-xs">
                         <span class="text-slate-500">สถานะ:</span>
                         ${unitStatus === 'ใช้งาน'
@@ -1866,6 +1882,19 @@
                 html += buildUnitRows('Ref Ss4 Door ', ss4Qty, 'ตู้ 4 ประตู SS', 1, 'SS', 1, 'ref_ss4door', 'bg-slate-600');
             }
 
+            // 2.7 Dump Chiller (teal) — per-unit Type: Air Flow / Brick
+            const dumpQty = parseInt(d['Ref Dump Chiller Qty']) || 0;
+            if (dumpQty > 0) {
+                let _dcAir = 0, _dcBrick = 0;
+                for (let u = 1; u <= dumpQty; u++) {
+                    const t = String(d['Ref Dump Chiller Type_' + u] || '');
+                    if (t === 'Air Flow') _dcAir++; else if (t === 'Brick') _dcBrick++;
+                }
+                html += sectionHeader('2.7 ตู้ Dump Chiller — ' + dumpQty + ' ตู้', 'teal');
+                html += `<div class="-mt-2 mb-3 px-1"><span class="text-xs text-slate-500">สรุป: Air Flow ${_dcAir} · Brick ${_dcBrick}${dumpQty - _dcAir - _dcBrick > 0 ? ' · ไม่ระบุ ' + (dumpQty - _dcAir - _dcBrick) : ''}</span></div>`;
+                html += buildUnitRows('Ref Dump Chiller ', dumpQty, 'ตู้ Dump Chiller', 1, 'DC', 1, 'ref_dumpchiller', 'bg-teal-700');
+            }
+
             // Section: Broken Ref
             if (d["Has Broken Ref"] === 'Yes') {
                 html += sectionHeader('ตู้แช่ชำรุด', 'red');
@@ -2034,46 +2063,27 @@
         function printModal() {
             const title    = document.getElementById('modalTitle').textContent;
             const subtitle = document.getElementById('modalSubtitle').textContent;
-            const bodyHtml = document.getElementById('modalBody').innerHTML;
 
-            // GAS web apps run inside a sandboxed iframe, so window.print() on the
-            // current window prints the outer Google wrapper — not this page.
-            // Opening a dedicated print window is the reliable workaround.
-            const pw = window.open('', '_blank',
-                'width=900,height=700,menubar=yes,toolbar=yes,scrollbars=yes');
-            if (!pw) {
-                alert('กรุณาอนุญาต Pop-up สำหรับหน้านี้แล้วลองใหม่อีกครั้ง\n(Allow pop-up for this page and try again)');
-                return;
-            }
-            pw.document.write(`<!DOCTYPE html>
-<html lang="th">
-<head>
-<meta charset="UTF-8">
-<title>${title}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
-<style>
-  @page { size: A4 portrait; margin: 15mm; }
-  body  { font-family: sans-serif; color: #1e293b; font-size: 11pt; }
-  .no-print, button { display: none !important; }
-  .detail-row   { display: flex; padding: 4px 0; font-size: 11pt; border-bottom: 1px solid #f1f5f9; }
-  .detail-label { width: 35%; font-weight: 600; color: #475569; flex-shrink: 0; }
-  .detail-value { flex: 1; }
-  img { max-width: 100%; break-inside: avoid; }
-  @media print { .no-print, button { display: none !important; } }
-</style>
-</head>
-<body>
-<div style="background:#0c4a6e;color:white;padding:14px 18px;margin-bottom:14px;border-radius:6px;">
-  <h2 style="margin:0 0 4px 0;font-size:16pt;">${title}</h2>
-  <p  style="margin:0;font-size:10pt;opacity:0.85;">${subtitle}</p>
-</div>
-${bodyHtml}
-<script>
-  window.onload = function() { window.print(); setTimeout(function(){ window.close(); }, 800); };
-<\/script>
-</body>
-</html>`);
-            pw.document.close();
+            // Print in-place via #printArea (same document = same Tailwind CDN
+            // build + CSP as the live page) instead of a separate pw = window.open()
+            // popup. That popup approach used to load a mismatched, older Tailwind
+            // build and could silently lose inline event handlers (broken photo
+            // fallbacks) and interactive controls (edit/status buttons) that were
+            // never meant to be printed — producing a PDF that didn't match the
+            // on-screen report. Cloning + stripping here guarantees those controls
+            // are gone regardless of whether print CSS applies correctly.
+            const clone = document.getElementById('modalBody').cloneNode(true);
+            clone.querySelectorAll('button, .no-print').forEach(el => el.remove());
+
+            const area = document.getElementById('printArea');
+            area.innerHTML =
+                '<div style="background:#0c4a6e;color:white;padding:14px 18px;margin-bottom:16px;border-radius:6px;">' +
+                '<h2 style="margin:0 0 4px 0;font-size:16pt;">' + htmlEscape(title) + '</h2>' +
+                '<p style="margin:0;font-size:10pt;opacity:0.85;">' + htmlEscape(subtitle) + '</p>' +
+                '</div>';
+            area.appendChild(clone);
+            window.print();
+            setTimeout(function() { area.innerHTML = ''; }, 1500);
         }
 
         let _modalCloseTimer = null;
@@ -2153,6 +2163,7 @@ ${bodyHtml}
                 { id:'refEditQtyIceCream',  col:'Ref Ice Cream Qty',    label:'2.4 ตู้ไอศกรีม',            c:'rose'   },
                 { id:'refEditQtyIce',       col:'Ref Ice Qty',          label:'2.5 ตู้น้ำแข็ง',            c:'cyan'   },
                 { id:'refEditQtySs4',       col:'Ref Ss4 Door Qty',     label:'2.6 ตู้ 4 ประตู Stainless', c:'slate'  },
+                { id:'refEditQtyDumpChiller', col:'Ref Dump Chiller Qty', label:'2.7 ตู้ Dump Chiller',     c:'teal'   },
             ];
             const cmap = { sky:'border-sky-200 bg-sky-50 text-sky-800', teal:'border-teal-200 bg-teal-50 text-teal-800', indigo:'border-indigo-200 bg-indigo-50 text-indigo-800', rose:'border-rose-200 bg-rose-50 text-rose-800', cyan:'border-cyan-200 bg-cyan-50 text-cyan-800', slate:'border-slate-200 bg-slate-100 text-slate-700' };
             let html = '<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">';
@@ -2258,6 +2269,7 @@ ${bodyHtml}
                 { prefix:'Ref Ice Cream ', qty:_qty('refEditQtyIceCream','Ref Ice Cream Qty'), startIdx:1,               tCode:'IC', label:'ตู้ไอศกรีม',               b:'border-rose-200',   bg:'bg-rose-50',   hc:'text-rose-700',   sup:true,  productOptions:[], hasDoors:false },
                 { prefix:'Ref Ice ',       qty:_qty('refEditQtyIce','Ref Ice Qty'),           startIdx:1,                tCode:'IM', label:'ตู้น้ำแข็ง',               b:'border-cyan-200',   bg:'bg-cyan-50',   hc:'text-cyan-700',   sup:false, productOptions:[], hasDoors:false },
                 { prefix:'Ref Ss4 Door ',  qty:_qty('refEditQtySs4','Ref Ss4 Door Qty'),      startIdx:1,                tCode:'SS', label:'ตู้ 4 ประตู SS',           b:'border-slate-200',  bg:'bg-slate-100', hc:'text-slate-700',  sup:false, productOptions:[], hasDoors:false },
+                { prefix:'Ref Dump Chiller ', qty:_qty('refEditQtyDumpChiller','Ref Dump Chiller Qty'), startIdx:1,     tCode:'DC', label:'ตู้ Dump Chiller',         b:'border-teal-200',   bg:'bg-teal-50',   hc:'text-teal-700',   sup:false, productOptions:[], hasDoors:false, hasType:true },
             ];
             const branchCode = d['Branch Code'] || '';
             const container = document.getElementById('_refEditUnitsBody');
@@ -2285,10 +2297,14 @@ ${bodyHtml}
                     if (def.sup) html += `<div class="col-span-2"><label class="block text-xs text-slate-500 mb-0.5">แบรนด์ไอศกรีม</label><input type="text" data-edit-field="${def.prefix}Supplier_${u}" value="${supplier}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
                     const brandInputId = `refEditBrandInput_${def.tCode}_${u}`;
                     html += `<div class="col-span-2 sm:col-span-1"><label class="block text-xs text-slate-500 mb-0.5">ยี่ห้อ</label>${_editBrandChipsHtml(REF_BRANDS, brandInputId)}<input type="text" id="${brandInputId}" list="${brandListId}" data-edit-field="${def.prefix}Brand_${u}" autocomplete="off" value="${brand}" placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่..." class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white"><datalist id="${brandListId}">${brandOpts}</datalist></div>`;
-                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><div class="flex gap-1"><input id="${assetInputId}" type="text" data-edit-field="${assetFieldKey}" value="${assetNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm">${branchCode ? `<button type="button" onclick="openAssetMapPicker('${branchCode}','${assetInputId}')" class="shrink-0 px-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>` : ''}</div></div>`;
+                    html += `<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><div class="flex gap-1"><input id="${assetInputId}" type="text" data-edit-field="${assetFieldKey}" value="${assetNo}" onblur="_confirmManualAssetEntry(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm">${branchCode ? `<button type="button" onclick="openAssetMapPicker('${branchCode}','${assetInputId}')" class="shrink-0 px-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>` : ''}</div></div>`;
                     if (def.hasDoors) {
                         const doorCountVal = htmlEscape(String(d[def.prefix+'Door Count_'+u] ?? ''));
                         html += `<div><label class="block text-xs text-slate-500 mb-0.5">🚪 จำนวนประตู</label><input type="number" min="0" step="1" data-edit-field="${def.prefix}Door Count_${u}" value="${doorCountVal}" class="w-full border border-slate-300 rounded p-1.5 text-sm" placeholder="-"></div>`;
+                    }
+                    if (def.hasType) {
+                        const typeVal = String(d[def.prefix+'Type_'+u] || '');
+                        html += `<div><label class="block text-xs text-slate-500 mb-0.5">❄️ ประเภท (Type)</label><select data-edit-field="${def.prefix}Type_${u}" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">${['', 'Air Flow', 'Brick'].map(v => `<option value="${v}" ${typeVal === v ? 'selected' : ''}>${v || '— ไม่ระบุ —'}</option>`).join('')}</select></div>`;
                     }
                     html += `<div><label class="block text-xs text-slate-500 mb-0.5">สถานะ</label>${_editRefStatusChipHtml(def.prefix+'Status_'+u, def.tCode, u, status)}</div>`;
                     if (def.productOptions && def.productOptions.length) {
@@ -2348,6 +2364,7 @@ ${bodyHtml}
             addGroup('Ref Ice Cream ', d['Ref Ice Cream Qty'], 'ตู้ไอศกรีม', 'IC');
             addGroup('Ref Ice ', d['Ref Ice Qty'], 'ตู้น้ำแข็ง', 'IM');
             addGroup('Ref Ss4 Door ', d['Ref Ss4 Door Qty'], 'ตู้ 4 ประตู SS', 'SS');
+            addGroup('Ref Dump Chiller ', d['Ref Dump Chiller Qty'], 'ตู้ Dump Chiller', 'DC');
             return units;
         }
 
@@ -2767,7 +2784,7 @@ ${bodyHtml}
             const comments     = document.getElementById('refEditComments').value;
 
             // Collect qty
-            const qtyMap = { refEditQtyOpen:'Ref Open Qty', refEditQtyBevPlugin:'Ref Bev Plugin Qty', refEditQtyBevWalkin:'Ref Bev Walk In Qty', refEditQtyBevRemote:'Ref Bev Remote Qty', refEditQtyFrozenPlugin:'Ref Frozen Plugin Qty', refEditQtyFrozenRemote:'Ref Frozen Remote Qty', refEditQtyFrozenWalkin:'Ref Frozen Walk In Qty', refEditQtyFrozen1:'Ref Frozen1 Door Qty', refEditQtyFrozen2:'Ref Frozen2 Door Qty', refEditQtyFrozen3:'Ref Frozen3 Door Qty', refEditQtyFrozen4:'Ref Frozen4 Door Qty', refEditQtyIceCream:'Ref Ice Cream Qty', refEditQtyIce:'Ref Ice Qty', refEditQtySs4:'Ref Ss4 Door Qty' };
+            const qtyMap = { refEditQtyOpen:'Ref Open Qty', refEditQtyBevPlugin:'Ref Bev Plugin Qty', refEditQtyBevWalkin:'Ref Bev Walk In Qty', refEditQtyBevRemote:'Ref Bev Remote Qty', refEditQtyFrozenPlugin:'Ref Frozen Plugin Qty', refEditQtyFrozenRemote:'Ref Frozen Remote Qty', refEditQtyFrozenWalkin:'Ref Frozen Walk In Qty', refEditQtyFrozen1:'Ref Frozen1 Door Qty', refEditQtyFrozen2:'Ref Frozen2 Door Qty', refEditQtyFrozen3:'Ref Frozen3 Door Qty', refEditQtyFrozen4:'Ref Frozen4 Door Qty', refEditQtyIceCream:'Ref Ice Cream Qty', refEditQtyIce:'Ref Ice Qty', refEditQtySs4:'Ref Ss4 Door Qty', refEditQtyDumpChiller:'Ref Dump Chiller Qty' };
             const unitQty = {};
             Object.entries(qtyMap).forEach(([inputId, colKey]) => {
                 const el = document.getElementById(inputId);
@@ -3131,7 +3148,7 @@ ${bodyHtml}
                         if (document.getElementById('npTableBody'))
                             document.getElementById('npTableBody').innerHTML = '<tr><td colspan="7" class="p-8 text-center text-red-500">Error: ' + htmlEscape((err&&err.message)||'') + '</td></tr>';
                     })
-                    .getNpSurveyListSlim();
+                    .getNpSurveyListSlim(window.ARCHIVE_ON);
             }
             _fetch(1);
         }
@@ -3735,7 +3752,7 @@ ${bodyHtml}
                     html+=`<div class="border border-slate-200 rounded-lg p-3 mb-2 bg-white"><p class="text-xs font-semibold text-slate-400 mb-2 border-b pb-1 flex items-center gap-2">เครื่องที่ ${u} <span class="font-mono bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded">${htmlEscape(eqId)}</span></p>`;
                     html+=`<div class="grid grid-cols-2 gap-2">`;
                     html+=`<div class="col-span-2 sm:col-span-1"><label class="block text-xs text-slate-500 mb-0.5">ยี่ห้อ</label><input type="text" data-np-edit-field="${prod.prefix}Brand_${u}" value="${brand}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
-                    html+=`<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><div class="flex gap-1"><input id="${npAssetInputId}" type="text" data-np-edit-field="${npAssetFieldKey}" value="${assetNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm">${branchCode ? `<button type="button" onclick="openAssetMapPicker('${branchCode}','${npAssetInputId}')" class="shrink-0 px-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>` : ''}</div></div>`;
+                    html+=`<div><label class="block text-xs text-slate-500 mb-0.5">Asset No.</label><div class="flex gap-1"><input id="${npAssetInputId}" type="text" data-np-edit-field="${npAssetFieldKey}" value="${assetNo}" onblur="_confirmManualAssetEntry(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm">${branchCode ? `<button type="button" onclick="openAssetMapPicker('${branchCode}','${npAssetInputId}')" class="shrink-0 px-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>` : ''}</div></div>`;
                     html+=`<div><label class="block text-xs text-slate-500 mb-0.5">Serial No.</label><input type="text" data-np-edit-field="${prod.prefix}Serial_${u}" value="${serialNo}" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>`;
                     html+=`<div><label class="block text-xs text-slate-500 mb-0.5">สถานะเครื่อง</label><select data-np-edit-field="${prod.prefix}Status_${u}" class="w-full border border-slate-300 rounded p-1.5 text-sm"><option value="ใช้งาน" ${status==='ใช้งาน'?'selected':''}>ใช้งาน</option><option value="ไม่ใช้งาน" ${status!=='ใช้งาน'?'selected':''}>ไม่ใช้งาน</option></select></div>`;
                     html+=`<div><label class="block text-xs text-slate-500 mb-0.5">🔌 ปลั๊กไฟรองรับ</label><select data-np-edit-field="${prod.prefix}Plug_${u}" class="w-full border border-slate-300 rounded p-1.5 text-sm"><option value="" ${!plugv?'selected':''}>— ไม่ระบุ —</option><option value="Yes" ${plugv==='Yes'?'selected':''}>✅ มีปลั๊กไฟ</option><option value="No" ${plugv==='No'?'selected':''}>⚠️ ไม่มีปลั๊กไฟ</option><option value="ไม่แน่ใจ" ${plugv==='ไม่แน่ใจ'?'selected':''}>❓ ไม่แน่ใจ</option></select></div>`;
@@ -3897,44 +3914,74 @@ ${bodyHtml}
         };
 
         // ── Asset register mapping picker (edit mode) ───────────────────────
-        // Lets an editor pick a unit's Asset No. from the store's real
-        // fixed-asset ledger (getStoreAssetRegisterForMapping, Survey.gs)
-        // instead of free-typing it. Results are cached per branch code for
-        // the life of the page since the ledger doesn't change mid-session.
-        let _assetMapCache = {};
+        // Lets an editor pick a unit's Asset No. from one of TWO SEPARATE,
+        // unmatched asset ledgers instead of free-typing it:
+        //   - BGCFA: accounting fixed-asset register (getStoreAssetRegisterForMapping)
+        //   - CMS:   CMS service/equipment asset register (getStoreCmsAssetRegisterForMapping)
+        // The two systems track different asset codes for the same store — a
+        // physical unit may appear in one, both (under different codes), or
+        // neither. Switching tabs does NOT cross-reference/match them; the
+        // in-modal banner says so explicitly. Results cached per source+branch
+        // code for the life of the page since neither ledger changes mid-session.
+        let _assetMapCache = { bgcfa: {}, cms: {} };
         let _assetMapCurrentTarget = null;
         let _assetMapCurrentItems = [];
+        let _assetMapSource = 'bgcfa';
 
         function openAssetMapPicker(branchCode, targetInputId) {
             const code = String(branchCode || '').trim();
             if (!code) return;
             _assetMapCurrentTarget = targetInputId;
-            const modal = document.getElementById('assetMapModal');
-            const listEl = document.getElementById('assetMapList');
             const searchEl = document.getElementById('assetMapSearch');
             if (searchEl) searchEl.value = '';
-            modal.classList.remove('hidden');
-            if (_assetMapCache[code]) {
-                _assetMapCurrentItems = _assetMapCache[code];
+            document.getElementById('assetMapModal').classList.remove('hidden');
+            document.getElementById('assetMapBranchCode').textContent = code;
+            _setAssetMapSourceTab('bgcfa');
+            _loadAssetMapSource(code, 'bgcfa');
+        }
+
+        function switchAssetMapSource(source) {
+            const code = document.getElementById('assetMapBranchCode').textContent;
+            _setAssetMapSourceTab(source);
+            _loadAssetMapSource(code, source);
+        }
+
+        function _setAssetMapSourceTab(source) {
+            _assetMapSource = source;
+            const activeCls = ['border-b-2','border-amber-500','text-amber-700','bg-amber-50'];
+            [['assetMapTabBgcfa','bgcfa'], ['assetMapTabCms','cms']].forEach(function(pair) {
+                const btn = document.getElementById(pair[0]);
+                if (!btn) return;
+                if (pair[1] === source) { btn.classList.add.apply(btn.classList, activeCls); btn.classList.remove('text-slate-500'); }
+                else { btn.classList.remove.apply(btn.classList, activeCls); btn.classList.add('text-slate-500'); }
+            });
+        }
+
+        function _loadAssetMapSource(code, source) {
+            const listEl = document.getElementById('assetMapList');
+            if (_assetMapCache[source][code]) {
+                _assetMapCurrentItems = _assetMapCache[source][code];
                 _renderAssetMapList();
                 return;
             }
             listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">กำลังโหลด...</p>';
+            const fn = source === 'cms' ? 'getStoreCmsAssetRegisterForMapping' : 'getStoreAssetRegisterForMapping';
             google.script.run.withSuccessHandler(function(res) {
                 if (!res || !res.success) {
                     listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ: ' + htmlEscape(res && res.error || '') + '</p>';
                     return;
                 }
-                _assetMapCache[code] = res.items || [];
-                _assetMapCurrentItems = _assetMapCache[code];
+                _assetMapCache[source][code] = res.items || [];
+                if (source !== _assetMapSource) return; // user switched tabs before this returned
+                _assetMapCurrentItems = _assetMapCache[source][code];
                 if (!res.prebuilt || !_assetMapCurrentItems.length) {
-                    listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลทะเบียนทรัพย์สินสำหรับสาขานี้</p>';
+                    listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลทะเบียนทรัพย์สิน' + (source === 'cms' ? ' CMS' : '') + 'สำหรับสาขานี้</p>';
                     return;
                 }
                 _renderAssetMapList();
             }).withFailureHandler(function(err) {
                 listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ</p>';
-            }).getStoreAssetRegisterForMapping(code);
+            })[fn](code);
         }
 
         function _renderAssetMapList() {
@@ -3944,14 +3991,17 @@ ${bodyHtml}
             const items = _assetMapCurrentItems.filter(function(it) {
                 return !q || String(it.assetNo).toLowerCase().indexOf(q) > -1 ||
                     String(it.name).toLowerCase().indexOf(q) > -1 ||
-                    String(it.category).toLowerCase().indexOf(q) > -1;
+                    String(it.category).toLowerCase().indexOf(q) > -1 ||
+                    String(it.brand || '').toLowerCase().indexOf(q) > -1 ||
+                    String(it.serialNo || '').toLowerCase().indexOf(q) > -1;
             });
             if (!items.length) { listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ไม่พบรายการ</p>'; return; }
             listEl.innerHTML = items.slice(0, 200).map(function(it) {
+                const sub = [it.brand, it.model].filter(Boolean).join(' ');
                 return '<button type="button" onclick="_pickAssetForMapping(\'' + htmlEscape(it.assetNo) + '\')" class="w-full text-left border border-slate-200 hover:border-amber-400 hover:bg-amber-50 rounded-lg px-2.5 py-1.5 mb-1.5 transition">' +
                     '<p class="font-mono font-semibold text-amber-700 text-xs">' + htmlEscape(it.assetNo) + '</p>' +
                     '<p class="text-slate-600 text-xs truncate">' + htmlEscape(it.name || '-') + '</p>' +
-                    '<p class="text-slate-400 text-[10px]">' + htmlEscape(it.category || '') + '</p>' +
+                    '<p class="text-slate-400 text-[10px]">' + htmlEscape([it.category, sub].filter(Boolean).join(' · ')) + '</p>' +
                     '</button>';
             }).join('');
         }
@@ -3959,7 +4009,7 @@ ${bodyHtml}
         function _pickAssetForMapping(assetNo) {
             if (_assetMapCurrentTarget) {
                 const input = document.getElementById(_assetMapCurrentTarget);
-                if (input) input.value = assetNo;
+                if (input) { input.value = assetNo; input.dataset.picked = assetNo; }
             }
             _closeAssetMapPicker();
         }
@@ -3968,15 +4018,42 @@ ${bodyHtml}
             document.getElementById('assetMapModal').classList.add('hidden');
             _assetMapCurrentTarget = null;
         }
+
+        // "Force select" nudge: if an editor types an Asset No. by hand instead
+        // of using the 🔗 picker, confirm on blur that they really checked the
+        // register first — manual entry stays allowed (many units genuinely
+        // aren't in either ledger yet), this just guards against skipping the
+        // picker out of habit. Same confirm-on-blur UX as confirmBevType/
+        // confirmFrozenType elsewhere in this file (once per distinct value).
+        function _confirmManualAssetEntry(inputEl) {
+            const val = (inputEl.value || '').trim();
+            if (!val) { inputEl.dataset.confirmedManual = ''; return; }
+            if (inputEl.dataset.picked === val) return;
+            if (inputEl.dataset.confirmedManual === val) return;
+            const ok = confirm('⚠️ กรุณายืนยัน\n\nคุณพิมพ์เลข Asset นี้เอง ("' + val + '") แทนที่จะเลือกจากทะเบียนทรัพย์สิน (กด 🔗)\n\nกด OK หากค้นหาในทะเบียนแล้วไม่พบเลขนี้จริง หรือกด Cancel เพื่อกลับไปลองเลือกจากทะเบียนก่อน');
+            if (ok) {
+                inputEl.dataset.confirmedManual = val;
+            } else {
+                inputEl.focus();
+                inputEl.select();
+            }
+        }
     </script>
 
     <!-- Asset register mapping picker modal -->
     <div id="assetMapModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
             <div class="p-3 border-b border-slate-200 flex items-center justify-between">
-                <p class="text-sm font-semibold text-slate-700">เลือก Asset จากทะเบียนทรัพย์สิน</p>
+                <p class="text-sm font-semibold text-slate-700">เลือก Asset — สาขา <span id="assetMapBranchCode" class="font-mono"></span></p>
                 <button onclick="_closeAssetMapPicker()" class="text-slate-400 hover:text-slate-600">✕</button>
             </div>
+            <div class="flex border-b border-slate-200 text-sm font-medium">
+                <button type="button" id="assetMapTabBgcfa" onclick="switchAssetMapSource('bgcfa')" class="flex-1 px-3 py-2 border-b-2 border-amber-500 text-amber-700 bg-amber-50">🧾 บัญชี (BGCFA)</button>
+                <button type="button" id="assetMapTabCms" onclick="switchAssetMapSource('cms')" class="flex-1 px-3 py-2 text-slate-500">🔧 CMS (Service)</button>
+            </div>
+            <p class="text-[11px] text-slate-500 bg-slate-50 border-b border-slate-100 px-3 py-1.5 leading-snug">
+                ⚠️ ทะเบียน 2 ระบบนี้แยกกันคนละระบบ ไม่ได้จับคู่กันอัตโนมัติ — อุปกรณ์ชิ้นเดียวกันอาจมีเลข Asset คนละเลขในแต่ละระบบ (บัญชี = ทะเบียนทรัพย์สินบัญชี/BGCFA, CMS = ทะเบียนอุปกรณ์บริการของระบบ CMS) กรุณาเลือกจากระบบที่ตรงกับป้าย/เอกสารที่หน้างานจริง
+            </p>
             <div class="p-3 border-b border-slate-100">
                 <input id="assetMapSearch" type="text" placeholder="ค้นหาชื่อ/หมวด/เลข Asset..." oninput="_renderAssetMapList()" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
             </div>

@@ -1,0 +1,99 @@
+<script>
+// Shared by the 6 Hyper report pages (set HYPER_REVIEW_KIND before including this file).
+//  • Adds a review bar (Pending / Acknowledged / Rejected / Corrected) above #modalBody once the
+//    page's openModal() has loaded currentRecord — reuses the page's own record fetch.
+//  • Opens a record directly when the page URL carries &open=<ID> (links from ?page=hyper-status).
+// Relies on the report pages' globals: openModal, currentRecord, _userEmail, isAdmin, smfCanEdit, opsCanEdit.
+(function() {
+    var LABEL = { Pending: '⏳ รอตรวจ', Corrected: '⏳ แก้ไขแล้ว รอตรวจ', Acknowledged: '✅ ตรวจรับแล้ว', Rejected: '🔁 ไม่ผ่าน — รอแก้ไข' };
+    var CLS = { Pending: 'bg-amber-50 border-amber-300 text-amber-800', Corrected: 'bg-amber-50 border-amber-300 text-amber-800',
+                Acknowledged: 'bg-emerald-50 border-emerald-300 text-emerald-800', Rejected: 'bg-red-50 border-red-300 text-red-800' };
+    var pollTimer = null;
+
+    function e(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function canReview() { try { return !!(isAdmin || smfCanEdit || opsCanEdit); } catch (x) { return false; } }
+    function fmt(v) {
+        if (!v) return '';
+        var d = new Date(v);
+        return isNaN(d.getTime()) ? String(v) : d.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function barEl() {
+        var bar = document.getElementById('hyperReviewBar');
+        if (!bar) {
+            var body = document.getElementById('modalBody');
+            if (!body) return null;
+            bar = document.createElement('div');
+            bar.id = 'hyperReviewBar';
+            bar.className = 'mx-5 mt-4';
+            body.parentNode.insertBefore(bar, body);
+        }
+        return bar;
+    }
+
+    function render(rec) {
+        var bar = barEl();
+        if (!bar) return;
+        if (!rec) { bar.innerHTML = ''; return; }
+        var st = String(rec['Review Status'] || '').trim() || 'Pending';
+        var h = '<div class="border rounded-lg px-3 py-2 text-sm ' + (CLS[st] || CLS.Pending) + '">' +
+            '<div class="flex flex-wrap items-center gap-2"><b>สถานะตรวจรับ:</b> <span>' + e(LABEL[st] || st) + '</span>';
+        if (rec['Reviewed By']) h += '<span class="text-xs opacity-75">โดย ' + e(rec['Reviewed By']) + ' · ' + e(fmt(rec['Review Date'])) + '</span>';
+        if (canReview()) {
+            h += '<span class="ml-auto flex gap-1">';
+            if (st !== 'Acknowledged') h += '<button type="button" data-hrb="Acknowledged" class="px-2 py-1 rounded bg-emerald-600 text-white text-xs">✅ ผ่าน</button>';
+            if (st !== 'Rejected') h += '<button type="button" data-hrb="RejectForm" class="px-2 py-1 rounded bg-red-600 text-white text-xs">🔁 ไม่ผ่าน</button>';
+            if (st === 'Acknowledged' || st === 'Rejected') h += '<button type="button" data-hrb="Pending" class="px-2 py-1 rounded border text-xs bg-white" title="ย้อนกลับเป็นรอตรวจ">↩ รอตรวจ</button>';
+            h += '</span>';
+        }
+        h += '</div>';
+        if (rec['Review Note']) h += '<div class="mt-1 text-xs">หมายเหตุ: ' + e(rec['Review Note']) + '</div>';
+        h += '<div id="hrbRejectForm" class="hidden mt-2"><textarea id="hrbNote" rows="2" class="w-full border rounded p-2 text-xs text-slate-800" placeholder="ระบุสิ่งที่ต้องแก้ไข (จำเป็น)"></textarea>' +
+             '<div class="flex justify-end gap-1 mt-1"><button type="button" data-hrb="Rejected" class="px-2 py-1 rounded bg-red-600 text-white text-xs">บันทึก ไม่ผ่าน</button></div></div>';
+        h += '</div>';
+        bar.innerHTML = h;
+    }
+
+    document.addEventListener('click', function(ev) {
+        var b = ev.target.closest && ev.target.closest('[data-hrb]');
+        if (!b || !currentRecord) return;
+        var act = b.getAttribute('data-hrb');
+        if (act === 'RejectForm') { document.getElementById('hrbRejectForm').classList.remove('hidden'); document.getElementById('hrbNote').focus(); return; }
+        var note = act === 'Rejected' ? document.getElementById('hrbNote').value.trim() : '';
+        if (act === 'Rejected' && !note) { document.getElementById('hrbNote').classList.add('border-red-500'); return; }
+        var rec = currentRecord;
+        b.disabled = true; b.textContent = '...';
+        google.script.run.withSuccessHandler(function(res) {
+            if (!res || !res.success) { alert(res && res.error || 'บันทึกไม่สำเร็จ'); render(rec); return; }
+            rec['Review Status'] = res.status; rec['Reviewed By'] = res.by; rec['Review Date'] = res.date ? new Date().toISOString() : ''; rec['Review Note'] = res.note;
+            render(rec);
+        }).withFailureHandler(function(err) { alert(err.message); render(rec); })
+          .setHyperReviewStatus(HYPER_REVIEW_KIND, rec['ID'], act, note, _userEmail);
+    });
+
+    var origOpen = window.openModal;
+    if (typeof origOpen !== 'function') return;
+    window.openModal = function(id) {
+        render(null);
+        var r = origOpen.apply(this, arguments);
+        clearInterval(pollTimer);
+        var tries = 0;
+        pollTimer = setInterval(function() {
+            tries++;
+            var rec = null;
+            try { rec = currentRecord; } catch (x) {}
+            if (rec && String(rec['ID']) === String(id)) { clearInterval(pollTimer); render(rec); }
+            else if (tries > 150) clearInterval(pollTimer);   // ~30 s
+        }, 200);
+        return r;
+    };
+
+    // Deep link from the status page: ...&open=<ID>. Delay past the page's own first-load calls.
+    try {
+        google.script.url.getLocation(function(loc) {
+            var id = loc && loc.parameter && loc.parameter.open;
+            if (id) setTimeout(function() { window.openModal(id); }, 1500);
+        });
+    } catch (x) {}
+})();
+</script>

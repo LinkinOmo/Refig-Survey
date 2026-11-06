@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCTV Survey Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel { background: rgba(255,255,255,.95); border: 1px solid rgba(226,232,240,.8); box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #1e3a8a; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: .75rem; font-weight: 600; color: #64748b; min-width: 130px; }
+        .detail-value { font-size: .85rem; color: #1e293b; }
+        .tab-on { background: #1e3a8a; color: #fff; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap justify-between gap-2 py-3">
+            <div class="flex items-center gap-4">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-slate-500 p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-blue-900 rounded-full"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">📹 รายงานคำขอกล้องวงจรปิด (CCTV)</h1>
+                    <p class="text-xs text-slate-500 font-medium">Branch requests → LP / Area screening · Must have only · ≈ <span id="costPP">33,000</span> ฿ / จุด</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="loader" id="mainLoader"></div>
+                <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                <button onclick="downloadToExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
+                <button onclick="window.location.reload()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-500"><p class="text-xs font-semibold text-slate-500 mb-1">สาขาที่ส่งคำขอ</p><h3 class="text-3xl font-bold" id="stStores">0</h3><p class="text-[11px] text-slate-400" id="stPending"></p></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-blue-700"><p class="text-xs font-semibold text-slate-500 mb-1">กล้องที่ขอ (ตัว)</p><h3 class="text-3xl font-bold text-blue-800" id="stQty">0</h3><p class="text-[11px] text-slate-400" id="stQtySplit"></p></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-red-500"><p class="text-xs font-semibold text-slate-500 mb-1">Must have (ตัว)</p><h3 class="text-3xl font-bold text-red-600" id="stMust">0</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-indigo-500"><p class="text-xs font-semibold text-slate-500 mb-1">⭐ จุดเสี่ยงหลัก (ตัว)</p><h3 class="text-3xl font-bold text-indigo-700" id="stFocus">0</h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-amber-500"><p class="text-xs font-semibold text-slate-500 mb-1">งบตามคำขอ</p><h3 class="text-2xl font-bold text-amber-700"><span id="stBudget">0</span> <span class="text-sm">฿</span></h3><p class="text-[11px] text-slate-400">Must have <span id="stMustBudget">0</span> ฿</p></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-emerald-500"><p class="text-xs font-semibold text-slate-500 mb-1">ผ่านคัดกรอง (ตัว)</p><h3 class="text-3xl font-bold text-emerald-700" id="stAppr">0</h3><p class="text-[11px] text-slate-400"><span id="stApprBudget">0</span> ฿</p></div>
+        </div>
+        <p class="text-xs text-slate-400 -mt-3">นับจากรายการล่าสุดของแต่ละสาขา (ตามตัวกรองด้านล่าง) · งบ = จำนวนจุด × ค่าเฉลี่ยต่อจุด (รวมระบบ + ติดตั้ง; ราคาจริงขึ้นกับความสูง / ระยะเดินสาย / เวลาทำงาน)</p>
+
+        <div class="glass-panel p-4 rounded-xl grid grid-cols-1 md:grid-cols-6 gap-3">
+            <input type="text" id="searchInput" placeholder="ค้นหา รหัสสาขา / ชื่อสาขา / ผู้แจ้ง..." class="md:col-span-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="applyFilters()">
+            <select id="fmtFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"><option value="">ทุก Format</option></select>
+            <select id="scrFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">ทุกสถานะคัดกรอง</option><option>รอคัดกรอง</option><option>คัดกรองบางส่วน</option><option>คัดกรองแล้ว</option>
+            </select>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="latestOnly" checked onchange="applyFilters()"> ล่าสุด/สาขา</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="mustOnly" onchange="applyFilters()"> เฉพาะสาขาที่มี Must have</label>
+        </div>
+
+        <div class="flex gap-2">
+            <button id="tabStores" onclick="showView('stores')" class="tab-on px-4 py-2 rounded-lg text-sm font-semibold border border-blue-900">🏬 รายสาขา</button>
+            <button id="tabZones" onclick="showView('zones')" class="px-4 py-2 rounded-lg text-sm font-semibold border border-blue-900 text-blue-900 bg-white">📍 สรุปตามพื้นที่ (Zone)</button>
+        </div>
+
+        <div id="viewStores" class="glass-panel rounded-xl overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-3 py-3 text-left">สาขา</th>
+                        <th class="px-3 py-3 text-right">กล้องเดิม<br><span class="normal-case font-normal">Online / Analog / เสีย</span></th>
+                        <th class="px-3 py-3 text-right">Shrink %<br><span class="normal-case font-normal">ปัจจุบัน → Est.</span></th>
+                        <th class="px-3 py-3 text-right">จุด</th>
+                        <th class="px-3 py-3 text-right">ขอ (ตัว)</th>
+                        <th class="px-3 py-3 text-right">Must have</th>
+                        <th class="px-3 py-3 text-right">⭐ หลัก</th>
+                        <th class="px-3 py-3 text-right">งบตามคำขอ ฿</th>
+                        <th class="px-3 py-3 text-left">คัดกรอง</th>
+                        <th class="px-3 py-3 text-left">ผู้แจ้ง / วันที่</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <div id="emptyState" class="hidden text-center py-12 text-slate-400">ไม่พบข้อมูล</div>
+        </div>
+
+        <div id="viewZones" class="hidden glass-panel rounded-xl overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-4 py-3 text-left">พื้นที่ (Zone)</th>
+                        <th class="px-4 py-3 text-right">สาขาที่ขอ</th>
+                        <th class="px-4 py-3 text-right">ขอ (ตัว)</th>
+                        <th class="px-4 py-3 text-right">Must have</th>
+                        <th class="px-4 py-3 text-right">ผ่านคัดกรอง</th>
+                        <th class="px-4 py-3 text-right">งบตามคำขอ ฿</th>
+                        <th class="px-4 py-3 text-left w-1/4">สัดส่วนคำขอ</th>
+                    </tr>
+                </thead>
+                <tbody id="zoneBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div class="bg-white w-full md:max-w-5xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดคำขอกล้อง &amp; การคัดกรอง</h3><button onclick="closeModal()" class="text-slate-400 text-xl">✕</button></div>
+            <div class="p-5 overflow-y-auto" id="modalBody"></div>
+            <div class="px-5 py-3 border-t flex flex-wrap justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ</button>
+                <div class="flex flex-wrap gap-2 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm border border-slate-300 rounded-lg">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="hidden px-4 py-2 text-sm font-semibold text-blue-900 bg-white border border-blue-900 rounded-lg hover:bg-blue-50">บันทึกหมายเหตุ</button>
+                    <button id="screenBtn" onclick="saveScreening()" class="hidden px-4 py-2 text-sm font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700">✔ บันทึกผลคัดกรอง</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let CC = null, allData = [], filtered = [], currentRecord = null, currentId = null, view = 'stores';
+        let isAdmin = false, smfCanEdit = false, opsCanEdit = false, _userEmail = '';
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fmt(n) { return Math.round(num(n)).toLocaleString(); }
+        function pct(v) { return v === '' || v == null ? '-' : num(v).toFixed(2); }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? '-' : d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }); }
+        function latestPerBranch(rows) { const seen = new Set(); return rows.filter(function(r) { const k = String(r['Branch Code']); if (seen.has(k)) return false; seen.add(k); return true; }); }
+        function zoneLabel(k) { const z = (CC.zones || []).find(function(x) { return x.k === k; }); return z ? (z.focus ? '⭐ ' : '') + z.l : (k || '-'); }
+        function zq(r) { try { return JSON.parse(r['Zone_Qty_JSON'] || '{}'); } catch (e) { return {}; } }
+        function canScreen() { return isAdmin || smfCanEdit || opsCanEdit; }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            loadData();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) {
+                if (!f) return;
+                isAdmin = !!(f.isAdmin || f.isScheduleAdmin); smfCanEdit = !!f.smfEditAllowed; opsCanEdit = !!f.opsEditAllowed;
+                document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+            }).getUserFlags(_userEmail);
+        });
+        let _attempt = 0;
+        function loadData() {
+            const my = ++_attempt;
+            google.script.run.withSuccessHandler(function(res) {
+                if (my !== _attempt) return;
+                if (!res) { if (my < 3) setTimeout(loadData, 1500); return; }
+                document.getElementById('mainLoader').classList.add('hidden');
+                if (!res.success) { alert('โหลดข้อมูลไม่สำเร็จ: ' + res.error); return; }
+                CC = res.ccConfig; allData = res.data || [];
+                document.getElementById('costPP').textContent = fmt(CC.costPerPoint);
+                const fmts = Array.from(new Set(allData.map(function(r) { return String(r['Store Format'] || ''); }).filter(Boolean))).sort();
+                const sel = document.getElementById('fmtFilter'), cur = sel.value;
+                sel.innerHTML = '<option value="">ทุก Format</option>' + fmts.map(function(f) { return '<option' + (f === cur ? ' selected' : '') + '>' + esc(f) + '</option>'; }).join('');
+                applyFilters();
+            }).withFailureHandler(function(err) { document.getElementById('mainLoader').classList.add('hidden'); alert('Error: ' + err.message); }).getCctvSurveyList(window.ARCHIVE_ON);
+        }
+        function showView(v) {
+            view = v;
+            document.getElementById('viewStores').classList.toggle('hidden', v !== 'stores');
+            document.getElementById('viewZones').classList.toggle('hidden', v !== 'zones');
+            [['tabStores', 'stores'], ['tabZones', 'zones']].forEach(function(t) {
+                const b = document.getElementById(t[0]);
+                b.classList.toggle('tab-on', v === t[1]); b.classList.toggle('bg-white', v !== t[1]); b.classList.toggle('text-blue-900', v !== t[1]);
+            });
+        }
+        function renderStats(rows) {
+            const sum = function(k) { return rows.reduce(function(s, r) { return s + num(r[k]); }, 0); };
+            document.getElementById('stStores').textContent = rows.length;
+            document.getElementById('stPending').textContent = 'รอคัดกรอง ' + rows.filter(function(r) { return r['Screening Status'] === 'รอคัดกรอง'; }).length + ' สาขา';
+            document.getElementById('stQty').textContent = fmt(sum('Requested Qty'));
+            document.getElementById('stQtySplit').textContent = 'ใหม่ ' + fmt(sum('New Qty')) + ' · ย้าย ' + fmt(sum('Relocate Qty')) + ' · ทดแทน ' + fmt(sum('Replace Qty'));
+            document.getElementById('stMust').textContent = fmt(sum('Must-have Qty'));
+            document.getElementById('stFocus').textContent = fmt(sum('Focus-zone Qty'));
+            document.getElementById('stBudget').textContent = fmt(sum('Est. Budget (THB)'));
+            document.getElementById('stMustBudget').textContent = fmt(sum('Must-have Budget (THB)'));
+            document.getElementById('stAppr').textContent = fmt(sum('Approved Qty'));
+            document.getElementById('stApprBudget').textContent = fmt(sum('Approved Budget (THB)'));
+        }
+        function renderZones(rows) {
+            const agg = {};
+            rows.forEach(function(r) {
+                const z = zq(r);
+                Object.keys(z).forEach(function(k) {
+                    agg[k] = agg[k] || { stores: 0, q: 0, m: 0, a: 0 };
+                    agg[k].stores++; agg[k].q += z[k][0]; agg[k].m += z[k][1]; agg[k].a += z[k][2];
+                });
+            });
+            const keys = Object.keys(agg).sort(function(a, b) { return agg[b].q - agg[a].q; });
+            const max = keys.length ? agg[keys[0]].q : 1;
+            document.getElementById('zoneBody').innerHTML = keys.map(function(k) {
+                const a = agg[k];
+                return '<tr><td class="px-4 py-2 font-medium">' + esc(zoneLabel(k)) + '</td><td class="px-4 py-2 text-right">' + a.stores + '</td><td class="px-4 py-2 text-right font-bold">' + a.q + '</td>' +
+                    '<td class="px-4 py-2 text-right text-red-600">' + a.m + '</td><td class="px-4 py-2 text-right text-emerald-700 font-semibold">' + a.a + '</td><td class="px-4 py-2 text-right font-mono">' + fmt(a.q * CC.costPerPoint) + '</td>' +
+                    '<td class="px-4 py-2"><div class="h-2 bg-slate-100 rounded"><div class="h-2 bg-blue-700 rounded" style="width:' + Math.round(a.q / max * 100) + '%"></div></div></td></tr>';
+            }).join('') || '<tr><td colspan="7" class="text-center py-10 text-slate-400">ไม่พบข้อมูล</td></tr>';
+        }
+        function scrBadge(s) {
+            const c = s === 'คัดกรองแล้ว' ? 'bg-emerald-100 text-emerald-800' : s === 'คัดกรองบางส่วน' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600';
+            return '<span class="text-xs px-2 py-0.5 rounded-full font-semibold ' + c + '">' + esc(s || 'รอคัดกรอง') + '</span>';
+        }
+        function applyFilters() {
+            const q = document.getElementById('searchInput').value.toLowerCase().trim();
+            const fm = document.getElementById('fmtFilter').value, sc = document.getElementById('scrFilter').value;
+            const base = document.getElementById('latestOnly').checked ? latestPerBranch(allData) : allData;
+            const must = document.getElementById('mustOnly').checked;
+            filtered = base.filter(function(r) {
+                if (must && !num(r['Must-have Qty'])) return false;
+                if (fm && String(r['Store Format']) !== fm) return false;
+                if (sc && (r['Screening Status'] || 'รอคัดกรอง') !== sc) return false;
+                return !q || [r['Branch Code'], r['Branch Name'], r['Reporter Name']].join(' ').toLowerCase().indexOf(q) > -1;
+            });
+            renderStats(filtered); renderZones(filtered);
+            document.getElementById('recordCount').textContent = filtered.length + ' รายการ';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+            document.getElementById('tableBody').innerHTML = filtered.map(function(r) {
+                return '<tr class="hover:bg-blue-50 cursor-pointer" data-id="' + esc(r['ID']) + '">' +
+                    '<td class="px-3 py-3"><b>' + esc(r['Branch Code']) + '</b> <span class="text-[10px] px-1.5 rounded bg-slate-100 text-slate-600">' + esc(r['Store Format'] || '') + '</span>' + (r['Has Broken'] === 'Yes' ? ' <span class="text-xs text-red-600">⚠️ กล้องเสีย</span>' : '') + '<div class="text-xs text-slate-500">' + esc(r['Branch Name']) + '</div></td>' +
+                    '<td class="px-3 py-3 text-right text-xs">' + num(r['Cam Online']) + ' / ' + num(r['Cam Analog / Offline']) + ' / <span class="' + (num(r['Cam Broken']) ? 'text-red-600 font-bold' : '') + '">' + num(r['Cam Broken']) + '</span></td>' +
+                    '<td class="px-3 py-3 text-right text-xs">' + pct(r['Shrink Current %']) + ' → ' + pct(r['Shrink Estimate %']) + '</td>' +
+                    '<td class="px-3 py-3 text-right">' + num(r['Points']) + '</td>' +
+                    '<td class="px-3 py-3 text-right font-bold">' + num(r['Requested Qty']) + '</td>' +
+                    '<td class="px-3 py-3 text-right text-red-600">' + num(r['Must-have Qty']) + '</td>' +
+                    '<td class="px-3 py-3 text-right text-indigo-700">' + num(r['Focus-zone Qty']) + '</td>' +
+                    '<td class="px-3 py-3 text-right font-mono">' + fmt(r['Est. Budget (THB)']) + '</td>' +
+                    '<td class="px-3 py-3">' + scrBadge(r['Screening Status']) + (r['Screening Status'] && r['Screening Status'] !== 'รอคัดกรอง' ? '<div class="text-xs text-emerald-700 mt-0.5">ผ่าน ' + num(r['Approved Qty']) + ' ตัว</div>' : '') + '</td>' +
+                    '<td class="px-3 py-3 text-xs">' + esc(r['Reporter Name']) + '<div class="text-slate-400">' + fdate(r['Timestamp']) + '</div></td></tr>';
+            }).join('');
+        }
+        document.getElementById('tableBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        function openModal(id) {
+            currentId = id; currentRecord = null;
+            document.getElementById('modalBody').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังโหลด...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            document.getElementById('screenBtn').classList.add('hidden');
+            google.script.run.withSuccessHandler(function(res) {
+                if (id !== currentId) return;
+                if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(res && res.error) + '</p>'; return; }
+                currentRecord = res.data; CC = res.ccConfig || CC;
+                renderModal(res.data);
+            }).getCctvSurveyRecordById(id);
+        }
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); currentId = null; }
+        function canEdit() { return canScreen() || (currentRecord && _userEmail && String(currentRecord['Reporter Email']).toLowerCase() === _userEmail.toLowerCase()); }
+        function photos(list) { return (list || []).map(function(u) { return '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" class="w-28 h-28 object-cover rounded border"></a>'; }).join(''); }
+        function decCls(d) { return d === CC.decisions[0] ? 'border-emerald-400 bg-emerald-50' : d === CC.decisions[1] ? 'border-amber-400 bg-amber-50' : d === CC.decisions[2] ? 'border-red-300 bg-red-50' : 'border-slate-200'; }
+
+        function renderModal(r) {
+            const pts = r['Points_JSON'] || [], att = r['Attachments_JSON'] || {}, scr = canScreen();
+            const row = function(l, v) { return '<div class="detail-row"><span class="detail-label">' + l + '</span><span class="detail-value">' + v + '</span></div>'; };
+            let h = row('สาขา', esc(r['Branch Code']) + ' - ' + esc(r['Branch Name']) + ' <span class="text-xs text-slate-500">(' + esc(r['Store Format'] || '-') + ')</span>') +
+                row('ผู้แจ้ง / วันที่', esc(r['Reporter Name']) + ' · ' + esc(r['Reporter Phone'] || '') + ' · ' + fdate(r['Timestamp'])) +
+                row('กล้องปัจจุบัน', 'Online <b>' + num(r['Cam Online']) + '</b> · Analog/Offline <b>' + num(r['Cam Analog / Offline']) + '</b> · เสีย <b class="text-red-600">' + num(r['Cam Broken']) + '</b> · ประตู ' + num(r['Doors Total']) + ' (มีกล้องนับคน ' + num(r['Doors With People Counter']) + ')') +
+                row('Shrink', 'ปัจจุบัน <b>' + pct(r['Shrink Current %']) + '%</b> · Act 2026 ' + pct(r['Shrink Act 2026 %']) + '% (' + (r['Shrink Act 2026 (THB)'] === '' ? '-' : fmt(r['Shrink Act 2026 (THB)']) + ' ฿') + ') · Estimate ' + pct(r['Shrink Estimate %']) + '% (' + (r['Shrink Estimate (THB)'] === '' ? '-' : fmt(r['Shrink Estimate (THB)']) + ' ฿') + ')') +
+                row('แผนกเสี่ยง', esc(r['Risk Depts'] || '-')) +
+                row('สรุปคำขอ', num(r['Points']) + ' จุด · ขอ <b>' + num(r['Requested Qty']) + '</b> ตัว (Must have ' + num(r['Must-have Qty']) + ') · งบ <b>' + fmt(r['Est. Budget (THB)']) + ' ฿</b> · ผ่านคัดกรอง <b class="text-emerald-700" id="mApprQty">' + num(r['Approved Qty']) + '</b> ตัว');
+            if ((att.cctv_layout || []).length) h += '<div class="mt-3"><p class="text-xs font-semibold text-slate-500 mb-1">ผังสาขา / ตำแหน่งกล้อง</p><div class="flex gap-2 flex-wrap">' + photos(att.cctv_layout) + '</div></div>';
+            if (scr) h += '<div class="mt-4 flex flex-wrap gap-2 text-xs"><span class="font-semibold text-slate-600 self-center">คัดกรองเร็ว:</span>' +
+                '<button type="button" onclick="bulkDecide(\'must\')" class="px-2 py-1 border border-emerald-400 rounded bg-emerald-50">อนุมัติทุกจุด Must have</button>' +
+                '<button type="button" onclick="bulkDecide(\'nice\')" class="px-2 py-1 border border-red-300 rounded bg-red-50">ตัดทุกจุด Nice to have</button></div>';
+            pts.forEach(function(p) {
+                const s = p.scr || {};
+                h += '<div class="border rounded-lg p-3 mt-4 ' + decCls(s.dec) + '" data-scr="' + esc(p.pid) + '">' +
+                    '<div class="flex flex-wrap justify-between gap-2"><b>' + esc(p.pid + ' · ' + zoneLabel(p.zone) + (p.zone === 'other' && p.zoneOther ? ' (' + p.zoneOther + ')' : '')) + (p.floor ? ' · ชั้น ' + esc(p.floor) : '') + '</b>' +
+                        '<span class="text-xs flex gap-1"><span class="px-2 py-0.5 rounded-full font-bold ' + (p.need === CC.need[0] ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700') + '">' + esc(p.need || '-') + '</span>' +
+                        '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold">' + p.qty + ' ตัว · ' + fmt(p.qty * CC.costPerPoint) + ' ฿</span></span></div>' +
+                    '<p class="text-sm mt-1">📍 ' + esc(p.name || '-') + '</p>' +
+                    '<div class="grid md:grid-cols-2 gap-x-4 text-xs mt-2 text-slate-700">' +
+                        '<p><b>ประเภทคำขอ:</b> ' + esc(p.req || '-') + '</p><p><b>ชนิดกล้อง:</b> ' + esc(p.cam || '-') + (p.count ? ' · <b class="text-indigo-700">นับคน</b>' : '') + '</p>' +
+                        '<p><b>กล้องเดิม:</b> ' + esc(p.cov || '-') + ' (' + (p.exist || 0) + ' ตัว)</p><p><b>เคส 12 เดือน:</b> ' + (p.inc || 0) + ' · <b>แผนก:</b> ' + esc(p.dept || '-') + '</p>' +
+                        '<p class="md:col-span-2"><b>ความเสี่ยง:</b> ' + esc((p.risk || []).join(', ') || '-') + '</p>' +
+                        '<p class="md:col-span-2"><b>เหตุผล:</b> ' + esc(p.reason || '-') + '</p>' + (p.nt ? '<p class="md:col-span-2 text-slate-500">หมายเหตุ: ' + esc(p.nt) + '</p>' : '') +
+                    '</div>' +
+                    '<div class="flex flex-wrap gap-2 mt-2">' + (photos(att[p.pk]) || '<span class="text-xs text-red-500">ไม่มีรูป</span>') + '</div>';
+                if (scr) {
+                    h += '<div class="mt-3 pt-2 border-t border-dashed grid grid-cols-2 md:grid-cols-6 gap-2 items-end">' +
+                        '<div class="col-span-2"><label class="block text-[11px] font-semibold text-slate-600">ผลคัดกรอง (LP / Area)</label><select data-dec onchange="decChange(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white"><option value="">-- ยังไม่คัดกรอง --</option>' +
+                            CC.decisions.map(function(d) { return '<option' + (d === s.dec ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('') + '</select></div>' +
+                        '<div><label class="block text-[11px] font-semibold text-slate-600">จำนวนที่อนุมัติ</label><input data-aq type="number" min="0" max="' + p.qty + '" value="' + (s.dec === CC.decisions[1] ? s.aq : s.dec === CC.decisions[0] ? p.qty : '') + '"' + (s.dec === CC.decisions[1] ? '' : ' disabled') + ' oninput="previewAppr()" class="w-full border border-slate-300 rounded p-1.5 text-sm"></div>' +
+                        '<div class="col-span-2 md:col-span-3"><label class="block text-[11px] font-semibold text-slate-600">เหตุผล / ความเห็น</label><input data-note value="' + esc(s.note || '') + '" class="w-full border border-slate-300 rounded p-1.5 text-sm" placeholder="เช่น มีกล้อง CH5 ครอบคลุมแล้ว / ย้ายมุมแทนติดใหม่"></div>' +
+                        (s.by ? '<p class="col-span-2 md:col-span-6 text-[10px] text-slate-400">คัดกรองโดย ' + esc(s.by) + ' · ' + esc(s.at || '') + '</p>' : '') + '</div>';
+                } else if (s.dec) {
+                    h += '<p class="mt-2 pt-2 border-t border-dashed text-xs"><b>ผลคัดกรอง:</b> ' + esc(s.dec) + (s.dec === CC.decisions[1] ? ' (' + s.aq + ' ตัว)' : '') + (s.note ? ' — ' + esc(s.note) : '') + '</p>';
+                }
+                h += '</div>';
+            });
+            const ed = canEdit() ? '' : ' disabled';
+            h += '<div class="mt-5"><label class="text-xs font-semibold text-slate-500">ความเห็นรวมการคัดกรอง (LP / Area)</label><textarea id="scrNote" rows="2" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + (scr ? '' : ' disabled') + '>' + esc(r['Screening Note'] || '') + '</textarea>' +
+                (r['Screened By'] ? '<p class="text-[11px] text-slate-400">ล่าสุด: ' + esc(r['Screened By']) + '</p>' : '') + '</div>';
+            h += '<div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg"><label class="flex items-center gap-2 text-xs font-bold text-red-700"><input type="checkbox" id="editHasBroken"' + (r['Has Broken'] === 'Yes' ? ' checked' : '') + ed + '> ⚠️ มีกล้องเสียที่ต้องซ่อมทันที</label>' +
+                '<textarea id="editBrokenDetail" rows="2" class="mt-2 w-full border border-red-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Broken Detail'] || '') + '</textarea></div>' +
+                '<div class="mt-3"><label class="text-xs font-semibold text-slate-500">สรุปความจำเป็นภาพรวมสาขา (ผู้แจ้ง)</label><textarea id="editComments" rows="3" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Comments'] || '') + '</textarea></div>' +
+                '<p class="text-[11px] text-slate-400 mt-2">แก้ไขจุดกล้อง: ส่งแบบสำรวจใหม่ (รายงานใช้รายการล่าสุดของสาขา — ผลคัดกรองของรายการเดิมจะไม่ถูกย้ายไป)</p>';
+            document.getElementById('modalBody').innerHTML = h;
+            document.getElementById('saveBtn').classList.toggle('hidden', !canEdit());
+            document.getElementById('screenBtn').classList.toggle('hidden', !scr || !pts.length);
+        }
+        function decChange(sel) {
+            const card = sel.closest('[data-scr]'), aq = card.querySelector('[data-aq]');
+            const p = (currentRecord['Points_JSON'] || []).find(function(x) { return x.pid === card.dataset.scr; });
+            ['border-emerald-400', 'bg-emerald-50', 'border-amber-400', 'bg-amber-50', 'border-red-300', 'bg-red-50', 'border-slate-200'].forEach(function(c) { card.classList.remove(c); });
+            decCls(sel.value).split(' ').forEach(function(c) { card.classList.add(c); });
+            aq.disabled = sel.value !== CC.decisions[1];
+            aq.value = sel.value === CC.decisions[0] ? p.qty : sel.value === CC.decisions[1] ? Math.max(1, p.qty - 1) : '';
+            previewAppr();
+        }
+        function previewAppr() {
+            let t = 0;
+            document.querySelectorAll('#modalBody [data-scr]').forEach(function(c) {
+                const d = c.querySelector('[data-dec]').value;
+                if (d === CC.decisions[0] || d === CC.decisions[1]) t += parseInt(c.querySelector('[data-aq]').value, 10) || 0;
+            });
+            const el = document.getElementById('mApprQty'); if (el) el.textContent = t;
+        }
+        function bulkDecide(kind) {
+            (currentRecord['Points_JSON'] || []).forEach(function(p) {
+                const card = document.querySelector('#modalBody [data-scr="' + p.pid + '"]');
+                if (!card) return;
+                const sel = card.querySelector('[data-dec]');
+                if (kind === 'must' && p.need === CC.need[0]) { sel.value = CC.decisions[0]; decChange(sel); }
+                if (kind === 'nice' && p.need !== CC.need[0]) { sel.value = CC.decisions[2]; decChange(sel); }
+            });
+        }
+        function saveScreening() {
+            const decisions = Array.from(document.querySelectorAll('#modalBody [data-scr]')).map(function(c) {
+                return { pid: c.dataset.scr, dec: c.querySelector('[data-dec]').value, aq: c.querySelector('[data-aq]').value, note: c.querySelector('[data-note]').value };
+            });
+            const bad = decisions.find(function(d) { return (d.dec === CC.decisions[2] || d.dec === CC.decisions[1] || d.dec === CC.decisions[3]) && !d.note.trim(); });
+            if (bad) { alert('จุด ' + bad.pid + ': กรุณาใส่เหตุผลเมื่อ ลดจำนวน / ตัดออก / รอข้อมูลเพิ่ม'); return; }
+            const btn = document.getElementById('screenBtn'); btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+            google.script.run.withSuccessHandler(function(res) {
+                btn.disabled = false; btn.textContent = '✔ บันทึกผลคัดกรอง';
+                if (res && res.success) { closeModal(); loadData(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error));
+            }).withFailureHandler(function(err) { btn.disabled = false; btn.textContent = '✔ บันทึกผลคัดกรอง'; alert('Server Error: ' + err.message); })
+              .screenCctvSurvey(currentId, decisions, document.getElementById('scrNote').value, _userEmail);
+        }
+        function saveRecord() {
+            const form = { id: currentId, clientEmail: _userEmail, hasBroken: document.getElementById('editHasBroken').checked ? 'Yes' : 'No',
+                           brokenDetail: document.getElementById('editBrokenDetail').value, comments: document.getElementById('editComments').value };
+            if (form.hasBroken === 'Yes' && !form.brokenDetail.trim()) { alert('กรุณาระบุกล้องที่เสีย'); return; }
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); }).updateCctvSurveyRecord(form);
+        }
+        function deleteRecord() {
+            if (!currentId || !confirm('ยืนยันการลบรายการนี้?')) return;
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); }).deleteCctvSurveyRecord(currentId, _userEmail);
+        }
+
+        function downloadToExcel(btn) {
+            if (!filtered.length) { alert('ไม่มีข้อมูล'); return; }
+            const cols = ['Timestamp', 'Branch Code', 'Branch Name', 'Store Format', 'Region', 'DM Area', 'Reporter Name', 'Cam Online', 'Cam Analog / Offline', 'Cam Broken', 'Doors Total', 'Doors With People Counter',
+                'Shrink Current %', 'Shrink Act 2026 %', 'Shrink Act 2026 (THB)', 'Shrink Estimate %', 'Shrink Estimate (THB)', 'Risk Depts', 'Points', 'Requested Qty', 'New Qty', 'Relocate Qty', 'Replace Qty',
+                'Must-have Qty', 'Focus-zone Qty', 'People Counting Qty', 'No-coverage Points', 'Est. Budget (THB)', 'Must-have Budget (THB)', 'Screening Status', 'Approved Qty', 'Approved Budget (THB)',
+                'Screened By', 'Screening Note', 'Has Broken', 'Broken Detail', 'Comments'];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cols].concat(filtered.map(function(r) { return cols.map(function(c) { return c === 'Timestamp' ? fdate(r[c]) : (r[c] == null ? '' : r[c]); }); }))), 'Stores');
+            const head = ['Branch Code', 'Branch Name', 'Store Format', 'Shrink Current %', 'Survey ID', 'จุด', 'พื้นที่', 'จุดเสี่ยงหลัก', 'ตำแหน่ง', 'ชั้น', 'ประเภทคำขอ', 'จำนวนที่ขอ', 'ชนิดกล้อง', 'นับคน',
+                'กล้องเดิม', 'จำนวนกล้องเดิม', 'เคส 12 เดือน', 'แผนก', 'ความเสี่ยง', 'เหตุผล', 'ความจำเป็น', 'งบตามคำขอ ฿', 'ผลคัดกรอง', 'จำนวนอนุมัติ', 'งบอนุมัติ ฿', 'ความเห็นคัดกรอง', 'คัดกรองโดย', 'หมายเหตุ', 'รูป'];
+            const rows = [head];
+            let pending = filtered.length;
+            if (btn) { btn.disabled = true; btn.textContent = 'กำลังเตรียมข้อมูลจุดกล้อง...'; }
+            const finish = function() {
+                if (--pending > 0) return;
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Points');
+                XLSX.writeFile(wb, 'cctv_survey_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+                if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+            };
+            filtered.forEach(function(r) {
+                google.script.run.withSuccessHandler(function(res) {
+                    if (res && res.success) {
+                        const att = res.data['Attachments_JSON'] || {};
+                        (res.data['Points_JSON'] || []).forEach(function(p) {
+                            const s = p.scr || {}, z = (CC.zones || []).find(function(x) { return x.k === p.zone; }) || {};
+                            const aq = s.dec === CC.decisions[0] ? p.qty : s.dec === CC.decisions[1] ? s.aq : (s.dec ? 0 : '');
+                            rows.push([r['Branch Code'], r['Branch Name'], r['Store Format'], r['Shrink Current %'], r['ID'], p.pid, (z.l || p.zone) + (p.zoneOther ? ' (' + p.zoneOther + ')' : ''), z.focus ? 'Yes' : '', p.name, p.floor, p.req, p.qty,
+                                p.cam, p.count ? 'Yes' : '', p.cov, p.exist, p.inc, p.dept, (p.risk || []).join(', '), p.reason, p.need, p.qty * CC.costPerPoint,
+                                s.dec || 'รอคัดกรอง', aq, aq === '' ? '' : aq * CC.costPerPoint, s.note || '', s.by || '', p.nt, (att[p.pk] || []).join(' ')]);
+                        });
+                    }
+                    finish();
+                }).withFailureHandler(finish).getCctvSurveyRecordById(r['ID']);
+            });
+        }
+    </script>
+</body>
+</html>

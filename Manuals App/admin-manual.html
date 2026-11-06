@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>คู่มือผู้ดูแลระบบ (Super Admin)</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --navy:#86198f; --ink:#1e293b; --mute:#64748b; --line:#e2e8f0; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Prompt', sans-serif; color: var(--ink); background: #f1f5f9; margin: 0; font-size: 13.5px; line-height: 1.55; }
+  .page { background: #fff; max-width: 210mm; margin: 0 auto; padding: 14mm 14mm 12mm; }
+  h2 { font-size: 19px; margin: 6mm 0 4mm; padding: 2.5mm 4mm; border-radius: 6px; color: #fff; background: var(--navy); }
+  h2.gen { background: #334155; } h2.ok { background: #047857; } h2.red { background: #b91c1c; }
+  h3 { font-size: 15px; margin: 0 0 1.5mm; }
+  p { margin: 0 0 2mm; }
+  ul, ol { margin: 0 0 2mm; padding-left: 5mm; }
+  li { margin-bottom: 1mm; }
+  code { background: #f1f5f9; border-radius: 3px; padding: 0 1mm; font-size: 12px; }
+  .muted { color: var(--mute); }
+  .cover { border: 3px solid var(--navy); border-radius: 10px; padding: 12mm; }
+  .cover .tag { display: inline-block; background: #fae8ff; color: var(--navy); font-weight: 600; padding: 1mm 4mm; border-radius: 99px; font-size: 13px; }
+  .cover .big { font-size: 32px; font-weight: 700; line-height: 1.2; margin: 6mm 0 3mm; }
+  .cover .sub { font-size: 16px; color: var(--mute); }
+  .cover-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin-top: 8mm; }
+  .cover-card { border: 1px solid var(--line); border-radius: 8px; padding: 4mm; }
+  .cover-card b { display: block; font-size: 15px; margin-bottom: 1mm; }
+  .toc { columns: 2; column-gap: 8mm; margin: 0; padding-left: 5mm; }
+  .step { padding: 3mm 0; border-top: 1px solid var(--line); break-inside: avoid; page-break-inside: avoid; }
+  .num { display: inline-flex; align-items: center; justify-content: center; width: 7mm; height: 7mm; border-radius: 50%; color: #fff; font-weight: 700; font-size: 13px; margin-right: 2mm; vertical-align: middle; background: var(--navy); }
+  .num.ok { background: #047857; } .num.red { background: #b91c1c; }
+  .tip { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 2mm 3mm; border-radius: 4px; margin: 2mm 0; }
+  .warn { background: #fff7ed; border-left: 4px solid #f97316; padding: 2mm 3mm; border-radius: 4px; margin: 2mm 0; }
+  .must { background: #fef2f2; border-left: 4px solid #ef4444; padding: 2mm 3mm; border-radius: 4px; margin: 2mm 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 2mm 0 3mm; }
+  th, td { border: 1px solid var(--line); padding: 1.6mm 2mm; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; }
+  td.c { text-align: center; }
+  .break { break-before: page; page-break-before: always; }
+  .foot { margin-top: 6mm; font-size: 11px; color: var(--mute); text-align: center; }
+  .checklist li { list-style: none; margin-left: -5mm; }
+  .checklist li::before { content: '☐ '; font-size: 15px; }
+  .printbar { position: sticky; top: 0; z-index: 5; background: #1e293b; color: #fff; text-align: center; padding: 2.5mm; font-size: 13px; }
+  .printbar button, .printbar a { font-family: inherit; margin-left: 3mm; background: #22c55e; color: #fff; border: 0; border-radius: 6px; padding: 1.5mm 4mm; font-weight: 600; cursor: pointer; text-decoration: none; font-size: 13px; }
+  .printbar a { background: #a21caf; }
+  @page { size: A4; margin: 0; }
+  @media print { body { background: #fff; } .page { margin: 0; max-width: none; padding: 12mm 13mm 10mm; } .noprint { display: none !important; } }
+  @media screen and (max-width: 640px) { .page { padding: 5mm 4mm; } .cover-grid { grid-template-columns: 1fr; } .cover { padding: 6mm; } .toc { columns: 1; } table { font-size: 11.5px; } }
+</style>
+</head>
+<body>
+<div class="printbar noprint">📘 คู่มือผู้ดูแลระบบ (Super Admin) v1.0
+  <a href="<?= APP_URL ?>?page=access-console" target="_top">🔐 Access Console</a>
+  <button onclick="window.print()">🖨️ พิมพ์ / บันทึก PDF</button></div>
+<div class="page">
+
+<div class="cover">
+  <span class="tag">🔐 Super Admin · v1.0 · ต.ค. 2026</span>
+  <div class="big">คู่มือผู้ดูแลระบบ<br>(Super Admin)</div>
+  <div class="sub">สิทธิ์ผู้ใช้ · การตั้งค่าแท็บ · การย้ายข้อมูลเก่าไปเก็บใน Google Drive (Data Archive) · การดูข้อมูลเก่าในรายงาน · การล้างข้อมูลซ้ำ</div>
+  <div class="cover-grid">
+    <div class="cover-card"><b>🔐 Access Console</b>หน้าหลัก → ปุ่ม <b>Access Console</b> (สีม่วง) — รวมสิทธิ์และสวิตช์ทั้งหมดไว้ที่เดียว เห็นเฉพาะ Super Admin</div>
+    <div class="cover-card"><b>🗄️ Data Archive</b>ย้ายข้อมูลเก่าออกจาก Google Sheet หลักไปเก็บใน Drive เพื่อให้หน้ารายงาน<b>โหลดเร็วขึ้น</b> — ข้อมูลไม่หาย ยังเปิดดูได้</div>
+    <div class="cover-card"><b>📦 Include archive</b>ปุ่มมุมซ้ายล่างของหน้ารายงาน 18 หน้า — กดเพื่อดึงข้อมูลเก่าที่ย้ายไปแล้วกลับมาแสดง (อ่านอย่างเดียว)</div>
+    <div class="cover-card"><b>🗑️ ล้างข้อมูลซ้ำ</b>ปุ่มในหน้ารายงานแบบสำรวจ — สำรองก่อน รวมข้อมูล แล้วเก็บแถวล่าสุดของแต่ละสาขา</div>
+  </div>
+</div>
+
+<h2 class="gen">สารบัญ</h2>
+<ol class="toc">
+  <li>ระดับสิทธิ์ผู้ใช้</li>
+  <li>Access Console — สิทธิ์และสวิตช์</li>
+  <li>Data Archive — ย้ายข้อมูลเก่าไป Drive</li>
+  <li>ขั้นตอนการ Flush ครั้งแรก</li>
+  <li>Auto-flush รายเดือน</li>
+  <li>📦 ดูข้อมูลเก่าในรายงาน</li>
+  <li>ไฟล์ Archive ใน Drive</li>
+  <li>🗑️ ล้างข้อมูลซ้ำ (Duplicate Cleanup)</li>
+  <li>หน้าผู้ดูแลอื่นๆ</li>
+  <li>Checklist ประจำเดือน</li>
+  <li>ปัญหาที่พบบ่อย</li>
+</ol>
+
+<h2 class="gen">1. ระดับสิทธิ์ผู้ใช้</h2>
+<p>สิทธิ์อ่านจากคอลัมน์ <b>Role</b> และ <b>Note</b> ในชีต <code>Employee_Database</code></p>
+<table>
+  <tr><th style="width:26%">ระดับ</th><th>ตั้งค่าอย่างไร</th><th>ทำอะไรได้</th></tr>
+  <tr><td><b>Super Admin / Admin</b></td><td>Role = <code>admin</code> หรือ <code>Super Admin</code> (ทั้งสองค่าเป็นสิทธิ์เดียวกัน)</td><td>ทำได้ทุกอย่าง: แก้ไขแบบสำรวจทุกประเภท, Access Console, Data Archive, ล้างข้อมูลซ้ำ</td></tr>
+  <tr><td><b>System Admin</b></td><td>Role = System Admin</td><td>เปิดหน้าตั้งค่าได้ (Email, Users) แต่<b>ไม่ได้</b>สิทธิ์แก้แบบสำรวจอัตโนมัติ และ<b>ไม่มี</b>สิทธิ์ Data Archive</td></tr>
+  <tr><td><b>Survey / Schedule Admin</b></td><td>Role = <code>survey_admin</code> หรือ <code>schedule_admin</code></td><td>แก้ไขแบบสำรวจได้ แต่ไม่ได้สิทธิ์ Admin เต็ม</td></tr>
+  <tr><td><b>SMF Team</b></td><td>Note = <code>SMF</code></td><td>ตามสวิตช์ใน Access Console (ข้อ 2)</td></tr>
+  <tr><td><b>BF (Big Format)</b></td><td>Note = <code>BF</code> / Big Format</td><td>ใช้กับการจำกัดแท็บตามทีม (ข้อ 2)</td></tr>
+  <tr><td><b>Operation</b></td><td>ผู้ใช้ทั่วไปที่ล็อกอิน</td><td>ตามสวิตช์ใน Access Console</td></tr>
+</table>
+<div class="tip">💡 การเปลี่ยน Role ของผู้ใช้ทำในหน้า <b>👤 Manage Users</b> (ลิงก์อยู่ท้าย Access Console) — ผู้ใช้ต้อง<b>ออกจากระบบแล้วเข้าใหม่</b>สิทธิ์ใหม่จึงมีผล</div>
+
+<h2>2. Access Console — สิทธิ์และสวิตช์</h2>
+<p>หน้าหลัก → ปุ่ม <b>🔐 Access Console</b> (เปิดแท็บใหม่) ทุกการ์ดต้องกด <b>Save Changes</b> ของการ์ดนั้นจึงจะบันทึก</p>
+<div class="step"><h3><span class="num">1</span>📊 Role Access Matrix</h3>
+  <table>
+    <tr><th>สวิตช์</th><th>ความหมายเมื่อเปิด</th></tr>
+    <tr><td>SMF → Full Admin Access <span class="muted">(SMF_ADMIN_ENABLED)</span></td><td>ทีม SMF ได้สิทธิ์เหมือน Super Admin <b>ทุกอย่าง</b> รวมถึง Access Console และ Data Archive (Flush) — <b>ใช้อย่างระวัง</b></td></tr>
+    <tr><td>SMF → Edit Survey Data <span class="muted">(SMF_SURVEY_EDIT_ENABLED_V1)</span></td><td>SMF แก้ไขข้อมูลในหน้ารายงาน Ref / NP / Aircon / EDMI / Layout / Trading Hours ได้ (รวมการผูก Asset No.)</td></tr>
+    <tr><td>Operation → Edit Survey Data <span class="muted">(OPS_SURVEY_EDIT_ENABLED_V1)</span></td><td>ผู้ใช้ทั่วไปทุกคนแก้ไขข้อมูลแบบสำรวจได้</td></tr>
+  </table></div>
+<div class="step"><h3><span class="num">2</span>👁️ Tab Visibility &amp; Team Restriction</h3>
+  <ul>
+    <li><b>Default landing tab</b> — แท็บที่เปิดขึ้นมาก่อนเมื่อผู้ใช้ทั่วไปล็อกอิน</li>
+    <li><b>Visible to general users</b> — ซ่อน / แสดงแท็บแบบสำรวจสำหรับผู้ใช้ที่ไม่ใช่ Admin</li>
+    <li><b>Restricted to team</b> — ล็อกแท็บให้เห็นเฉพาะทีม SMF, MMS หรือ BF</li>
+  </ul></div>
+<div class="step"><h3><span class="num">3</span>📷 Equipment Photo Required</h3>
+  <p>ติ๊กแบบสำรวจที่ต้องการ<b>บังคับแนบรูป</b>อุปกรณ์ก่อนส่ง (ค่าเริ่มต้น = ไม่บังคับ)</p></div>
+<div class="step"><h3><span class="num">4</span>⚙️ Other Toggles</h3>
+  <p><b>"Continue as Guest"</b> — ปิดเมื่อต้องการให้ทุกคนต้องล็อกอินก่อนใช้งาน (บันทึกทันทีเมื่อกด ไม่ต้องกด Save)</p></div>
+
+<h2 class="break">3. Data Archive — ย้ายข้อมูลเก่าไป Drive</h2>
+<p>ทุกหน้ารายงานอ่านข้อมูล<b>ทั้งชีต</b>ทุกครั้งที่เปิด ชีตที่มีแต่เพิ่มแถวจึงช้าลงเรื่อยๆ Data Archive จะ<b>ย้าย</b>แถวที่เก่ากว่าระยะเวลาที่กำหนดออกจาก Google Sheet หลัก ไปเก็บในไฟล์ <b>"Archive YYYY-MM"</b> ในโฟลเดอร์ Drive <b>"Air Ref Survey — Data Archive"</b></p>
+<div class="tip">✅ ข้อมูล<b>ไม่ถูกลบทิ้ง</b> — ระบบเขียนลงไฟล์ Archive แล้ว<b>นับแถวตรวจสอบ</b>ก่อน จึงลบออกจากชีตหลัก ถ้าตรวจไม่ผ่านจะไม่ลบอะไรเลย</div>
+
+<h3>กฎการย้าย (ค่าเริ่มต้น)</h3>
+<table>
+  <tr><th>กลุ่ม</th><th>ชีต</th><th class="c">เก็บไว้ (เดือน)</th><th>เงื่อนไขพิเศษ</th></tr>
+  <tr><td rowspan="5">Logs</td><td>Activity_Log</td><td class="c">6</td><td>—</td></tr>
+  <tr><td>Debug_Log</td><td class="c">1</td><td>—</td></tr>
+  <tr><td>email_outbox</td><td class="c">3</td><td>ย้ายเฉพาะสถานะ sent / failed / cancelled (อีเมลที่รอส่งไม่ถูกย้าย)</td></tr>
+  <tr><td>Survey_Drafts</td><td class="c">2</td><td>ร่างที่ไม่ได้แก้ไขเกิน 2 เดือน</td></tr>
+  <tr><td>Trip_Comments</td><td class="c">18</td><td>—</td></tr>
+  <tr><td rowspan="5">Business</td><td>Trip_Plans</td><td class="c">12</td><td>เฉพาะ Closed / Rejected / Cancelled / Approved — แผนที่ยัง Pending ไม่ถูกย้ายแม้จะเก่า</td></tr>
+  <tr><td>Work_Orders, BigC_Work_Orders</td><td class="c">12</td><td>เฉพาะ Closed / Rejected / Cancelled — งานที่ยังเปิดอยู่ไม่ถูกย้าย</td></tr>
+  <tr><td>Ref_Broken_History, Ac_Broken_History</td><td class="c">24</td><td>นับจากวันที่ "Logged At"</td></tr>
+  <tr><td>Hyper_Equipment_History</td><td class="c">36</td><td>—</td></tr>
+  <tr><td>Hyper_Equipment_Maintenance</td><td class="c">36</td><td>—</td></tr>
+  <tr><td>Surveys</td><td>Ref, Aircon, NP, EDMI, Layout, Trading Hours, Site Visit, CCTV, Hyper ทั้ง 7 ประเภท</td><td class="c">12</td><td><b>เก็บแถวล่าสุดของแต่ละสาขาไว้เสมอ</b> (Layout: ต่อสาขา+โครงการ, Trading Hours: ต่อสาขา+Stage) · สถานะ <b>Draft ไม่ถูกย้าย</b></td></tr>
+  <tr><td>Backups</td><td>แท็บ *_DupBackup, *_TypeCleanupBackup</td><td class="c">—</td><td>ย้าย<b>ทั้งแท็บ</b>ทุกครั้งที่ Flush (เป็นสำรองจากการล้างข้อมูลซ้ำ)</td></tr>
+</table>
+<div class="must">⚠️ <b>ทุกกฎเปิดอยู่ (On) ตั้งแต่เริ่มต้น</b> — ก่อน Flush ครั้งแรกให้ตรวจตารางในการ์ด Data Archive ปิดชีตที่ยังไม่อยากย้าย หรือปรับจำนวนเดือน แล้วกด <b>Save settings</b></div>
+
+<h2>4. ขั้นตอนการ Flush ครั้งแรก</h2>
+<div class="step"><h3><span class="num">1</span>เปิดการ์ด 🗄️ Data Archive</h3>
+  <p>Access Console → เลื่อนลงไปที่การ์ด <b>🗄️ Data Archive (Flush to Google Drive)</b> ตารางจะแสดงทุกชีต จำนวนแถวปัจจุบัน (Rows)</p></div>
+<div class="step"><h3><span class="num">2</span>ตั้งค่าและบันทึก</h3>
+  <p>ติ๊ก / ไม่ติ๊กช่อง <b>On</b> และแก้ช่อง <b>Keep (months)</b> (ขั้นต่ำ 1 เดือน) → กด <b>Save settings</b></p></div>
+<div class="step"><h3><span class="num">3</span>🔍 Preview (dry run)</h3>
+  <p>กด <b>Preview</b> — ระบบ<b>นับอย่างเดียว ไม่ย้ายอะไร</b> คอลัมน์ <b>Will move</b> จะแสดงจำนวนแถวที่จะถูกย้าย ตรวจว่าตัวเลขสมเหตุสมผล</p>
+  <div class="warn">ถ้าชีตไหนตัวเลข Will move สูงผิดปกติ (เช่น เกือบเท่า Rows) ให้หยุดและตรวจคอลัมน์วันที่ของชีตนั้นก่อน</div></div>
+<div class="step"><h3><span class="num red">4</span>🗄️ Flush now</h3>
+  <p>ปุ่มจะกดได้หลังจาก Preview แล้วเท่านั้น → กด → ยืนยัน → รอจนข้อความสถานะขึ้นว่าเสร็จ</p>
+  <ul>
+    <li>หนึ่งรอบทำงานได้ราว 4.5 นาที ถ้าข้อมูลเยอะ หน้าจอจะ<b>ทำต่อให้อัตโนมัติ</b>จนครบ — <b>อย่าปิดหน้าต่าง</b>ระหว่างทำงาน</li>
+    <li>ถ้าเผลอปิด ไม่เสียหาย — แถวที่ย้ายแล้วอยู่ใน Archive ครบ กด Preview → Flush now ใหม่เพื่อทำส่วนที่เหลือ</li>
+    <li>ระหว่าง Flush ผู้ใช้อื่นที่กำลังบันทึกแบบสำรวจอาจต้องรอไม่กี่วินาที (ระบบล็อกการเขียนทีละชีต) — แนะนำให้ทำ<b>นอกเวลางาน</b></li>
+  </ul></div>
+<div class="step"><h3><span class="num ok">5</span>ตรวจผล</h3>
+  <p>กด <b>📁 Open archive folder</b> (มุมขวาบนของการ์ด) → เปิดไฟล์ Archive ของเดือนนี้ → แท็บ <b>_Run_Log</b> บันทึกวันเวลา ชีต และจำนวนแถวที่ย้ายในแต่ละรอบ บรรทัดล่างการ์ดแสดงผลรอบล่าสุด (Last run)</p></div>
+
+<h2>5. Auto-flush รายเดือน</h2>
+<p>ติ๊ก <b>Auto-flush monthly (1st, 02:00)</b> → ระบบจะ Flush เองทุกวันที่ 1 ของเดือน เวลา 02:00 ตามการตั้งค่าที่บันทึกไว้ ถ้าไม่เสร็จในรอบเดียวจะทำต่อเองอัตโนมัติ</p>
+<div class="tip">💡 แนะนำ: Flush ด้วยมือ 1–2 ครั้งให้มั่นใจก่อน แล้วค่อยเปิด Auto-flush · ยกเลิกได้ทุกเมื่อโดยเอาติ๊กออก</div>
+
+<h2 class="break">6. 📦 ดูข้อมูลเก่าในรายงาน (Include archive)</h2>
+<p>ข้อมูลที่ย้ายไปแล้วจะ<b>ไม่แสดง</b>ในรายงานตามปกติ ถ้าต้องการดู ให้กดปุ่ม <b>📦 Include archive</b> ที่มุม<b>ซ้ายล่าง</b>ของหน้ารายงาน → หน้าจะโหลดใหม่ มีแถบสีเหลือง "กำลังแสดงข้อมูลที่เก็บถาวรด้วย" และปุ่มเปลี่ยนเป็น <b>📦 Archive: ON</b> กดอีกครั้งเพื่อปิด</p>
+<table>
+  <tr><th>มีปุ่ม 📦 (18 หน้า)</th><th>ยังไม่มี (แสดงเฉพาะข้อมูลปัจจุบัน)</th></tr>
+  <tr><td>รายงาน Ref, NP, Aircon, EDMI, Layout, Trading Hours, CCTV · Hyper ทั้ง 7 (Ref, Aircon, Equipment, Fresh Food, Lighting, Toilet, Parking) · Work Order Report / Dashboard · Big C Work Order · Trip Plan Report / Map</td>
+      <td>Survey Dashboard (คำนวณล่วงหน้า) · Broken Unit Summary · กราฟแนวโน้มรายเดือนรวม</td></tr>
+</table>
+<ul>
+  <li><b>อ่านอย่างเดียว</b> — เปิดดูรายละเอียดได้ แต่แก้ไข / ลบไม่ได้ (จะขึ้นข้อความ "read-only" หรือ "Record not found")</li>
+  <li>ข้อมูลเก่าจะ<b>เรียงต่อท้าย</b>ข้อมูลปัจจุบัน</li>
+  <li>การเปิดครั้งแรก<b>ช้ากว่าปกติ</b> (ต้องเปิดไฟล์ใน Drive) ครั้งต่อไปภายใน 6 ชั่วโมงจะเร็วขึ้น</li>
+  <li>ระบบจำการเลือกแยกต่อหน้าและต่อเครื่อง — <b>ปิดเมื่อดูเสร็จ</b> เพื่อให้หน้ารายงานกลับมาเร็วเหมือนเดิม</li>
+  <li>ปุ่มนี้ทุกคนที่เปิดรายงานได้ก็กดได้ — สิทธิ์การมองเห็นข้อมูลยังเป็นไปตามสิทธิ์เดิมของหน้านั้น</li>
+</ul>
+
+<h2>7. ไฟล์ Archive ใน Drive</h2>
+<ul>
+  <li>โฟลเดอร์ <b>"Air Ref Survey — Data Archive"</b> อยู่ใน Drive ของบัญชีเจ้าของสคริปต์</li>
+  <li>หนึ่งไฟล์ต่อ<b>เดือนที่ทำการ Flush</b> (ไม่ใช่เดือนของข้อมูล) เช่น Flush วันที่ 1 พ.ย. 2026 → ข้อมูลทุกปีที่ย้ายรอบนั้นอยู่ในไฟล์ <b>Archive 2026-11</b></li>
+  <li>ในไฟล์มีหนึ่งแท็บต่อชีตต้นทาง (ชื่อเดียวกัน) + แท็บ <b>_Run_Log</b></li>
+</ul>
+<div class="must">🚫 <b>ห้าม</b>เปลี่ยนชื่อไฟล์ Archive, เปลี่ยนชื่อแท็บ, ย้ายไฟล์ออกจากโฟลเดอร์ หรือลบหัวคอลัมน์ — ปุ่ม 📦 ในรายงานหาข้อมูลจาก<b>ชื่อไฟล์ "Archive YYYY-MM"</b> และ<b>ชื่อแท็บ</b> ถ้าเปลี่ยน ข้อมูลเก่าจะหายจากรายงาน (แต่ยังอยู่ในไฟล์)</div>
+<div class="step"><h3>ต้องการนำแถวกลับมาเป็นข้อมูลปัจจุบัน (Restore)</h3>
+  <p>ยังไม่มีปุ่ม Restore — ให้ทำด้วยมือ: เปิดไฟล์ Archive → คัดลอกแถว → วางต่อท้ายชีตเดียวกันในไฟล์หลัก โดย<b>เรียงคอลัมน์ให้ตรงกับหัวตารางของชีตหลัก</b> → ลบแถวนั้นออกจากไฟล์ Archive (ไม่เช่นนั้นจะแสดงซ้ำเมื่อเปิด 📦)</p>
+  <p class="muted">ถ้าไม่ต้องการให้ชีตนั้นถูกย้ายอีก ให้ปิด On หรือเพิ่มจำนวนเดือนใน Data Archive ก่อน</p></div>
+
+<h2 class="break">8. 🗑️ ล้างข้อมูลซ้ำ (Duplicate Cleanup)</h2>
+<p>ในหน้ารายงาน Ref, Aircon, EDMI, Layout, Trading Hours มีปุ่ม <b>🗑️ ตรวจสอบข้อมูลซ้ำ</b> (เห็นเฉพาะ Super Admin หรือ System Admin / SMF ถ้าเปิดสิทธิ์ไว้)</p>
+<ol>
+  <li>กดปุ่ม → ระบบแสดงสาขาที่มีมากกว่า 1 แถว (แยกตามรอบ / วันที่ / โครงการ / Stage ตามประเภท)</li>
+  <li>กด <b>🗑️ เก็บล่าสุด (รวมข้อมูล)</b> ทีละสาขา → ระบบ<b>สำรองทุกแถว</b>ไว้ในแท็บ <code>*_DupBackup</code> → รวมข้อมูลและรูปจากทุกแถวเข้าแถวล่าสุด → ลบแถวที่ซ้ำ</li>
+  <li>แท็บสำรองจะถูกย้ายไป Drive อัตโนมัติในการ Flush ครั้งถัดไป (กฎ Backups)</li>
+</ol>
+
+<h2>9. หน้าผู้ดูแลอื่นๆ</h2>
+<table>
+  <tr><th style="width:30%">หน้า</th><th>เปิดจาก</th><th>ใช้ทำอะไร</th></tr>
+  <tr><td>👤 Manage Users</td><td>Access Console → Related Consoles / ปุ่ม Reset Password</td><td>แก้ Role / สถานะผู้ใช้, รีเซ็ตรหัสผ่าน</td></tr>
+  <tr><td>📧 Email Delivery</td><td>Access Console / หน้าหลัก</td><td>ตั้งค่าการส่งอีเมล (Brevo สำรอง)</td></tr>
+  <tr><td>📜 Activity Log</td><td>Access Console → Related Consoles</td><td>ประวัติการล็อกอิน / การเปิดหน้า Dashboard</td></tr>
+  <tr><td>📥 FF Register Upload</td><td>หน้าหลัก</td><td>อัปโหลดไฟล์ทะเบียนอุปกรณ์ Fresh Food (.xlsx) สำหรับแบบสำรวจ Hyper Fresh Food</td></tr>
+  <tr><td>Hyper Review Status</td><td><code>?page=hyper-status</code></td><td>ติดตามสถานะการตรวจทานแบบสำรวจ Hyper</td></tr>
+  <tr><td>Upload Schedule</td><td>หน้าหลัก</td><td>ตารางกำหนดส่งแบบสำรวจของสาขา</td></tr>
+</table>
+
+<h2 class="ok">10. Checklist ประจำเดือน</h2>
+<ul class="checklist">
+  <li>ตรวจรายชื่อ Super Admin / System Admin ใน Manage Users — ถอดสิทธิ์คนที่ย้ายงานแล้ว</li>
+  <li>ตรวจสวิตช์ใน Role Access Matrix ว่ายังตรงกับนโยบาย (โดยเฉพาะ SMF Full Admin)</li>
+  <li>หลังวันที่ 1: เปิด Access Console ดูบรรทัด Last run ของ Data Archive ว่ารอบอัตโนมัติทำงานสำเร็จ</li>
+  <li>เปิด _Run_Log ในไฟล์ Archive ล่าสุด ดูว่าไม่มีชีตที่ขึ้น error</li>
+  <li>ทดลองเปิดรายงาน 1 หน้าพร้อม 📦 Include archive ว่าข้อมูลเก่ายังแสดง แล้วปิดกลับ</li>
+</ul>
+
+<h2 class="red">11. ปัญหาที่พบบ่อย</h2>
+<table>
+  <tr><th style="width:38%">อาการ</th><th>สาเหตุ / วิธีแก้</th></tr>
+  <tr><td>ผู้ใช้แจ้งว่า "ข้อมูลเก่าหาย" ในรายงาน</td><td>น่าจะถูก Flush ไปแล้ว → ให้กด <b>📦 Include archive</b> มุมซ้ายล่าง</td></tr>
+  <tr><td>ปุ่ม Flush now กดไม่ได้</td><td>ต้องกด <b>Preview</b> ก่อนทุกครั้ง</td></tr>
+  <tr><td>ขึ้น "Super Admin privileges required"</td><td>บัญชีนี้ไม่ใช่ Admin / Super Admin — ตรวจ Role แล้วออกจากระบบ / เข้าใหม่</td></tr>
+  <tr><td>เปิด 📦 แล้วไม่เห็นข้อมูลที่เพิ่งแก้ในไฟล์ Archive</td><td>ระบบจำข้อมูล Archive ไว้ 6 ชั่วโมง — รอ หรือ Flush รอบถัดไปจะรีเฟรชให้</td></tr>
+  <tr><td>แก้ไขข้อมูลเก่าไม่ได้ ("read-only" / "Record not found")</td><td>ปกติ — ข้อมูลใน Archive แก้ไม่ได้ ถ้าจำเป็นให้ Restore (ข้อ 7) ก่อน</td></tr>
+  <tr><td>รายงานยังช้าหลัง Flush</td><td>ดูคอลัมน์ Rows ว่าชีตไหนยังใหญ่ → ลดจำนวนเดือน (Keep) ของชีตนั้น แล้ว Preview → Flush อีกครั้ง</td></tr>
+</table>
+
+<div class="foot">Big C Building Management · Air Ref Survey Web App · คู่มือผู้ดูแลระบบ v1.0 (ต.ค. 2026)</div>
+</div>
+</body>
+</html>

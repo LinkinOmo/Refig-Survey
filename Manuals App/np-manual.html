@@ -198,6 +198,14 @@
                     <p class="font-semibold text-gray-800">หาสาขาที่ต้องการสำรวจในช่องค้นหาไม่เจอ ทำอย่างไร?</p>
                     <p class="text-gray-600">ลองพิมพ์เฉพาะรหัสสาขา 5 หลัก หรือพิมพ์ชื่อสาขาบางส่วน หากยังหาไม่เจอ ให้แจ้งผู้ดูแลระบบเพื่อตรวจสอบข้อมูลสาขาในฐานข้อมูล</p>
                 </div>
+                <div>
+                    <p class="font-semibold text-gray-800">ขึ้นข้อความ “ระบบกำลังบันทึกข้อมูลของผู้ใช้รายอื่นอยู่ กรุณารอสักครู่แล้วลองใหม่อีกครั้ง” หมายความว่าอะไร?</p>
+                    <p class="text-gray-600">มีผู้ใช้อื่นกำลังบันทึกข้อมูลในเวลาเดียวกัน ระบบจึงให้รอคิวเพื่อไม่ให้ข้อมูลบันทึกทับกัน — รอ 5–10 วินาทีแล้วกดบันทึกใหม่ ข้อมูลที่กรอกไว้ในหน้าจอไม่หาย</p>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-800">เพิ่มรูปในหน้ารายงานแล้วขึ้น “Record not found (it may have been deleted)”</p>
+                    <p class="text-gray-600">รายการนั้นถูกลบหรือถูกรวมรายการซ้ำ (Duplicate cleanup) ระหว่างที่กำลังอัปโหลด — กดรีเฟรชหน้ารายงาน เปิดรายการล่าสุดของสาขาแล้วเพิ่มรูปใหม่อีกครั้ง</p>
+                </div>
             </div>
         </div>
 
@@ -205,7 +213,7 @@
         <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 text-center">
             <p class="text-sm text-gray-500">หากพบปัญหาการใช้งานที่ไม่ได้อยู่ในคู่มือนี้ กรุณาติดต่อผู้ดูแลระบบ (Admin)
                 หรือทีมงานฝ่ายซ่อมบำรุง (Maintenance) ของท่าน</p>
-            <a href="<?= ScriptApp.getService().getUrl() ?>"
+            <a href="<?= APP_URL ?>"
                 class="inline-block mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors text-sm">
                 &larr; กลับสู่หน้าแรก
             </a>

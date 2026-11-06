@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hyper Upload Schedule</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; }
+  .tab-btn.active { background: #0f766e; color: #fff; }
+  .chip { display:inline-flex; align-items:center; gap:4px; background:#fee2e2; color:#991b1b; border-radius:9999px; padding:2px 10px; font-size:12px; }
+  .chip button { font-weight:700; cursor:pointer; }
+  .dot-ok { background:#10b981; } .dot-no { background:#e5e7eb; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div class="bg-gradient-to-r from-teal-700 to-teal-900 text-white px-4 py-4 shadow-lg">
+  <div class="max-w-6xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+    <div>
+      <h1 class="text-lg font-bold">📅 Hyper Upload Schedule</h1>
+      <p class="text-xs text-teal-200 mt-0.5">แผนวันส่งแบบสำรวจ Hyper (Big Format) — ตู้แช่ · แอร์ · อุปกรณ์อาคาร · แสงสว่าง · ห้องน้ำ · ที่จอดรถ/ผู้พิการ</p>
+    </div>
+    <div class="flex items-center gap-3 text-xs">
+      <span id="admin-badge" class="hidden bg-amber-400 text-amber-900 font-bold px-2 py-0.5 rounded-full">🔑 Admin</span>
+      <a href="<?= ScriptApp.getService().getUrl() ?>?page=upload-schedule" target="_top" class="text-teal-100 underline">Mini Big C schedule</a>
+      <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-status" target="_blank" class="text-teal-100 underline">🧭 สถานะส่ง/ตรวจ</a>
+      <a href="<?= ScriptApp.getService().getUrl() ?>?page=survey_dashboard&type=hyperRef" target="_top" class="text-teal-100 underline">📊 Dashboard</a>
+      <a href="<?= ScriptApp.getService().getUrl() ?>?page=exec-summary" target="_top" class="admin-only hidden text-teal-100 underline">✨ AI สรุปผู้บริหาร</a>
+    </div>
+  </div>
+  <div id="prog-wrap" class="hidden max-w-6xl mx-auto mt-3">
+    <div class="flex justify-between text-xs text-teal-200 mb-1"><span id="prog-label"></span><span id="prog-pct"></span></div>
+    <div class="bg-teal-800 rounded-full overflow-hidden"><div id="prog-bar" class="h-2 bg-emerald-400 rounded-full" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div class="max-w-6xl mx-auto mt-4 px-3">
+  <div class="flex gap-1 bg-white p-1 rounded-xl shadow-sm border w-fit flex-wrap">
+    <button class="tab-btn active px-4 py-2 rounded-lg text-sm font-semibold" data-tab="report" onclick="showTab('report')">📋 รายงานความคืบหน้า</button>
+    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="daily" onclick="showTab('daily')">📆 รายวัน</button>
+    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold" data-tab="setup" onclick="showTab('setup')">⚙️ ตั้งค่าแผน</button>
+  </div>
+</div>
+
+<div class="max-w-6xl mx-auto px-3 py-4 space-y-4">
+  <div id="loading" class="text-sm text-gray-500">กำลังโหลด...</div>
+  <div id="no-plan" class="hidden bg-amber-50 border border-amber-300 text-amber-800 rounded-xl p-4 text-sm">ยังไม่มีแผน Hyper — ไปที่แท็บ ⚙️ ตั้งค่าแผน เพื่อสร้าง (เฉพาะ Admin)</div>
+
+  <!-- ── Report ── -->
+  <div id="tab-report" class="tab-pane space-y-4">
+    <div id="cards" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+    <div class="bg-white rounded-xl border p-4">
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <h2 class="font-bold text-sm text-gray-700 mr-auto">สถานะรายสาขา</h2>
+        <input id="f-q" oninput="renderReport()" placeholder="ค้นหารหัส / ชื่อสาขา" class="border rounded-lg px-2 py-1 text-sm">
+        <select id="f-fmt" onchange="renderReport()" class="border rounded-lg px-2 py-1 text-sm"><option value="">ทุกรูปแบบ</option></select>
+        <select id="f-reg" onchange="renderReport()" class="border rounded-lg px-2 py-1 text-sm"><option value="">ทุกภาค</option></select>
+        <select id="f-st" onchange="renderReport()" class="border rounded-lg px-2 py-1 text-sm">
+          <option value="">ทุกสถานะ</option><option value="complete">ส่งครบ</option><option value="started">ส่งบางส่วน</option><option value="none">ยังไม่ส่ง</option><option value="overdue">เลยกำหนด</option><option value="critical">Critical</option>
+        </select>
+        <button onclick="exportExcel()" class="bg-emerald-600 text-white text-sm font-semibold px-3 py-1 rounded-lg">⬇️ Excel</button>
+        <button onclick="fuOpen()" class="admin-only hidden bg-sky-600 text-white text-sm font-semibold px-3 py-1 rounded-lg">📧 ติดตามทางอีเมล</button>
+      </div>
+      <div class="text-xs text-gray-400 mb-2" id="report-count"></div>
+      <div class="overflow-x-auto"><table class="w-full text-xs"><thead id="report-head"></thead><tbody id="report-body"></tbody></table></div>
+    </div>
+    <div class="bg-white rounded-xl border p-4">
+      <h2 class="font-bold text-sm text-gray-700 mb-2">สรุปตามรูปแบบสาขา / ภาค</h2>
+      <div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="bg-gray-50 text-left"><th class="p-2">รูปแบบ</th><th class="p-2">ภาค</th><th class="p-2 text-center">สาขา</th><th class="p-2 text-center">ส่งครบ</th><th class="p-2 text-center">บางส่วน</th><th class="p-2 text-center">ยังไม่ส่ง</th><th class="p-2 text-center">เลยกำหนด</th><th class="p-2">%</th></tr></thead><tbody id="group-body"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ── Daily ── -->
+  <div id="tab-daily" class="tab-pane hidden bg-white rounded-xl border p-4">
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <h2 class="font-bold text-sm text-gray-700 mr-auto">แผนรายวัน</h2>
+      <input type="date" id="d-date" onchange="renderDaily()" class="border rounded-lg px-2 py-1 text-sm">
+      <button onclick="gotoToday()" class="text-sm border rounded-lg px-3 py-1">วันนี้</button>
+      <button id="btn-resched" onclick="doReschedule()" class="admin-only hidden bg-orange-500 text-white text-sm font-semibold px-3 py-1 rounded-lg">🔄 เลื่อนสาขาที่เลยกำหนด</button>
+    </div>
+    <div id="d-days" class="flex flex-wrap gap-1 mb-3 max-h-24 overflow-y-auto"></div>
+    <div class="overflow-x-auto"><table class="w-full text-xs"><thead id="daily-head"></thead><tbody id="daily-body"></tbody></table></div>
+  </div>
+
+  <!-- ── Setup ── -->
+  <div id="tab-setup" class="tab-pane hidden space-y-4">
+    <div id="setup-denied" class="hidden bg-gray-50 border rounded-xl p-4 text-sm text-gray-500">🔒 เฉพาะ Admin / Schedule Admin เท่านั้นที่สร้างหรือเปลี่ยนแผนได้</div>
+    <div id="setup-form" class="admin-only hidden bg-white rounded-xl border p-5 space-y-4">
+      <h2 class="font-bold text-gray-800">สร้างแผน Hyper ใหม่ <span class="text-xs font-normal text-red-500">(แทนที่แผนเดิมทั้งหมด)</span></h2>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">🏷️ รอบสำรวจ (Round) *</label>
+        <input id="i-round" placeholder="เช่น 2026-H2" class="w-full border rounded-lg p-2 text-sm">
+        <p class="text-xs text-gray-400 mt-1">แบบสำรวจที่ส่ง <b>ตั้งแต่วันเริ่มแผน</b> เป็นต้นไปจึงนับว่า “ส่งแล้ว” ในแผนนี้</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div><label class="block text-xs font-semibold text-gray-600 mb-1">🗓️ วันเริ่มต้น *</label><input type="date" id="i-start" class="w-full border rounded-lg p-2 text-sm"></div>
+        <div><label class="block text-xs font-semibold text-gray-600 mb-1">📅 Deadline *</label><input type="date" id="i-deadline" class="w-full border rounded-lg p-2 text-sm"></div>
+        <div><label class="block text-xs font-semibold text-gray-600 mb-1">📊 สาขาสูงสุดต่อวัน</label><input type="number" id="i-max" value="20" min="1" max="100" class="w-full border rounded-lg p-2 text-sm"></div>
+        <div><label class="block text-xs font-semibold text-gray-600 mb-1">⏰ ช่วงเวลา</label><div class="flex items-center gap-2"><input type="time" id="i-from" value="08:00" class="flex-1 border rounded-lg p-2 text-sm"><span class="text-xs text-gray-400">ถึง</span><input type="time" id="i-to" value="17:00" class="flex-1 border rounded-lg p-2 text-sm"></div></div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">🏢 รูปแบบสาขา (ไม่เลือก = ทุกรูปแบบ)</label>
+        <div id="i-formats" class="flex flex-wrap gap-3 text-sm"></div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">🔴 สาขา Critical (จัดวันแรกๆ)</label>
+        <input id="i-crit-search" oninput="searchStore(this.value,'crit')" placeholder="พิมพ์รหัส / ชื่อสาขา" class="w-full border rounded-lg p-2 text-sm">
+        <div id="i-crit-res" class="hidden border rounded-lg mt-1 bg-white shadow max-h-44 overflow-y-auto"></div>
+        <div id="i-crit-chips" class="flex flex-wrap gap-2 mt-2"></div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">🚫 สาขาที่ไม่เข้าแผน (Excluded)</label>
+        <input id="i-excl-search" oninput="searchStore(this.value,'excl')" placeholder="พิมพ์รหัส / ชื่อสาขา" class="w-full border rounded-lg p-2 text-sm">
+        <div id="i-excl-res" class="hidden border rounded-lg mt-1 bg-white shadow max-h-44 overflow-y-auto"></div>
+        <div id="i-excl-chips" class="flex flex-wrap gap-2 mt-2"></div>
+      </div>
+      <p class="text-xs text-gray-400">ลำดับการจัด: Critical → สาขาที่ยังไม่เคยส่งครบทุกแบบ → สาขาอื่น (เรียงตามรูปแบบ / ภาค)</p>
+      <div class="flex gap-2">
+        <button id="btn-create" onclick="doCreate()" class="flex-1 bg-teal-700 hover:bg-teal-800 text-white font-bold py-2.5 rounded-xl text-sm">สร้างแผน</button>
+        <button onclick="doClear()" class="border border-red-300 text-red-600 font-semibold px-4 rounded-xl text-sm">ล้างแผน</button>
+      </div>
+      <p id="setup-msg" class="text-sm"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Follow-up email (Admin / Schedule Admin): SGM per store or AMM MTN per AMM ── -->
+<div id="fu-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-3">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[92vh] flex flex-col">
+    <div class="p-4 border-b flex items-start justify-between gap-3">
+      <div>
+        <h3 class="font-bold text-gray-800">📧 ติดตามทางอีเมล — แบบสำรวจ Hyper</h3>
+        <p class="text-xs text-gray-500 mt-0.5">สาขาที่ <b>ยังไม่ส่ง</b> (เลยกำหนด หรือใกล้ถึงกำหนดภายใน <span id="fu-days">3</span> วัน) และ <b>ถูกตีกลับแต่ยังไม่แก้ไขส่งใหม่</b> — ระบบไม่ส่งอัตโนมัติ ต้องกดส่งเอง</p>
+      </div>
+      <button onclick="fuClose()" class="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+    </div>
+    <div class="p-4 border-b space-y-3 max-h-[50vh] overflow-auto flex-shrink-0">
+      <div class="flex flex-wrap items-center gap-4 text-sm">
+        <span class="font-semibold text-gray-600">ส่งถึง:</span>
+        <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="fu-mode" value="sgm" checked onchange="fuLoad()"> 📧 ติดตาม SGM (รายสาขา)</label>
+        <label class="flex items-center gap-1.5 cursor-pointer"><input type="radio" name="fu-mode" value="mtn" onchange="fuLoad()"> 📧 ติดตาม AMM MTN (รวมสาขา)</label>
+        <label class="flex items-center gap-1.5 cursor-pointer text-emerald-700"><input type="radio" name="fu-mode" value="thanks" onchange="fuLoad()"> 🙏 ขอบคุณ SGM (ส่งครบ + ถูกต้อง)</label>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span class="font-semibold text-gray-600 text-sm">โมดูล:</span>
+        <span id="fu-mods" class="flex flex-wrap gap-x-3 gap-y-1"></span>
+        <button onclick="fuSetMods(true)" class="text-sky-600 underline">ทั้งหมด</button>
+        <button onclick="fuSetMods(false)" class="text-sky-600 underline">ไม่เลือก</button>
+        <button onclick="fuNaToggle()" class="ml-auto text-gray-600 underline">⚙️ ตั้งค่าโมดูลรายสาขา</button>
+      </div>
+      <div id="fu-na" class="hidden border border-gray-200 bg-gray-50 rounded-lg p-3 space-y-2 text-xs">
+        <p class="text-gray-600">เลือกสาขา แล้วติ๊กเฉพาะโมดูลที่ <b>ใช้กับสาขานี้</b> — โมดูลที่ไม่ติ๊กจะไม่ถูกติดตาม ไม่ถูกนับในตารางนัดส่ง และไม่จำเป็นต่อการขอบคุณ</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="fu-na-store" list="fu-store-list" placeholder="รหัส / ชื่อสาขา" class="border rounded px-2 py-1 w-64" onchange="fuNaPick()">
+          <span id="fu-na-mods" class="flex flex-wrap gap-x-3 gap-y-1"></span>
+          <button onclick="fuNaSave()" class="bg-gray-700 text-white font-semibold px-3 py-1 rounded">บันทึก</button>
+          <span id="fu-na-msg" class="text-gray-500"></span>
+        </div>
+        <div id="fu-na-list" class="text-gray-500"></div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <span class="font-semibold text-gray-600 text-sm">เลือกสาขาเพิ่มเอง:</span>
+        <input id="fu-extra-in" list="fu-store-list" placeholder="รหัส / ชื่อสาขา (รวมสาขาที่ยังไม่ถึงกำหนด)" class="border rounded px-2 py-1 w-72">
+        <button onclick="fuExtraAdd()" class="text-sky-600 underline">+ เพิ่ม</button>
+        <span id="fu-extra-chips" class="flex flex-wrap gap-1"></span>
+        <datalist id="fu-store-list"></datalist>
+      </div>
+      <textarea id="fu-note" rows="2" placeholder="ข้อความเพิ่มเติม (ไม่บังคับ) — แสดงในกรอบสีเหลืองด้านบนอีเมล / AI จะนำไปใช้ในเนื้อหา" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+      <div class="border border-violet-200 bg-violet-50 rounded-lg p-3 space-y-2">
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <span class="font-semibold text-violet-800">✨ AI ช่วยเขียนอีเมล</span>
+          <button id="fu-ai-tpl-btn" onclick="fuAiTemplate()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">✨ ร่างข้อความกลางด้วย AI</button>
+          <label id="fu-use-tpl-wrap" class="hidden items-center gap-1.5 text-xs text-violet-900"><input type="checkbox" id="fu-use-tpl" checked> ใช้ข้อความนี้ตอนส่ง</label>
+          <button id="fu-tpl-clear" onclick="fuTplClear()" class="hidden text-xs text-red-600 underline">ล้าง</button>
+          <span id="fu-ai-msg" class="text-xs text-violet-700"></span>
+          <button id="fu-ai-cfg-btn" onclick="fuAiCfgToggle()" class="hidden ml-auto text-xs text-violet-700 underline">⚙️ AI</button>
+        </div>
+        <div id="fu-ai-cfg" class="hidden bg-white border rounded-lg p-2 flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-gray-600">DeepSeek API key (เหมือน CMS Dashboard):</span>
+          <input id="fu-ai-key" type="password" autocomplete="off" placeholder="sk-… (เว้นว่าง = ใช้ค่าเดิม)" class="border rounded px-2 py-1 w-56">
+          <input id="fu-ai-model" placeholder="deepseek-v4-flash" class="border rounded px-2 py-1 w-40">
+          <button onclick="fuAiCfgSave()" class="bg-violet-600 text-white font-semibold px-3 py-1 rounded">บันทึก</button>
+          <span id="fu-ai-cfg-msg" class="text-gray-500"></span>
+        </div>
+        <div id="fu-tpl" class="hidden space-y-1.5">
+          <input id="fu-tpl-subject" class="w-full border rounded px-2 py-1 text-sm" placeholder="หัวข้ออีเมล">
+          <div id="fu-tpl-body" contenteditable="true" class="bg-white border rounded px-3 py-2 text-sm max-h-48 overflow-auto"></div>
+          <p class="text-[11px] text-violet-700">แก้ไขได้ — <b>{{RECIPIENT}}</b> = ชื่อผู้รับ, <b>{{ITEMS_TABLE}}</b> = ตารางรายการค้างของแต่ละฉบับ (ระบบเติมจากข้อมูลจริง) · คำลงท้าย/ลายเซ็นเติมให้อัตโนมัติ</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-4 text-xs text-gray-600">
+        <label class="flex items-center gap-1.5"><input type="checkbox" id="fu-ccme" checked> CC ถึงตัวฉัน</label>
+        <label id="fu-ccamm-wrap" class="flex items-center gap-1.5"><input type="checkbox" id="fu-ccamm" checked> CC AMM MTN ของสาขา</label>
+        <label id="fu-overdue-wrap" class="flex items-center gap-1.5"><input type="checkbox" id="fu-overdue-only" onchange="fuRender()"> เฉพาะที่เลยกำหนด / ถูกตีกลับ</label>
+        <label id="fu-reviewed-wrap" class="hidden items-center gap-1.5"><input type="checkbox" id="fu-reviewed-only" onchange="fuLoad()"> เฉพาะที่ผู้ตรวจ "ตรวจรับแล้ว" ทุกแบบ</label>
+        <label id="fu-hide-thanked-wrap" class="hidden items-center gap-1.5"><input type="checkbox" id="fu-hide-thanked" checked onchange="fuRender()"> ซ่อนสาขาที่ขอบคุณไปแล้ว</label>
+        <span id="fu-gen" class="ml-auto text-gray-400"></span>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <span class="font-semibold text-gray-600 text-sm">CC เพิ่มเติม:</span>
+        <span class="relative">
+          <input id="fu-cc-in" autocomplete="off" placeholder="ค้นหาชื่อ/อีเมลพนักงาน หรือพิมพ์อีเมลแล้วกด Enter" class="border rounded px-2 py-1 w-80" oninput="fuCcSearch()" onkeydown="if(event.key==='Enter'){event.preventDefault();fuCcAdd(this.value);}">
+          <div id="fu-cc-dd" class="hidden absolute z-10 left-0 top-full mt-1 w-96 bg-white border rounded-lg shadow-lg max-h-56 overflow-auto"></div>
+        </span>
+        <span id="fu-cc-chips" class="flex flex-wrap gap-1"></span>
+      </div>
+      <div id="fu-cc-saved-wrap" class="hidden flex-wrap items-center gap-1 text-xs">
+        <span class="text-gray-500">⭐ อีเมลที่เคยใช้ (คลิกเพื่อเพิ่ม):</span>
+        <span id="fu-cc-saved" class="flex flex-wrap gap-1"></span>
+      </div>
+      <div id="fu-notes" class="text-xs text-amber-700"></div>
+    </div>
+    <div class="flex-1 overflow-auto min-h-[180px]">
+      <table class="w-full text-xs">
+        <thead class="bg-gray-50 sticky top-0"><tr class="text-left">
+          <th class="p-2 w-8"><input type="checkbox" id="fu-all" onchange="fuToggleAll(this.checked)"></th>
+          <th class="p-2" id="fu-col-name">สาขา</th><th class="p-2">อีเมลผู้รับ</th><th class="p-2 text-center" id="fu-col-a">เลยกำหนด</th><th class="p-2 text-center" id="fu-col-b">ตีกลับ</th><th class="p-2 text-center">รายการ</th><th class="p-2"></th>
+        </tr></thead>
+        <tbody id="fu-body"><tr><td colspan="7" class="p-4 text-gray-400">กำลังโหลด…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="p-4 border-t flex flex-wrap items-center gap-3">
+      <span id="fu-msg" class="text-sm mr-auto"></span>
+      <button onclick="fuClose()" class="border px-4 py-2 rounded-lg text-sm">ปิด</button>
+      <button id="fu-send" onclick="fuSend()" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-2 rounded-lg text-sm">ส่งอีเมลที่เลือก</button>
+    </div>
+  </div>
+</div>
+<div id="fu-preview" class="hidden fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-3">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div class="p-3 border-b flex flex-wrap gap-2 justify-between items-center">
+      <b class="text-sm">ตัวอย่างอีเมล</b>
+      <span class="flex items-center gap-2">
+        <button id="fu-pv-ai" onclick="fuPvAi()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">✨ AI ร่างเฉพาะฉบับนี้</button>
+        <button id="fu-pv-send" onclick="fuPvSend()" class="hidden bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">ส่งฉบับนี้</button>
+        <button onclick="document.getElementById('fu-preview').classList.add('hidden')" class="text-gray-400 text-xl leading-none">×</button>
+      </span>
+    </div>
+    <div id="fu-pv-edit" class="hidden p-3 border-b bg-violet-50 space-y-1.5">
+      <input id="fu-pv-subject" class="w-full border rounded px-2 py-1 text-sm" placeholder="หัวข้ออีเมล">
+      <div id="fu-pv-body" contenteditable="true" class="bg-white border rounded px-3 py-2 text-sm max-h-56 overflow-auto"></div>
+      <p class="text-[11px] text-violet-700">แก้ไขข้อความได้ก่อนส่ง — <b>{{ITEMS_TABLE}}</b> จะถูกแทนด้วยตารางจริง · <span id="fu-pv-msg"></span></p>
+    </div>
+    <div id="fu-preview-body" class="p-4 overflow-auto text-sm"></div>
+  </div>
+</div>
+
+<script>
+var DATA = null, OPTS = null, IS_ADMIN = false, CRIT = {}, EXCL = {}, ME = '';
+var TAB_STATE = 'report';
+
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function dmy(s) { var p = String(s || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : (s || '-'); }
+
+function applyRole() {
+  document.getElementById('admin-badge').classList.toggle('hidden', !IS_ADMIN);
+  document.querySelectorAll('.admin-only').forEach(function(el) { el.classList.toggle('hidden', !IS_ADMIN); });
+  document.getElementById('setup-denied').classList.toggle('hidden', IS_ADMIN);
+}
+(function checkAuth() {
+  var email = '';
+  try {
+    var u = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+    IS_ADMIN = !!(u && (u.isAdmin || u.isScheduleAdmin));
+    email = u && u.email || '';
+    ME = email;
+  } catch (e) { IS_ADMIN = false; }
+  applyRole();
+  // re-check on the server in case the stored role is stale (same as the Mini schedule page)
+  if (email && !IS_ADMIN) {
+    google.script.run.withSuccessHandler(function(f) {
+      if (f && (f.isAdmin || f.isScheduleAdmin)) { IS_ADMIN = true; applyRole(); }
+    }).withFailureHandler(function() {}).getUserFlags(email);
+  }
+})();
+
+function showTab(t) {
+  TAB_STATE = t;
+  document.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.add('hidden'); });
+  document.getElementById('tab-' + t).classList.remove('hidden');
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-tab') === t); });
+}
+
+// A null reply (GAS cold start / busy script) is transient → retry with backoff; success:false is a real error.
+var LOAD_ATTEMPT = 0, LOAD_MAX = 5;
+function load(attempt) {
+  attempt = attempt || 1;
+  var my = ++LOAD_ATTEMPT;
+  var loadingEl = document.getElementById('loading');
+  loadingEl.classList.remove('hidden');
+  if (attempt > 1) loadingEl.textContent = 'กำลังโหลด… (ลองครั้งที่ ' + attempt + '/' + LOAD_MAX + ')';
+  if (attempt === 1) google.script.run.withSuccessHandler(function(o) { OPTS = o; renderSetupOptions(); }).getHyperScheduleOptions();
+  var retry = function(why) {
+    if (my !== LOAD_ATTEMPT) return;
+    if (attempt < LOAD_MAX) { setTimeout(function() { load(attempt + 1); }, 1500 * attempt); return; }
+    loadingEl.innerHTML = 'โหลดไม่สำเร็จ (' + esc(why) + ') — <button onclick="load()" class="underline font-semibold">ลองใหม่</button>';
+  };
+  var watchdog = setTimeout(function() { retry('หมดเวลา'); }, 45000);
+  google.script.run.withSuccessHandler(function(d) {
+    if (my !== LOAD_ATTEMPT) return;
+    clearTimeout(watchdog);
+    if (!d) { retry('server returned empty'); return; }
+    loadingEl.classList.add('hidden');
+    if (!d.success) { document.getElementById('no-plan').classList.remove('hidden'); document.getElementById('no-plan').textContent = 'โหลดไม่สำเร็จ: ' + (d.error || ''); return; }
+    DATA = d;
+    document.getElementById('no-plan').classList.toggle('hidden', !!d.exists);
+    if (d.exists) { renderAll(); } else { showTab('setup'); }
+  }).withFailureHandler(function(e) {
+    if (my !== LOAD_ATTEMPT) return;
+    clearTimeout(watchdog);
+    retry(e && e.message || 'error');
+  }).getHyperScheduleData();
+}
+
+function renderAll() {
+  var s = DATA.summary, m = DATA.meta;
+  var pct = s.total ? Math.round(s.complete / s.total * 100) : 0;
+  document.getElementById('prog-wrap').classList.remove('hidden');
+  document.getElementById('prog-label').textContent = 'รอบ ' + m.round + ' · ' + dmy(m.startDate) + ' – ' + dmy(m.deadline) + ' · ส่งครบ ' + s.complete + '/' + s.total + ' สาขา';
+  document.getElementById('prog-pct').textContent = pct + '%';
+  document.getElementById('prog-bar').style.width = pct + '%';
+  var card = function(l, v, sub, warn) { return '<div class="bg-white rounded-xl border p-3"><div class="text-xs text-gray-500">' + l + '</div><div class="text-2xl font-bold ' + (warn ? 'text-red-600' : 'text-gray-800') + '">' + v + '</div><div class="text-xs text-gray-400">' + (sub || '') + '</div></div>'; };
+  var h = card('สาขาในแผน', s.total, 'Critical ' + s.critical) + card('ส่งครบ ' + DATA.types.length + ' แบบ', s.complete, pct + '%') + card('ส่งบางส่วน', s.started, 'ยังไม่ครบทุกแบบ') + card('เลยกำหนด', s.overdue, 'ยังไม่ครบและเลยวันนัด', s.overdue > 0);
+  DATA.types.forEach(function(t) { h += card(t.label, s.perType[t.key], 'สาขาที่ส่งแล้ว'); });
+  document.getElementById('cards').innerHTML = h;
+  var fmts = {}, regs = {};
+  DATA.rows.forEach(function(r) { fmts[r.format] = 1; regs[r.region] = 1; });
+  fillSel('f-fmt', Object.keys(fmts).sort(), 'ทุกรูปแบบ'); fillSel('f-reg', Object.keys(regs).sort(), 'ทุกภาค');
+  var head = '<tr class="bg-gray-50 text-left"><th class="p-2">รหัส</th><th class="p-2">สาขา</th><th class="p-2">รูปแบบ</th><th class="p-2">ภาค</th><th class="p-2">AMM</th><th class="p-2">วันนัด</th>' +
+    DATA.types.map(function(t) { return '<th class="p-2 text-center">' + t.label + '</th>'; }).join('') + '<th class="p-2">สถานะ</th></tr>';
+  document.getElementById('report-head').innerHTML = head;
+  document.getElementById('daily-head').innerHTML = head.replace('<th class="p-2">วันนัด</th>', '<th class="p-2">เวลา</th>');
+  renderReport(); renderGroups(); initDaily();
+}
+
+function fillSel(id, list, first) {
+  var el = document.getElementById(id), cur = el.value;
+  el.innerHTML = '<option value="">' + first + '</option>' + list.map(function(x) { return '<option>' + esc(x) + '</option>'; }).join('');
+  el.value = cur;
+}
+
+function statusCell(r) {
+  if (r.complete) return '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">ส่งครบ</span>';
+  if (r.overdue) return '<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700">เลยกำหนด' + (r.done ? ' (' + r.done + '/' + (r.need || DATA.types.length) + ')' : '') + '</span>';
+  if (r.done) return '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">' + r.done + '/' + (r.need || DATA.types.length) + '</span>';
+  return '<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">รอส่ง</span>';
+}
+
+function rowHtml(r, mode) {
+  var cells = DATA.types.map(function(t) { return '<td class="p-2 text-center" title="' + esc(r.st[t.key]) + '">' + (r.st[t.key] ? '<span class="inline-block w-3 h-3 rounded-full dot-ok"></span>' : (r.na && r.na.indexOf(t.key) > -1) ? '<span class="text-gray-300" title="ไม่ใช้กับสาขานี้">–</span>' : '<span class="inline-block w-3 h-3 rounded-full dot-no"></span>') + '</td>'; }).join('');
+  return '<tr class="border-t"><td class="p-2 font-mono">' + esc(r.code) + (r.critical ? ' <span class="text-red-600">●</span>' : '') + '</td><td class="p-2">' + esc(r.name) + '</td><td class="p-2">' + esc(r.format) + '</td><td class="p-2">' + esc(r.region) + '</td><td class="p-2">' + esc(r.amm || '-') + '</td>' +
+    '<td class="p-2 whitespace-nowrap">' + (mode === 'daily' ? esc(r.time) : dmy(r.date) + ' ' + esc(r.time)) + '</td>' + cells + '<td class="p-2">' + statusCell(r) + '</td></tr>';
+}
+
+function filteredRows() {
+  var q = document.getElementById('f-q').value.trim().toLowerCase(), fm = document.getElementById('f-fmt').value, rg = document.getElementById('f-reg').value, st = document.getElementById('f-st').value;
+  return DATA.rows.filter(function(r) {
+    if (q && (r.code + ' ' + r.name).toLowerCase().indexOf(q) < 0) return false;
+    if (fm && r.format !== fm) return false; if (rg && r.region !== rg) return false;
+    if (st === 'complete' && !r.complete) return false; if (st === 'started' && !(r.done > 0 && !r.complete)) return false;
+    if (st === 'none' && r.done > 0) return false; if (st === 'overdue' && !r.overdue) return false; if (st === 'critical' && !r.critical) return false;
+    return true;
+  });
+}
+
+function renderReport() {
+  if (!DATA || !DATA.exists) return;
+  var rows = filteredRows();
+  document.getElementById('report-count').textContent = rows.length + ' สาขา';
+  document.getElementById('report-body').innerHTML = rows.slice(0, 600).map(function(r) { return rowHtml(r); }).join('') || '<tr><td colspan="12" class="p-4 text-center text-gray-400">ไม่พบข้อมูล</td></tr>';
+}
+
+function renderGroups() {
+  var g = {};
+  DATA.rows.forEach(function(r) {
+    var k = r.format + '|' + r.region;
+    if (!g[k]) g[k] = { f: r.format, r: r.region, n: 0, c: 0, s: 0, o: 0 };
+    g[k].n++; if (r.complete) g[k].c++; else if (r.done) g[k].s++; if (r.overdue) g[k].o++;
+  });
+  document.getElementById('group-body').innerHTML = Object.keys(g).sort().map(function(k) {
+    var x = g[k], p = x.n ? Math.round(x.c / x.n * 100) : 0;
+    return '<tr class="border-t"><td class="p-2">' + esc(x.f) + '</td><td class="p-2">' + esc(x.r) + '</td><td class="p-2 text-center">' + x.n + '</td><td class="p-2 text-center">' + x.c + '</td><td class="p-2 text-center">' + x.s + '</td><td class="p-2 text-center">' + (x.n - x.c - x.s) + '</td><td class="p-2 text-center ' + (x.o ? 'text-red-600 font-bold' : '') + '">' + x.o + '</td>' +
+      '<td class="p-2 w-32"><div class="bg-gray-100 rounded-full h-2"><div class="bg-emerald-500 h-2 rounded-full" style="width:' + p + '%"></div></div></td></tr>';
+  }).join('');
+}
+
+function initDaily() {
+  var days = {};
+  DATA.rows.forEach(function(r) { days[r.date] = (days[r.date] || 0) + 1; });
+  var list = Object.keys(days).sort();
+  document.getElementById('d-days').innerHTML = list.map(function(d) {
+    return '<button onclick="setDay(\'' + d + '\')" class="text-xs border rounded px-2 py-1 ' + (d === DATA.today ? 'bg-teal-50 border-teal-400' : '') + '">' + dmy(d).slice(0, 5) + ' (' + days[d] + ')</button>';
+  }).join('');
+  var dt = document.getElementById('d-date');
+  if (!dt.value) dt.value = days[DATA.today] ? DATA.today : (list[0] || '');
+  renderDaily();
+}
+function setDay(d) { document.getElementById('d-date').value = d; renderDaily(); }
+function gotoToday() { document.getElementById('d-date').value = DATA.today; renderDaily(); }
+function renderDaily() {
+  if (!DATA || !DATA.exists) return;
+  var d = document.getElementById('d-date').value;
+  var rows = DATA.rows.filter(function(r) { return r.date === d; }).sort(function(a, b) { return a.time.localeCompare(b.time); });
+  document.getElementById('daily-body').innerHTML = rows.map(function(r) { return rowHtml(r, 'daily'); }).join('') || '<tr><td colspan="12" class="p-4 text-center text-gray-400">ไม่มีสาขาในวันนี้</td></tr>';
+}
+
+function exportExcel() {
+  if (!DATA || !DATA.exists) return;
+  var hdr = ['รหัสสาขา', 'ชื่อสาขา', 'รูปแบบ', 'ภาค', 'AMM', 'CM', 'Critical', 'วันนัด', 'เวลา', 'เลื่อนแล้ว (ครั้ง)'].concat(DATA.types.map(function(t) { return t.label; })).concat(['ส่งแล้ว (จาก 5)', 'สถานะ']);
+  var aoa = [hdr].concat(filteredRows().map(function(r) {
+    return [r.code, r.name, r.format, r.region, r.amm, r.cm, r.critical ? 'Yes' : '', r.date, r.time, r.skip].concat(DATA.types.map(function(t) { return r.st[t.key] || ''; })).concat([r.done, r.complete ? 'ส่งครบ' : r.overdue ? 'เลยกำหนด' : r.done ? 'บางส่วน' : 'รอส่ง']);
+  }));
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Hyper Schedule');
+  XLSX.writeFile(wb, 'Hyper_Upload_Schedule_' + DATA.meta.round + '.xlsx');
+}
+
+// ── Setup ──
+function renderSetupOptions() {
+  document.getElementById('i-formats').innerHTML = OPTS.formats.map(function(f) {
+    return '<label class="inline-flex items-center gap-1"><input type="checkbox" class="i-fmt" value="' + esc(f.name) + '"> ' + esc(f.name) + ' <span class="text-xs text-gray-400">(' + f.count + ')</span></label>';
+  }).join('');
+}
+function searchStore(v, kind) {
+  var box = document.getElementById('i-' + kind + '-res'); v = v.trim().toLowerCase();
+  if (!v || !OPTS) { box.classList.add('hidden'); return; }
+  var hit = OPTS.stores.filter(function(s) { return (s.code + ' ' + s.name + ' ' + s.nameTh).toLowerCase().indexOf(v) > -1; }).slice(0, 12);
+  box.innerHTML = hit.map(function(s) { return '<div class="px-3 py-1.5 text-sm hover:bg-teal-50 cursor-pointer" data-code="' + esc(s.code) + '" data-kind="' + kind + '">' + esc(s.code) + ' — ' + esc(s.name || s.nameTh) + ' <span class="text-xs text-gray-400">' + esc(s.format) + '</span></div>'; }).join('') || '<div class="px-3 py-2 text-xs text-gray-400">ไม่พบ</div>';
+  box.classList.remove('hidden');
+}
+document.addEventListener('click', function(e) {
+  var el = e.target.closest('[data-code]');
+  if (el && el.getAttribute('data-kind')) {
+    var kind = el.getAttribute('data-kind'), code = el.getAttribute('data-code');
+    (kind === 'crit' ? CRIT : EXCL)[code] = true; if (kind === 'crit') delete EXCL[code]; else delete CRIT[code];
+    document.getElementById('i-' + kind + '-search').value = ''; document.getElementById('i-' + kind + '-res').classList.add('hidden'); renderChips(); return;
+  }
+  var rm = e.target.closest('[data-rm]');
+  if (rm) { delete CRIT[rm.getAttribute('data-rm')]; delete EXCL[rm.getAttribute('data-rm')]; renderChips(); }
+});
+function renderChips() {
+  ['crit', 'excl'].forEach(function(k) {
+    var set = k === 'crit' ? CRIT : EXCL;
+    document.getElementById('i-' + k + '-chips').innerHTML = Object.keys(set).map(function(c) { return '<span class="chip">' + esc(c) + ' <button data-rm="' + esc(c) + '">×</button></span>'; }).join('') || '<span class="text-xs text-gray-400 italic">ไม่มี</span>';
+  });
+}
+renderChips();
+
+function doCreate() {
+  var msg = document.getElementById('setup-msg'); msg.className = 'text-sm text-gray-500';
+  var p = { round: document.getElementById('i-round').value, startDate: document.getElementById('i-start').value, deadline: document.getElementById('i-deadline').value,
+    maxPerDay: document.getElementById('i-max').value, uploadTimeFrom: document.getElementById('i-from').value, uploadTimeTo: document.getElementById('i-to').value,
+    formats: Array.prototype.slice.call(document.querySelectorAll('.i-fmt:checked')).map(function(x) { return x.value; }), criticalCodes: Object.keys(CRIT), excludedCodes: Object.keys(EXCL) };
+  if (!p.round.trim() || !p.startDate || !p.deadline) { msg.className = 'text-sm text-red-600'; msg.textContent = 'กรุณากรอกรอบสำรวจ วันเริ่มต้น และ Deadline'; return; }
+  if (DATA && DATA.exists && !confirm('การสร้างแผนใหม่จะแทนที่แผนเดิม (รอบ ' + DATA.meta.round + ') ทั้งหมด — ดำเนินการต่อ?')) return;
+  var btn = document.getElementById('btn-create'); btn.disabled = true; msg.textContent = 'กำลังสร้างแผน...';
+  google.script.run.withSuccessHandler(function(r) {
+    btn.disabled = false;
+    if (!r.success) { msg.className = 'text-sm text-red-600'; msg.textContent = r.error; return; }
+    msg.className = 'text-sm text-emerald-700'; msg.textContent = '✅ สร้างแผนแล้ว ' + r.totalStores + ' สาขา · ' + r.totalDays + ' วัน · ~' + r.storesPerDay + ' สาขา/วัน (Critical ' + r.totalCritical + ', ยังไม่เคยส่งครบ ' + r.totalNoData + ')';
+    load(); showTab('report');
+  }).withFailureHandler(function(e) { btn.disabled = false; msg.className = 'text-sm text-red-600'; msg.textContent = e.message; }).createHyperSchedule(p);
+}
+function doClear() {
+  if (!confirm('ล้างแผน Hyper ทั้งหมด? (ข้อมูลแบบสำรวจที่ส่งแล้วไม่ถูกลบ)')) return;
+  google.script.run.withSuccessHandler(function() { DATA = null; load(); }).clearHyperSchedule();
+}
+function doReschedule() {
+  if (!confirm('เลื่อนสาขาที่เลยกำหนดและยังส่งไม่ครบ ไปวันทำงานถัดไป?')) return;
+  google.script.run.withSuccessHandler(function(r) { alert(r.success ? 'เลื่อนแล้ว ' + r.rescheduled + ' สาขา' : r.error); load(); }).rescheduleOverdueHyper();
+}
+
+// ── Follow-up email ──
+var FU = { mode: 'sgm', targets: [], sel: {}, mods: null, modList: [], pvKey: '', pvAi: false, extra: [], cc: [], saved: [], stores: [], na: null };
+// Options sent with every server call: hand-picked stores, thank-you strictness, extra CC.
+function fuOpts() {
+  return { extraCodes: FU.extra.map(function(s) { return s.code; }), reviewedOnly: document.getElementById('fu-reviewed-only').checked, extraCc: FU.cc };
+}
+function fuPerStore() { return FU.mode !== 'mtn'; }
+// null = all modules (first open); otherwise the ticked survey keys
+function fuModsSel() { return FU.mods; }
+function fuRenderMods() {
+  document.getElementById('fu-mods').innerHTML = FU.modList.map(function(m) {
+    var on = !FU.mods || FU.mods.indexOf(m.key) > -1;
+    return '<label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" data-fu-mod="' + esc(m.key) + '"' + (on ? ' checked' : '') + '> ' + esc(m.label) + '</label>';
+  }).join('');
+}
+function fuSetMods(on) { FU.mods = on ? null : []; fuRenderMods(); fuLoad(); }
+document.getElementById('fu-mods').addEventListener('change', function() {
+  var ticked = [].slice.call(document.querySelectorAll('[data-fu-mod]')).filter(function(c) { return c.checked; }).map(function(c) { return c.getAttribute('data-fu-mod'); });
+  FU.mods = ticked.length === FU.modList.length ? null : ticked;
+  fuLoad();
+});
+function fuMode() { var r = document.querySelector('input[name="fu-mode"]:checked'); return r ? r.value : 'sgm'; }
+function fuOpen() { document.getElementById('fu-modal').classList.remove('hidden'); fuLoad(); }
+function fuClose() { document.getElementById('fu-modal').classList.add('hidden'); }
+function fuShow(id, on, flex) { var el = document.getElementById(id); el.classList.toggle('hidden', !on); if (flex) el.classList.toggle('flex', on); }
+function fuLoad() {
+  FU.mode = fuMode(); FU.sel = {};
+  var thx = FU.mode === 'thanks';
+  fuShow('fu-ccamm-wrap', fuPerStore());
+  fuShow('fu-overdue-wrap', !thx, true);
+  fuShow('fu-reviewed-wrap', thx, true);
+  fuShow('fu-hide-thanked-wrap', thx, true);
+  document.getElementById('fu-col-name').textContent = fuPerStore() ? 'สาขา (AMM MTN)' : 'AMM MTN';
+  document.getElementById('fu-col-a').textContent = thx ? 'ขอบคุณล่าสุด' : 'เลยกำหนด';
+  document.getElementById('fu-col-b').textContent = thx ? '' : 'ตีกลับ';
+  document.getElementById('fu-body').innerHTML = '<tr><td colspan="7" class="p-4 text-gray-400">กำลังโหลด…</td></tr>';
+  document.getElementById('fu-msg').textContent = '';
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { document.getElementById('fu-body').innerHTML = '<tr><td colspan="7" class="p-4 text-red-600">' + esc(r && r.error || 'โหลดไม่สำเร็จ — ลองใหม่') + '</td></tr>'; return; }
+    FU.targets = r.targets || [];
+    if (!FU.modList.length && r.modules) { FU.modList = r.modules; fuRenderMods(); }
+    FU.ai = r.ai || {};
+    document.getElementById('fu-ai-cfg-btn').classList.toggle('hidden', !FU.ai.canConfigure);
+    document.getElementById('fu-ai-msg').textContent = FU.ai.configured ? '' : (FU.ai.canConfigure ? 'ยังไม่ได้ตั้งค่า API key — กด ⚙️ AI' : 'ยังไม่ได้ตั้งค่า AI (ติดต่อ Super Admin)');
+    document.getElementById('fu-days').textContent = r.dueDays;
+    document.getElementById('fu-gen').textContent = 'ข้อมูล ณ ' + r.generatedAt;
+    document.getElementById('fu-notes').innerHTML = (r.notes || []).map(esc).join('<br>');
+    // thank-you: pre-tick only stores not thanked yet
+    FU.targets.forEach(function(t) { if (t.email && !(thx && t.thankedAt)) FU.sel[t.key] = true; });
+    if (r.stores && !FU.stores.length) {
+      FU.stores = r.stores;
+      document.getElementById('fu-store-list').innerHTML = r.stores.map(function(s) { return '<option value="' + esc(s.code + ' ' + (s.nameTh || s.name)) + '">'; }).join('');
+    }
+    FU.saved = r.savedCc || []; fuCcRender();
+    fuRender();
+  }).withFailureHandler(function(e) {
+    document.getElementById('fu-body').innerHTML = '<tr><td colspan="7" class="p-4 text-red-600">' + esc(e.message) + '</td></tr>';
+  }).getHyperFollowUpPreview(ME, FU.mode, fuModsSel(), fuOpts());
+}
+function fuVisible() {
+  if (FU.mode === 'thanks') {
+    var hide = document.getElementById('fu-hide-thanked').checked;
+    return FU.targets.filter(function(t) { return !hide || !t.thankedAt; });
+  }
+  var only = document.getElementById('fu-overdue-only').checked;
+  return FU.targets.filter(function(t) { return !only || t.overdue || t.rejected; });
+}
+function fuRender() {
+  var rows = fuVisible(), thx = FU.mode === 'thanks';
+  if (!rows.length) { document.getElementById('fu-body').innerHTML = '<tr><td colspan="7" class="p-4 text-emerald-700">' + (thx ? 'ยังไม่มีสาขาที่ส่งครบตามเงื่อนไข (หรือขอบคุณครบแล้ว)' : '✅ ไม่มีรายการค้าง') + '</td></tr>'; fuCount(); return; }
+  document.getElementById('fu-body').innerHTML = rows.map(function(t) {
+    var sub = fuPerStore() ? '<div class="text-gray-400">' + esc(t.ammName) + '</div>' : '<div class="text-gray-400">' + t.stores + ' สาขา</div>';
+    var mail = t.email
+      ? '<span>' + esc(t.email) + '</span>' + (t.emailSrc === 'manual' ? ' <span class="text-gray-400">(กำหนดเอง)</span>' : '') + ' <button data-fu-edit="' + esc(t.key) + '" class="text-sky-600 underline">แก้</button>'
+      : '<span class="text-red-600">ไม่มีอีเมล</span> <button data-fu-edit="' + esc(t.key) + '" class="text-sky-600 underline">+ ใส่อีเมล</button>';
+    return '<tr class="border-t align-top">' +
+      '<td class="p-2"><input type="checkbox" data-fu-sel="' + esc(t.key) + '"' + (FU.sel[t.key] ? ' checked' : '') + (t.email ? '' : ' disabled') + '></td>' +
+      '<td class="p-2"><div class="font-semibold text-gray-800">' + esc(t.name) + '</div>' + sub + '</td>' +
+      '<td class="p-2">' + mail + '</td>' +
+      (thx
+        ? '<td class="p-2 text-center ' + (t.thankedAt ? 'text-emerald-700' : 'text-gray-300') + '">' + esc(t.thankedAt || '—') + '</td><td class="p-2"></td>'
+        : '<td class="p-2 text-center ' + (t.overdue ? 'text-red-600 font-bold' : 'text-gray-400') + '">' + t.overdue + '</td>' +
+          '<td class="p-2 text-center ' + (t.rejected ? 'text-orange-600 font-bold' : 'text-gray-400') + '">' + t.rejected + '</td>') +
+      '<td class="p-2 text-center">' + t.items + '</td>' +
+      '<td class="p-2"><button data-fu-prev="' + esc(t.key) + '" class="text-sky-600 underline whitespace-nowrap">👁 ดูอีเมล</button></td></tr>';
+  }).join('');
+  fuCount();
+}
+function fuCount() {
+  var vis = {}; fuVisible().forEach(function(t) { vis[t.key] = 1; });
+  var n = Object.keys(FU.sel).filter(function(k) { return FU.sel[k] && vis[k]; }).length;
+  document.getElementById('fu-send').textContent = 'ส่งอีเมลที่เลือก (' + n + ')';
+  document.getElementById('fu-send').disabled = !n;
+}
+function fuToggleAll(on) { fuVisible().forEach(function(t) { if (t.email) FU.sel[t.key] = on; }); fuRender(); }
+document.getElementById('fu-body').addEventListener('click', function(e) {
+  var s = e.target.closest('[data-fu-sel]');
+  if (s) { FU.sel[s.getAttribute('data-fu-sel')] = s.checked; fuCount(); return; }
+  var p = e.target.closest('[data-fu-prev]');
+  if (p) {
+    FU.pvKey = p.getAttribute('data-fu-prev'); FU.pvAi = false;
+    var pt = FU.targets.filter(function(x) { return x.key === FU.pvKey; })[0];
+    document.getElementById('fu-pv-edit').classList.add('hidden');
+    document.getElementById('fu-pv-send').classList.toggle('hidden', !(pt && pt.email));
+    document.getElementById('fu-pv-ai').classList.toggle('hidden', !(FU.ai && FU.ai.configured));
+    var box = document.getElementById('fu-preview-body');
+    box.innerHTML = '<span class="text-gray-400">กำลังสร้างตัวอย่าง…</span>';
+    document.getElementById('fu-preview').classList.remove('hidden');
+    var tpl = fuTpl();
+    google.script.run.withSuccessHandler(function(r) {
+      if (!r || !r.success) { box.innerHTML = '<span class="text-red-600">' + esc(r && r.error || 'error') + '</span>'; return; }
+      box.innerHTML = '<p class="text-xs ' + (tpl ? 'text-violet-700' : 'text-gray-500') + ' mb-2">' + (tpl ? '✨ ข้อความกลางจาก AI · ' : '') + 'หัวข้อ: ' + esc(r.subject) + '</p>' + r.html;
+    }).withFailureHandler(function(err) { box.innerHTML = '<span class="text-red-600">' + esc(err.message) + '</span>'; })
+      .getHyperFollowUpEmailHtml(ME, FU.mode, FU.pvKey, document.getElementById('fu-note').value, fuModsSel(), tpl, fuOpts());
+    return;
+  }
+  var ed = e.target.closest('[data-fu-edit]');
+  if (ed) {
+    var key = ed.getAttribute('data-fu-edit'), t = FU.targets.filter(function(x) { return x.key === key; })[0];
+    var v = prompt('อีเมลผู้รับสำหรับ ' + (t ? t.name : key) + ' (เว้นว่าง = ใช้ค่าจากฐานข้อมูล)', t && t.email || '');
+    if (v === null) return;
+    google.script.run.withSuccessHandler(function(r) { if (r && r.success) fuLoad(); else alert(r && r.error || 'บันทึกไม่สำเร็จ'); })
+      .saveHyperFollowUpEmail(ME, key, v);
+  }
+});
+function fuSend() {
+  var vis = {}; fuVisible().forEach(function(t) { vis[t.key] = 1; });
+  var keys = Object.keys(FU.sel).filter(function(k) { return FU.sel[k] && vis[k]; });
+  if (!keys.length) return;
+  var tpl = fuTpl();
+  if (!confirm((FU.mode === 'thanks' ? 'ส่งอีเมลขอบคุณ ' : 'ส่งอีเมลติดตาม ') + keys.length + ' ฉบับ ถึง ' + (fuPerStore() ? 'SGM' : 'AMM MTN') + (FU.cc.length ? ' (+CC ' + FU.cc.length + ')' : '') + (tpl ? ' (ใช้ข้อความกลางจาก AI)' : '') + '?')) return;
+  var btn = document.getElementById('fu-send'), msg = document.getElementById('fu-msg');
+  btn.disabled = true; msg.className = 'text-sm text-gray-500 mr-auto'; msg.textContent = 'กำลังส่ง…';
+  google.script.run.withSuccessHandler(function(r) {
+    btn.disabled = false;
+    if (!r || !r.success) { msg.className = 'text-sm text-red-600 mr-auto'; msg.textContent = r && r.error || 'ส่งไม่สำเร็จ'; return; }
+    if (r.savedCc) { FU.saved = r.savedCc; fuCcRender(); }
+    var ok = r.results.filter(function(x) { return x.ok; }), bad = r.results.filter(function(x) { return !x.ok; });
+    msg.className = 'text-sm mr-auto ' + (bad.length ? 'text-amber-700' : 'text-emerald-700');
+    msg.textContent = '✅ ส่งแล้ว ' + ok.length + ' ฉบับ' + (bad.length ? ' · ไม่สำเร็จ ' + bad.length + ': ' + bad.map(function(x) { return (x.name || x.key) + ' (' + x.error + ')'; }).join(', ') : '');
+  }).withFailureHandler(function(e) { btn.disabled = false; msg.className = 'text-sm text-red-600 mr-auto'; msg.textContent = e.message; })
+    .sendHyperFollowUpEmails(ME, FU.mode, keys, document.getElementById('fu-note').value, document.getElementById('fu-ccme').checked, document.getElementById('fu-ccamm').checked, fuModsSel(), tpl, fuOpts());
+}
+
+// ── AI (same DeepSeek engine as the CMS Dashboard vendor follow-up) ──
+// The common message (template) used for bulk send, or null when not generated / unticked.
+function fuTpl() {
+  if (document.getElementById('fu-tpl').classList.contains('hidden') || !document.getElementById('fu-use-tpl').checked) return null;
+  var body = document.getElementById('fu-tpl-body').innerHTML.trim();
+  return body ? { subject: document.getElementById('fu-tpl-subject').value, bodyHtml: body } : null;
+}
+function fuSelectedKeys() {
+  var vis = {}; fuVisible().forEach(function(t) { vis[t.key] = 1; });
+  return Object.keys(FU.sel).filter(function(k) { return FU.sel[k] && vis[k]; });
+}
+function fuAiTemplate() {
+  var btn = document.getElementById('fu-ai-tpl-btn'), msg = document.getElementById('fu-ai-msg');
+  btn.disabled = true; msg.textContent = 'AI กำลังร่าง… (ประมาณ 10–30 วินาที)';
+  google.script.run.withSuccessHandler(function(r) {
+    btn.disabled = false;
+    if (!r || !r.success) { msg.textContent = '❌ ' + (r && r.error || 'ร่างไม่สำเร็จ'); return; }
+    msg.textContent = '✅ ร่างแล้ว (' + r.model + ') — แก้ไขได้ก่อนส่ง';
+    document.getElementById('fu-tpl-subject').value = r.subject || '';
+    document.getElementById('fu-tpl-body').innerHTML = r.bodyHtml || '';
+    document.getElementById('fu-tpl').classList.remove('hidden');
+    document.getElementById('fu-use-tpl-wrap').classList.remove('hidden'); document.getElementById('fu-use-tpl-wrap').classList.add('flex');
+    document.getElementById('fu-use-tpl').checked = true;
+    document.getElementById('fu-tpl-clear').classList.remove('hidden');
+  }).withFailureHandler(function(e) { btn.disabled = false; msg.textContent = '❌ ' + e.message; })
+    .generateHyperFollowUpAiTemplate(ME, FU.mode, fuSelectedKeys(), fuModsSel(), document.getElementById('fu-note').value, fuOpts());
+}
+function fuTplClear() {
+  document.getElementById('fu-tpl').classList.add('hidden');
+  document.getElementById('fu-tpl-body').innerHTML = ''; document.getElementById('fu-tpl-subject').value = '';
+  document.getElementById('fu-use-tpl-wrap').classList.add('hidden'); document.getElementById('fu-use-tpl-wrap').classList.remove('flex');
+  document.getElementById('fu-tpl-clear').classList.add('hidden');
+  document.getElementById('fu-ai-msg').textContent = 'ใช้ข้อความมาตรฐาน';
+}
+function fuPvAi() {
+  var btn = document.getElementById('fu-pv-ai'), msg = document.getElementById('fu-pv-msg');
+  btn.disabled = true; btn.textContent = 'AI กำลังร่าง…';
+  google.script.run.withSuccessHandler(function(r) {
+    btn.disabled = false; btn.textContent = '✨ ร่างใหม่';
+    if (!r || !r.success) { document.getElementById('fu-preview-body').insertAdjacentHTML('afterbegin', '<p class="text-red-600 text-xs mb-2">❌ ' + esc(r && r.error || 'ร่างไม่สำเร็จ') + '</p>'); return; }
+    FU.pvAi = true;
+    document.getElementById('fu-pv-subject').value = r.subject || '';
+    document.getElementById('fu-pv-body').innerHTML = r.bodyHtml || '';
+    document.getElementById('fu-pv-edit').classList.remove('hidden');
+    msg.textContent = 'ร่างโดย ' + r.model;
+    document.getElementById('fu-preview-body').innerHTML = r.previewHtml;
+  }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = '✨ AI ร่างเฉพาะฉบับนี้'; alert(e.message); })
+    .generateHyperFollowUpAiDraft(ME, FU.mode, FU.pvKey, fuModsSel(), document.getElementById('fu-note').value, fuOpts());
+}
+// Sends just the previewed recipient — with the per-recipient AI draft if one was made, else the common/standard text.
+function fuPvSend() {
+  var t = FU.targets.filter(function(x) { return x.key === FU.pvKey; })[0];
+  if (!t || !t.email) return;
+  var tpl = FU.pvAi ? { subject: document.getElementById('fu-pv-subject').value, bodyHtml: document.getElementById('fu-pv-body').innerHTML } : fuTpl();
+  if (!confirm('ส่งอีเมลฉบับนี้ถึง ' + t.email + '?')) return;
+  var btn = document.getElementById('fu-pv-send'); btn.disabled = true; btn.textContent = 'กำลังส่ง…';
+  google.script.run.withSuccessHandler(function(r) {
+    btn.disabled = false; btn.textContent = 'ส่งฉบับนี้';
+    var res = r && r.success && r.results && r.results[0];
+    if (res && res.ok) { alert('✅ ส่งแล้ว: ' + t.email); FU.sel[t.key] = false; fuRender(); document.getElementById('fu-preview').classList.add('hidden'); }
+    else alert('❌ ' + ((res && res.error) || (r && r.error) || 'ส่งไม่สำเร็จ'));
+  }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = 'ส่งฉบับนี้'; alert(e.message); })
+    .sendHyperFollowUpEmails(ME, FU.mode, [t.key], document.getElementById('fu-note').value, document.getElementById('fu-ccme').checked, document.getElementById('fu-ccamm').checked, fuModsSel(), tpl, fuOpts());
+}
+function fuAiCfgToggle() {
+  var box = document.getElementById('fu-ai-cfg');
+  box.classList.toggle('hidden');
+  if (box.classList.contains('hidden')) return;
+  box.classList.add('flex');
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { document.getElementById('fu-ai-cfg-msg').textContent = r && r.error || ''; return; }
+    document.getElementById('fu-ai-cfg-msg').textContent = r.configured ? 'ตั้งค่าแล้ว: ' + r.masked : 'ยังไม่ได้ตั้งค่า';
+    document.getElementById('fu-ai-model').value = r.model;
+  }).getFollowUpAiConfig(ME);
+}
+function fuAiCfgSave() {
+  var keyEl = document.getElementById('fu-ai-key');
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { document.getElementById('fu-ai-cfg-msg').textContent = '❌ ' + (r && r.error || ''); return; }
+    keyEl.value = '';
+    document.getElementById('fu-ai-cfg-msg').textContent = '✅ บันทึกแล้ว (' + r.model + ')';
+    fuLoad();
+  }).saveFollowUpAiConfig(ME, keyEl.value, document.getElementById('fu-ai-model').value);
+}
+
+// ── Hand-picked stores ("1234 name" from the datalist, or a bare code) ──
+function fuStoreFrom(v) {
+  v = String(v || '').trim(); if (!v) return null;
+  var code = v.split(' ')[0];
+  return FU.stores.filter(function(s) { return s.code === code; })[0] ||
+         FU.stores.filter(function(s) { return (s.code + ' ' + s.name + ' ' + s.nameTh).toLowerCase().indexOf(v.toLowerCase()) > -1; })[0] || null;
+}
+function fuExtraAdd() {
+  var inp = document.getElementById('fu-extra-in'), s = fuStoreFrom(inp.value);
+  if (!s) { inp.classList.add('border-red-400'); return; }
+  inp.classList.remove('border-red-400'); inp.value = '';
+  if (!FU.extra.some(function(x) { return x.code === s.code; })) FU.extra.push(s);
+  fuExtraRender(); fuLoad();
+}
+function fuExtraRender() {
+  document.getElementById('fu-extra-chips').innerHTML = FU.extra.map(function(s) {
+    return '<span class="bg-sky-100 text-sky-800 rounded-full px-2 py-0.5">' + esc(s.code + ' ' + (s.nameTh || s.name)) +
+      ' <button data-fu-extra-rm="' + esc(s.code) + '" class="font-bold">×</button></span>';
+  }).join('');
+}
+document.getElementById('fu-extra-chips').addEventListener('click', function(e) {
+  var b = e.target.closest('[data-fu-extra-rm]'); if (!b) return;
+  var c = b.getAttribute('data-fu-extra-rm');
+  FU.extra = FU.extra.filter(function(s) { return s.code !== c; });
+  fuExtraRender(); fuLoad();
+});
+
+// ── Per-store module applicability ──
+function fuNaToggle() {
+  var box = document.getElementById('fu-na'); box.classList.toggle('hidden');
+  if (box.classList.contains('hidden')) return;
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { document.getElementById('fu-na-msg').textContent = r && r.error || ''; return; }
+    FU.na = r.na || {}; fuNaList();
+  }).getHyperStoreModules(ME);
+}
+function fuNaList() {
+  var codes = Object.keys(FU.na || {});
+  document.getElementById('fu-na-list').innerHTML = codes.length
+    ? 'ตั้งค่าแล้ว ' + codes.length + ' สาขา: ' + codes.map(function(c) {
+        var s = FU.stores.filter(function(x) { return x.code === c; })[0];
+        return '<button data-fu-na-open="' + esc(c) + '" class="underline">' + esc(c + (s ? ' ' + (s.nameTh || s.name) : '')) + '</button> (ไม่ใช้: ' + esc(FU.na[c].map(fuModLabel).join(', ')) + ')';
+      }).join(' · ')
+    : 'ยังไม่มีสาขาที่ตั้งค่า — ทุกโมดูลใช้กับทุกสาขา';
+}
+function fuModLabel(k) { var m = FU.modList.filter(function(x) { return x.key === k; })[0]; return m ? m.label : k; }
+function fuNaPick() {
+  var s = fuStoreFrom(document.getElementById('fu-na-store').value), box = document.getElementById('fu-na-mods');
+  if (!s) { box.innerHTML = ''; return; }
+  FU.naStore = s.code;
+  var na = (FU.na && FU.na[s.code]) || [];
+  box.innerHTML = FU.modList.map(function(m) {
+    return '<label class="flex items-center gap-1"><input type="checkbox" data-fu-na-mod="' + esc(m.key) + '"' + (na.indexOf(m.key) > -1 ? '' : ' checked') + '> ' + esc(m.label) + '</label>';
+  }).join('');
+  document.getElementById('fu-na-msg').textContent = '';
+}
+document.getElementById('fu-na-list').addEventListener('click', function(e) {
+  var b = e.target.closest('[data-fu-na-open]'); if (!b) return;
+  var c = b.getAttribute('data-fu-na-open'), s = FU.stores.filter(function(x) { return x.code === c; })[0];
+  document.getElementById('fu-na-store').value = s ? s.code + ' ' + (s.nameTh || s.name) : c;
+  fuNaPick();
+});
+function fuNaSave() {
+  if (!FU.naStore) { document.getElementById('fu-na-msg').textContent = 'เลือกสาขาก่อน'; return; }
+  var naKeys = [].slice.call(document.querySelectorAll('[data-fu-na-mod]')).filter(function(c) { return !c.checked; }).map(function(c) { return c.getAttribute('data-fu-na-mod'); });
+  document.getElementById('fu-na-msg').textContent = 'กำลังบันทึก…';
+  google.script.run.withSuccessHandler(function(r) {
+    if (!r || !r.success) { document.getElementById('fu-na-msg').textContent = '❌ ' + (r && r.error || ''); return; }
+    if (r.na.length) FU.na[FU.naStore] = r.na; else delete FU.na[FU.naStore];
+    document.getElementById('fu-na-msg').textContent = '✅ บันทึกแล้ว';
+    fuNaList(); fuLoad(); DATA = null; load();   // schedule counts change too
+  }).saveHyperStoreModules(ME, FU.naStore, naKeys);
+}
+
+// ── Extra CC: staff search (both employee lists) or typed address; addresses used are remembered ──
+var FU_CC_TIMER = null;
+function fuCcSearch() {
+  clearTimeout(FU_CC_TIMER);
+  var q = document.getElementById('fu-cc-in').value.trim(), dd = document.getElementById('fu-cc-dd');
+  if (q.length < 2) { dd.classList.add('hidden'); return; }
+  FU_CC_TIMER = setTimeout(function() {
+    google.script.run.withSuccessHandler(function(r) {
+      var res = (r && r.success && r.results) || [];
+      if (!res.length) { dd.innerHTML = '<div class="p-2 text-gray-400">ไม่พบ — กด Enter เพื่อใช้อีเมลที่พิมพ์</div>'; dd.classList.remove('hidden'); return; }
+      dd.innerHTML = res.map(function(p) { return '<button data-fu-cc-pick="' + esc(p.e) + '" class="block w-full text-left px-3 py-1.5 hover:bg-sky-50"><b>' + esc(p.n || p.e) + '</b> <span class="text-gray-500">' + esc(p.e) + '</span></button>'; }).join('');
+      dd.classList.remove('hidden');
+    }).searchFollowUpPeople(ME, q);
+  }, 300);
+}
+// Accepts one address or a pasted list ("a@x.com, b@y.com; c@z.com") — each becomes its own chip.
+function fuCcAdd(v) {
+  var inp = document.getElementById('fu-cc-in');
+  var parts = String(v || '').split(/[\s,;]+/).filter(Boolean);
+  var ok = parts.filter(function(p) { return /^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(p); });
+  var bad = parts.filter(function(p) { return ok.indexOf(p) === -1; });
+  if (!ok.length) { inp.classList.add('border-red-400'); return; }
+  ok.forEach(function(e) { if (FU.cc.indexOf(e) === -1) FU.cc.push(e); });
+  inp.value = bad.join(', ');   // leave anything that isn't an email in the box to fix
+  inp.classList.toggle('border-red-400', bad.length > 0);
+  document.getElementById('fu-cc-dd').classList.add('hidden');
+  fuCcRender();
+}
+function fuCcRender() {
+  document.getElementById('fu-cc-chips').innerHTML = FU.cc.map(function(e) {
+    return '<span class="bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">' + esc(e) + ' <button data-fu-cc-rm="' + esc(e) + '" class="font-bold">×</button></span>';
+  }).join('');
+  var saved = (FU.saved || []).filter(function(e) { return FU.cc.indexOf(e) === -1; });
+  fuShow('fu-cc-saved-wrap', saved.length > 0, true);
+  document.getElementById('fu-cc-saved').innerHTML = saved.map(function(e) {
+    return '<span class="bg-gray-100 text-gray-700 rounded-full px-2 py-0.5"><button data-fu-cc-pick="' + esc(e) + '">⭐ ' + esc(e) + '</button> <button data-fu-cc-forget="' + esc(e) + '" class="text-gray-400 font-bold" title="ลืมอีเมลนี้">×</button></span>';
+  }).join('');
+}
+document.getElementById('fu-modal').addEventListener('click', function(e) {
+  var p = e.target.closest('[data-fu-cc-pick]');
+  if (p) { fuCcAdd(p.getAttribute('data-fu-cc-pick')); return; }
+  var r = e.target.closest('[data-fu-cc-rm]');
+  if (r) { var v = r.getAttribute('data-fu-cc-rm'); FU.cc = FU.cc.filter(function(x) { return x !== v; }); fuCcRender(); return; }
+  var f = e.target.closest('[data-fu-cc-forget]');
+  if (f) {
+    google.script.run.withSuccessHandler(function(res) { if (res && res.success) { FU.saved = res.saved; fuCcRender(); } })
+      .removeFollowUpSavedCc(ME, f.getAttribute('data-fu-cc-forget'));
+    return;
+  }
+  if (!e.target.closest('#fu-cc-dd') && e.target.id !== 'fu-cc-in') document.getElementById('fu-cc-dd').classList.add('hidden');
+});
+
+load();
+</script>
+</body>
+</html>

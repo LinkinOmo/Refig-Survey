@@ -679,45 +679,8 @@ function hasSubordinates(empEmail) {
 }
 
 // Helper to get n+2 manager (manager's manager) email for an employee
-function getManagersManagerEmail(empId) {
-    try {
-        var sheet = findEmployeeSheet();
-        if (!sheet) return null;
-        
-        var data = sheet.getDataRange().getValues();
-        
-        // First, find the employee's direct manager (n+1)
-        var directManagerName = null;
-        for (var i = 1; i < data.length; i++) {
-            if (String(data[i][1]) === String(empId)) { // Col 1 is Employee ID
-                directManagerName = data[i][4]; // Col 4 is Direct Manager
-                break;
-            }
-        }
-        
-        if (!directManagerName) return null;
-        
-        // Now find the direct manager's manager (n+2)
-        for (var i = 1; i < data.length; i++) {
-            if (data[i][2] && String(data[i][2]).trim() === String(directManagerName).trim()) { // Col 2 is Full Name
-                var managersManagerName = data[i][4]; // This manager's Direct Manager
-                if (!managersManagerName) return null;
-                
-                // Find the email of n+2
-                for (var j = 1; j < data.length; j++) {
-                    if (data[j][2] && String(data[j][2]).trim() === String(managersManagerName).trim()) {
-                        return data[j][6]; // Col 6 is Email
-                    }
-                }
-            }
-        }
-        
-        return null;
-    } catch (e) {
-        console.error("Error getting manager's manager: " + e.toString());
-        return null;
-    }
-}
+// getManagersManagerEmail() lives in Code01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.
 
 function approveTripPlan(workOrderId, approverNameInput, rating, clientEmail) {
     try {
@@ -987,7 +950,7 @@ function rejectTripPlan(workOrderId, rejectorName, reason, clientEmail) {
     }
 }
 
-function getAllTripPlansReport(clientEmail) {
+function getAllTripPlansReport(clientEmail, includeArchive) {
     try {
         console.log("getAllTripPlansReport: Starting...");
         var userEmail = clientEmail || Session.getActiveUser().getEmail();
@@ -999,11 +962,11 @@ function getAllTripPlansReport(clientEmail) {
         // on every report/map load and after every save/approve/check-in. Cache key
         // includes email since per-row canApprove is computed relative to the caller.
         var _tprCache = CacheService.getScriptCache();
-        var _tprKey = 'TP_REPORT_V1_' + String(userEmail || '').trim().toLowerCase();
+        var _tprKey = 'TP_REPORT_V1_' + (includeArchive ? 'ARC_' : '') + String(userEmail || '').trim().toLowerCase();
         var _tprHit = _tprCache.get(_tprKey);
         if (_tprHit) return _tprHit;
 
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Trip_Plans");
+        var sheet = _archSheetFor_("Trip_Plans", includeArchive);
         if (!sheet) {
             console.log("Trip_Plans sheet not found");
             return JSON.stringify({ orders: [], isAdmin: isAdmin });
@@ -1548,6 +1511,7 @@ function deleteTripPlan(tripPlanId, clientEmail) {
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Trip_Plans");
         if (!sheet) return { success: false, error: "Sheet not found" };
         
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
         
@@ -2342,10 +2306,18 @@ function getStoreDBDataForFrontend() {
     return getStoreDBDataV2();
 }
 
+// Per-execution memo: one server call (e.g. the follow-up email build) can need the store list several
+// times, and the list is too big for CacheService so each miss re-opens the store DB spreadsheet.
+var _storeDbMemo_ = null;
 function getStoreDBDataV2() {
+    if (_storeDbMemo_) return _storeDbMemo_;
+    _storeDbMemo_ = _getStoreDBDataV2Raw_();
+    return _storeDbMemo_;
+}
+function _getStoreDBDataV2Raw_() {
     try {
         var cache = CacheService.getScriptCache();
-        var listCacheKey = "STORE_DB_LIST_V9"; // bumped: now filters Status=A only
+        var listCacheKey = "STORE_DB_LIST_V12"; // bumped: + sgmEmail (V11: + oracle (6-digit) code, ammId)
         var cached = cache.get(listCacheKey);
         
         if (cached) {
@@ -2366,7 +2338,7 @@ function getStoreDBDataV2() {
         
         // Find Indices
         var idIdx = -1, nameIdx = -1, buIdx = -1, statusIdx = -1;
-        var dmNameIdx = -1, dmEmailIdx = -1, cmNameIdx = -1, cmEmailIdx = -1, ammMtnIdx = -1;
+        var dmNameIdx = -1, dmEmailIdx = -1, cmNameIdx = -1, cmEmailIdx = -1, ammMtnIdx = -1, oracleIdx = -1, ammIdIdx = -1, sgmEmailIdx = -1;
         
         for (var i = 0; i < headers.length; i++) {
             var h = String(headers[i]).trim().toLowerCase();
@@ -2407,6 +2379,10 @@ function getStoreDBDataV2() {
             if (h.includes("amm mtn") || h.includes("ammm mtn")) {
                 ammMtnIdx = i;
             }
+            // Oracle (6-digit) code — what the Hyper lists key on. Never derive it from the gold code.
+            if (h.includes("oracle")) oracleIdx = i;
+            if (h.includes("id amm")) ammIdIdx = i;   // AMM employee ID — used to find the AMM's email
+            if (h.includes("sgm") && h.includes("mail")) sgmEmailIdx = i;   // "e-mail SGM" — store-level follow-up emails
         }
         
         console.log("Indices Found - DM Name:", dmNameIdx, "CM Name:", cmNameIdx, "DM Email:", dmEmailIdx, "CM Email:", cmEmailIdx, "AMM MTN:", ammMtnIdx);
@@ -2452,7 +2428,10 @@ function getStoreDBDataV2() {
                     dmEmail: (dmEmailIdx > -1) ? String(row[dmEmailIdx]).trim() : "",
                     cmName: (cmNameIdx > -1) ? String(row[cmNameIdx]).trim() : "",
                     cmEmail: (cmEmailIdx > -1) ? String(row[cmEmailIdx]).trim() : "",
-                    ammMtn: (ammMtnIdx > -1) ? String(row[ammMtnIdx]).trim() : ""
+                    ammMtn: (ammMtnIdx > -1) ? String(row[ammMtnIdx]).trim() : "",
+                    oracle: (oracleIdx > -1) ? String(row[oracleIdx]).trim().replace(/\.0+$/, '') : "",
+                    ammId: (ammIdIdx > -1) ? String(row[ammIdIdx]).trim().replace(/\.0+$/, '') : "",
+                    sgmEmail: (sgmEmailIdx > -1) ? String(row[sgmEmailIdx]).trim() : ""
                 });
             }
         }
@@ -2627,23 +2606,6 @@ function getTripComments(tripId) {
         if (header === "fileurl" || header === "url" || header === "attachment" || header === "file") fileIdx = h;
         if (header === "filename" || header === "name") nameIdx = h;
     }
-
-    // --- LOG MATCHING DEBUG ---
-    try {
-         var logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Debug_Log");
-         if(logSheet) {
-             const headLog = `Indices: ID=${idIdx}, Time=${timeIdx}, Comment=${commIdx}`;
-             logSheet.appendRow([new Date(), tripId, headLog]);
-             
-             // Log first 3 comparisons
-             for(var k=1; k<Math.min(data.length, 4); k++) {
-                 const rowId = String(data[k][idIdx]).trim();
-                 const match = (rowId === String(tripId).trim());
-                 logSheet.appendRow([new Date(), tripId, `Row ${k}: '${rowId}' vs '${tripId}' => ${match}`]);
-             }
-         }
-    } catch(e) {}
-    // --------------------------
     
     if (idIdx === -1) {
         console.warn("TripID column not found in Trip_Comments");
@@ -2680,12 +2642,6 @@ function getTripComments(tripId) {
              if(logSheet) logSheet.appendRow([new Date(), tripId, "Sort Error: " + sortErr.toString()]);
         } catch(e) {}
     }
-
-    // LOG SUCCESS
-    try {
-         var logSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Debug_Log");
-         if(logSheet) logSheet.appendRow([new Date(), tripId, "Returning " + comments.length + " comments"]);
-    } catch(e) {}
 
     console.log("Found " + comments.length + " comments for trip " + tripId);
     

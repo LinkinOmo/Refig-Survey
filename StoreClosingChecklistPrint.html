@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store Closing Checklist</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 landscape; margin: 8mm; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', sans-serif; font-size: 10.5pt; color: #111; margin: 0; background: #e5e7eb; }
+        .sheet { width: 281mm; min-height: 194mm; margin: 8mm auto; background: #fff; padding: 6mm 7mm; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+        @media print { body { background: #fff; } .sheet { margin: 0; box-shadow: none; padding: 0; width: auto; min-height: 0; page-break-after: always; } .sheet:last-child { page-break-after: auto; } .noprint { display: none !important; } }
+        h1 { font-size: 15pt; margin: 0; }
+        h2 { font-size: 11pt; margin: 2.2mm 0 1.2mm; padding: 1mm 2mm; background: #ffe4e6; border-left: 4px solid #be123c; }
+        .hdr { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #be123c; padding-bottom: 1.5mm; }
+        .muted { color: #555; font-size: 8.5pt; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { border: 1px solid #555; padding: .9mm 1.5mm; vertical-align: middle; }
+        th { background: #f3f4f6; font-size: 9pt; }
+        .assets { table-layout: fixed; }
+        .assets td { height: 8.6mm; }
+        .assets th, .assets td { font-size: 8pt; text-align: center; padding: .8mm .6mm; }
+        .tasks td { font-size: 8.2pt; padding: .5mm 1.2mm; height: 6mm; line-height: 1.25; }
+        .tasks .ph td { background: #ffe4e6; font-weight: 700; color: #881337; height: auto; padding: .4mm 1.2mm; }
+        .box { display: inline-block; width: 3.4mm; height: 3.4mm; border: 1.2px solid #111; vertical-align: -0.6mm; margin-right: .8mm; }
+        .fill { border-bottom: 1px dotted #333; display: inline-block; min-width: 40mm; }
+        .legend { font-size: 7.6pt; line-height: 1.3; }
+        .sign td { height: 18mm; vertical-align: bottom; text-align: center; font-size: 9pt; }
+        .toolbar { position: sticky; top: 0; background: #881337; color: #fff; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; z-index: 5; font-size: 14px; }
+        .toolbar button, .toolbar select { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; }
+        .toolbar button { background: #fff; color: #881337; font-weight: 700; cursor: pointer; }
+        .cost td { height: 9mm; }
+    </style>
+</head>
+<body>
+    <div class="toolbar noprint">
+        <b>🖨️ แบบฟอร์มเช็คลิสต์ปิดสาขา</b>
+        <span>สาขา:</span><select id="storeSel" onchange="fillStore(this.value)"></select>
+        <button onclick="window.print()">พิมพ์ / Save PDF</button>
+        <span style="font-size:12px;opacity:.85">A4 แนวนอน 3 หน้า · ตั้งค่าเครื่องพิมพ์: Margins = Default, เปิด Background graphics · ⚠️ เอกสารภายใน — ห้ามเผยแพร่ที่สาขา</span>
+    </div>
+
+    <!-- PAGE 1: store + plan + assets -->
+    <div class="sheet">
+        <div class="hdr">
+            <div><h1>🏁 เช็คลิสต์ปิดสาขา — สำรวจทรัพย์สิน &amp; การตัดสินใจ</h1><div class="muted">PPT Property · Building Management (MTN) · หน้า 1/3: แผนปิด &amp; ทรัพย์สิน · <b>เอกสารภายใน (Confidential)</b></div></div>
+            <div class="muted" style="text-align:right">บันทึกเข้าระบบ: แท็บ 🏁 ปิดสาขา<br>PPT Approval <span class="appr"></span></div>
+        </div>
+        <table style="margin-top:2.5mm">
+            <tr><td style="width:23%">รหัสสาขา: <b class="fill sCode" style="min-width:22mm"></b></td><td style="width:33%">ชื่อสาขา: <b class="fill sName" style="min-width:60mm"></b></td>
+                <td style="width:22%">Format: <b id="sFmt" class="fill" style="min-width:20mm"></b></td><td>วันที่สำรวจ: <span class="fill" style="min-width:30mm"></span></td></tr>
+            <tr><td colspan="2">ผู้สำรวจ (MTN): <span id="sSurveyor" class="fill" style="min-width:80mm"></span></td><td colspan="2">VP OPT ที่ร่วมเดิน: <span class="fill" style="min-width:60mm"></span></td></tr>
+            <tr><td colspan="2">ทีมที่ร่วมเดิน: <span class="fill" style="min-width:90mm"></span></td><td colspan="2">วันปิดสาขา (หยุดขาย): <span class="fill" style="min-width:45mm"></span></td></tr>
+            <tr><td colspan="2">เงื่อนไขส่งมอบพื้นที่: <span id="sHandover"></span></td><td colspan="2">แผนหลังปิด: <span id="sAfter" class="fill" style="min-width:70mm"></span></td></tr>
+            <tr><td colspan="2">☀️ Solar Rooftop: <span id="sSolar"></span></td><td colspan="2">🔌 EV Charger: <span id="sEv"></span> · กรรมสิทธิ์: <span id="sOwn"></span></td></tr>
+        </table>
+
+        <h2>A. ทรัพย์สิน &amp; การตัดสินใจ — 1 แถว ต่อ 1 รายการ / กลุ่มที่เหมือนกัน</h2>
+        <table class="assets">
+            <colgroup><col style="width:9mm"><col style="width:13mm"><col style="width:52mm"><col style="width:11mm"><col style="width:11mm"><col style="width:10mm"><col style="width:14mm"><col style="width:26mm">
+                <col style="width:11mm"><col style="width:41mm"><col style="width:17mm"><col style="width:17mm"><col style="width:15mm"></colgroup>
+            <thead><tr><th>#</th><th>กลุ่ม<br>(รหัส G)</th><th>รายการ / รุ่น / ขนาด</th><th>จำนวน</th><th>สภาพ<br>A/B/C</th><th>อายุ<br>(ปี)</th><th>เจ้าของ<br>(รหัส O)</th><th>Asset No.</th>
+                <th>ตัดสินใจ<br>(รหัส D)</th><th>ปลายทาง (สาขา / FWH)</th><th>ค่าขนย้าย ฿</th><th>มูลค่าซาก ฿</th><th>ภาพ<br>(เลขรูป)</th></tr></thead>
+            <tbody id="assetRows"></tbody>
+            <tfoot><tr style="font-weight:700;background:#fff1f2"><td colspan="3" style="text-align:right">รวม</td><td></td><td colspan="6" style="text-align:left;font-weight:400;font-size:8pt">ต่อแผ่นเพิ่มได้ (CA11 …)</td><td></td><td></td><td></td></tr></tfoot>
+        </table>
+        <div class="legend" style="display:grid;grid-template-columns:1.25fr 1fr;gap:4mm;margin-top:1.8mm">
+            <div><b>รหัสกลุ่ม (G):</b> <span id="grpLegend"></span></div>
+            <div><b>ตัดสินใจ (D):</b> <span id="dispoLegend"></span><br><b>สภาพ:</b> <span id="condLegend"></span><br><b>เจ้าของ (O):</b> <span id="ownLegend"></span></div>
+        </div>
+    </div>
+
+    <!-- PAGE 2: closing tasks -->
+    <div class="sheet">
+        <div class="hdr">
+            <div><h1>งานปิดสาขา (Closing Tasks)</h1><div class="muted">หน้า 2/3 · สาขา <b class="sCode"></b> <span class="sName"></span> · ติ๊กสถานะ: ✔ เสร็จ / ◐ กำลังทำ / – ไม่เกี่ยวข้อง</div></div>
+            <div class="muted" style="text-align:right">กำหนดเสร็จตามขั้นตอน<br>เคลียร์ทรัพย์สินภายใน <span class="clr"></span> วันหลังปิด</div>
+        </div>
+        <table class="tasks" style="margin-top:2.5mm">
+            <thead><tr><th style="width:10mm">รหัส</th><th>งาน</th><th style="width:25mm">กำหนดเสร็จ</th><th style="width:27mm">สถานะ</th><th style="width:30mm">ผู้รับผิดชอบ</th><th style="width:38mm">หมายเหตุ</th></tr></thead>
+            <tbody id="taskRows"></tbody>
+        </table>
+    </div>
+
+    <!-- PAGE 3: costs + issues + sign-off -->
+    <div class="sheet">
+        <div class="hdr">
+            <div><h1>ค่าใช้จ่ายปิดสาขา &amp; ลงนาม</h1><div class="muted">หน้า 3/3 · สาขา <b class="sCode"></b> <span class="sName"></span></div></div>
+            <div class="muted" style="text-align:right">ตัวเลขประมาณการ (บาท)</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin-top:2.5mm">
+            <div>
+                <h2 style="margin-top:0">B. ค่าใช้จ่าย (ประมาณการ)</h2>
+                <table class="cost">
+                    <tr><td style="width:62%">ค่าขนย้าย (รวมจากหน้า 1)</td><td></td></tr>
+                    <tr><td>ค่ารื้อถอน / ทุบอาคาร</td><td></td></tr>
+                    <tr><td>Solar Rooftop (ยกเลิก PPA / ย้ายระบบ)</td><td></td></tr>
+                    <tr><td>EV Charger (ค่าเสียหายการยกเลิก)</td><td></td></tr>
+                    <tr><td>อื่นๆ: <span class="fill" style="min-width:45mm"></span></td><td></td></tr>
+                    <tr><td><b>รวมค่าใช้จ่าย</b></td><td></td></tr>
+                    <tr><td>หัก มูลค่าซาก (รวมจากหน้า 1)</td><td></td></tr>
+                    <tr style="background:#fff1f2"><td><b>ค่าใช้จ่ายสุทธิ</b></td><td></td></tr>
+                </table>
+                <p class="muted" style="margin:1.2mm 0 0">อ้างอิงราคา: <span class="fill" style="min-width:95mm"></span></p>
+            </div>
+            <div>
+                <h2 style="margin-top:0">C. สรุปการตัดสินใจ (จำนวนชิ้น)</h2>
+                <table class="cost" id="dispoSum"></table>
+                <h2>D. ประเด็นเร่งด่วน / ความเสี่ยง</h2>
+                <table><tr><td style="height:24mm;vertical-align:top"><span class="box"></span>ไม่มี <span class="box"></span>มี — ระบุ:</td></tr></table>
+            </div>
+        </div>
+        <h2>E. สรุป / ข้อเสนอ</h2>
+        <table><tr><td style="height:20mm"></td></tr></table>
+        <table class="sign" style="margin-top:4mm"><tr>
+            <td>ลงชื่อ ......................................<br>ผู้สำรวจ (Area MTN)<br>วันที่ ......./......./.......</td>
+            <td>ลงชื่อ ......................................<br>VP OPT (ยืนยันการตัดสินใจ)<br>วันที่ ......./......./.......</td>
+            <td>ลงชื่อ ......................................<br>ผู้จัดการสาขา (SGM / DM)<br>วันที่ ......./......./.......</td>
+            <td>ลงชื่อ ......................................<br>FAD (Fixed Asset)<br>วันที่ ......./......./.......</td>
+        </tr></table>
+    </div>
+
+    <script>
+        const SC = <?!= JSON.stringify(getStoreCloseConfig_()) ?>;
+        const PRESET = <?!= JSON.stringify(storeCode || '') ?>;
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+        function thDate(iso) { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + String(+p[0] + 543).slice(-2) : iso; }
+        function setAll(sel, h) { document.querySelectorAll(sel).forEach(function(el) { el.innerHTML = h; }); }
+        const DCODE = SC.dispo.map(function(d, i) { return 'D' + (i + 1); });
+        setAll('.appr', thDate(SC.approval)); setAll('.clr', SC.clearDays);
+        document.getElementById('grpLegend').innerHTML = SC.groups.map(function(g, i) { return '<b>G' + (i + 1) + '</b> ' + esc(g); }).join(' · ');
+        document.getElementById('dispoLegend').innerHTML = SC.dispo.map(function(d, i) { return '<b>' + DCODE[i] + '</b> ' + esc(d.l) + (d.needTarget ? ' <i>(ระบุปลายทาง)</i>' : ''); }).join(' · ');
+        document.getElementById('condLegend').innerHTML = SC.cond.map(esc).join(' · ');
+        document.getElementById('ownLegend').innerHTML = SC.owner.map(function(o, i) { return '<b>O' + (i + 1) + '</b> ' + esc(o); }).join(' · ');
+        let rows = '';
+        for (let i = 1; i <= 10; i++) rows += '<tr><td>CA' + String(i).padStart(2, '0') + '</td><td>G</td><td></td><td></td><td>A B C</td><td></td><td>O</td><td></td><td>D</td><td></td><td></td><td></td><td></td></tr>';
+        document.getElementById('assetRows').innerHTML = rows;
+        document.getElementById('dispoSum').innerHTML = SC.dispo.map(function(d, i) { return '<tr><td style="width:62%"><b>' + DCODE[i] + '</b> ' + esc(d.l) + '</td><td></td></tr>'; }).join('');
+        const dueText = function(due) { return due === 'approval' ? thDate(SC.approval) + ' (PPT)' : due === 'close' ? 'วันปิดสาขา' : 'ปิด + ' + due + ' วัน'; };
+        document.getElementById('taskRows').innerHTML = SC.tasks.map(function(ph, pi) {
+            return '<tr class="ph"><td colspan="6">' + (pi + 1) + '. ' + esc(ph.p) + '</td></tr>' + ph.items.map(function(it) {
+                return '<tr><td style="text-align:center;font-weight:700">' + it[0] + '</td><td>' + esc(it[1]) + '</td><td style="text-align:center">' + dueText(ph.due) + '</td>' +
+                    '<td style="white-space:nowrap"><span class="box"></span>✔ <span class="box"></span>◐ <span class="box"></span>–</td><td></td><td></td></tr>';
+            }).join('');
+        }).join('');
+
+        const sel = document.getElementById('storeSel');
+        sel.innerHTML = '<option value="">— ฟอร์มเปล่า —</option>' + SC.plan.map(function(p) { return '<option value="' + p[0] + '">🏁 ' + esc(p[0] + ' ' + p[4] + ' / ' + p[3] + ' · ' + p[2].trim()) + '</option>'; }).join('');
+        function boxes(list, pick) { return list.map(function(x) { return '<span class="box">' + (x === pick ? '✔' : '') + '</span>' + esc(x) + ' '; }).join(''); }
+        function fillStore(code) {
+            const p = code ? SC.plan.find(function(x) { return x[0] === code || x[1] === code; }) : null;
+            const set = function(id, h) { document.getElementById(id).innerHTML = h; };
+            sel.value = p ? p[0] : '';
+            setAll('.sCode', p ? p[0] + ' <span style="font-weight:400;font-size:8.5pt">(Oracle ' + p[1] + ')</span>' : '');
+            setAll('.sName', p ? esc(p[4] + ' / ' + p[3]) : '');
+            set('sFmt', p ? esc(p[2].trim()) : '');
+            set('sSurveyor', p ? esc([p[13], p[12] ? 'นัด ' + p[12] : ''].filter(Boolean).join(' · ')) : '');
+            set('sHandover', boxes(['ทุบ / รื้อถอน', 'ไม่ทุบ — ส่งมอบตามสภาพ', 'คืนสภาพตามสัญญา'], p ? (p[10].indexOf('ไม่ทุบ') === 0 ? 'ไม่ทุบ — ส่งมอบตามสภาพ' : 'ทุบ / รื้อถอน') : '') + (p ? '<span class="muted">(' + esc(p[10]) + ')</span>' : ''));
+            set('sAfter', p ? esc(p[11]) : '');
+            set('sSolar', p ? (p[7] ? 'Phase ' + esc(p[7]) + ' · ' + esc(p[8]) : 'ไม่มี') : '<span class="box"></span>ไม่มี <span class="box"></span>มี Phase ___ Investor ____________');
+            set('sEv', p ? esc(p[9]) : '<span class="box"></span>ไม่มี <span class="box"></span>มี <span class="box"></span>Plan Install');
+            set('sOwn', p ? esc(p[6]) : '__________');
+        }
+        fillStore(PRESET);
+    </script>
+</body>
+</html>

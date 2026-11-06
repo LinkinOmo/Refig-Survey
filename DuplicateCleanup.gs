@@ -194,7 +194,7 @@ function mergeDuplicateSurveysForSite(typeKey, code, scope, clientEmail) {
         if (!def) return { success: false, error: 'Unknown survey type: ' + typeKey };
 
         var adminCheck = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
-        if (!adminCheck.isAdmin && !adminCheck.sysAdminDedupAllowed) return { success: false, error: 'Super Admin privileges required.' };
+        if (!adminCheck.isAdmin && !adminCheck.sysAdminDedupAllowed && !adminCheck.smfDedupAllowed) return { success: false, error: 'Super Admin privileges required.' };
 
         code = String(code || '').trim();
         if (!code) return { success: false, error: 'Branch code required.' };
@@ -335,6 +335,30 @@ function setSysAdminDupCleanupSetting(enabled, clientEmail) {
 function _sysAdminDupCleanupToggleOn_() {
     try {
         return PropertiesService.getScriptProperties().getProperty('SYSADMIN_DUP_CLEANUP_ENABLED_V1') === 'true';
+    } catch (e) { return false; }
+}
+
+// ─── SMF Team Duplicate-Cleanup Toggle ─────────────────────────────────────
+// Same shape as the System Admin toggle above — off by default, only a Super
+// Admin (isAdmin) may flip it, isSMF cannot self-escalate its own access.
+function getSmfDupCleanupSetting() {
+    return _smfDupCleanupToggleOn_();
+}
+
+function setSmfDupCleanupSetting(enabled, clientEmail) {
+    try {
+        var status = checkSurveyAdminStatus(clientEmail || Session.getActiveUser().getEmail());
+        if (!status.isAdmin) return { success: false, error: 'Super Admin privileges required.' };
+        PropertiesService.getScriptProperties().setProperty('SMF_DUP_CLEANUP_ENABLED_V1', enabled ? 'true' : 'false');
+        return { success: true, enabled: enabled };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function _smfDupCleanupToggleOn_() {
+    try {
+        return PropertiesService.getScriptProperties().getProperty('SMF_DUP_CLEANUP_ENABLED_V1') === 'true';
     } catch (e) { return false; }
 }
 

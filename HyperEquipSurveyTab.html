@@ -1,0 +1,658 @@
+        <!-- CONTENT: HYPER EQUIPMENT SURVEY (big-format stores — lifts, escalators, power, fire, water ...).
+             Reuses HYPER_REF_STORES / HYPER_REF_COLORS / _hyperRefStoreLabel / _hyperRefFindStoreDb and the
+             brand / age / note helpers from HyperRefSurveyTab.html, included before this. -->
+        <div id="content-hyper-eq-survey" class="tab-content hidden">
+            <form id="hyper-eq-form" onsubmit="handleHyperEqSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">🛗 สำรวจอุปกรณ์อาคาร Hyper</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= MANUALS_URL ?>?page=hyper-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=equip" target="_blank" class="text-indigo-600 hover:underline text-sm font-medium">🔎 อุปกรณ์ / QR</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_eq_survey_report" target="_blank"
+                            class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+
+                <p class="text-xs text-cyan-800 bg-cyan-50 border border-cyan-200 rounded px-3 py-2 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>แบบสำรวจ <b>ลิฟต์ / บันไดเลื่อน / ทางเลื่อน / ระบบไฟฟ้า / ระบบดับเพลิง / ระบบน้ำ และอุปกรณ์อื่น</b> สำหรับสาขา <b>Hyper / Market / Foodplace</b> — ใส่ <b>จำนวนเครื่อง</b> ตามประเภท แล้วระบบจะสร้าง <b>การ์ดทีละเครื่อง</b> (Equipment ID + QR) ให้กรอก ยี่ห้อ, ปีที่ผลิต, สเปค, ผู้รับเหมาดูแล, <b>วันหมดอายุใบตรวจ</b>, สภาพ และรูปถ่าย</span>
+                </p>
+
+                <div id="hyper-eq-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="hyper-eq-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreHyperEqDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardHyperEqDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <!-- 1. General Info -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เทรนเนอร์ / ผู้แจ้ง (Reporter) *</label>
+                            <input type="text" name="reporterName"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                                required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="hyper-eq-station-search" autocomplete="off"
+                                    class="input-field w-full border p-2 rounded text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-500"
+                                    placeholder="พิมพ์รหัสสาขา หรือชื่อสาขา (ไทย/อังกฤษ)..." oninput="handleHyperEqStationInput(this)">
+                                <div id="hyper-eq-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div id="hyper-eq-store-badge" class="hidden self-end text-xs"></div>
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly>
+                            <input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat">
+                            <input type="hidden" name="region">
+                            <input type="hidden" name="ammMtn">
+                            <input type="hidden" name="dmArea">
+                            <input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="hyper-eq-rest-form" class="hidden">
+                    <div class="sticky top-0 z-30 bg-white/95 backdrop-blur border border-indigo-200 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span class="font-semibold text-gray-600">รวม:</span>
+                        <span class="text-blue-700">ลิฟต์/บันไดเลื่อน <b id="hyper-eq-total-vt">0</b></span>
+                        <span class="text-amber-700">ไฟฟ้า <b id="hyper-eq-total-power">0</b></span>
+                        <span class="text-red-700">ดับเพลิง <b id="hyper-eq-total-fire">0</b></span>
+                        <span class="text-sky-700">น้ำ <b id="hyper-eq-total-water">0</b></span>
+                        <span class="text-violet-700">อื่นๆ <b id="hyper-eq-total-other">0</b></span>
+                    </div>
+                    <p class="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-3 py-2 mt-4">📄 <b>ใบตรวจ / ใบรับรองประจำปี</b> — ลิฟต์, บันไดเลื่อน, ทางเลื่อน <b>ต้องกรอกวันหมดอายุ</b> (ดูใบที่ติดในตัวลิฟต์ / ข้างบันไดเลื่อน); อุปกรณ์อื่นที่มีช่องนี้ให้กรอกถ้ามี — ระบบเตือนเมื่อ <span class="text-red-600 font-semibold">หมดอายุแล้ว</span> หรือ <span class="text-amber-600 font-semibold">จะหมดภายใน 60 วัน</span></p>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">2. ลิฟต์ / บันไดเลื่อน / ทางเลื่อน (Vertical Transport)</h3>
+                        <div id="hyper-eq-vt-cats" class="space-y-6"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">3. ระบบไฟฟ้า (Power)</h3>
+                        <div id="hyper-eq-power-cats" class="space-y-6"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">4. ระบบดับเพลิง (Fire Protection)</h3>
+                        <div id="hyper-eq-fire-cats" class="space-y-6"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">5. ระบบน้ำ (Water)</h3>
+                        <div id="hyper-eq-water-cats" class="space-y-6"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">6. อุปกรณ์อื่นๆ (Others)</h3>
+                        <div id="hyper-eq-other-cats" class="space-y-6"></div>
+                        <div class="mt-4">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">อุปกรณ์อื่นๆ ที่ไม่มีในรายการ — โปรดระบุรูปแบบ / จำนวน</label>
+                            <textarea name="otherEquip" rows="2" class="input-field w-full border border-gray-300 p-2 rounded text-sm" placeholder="เช่น เครื่องปั่นไฟสำรองเคลื่อนที่ 1 เครื่อง, ระบบ Sprinkler ..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 6. Broken units -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">7. อุปกรณ์ที่ชำรุด / ใช้งานไม่ได้</h3>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">มีอุปกรณ์ที่ชำรุด / ใช้งานไม่ได้ หรือไม่?</label>
+                        <div class="flex gap-4 mb-3">
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" class="text-blue-600 focus:ring-blue-500" onchange="toggleHyperEqBroken(true)"> <span class="text-sm">มี (Yes)</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" class="text-blue-600 focus:ring-blue-500" onchange="toggleHyperEqBroken(false)" checked> <span class="text-sm">ไม่มี (No)</span></label>
+                        </div>
+                        <div id="hyper-eq-broken-section" class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ระบุเครื่องที่ชำรุด และอาการ *</label>
+                            <textarea name="brokenDetail" rows="3" class="input-field w-full border border-red-300 p-2 rounded text-sm focus:ring-red-400" placeholder="เช่น 111108-ES02 บันไดเลื่อนขาลง หยุดบ่อย / Fire Pump Diesel สตาร์ทไม่ติด"></textarea>
+                            <div id="hyper-eq-photo-broken"></div>
+                        </div>
+                    </div>
+
+                    <!-- 7. Notes -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-2 border-b pb-2">8. สรุปปัญหา (Additional Findings)</h3>
+                        <textarea name="comments" rows="3"
+                            class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+                            placeholder="ระบุปัญหาเพิ่มเติมที่พบ... (Optional)"></textarea>
+                    </div>
+
+                    <!-- 8. CC Emails -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">9. CC Email Notification (Optional)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1 (DM)</label>
+                                <input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm" placeholder="email1@example.com">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2 (CM)</label>
+                                <input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm" placeholder="email2@example.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetHyperEqForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveHyperEqDraft()"
+                                class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 transition text-sm">
+                                &#128190; Save Draft
+                            </button>
+                            <button type="submit"
+                                class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-blue-700 transition transform hover:-translate-y-0.5">
+                                Submit
+                            </button>
+                        </div>
+                    </div>
+                </div> <!-- End hidden hyper-eq-rest-form -->
+            </form>
+        </div> <!-- End content-hyper-eq-survey -->
+
+        <script>
+            const HYPER_EQ_CONFIG = <?!= JSON.stringify(getHyperEqConfig_()) ?>;
+            const HYPER_EQ_DRAFT_KEY = 'hyper_eq_survey_draft_v1';
+
+            (function renderHyperEqForm() {
+                const counters = { vt: 0, power: 0, fire: 0, water: 0, other: 0 };
+                const sectionNo = { vt: 2, power: 3, fire: 4, water: 5, other: 6 };
+                HYPER_EQ_CONFIG.categories.forEach(function(cat) {
+                    const c = HYPER_REF_COLORS[cat.color] || HYPER_REF_COLORS.blue;
+                    const num = sectionNo[cat.group] + '.' + (++counters[cat.group]);
+                    const sizes = cat.sizes.map(function(s) {
+                        return '<div>' +
+                            '<label class="block text-xs text-gray-500 mb-1">[' + s.label + '] — จำนวน (เครื่อง)</label>' +
+                            '<input type="number" name="' + s.key + '" min="0" value="0" inputmode="numeric" data-heq-cat="' + cat.id + '"' +
+                                ' class="input-field w-full border border-gray-300 p-2 rounded text-sm" placeholder="0"' +
+                                ' oninput="onHyperEqCountInput(\'' + cat.id + '\')" onfocus="if(this.value===\'0\')this.select()">' +
+                        '</div>';
+                    }).join('');
+                    const html =
+                        '<div class="pb-4 rounded-lg p-3 border ' + c.box + '">' +
+                            '<h4 class="font-semibold ' + c.title + ' mb-1 flex flex-wrap items-center gap-2">' +
+                                '<span class="inline-block w-2.5 h-2.5 rounded-full ' + c.dot + '"></span>' +
+                                num + ') ' + cat.title +
+                                '<span class="ml-auto text-xs font-bold bg-white border border-gray-200 text-gray-700 px-2 py-0.5 rounded-full">รวม <span id="hyper-eq-sum-' + cat.id + '">0</span> เครื่อง</span>' +
+                            '</h4>' +
+                            (cat.hint ? '<p class="text-xs border rounded px-2 py-1 mb-3 flex items-start gap-1.5 ' + c.hint + '"><span class="mt-0.5">💡</span><span>' + cat.hint + '</span></p>' : '<div class="mb-3"></div>') +
+                            '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-' + Math.min(cat.sizes.length, 5) + ' gap-3">' + sizes + '</div>' +
+                            '<div id="hyper-eq-units-' + cat.id + '" class="mt-3 space-y-4">' +
+                                cat.sizes.map(function(sz) { return '<div id="hyper-eq-ug-' + cat.id + '-' + sz.sizeKey + '" class="hidden space-y-3"></div>'; }).join('') +
+                            '</div>' +
+                        '</div>';
+                    document.getElementById('hyper-eq-' + cat.group + '-cats').insertAdjacentHTML('beforeend', html);
+                });
+                document.getElementById('hyper-eq-photo-broken').innerHTML = photoUpload('อุปกรณ์ที่ชำรุด', 'heq_broken');
+
+            })();
+
+            function updateHyperEqTotals() {
+                const form = document.getElementById('hyper-eq-form');
+                const totals = { vt: 0, power: 0, fire: 0, water: 0, other: 0 };
+                HYPER_EQ_CONFIG.categories.forEach(function(cat) {
+                    let sum = 0;
+                    cat.sizes.forEach(function(s) { sum += Math.max(0, parseInt(form.elements[s.key].value, 10) || 0); });
+                    document.getElementById('hyper-eq-sum-' + cat.id).textContent = sum;
+                    totals[cat.group] = (totals[cat.group] || 0) + sum;
+                });
+                Object.keys(totals).forEach(function(g) {
+                    const el = document.getElementById('hyper-eq-total-' + g);
+                    if (el) el.textContent = totals[g];
+                });
+                return totals;
+            }
+
+            // ─── Per-unit cards (same fields as the Aircon Survey's unit card) ────────────
+            // Mirrors the Hyper Ref tab: cards keyed by (category, size, n) so changing a count only
+            // appends/removes trailing cards; Equipment ID renumbered per category across sizes.
+            // Brand helpers (_hyperBrandHtml, validateHyperBrands ...) come from the Ref tab include.
+            // Temps: ct = Supply air, mt = Return air (ΔT < threshold flags), tc = controller/set.
+            const HYPER_EQ_UNIT_MAX_PER_SIZE = 200;
+            function _hyperEqBase(catId, sizeKey) { return 'he_' + catId + '_' + sizeKey; }
+            function _hyperEqPk(catId, sizeKey, n) { return 'heu_' + catId + '_' + sizeKey + '_' + n; }
+            function _hyperEqBranchCode() { return (document.getElementById('hyper-eq-form').branchCode.value || '').trim(); }
+
+            function _hyperEqCardHtml(cat, size, n) {
+                const base = _hyperEqBase(cat.id, size.sizeKey);
+                const pk = _hyperEqPk(cat.id, size.sizeKey, n);
+                const label = cat.title.replace(/\s*[—(].*$/, '') + ' [' + size.label + '] #' + n;
+                const assetId = 'aiFormHyperEq_' + base + '_' + n;
+                const specs = cat.specs || [];
+                const eqBlock =
+                    '<div class="border-t border-gray-100 pt-2 mt-1 space-y-2" data-eq-block>' +
+                        (specs.length ? '<div class="grid grid-cols-2 gap-2">' + specs.map(function(f) {
+                            return '<div><label class="block text-xs font-semibold text-gray-600 mb-1">' + f.l + '</label>' +
+                                '<input type="' + (f.t === 'n' ? 'number" step="any" inputmode="decimal' : 'text') + '" data-sx="' + f.k + '" name="' + base + 'Sx_' + f.k + '_' + n + '" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-indigo-400"></div>';
+                        }).join('') + '</div>' : '') +
+                        '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ผู้รับเหมา / บริษัทที่ดูแล (MA)</label>' +
+                            '<input type="text" list="hyper-eq-contractors" data-f="mc" name="' + base + 'Mc_' + n + '" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-indigo-400" placeholder="เช่น KONE (Thailand), ผู้รับเหมาในพื้นที่"></div>' +
+                        (cat.cert ? '<div><label class="block text-xs font-semibold text-gray-600 mb-1">📄 วันหมดอายุใบตรวจ / ใบรับรอง' + (cat.cert === 'req' ? ' <span class="text-red-500">*</span>' : ' (ถ้ามี)') + '</label>' +
+                            '<input type="date" data-f="ce" name="' + base + 'Ce_' + n + '" oninput="checkHyperEqCert(this)" onchange="checkHyperEqCert(this)" class="w-full border border-indigo-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-indigo-400">' +
+                            '<p class="hidden text-[11px] mt-1" data-cert-warn></p></div>' : '') +
+                    '</div>';
+                return '' +
+                '<div class="hyper-unit-card border border-indigo-200 rounded-lg overflow-hidden shadow-sm bg-white" data-card data-heu data-cat="' + cat.id + '" data-size="' + size.sizeKey + '" data-n="' + n + '" data-pk="' + pk + '" data-label="' + label.replace(/"/g, '&quot;') + '">' +
+                    '<div class="bg-indigo-700 text-white px-3 py-2 flex items-center justify-between gap-2 min-h-[38px]">' +
+                        '<span class="font-bold text-sm">' + label + '</span>' +
+                        '<div class="flex items-center gap-2">' +
+                            '<span class="text-xs font-mono text-indigo-100 hyper-unit-id">-</span>' +
+                            '<button type="button" onclick="showQrModal(this.closest(\'[data-heu]\').querySelector(\'.hyper-unit-id\').textContent, this.closest(\'[data-heu]\').dataset.label)" class="flex items-center gap-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2 py-1 rounded text-xs shadow-sm">QR</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="p-3 space-y-2">' +
+                        _hyperBrandHtml('eq', base + 'Brand_' + n) +
+                        _hyperYearHtml(base, n) +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">รุ่น / Serial No. (Model)</label>' +
+                            '<input type="text" name="' + base + 'Spec_' + n + '" data-f="sp" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="เช่น รุ่น / Serial ที่ป้าย Nameplate">' +
+                        '</div>' +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">Asset No. (ถ้ามี)</label>' +
+                            '<div class="flex gap-1">' +
+                                '<input id="' + assetId + '" type="text" name="' + base + 'AssetNo_' + n + '" data-f="as" onblur="_confirmManualAssetEntry(this)" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="ระบุ Asset No. หรือกด 🔗 เลือกจากทะเบียน">' +
+                                '<button type="button" onclick="openAssetMapPicker(_hyperEqBranchCode(), \'' + assetId + '\')" class="shrink-0 px-2 border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">สถานะการใช้งาน</label>' +
+                            '<div class="flex gap-2 mt-1">' +
+                                '<label id="rfSt_use_' + base + '_' + n + '" onclick="_refStatus(\'' + base + '\',' + n + ',true)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-green-100 border-green-400 text-green-700 transition-colors">' +
+                                    '<input type="radio" name="' + base + 'Status_' + n + '" value="ใช้งาน" checked class="hidden">✓ ใช้งาน</label>' +
+                                '<label id="rfSt_no_' + base + '_' + n + '" onclick="_refStatus(\'' + base + '\',' + n + ',false)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-white border-gray-300 text-gray-500 transition-colors">' +
+                                    '<input type="radio" name="' + base + 'Status_' + n + '" value="ไม่ใช้งาน" class="hidden">✗ ไม่ใช้งาน</label>' +
+                            '</div>' +
+                        '</div>' +
+                        condRatingRow(base + 'CondRating_' + n) +
+                        eqBlock +
+                        (_userIsTechTeam ?
+                        '<div class="bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1">' +
+                            '<label class="block text-xs text-amber-700 font-semibold mb-1">🔧 กระแสไฟ (A) <span class="font-normal text-amber-500">(เฉพาะช่าง)</span></label>' +
+                            '<input type="number" step="0.01" name="' + base + 'Amps_' + n + '" data-f="am" class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-amber-400" placeholder="A">' +
+                        '</div>' : '') +
+                        _hyperNoteHtml(base, n) +
+                        photoUpload(label, pk) +
+                    '</div>' +
+                '</div>';
+            }
+
+            // Certificate expiry: red when expired, amber within 60 days
+            function _hyperEqCertState(v) {
+                if (!v) return '';
+                const today = new Date().toISOString().slice(0, 10);
+                const in60 = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+                return v < today ? 'expired' : v <= in60 ? 'due' : 'ok';
+            }
+            function checkHyperEqCert(input) {
+                const warn = input.parentElement.querySelector('[data-cert-warn]');
+                const st = _hyperEqCertState(input.value);
+                const days = input.value ? Math.round((new Date(input.value) - new Date(new Date().toISOString().slice(0, 10))) / 86400000) : 0;
+                warn.textContent = st === 'expired' ? '⛔ ใบตรวจหมดอายุแล้ว ' + (-days) + ' วัน — แจ้งผู้รับเหมาดำเนินการตรวจ / ต่ออายุ' : st === 'due' ? '⏰ ใบตรวจจะหมดอายุในอีก ' + days + ' วัน' : '';
+                warn.className = 'text-[11px] mt-1 ' + (st === 'expired' ? 'text-red-600 font-semibold' : st === 'due' ? 'text-amber-600' : 'hidden');
+                input.classList.toggle('border-red-400', st === 'expired');
+                input.classList.toggle('bg-red-50', st === 'expired');
+                const card = input.closest('[data-card]');
+                if (card && input.value) card.classList.remove('ring-2', 'ring-red-400');
+            }
+
+            function _hyperEqCardHasData(card) {
+                const typed = Array.from(card.querySelectorAll('input[type="text"], input[type="number"]')).some(function(el) { return el.value.trim() !== ''; });
+                const photos = (_accumulatedFiles[card.dataset.pk] || []).filter(Boolean).length > 0;
+                const rated = card.querySelector('input[name*="CondRating"]').getAttribute('data-confirmed') === '1';
+                return typed || photos || rated;
+            }
+
+            function syncHyperEqUnits(catId) {
+                const form = document.getElementById('hyper-eq-form');
+                const cat = HYPER_EQ_CONFIG.categories.find(function(c) { return c.id === catId; });
+                cat.sizes.forEach(function(sz) {
+                    const input = form.elements[sz.key];
+                    let want = Math.max(0, parseInt(input.value, 10) || 0);
+                    if (want > HYPER_EQ_UNIT_MAX_PER_SIZE) { want = HYPER_EQ_UNIT_MAX_PER_SIZE; input.value = want; }
+                    const group = document.getElementById('hyper-eq-ug-' + catId + '-' + sz.sizeKey);
+                    let cards = group.querySelectorAll('[data-heu]');
+                    if (want < cards.length) {
+                        const doomed = Array.from(cards).slice(want);
+                        if (doomed.some(_hyperEqCardHasData) && !confirm('ลดจำนวน [' + sz.label + '] — การ์ดที่ถูกลบมีข้อมูลที่กรอกไว้แล้ว ยืนยันลบหรือไม่?')) {
+                            input.value = cards.length;
+                            return;
+                        }
+                        doomed.forEach(function(card) { delete _accumulatedFiles[card.dataset.pk]; card.remove(); });
+                    }
+                    cards = group.querySelectorAll('[data-heu]');
+                    for (let n = cards.length + 1; n <= want; n++) group.insertAdjacentHTML('beforeend', _hyperEqCardHtml(cat, sz, n));
+                    group.classList.toggle('hidden', want === 0);
+                    let head = group.querySelector('[data-ug-head]');
+                    if (want > 0) {
+                        if (!head) { group.insertAdjacentHTML('afterbegin', '<p data-ug-head class="text-xs font-bold text-gray-600"></p>'); head = group.querySelector('[data-ug-head]'); }
+                        head.textContent = '▼ ' + sz.label + ' — ' + want + ' เครื่อง';
+                    } else if (head) head.remove();
+                });
+                renumberHyperEqIds(catId);
+            }
+
+            function onHyperEqCountInput(catId) {
+                _ensureHyperBrandOptions();
+                updateHyperEqTotals();
+                syncHyperEqUnits(catId);
+            }
+
+            // Equipment ID = <branch code>-<type prefix><NN>, NN running across the sizes of one type
+            function renumberHyperEqIds(onlyCatId) {
+                const code = _hyperEqBranchCode() || '[Branch]';
+                HYPER_EQ_CONFIG.categories.forEach(function(cat) {
+                    if (onlyCatId && cat.id !== onlyCatId) return;
+                    let idx = 0;
+                    document.querySelectorAll('#hyper-eq-units-' + cat.id + ' [data-heu]').forEach(function(card) {
+                        idx++;
+                        card.querySelector('.hyper-unit-id').textContent = code + '-' + cat.eqPrefix + (idx < 10 ? '0' + idx : idx);
+                    });
+                });
+            }
+
+            function _hyperEqVal(card, f) {
+                const el = card.querySelector('[data-f="' + f + '"]');
+                return el ? el.value : '';
+            }
+
+            function collectHyperEqUnits() {
+                const units = [];
+                HYPER_EQ_CONFIG.categories.forEach(function(cat) {
+                    document.querySelectorAll('#hyper-eq-units-' + cat.id + ' [data-heu]').forEach(function(card) {
+                        const rating = card.querySelector('input[name*="CondRating"]');
+                        const statusEl = card.querySelector('input[type="radio"]:checked');
+                        units.push({
+                            c: cat.id, s: card.dataset.size, n: parseInt(card.dataset.n, 10),
+                            id: card.querySelector('.hyper-unit-id').textContent,
+                            br: _hyperEqVal(card, 'br'), sp: _hyperEqVal(card, 'sp'), as: _hyperEqVal(card, 'as'),
+                            yr: _hyperYearVal(card), yrSel: card.querySelector('[data-f="yr"]').value, ys: _hyperEqVal(card, 'ys'), nt: _hyperEqVal(card, 'nt'),
+                            st: statusEl ? statusEl.value : 'ใช้งาน',
+                            cr: rating.getAttribute('data-confirmed') === '1' ? rating.value : '',
+                            am: _hyperEqVal(card, 'am'), mc: _hyperEqVal(card, 'mc'), ce: _hyperEqVal(card, 'ce'),
+                            sx: Array.from(card.querySelectorAll('[data-sx]')).reduce(function(o, el) { if (el.value.trim() !== '') o[el.dataset.sx] = el.value.trim(); return o; }, {}),
+                            pk: card.dataset.pk
+                        });
+                    });
+                });
+                return units;
+            }
+
+            function restoreHyperEqUnits(units) {
+                const form = document.getElementById('hyper-eq-form');
+                const counts = {};
+                (units || []).forEach(function(u) { const k = u.c + '|' + u.s; counts[k] = (counts[k] || 0) + 1; });
+                HYPER_EQ_CONFIG.categories.forEach(function(cat) {
+                    cat.sizes.forEach(function(sz) { form.elements[sz.key].value = counts[cat.id + '|' + sz.sizeKey] || 0; });
+                    syncHyperEqUnits(cat.id);
+                });
+                (units || []).forEach(function(u) {
+                    const card = document.querySelector('[data-heu][data-pk="' + _hyperEqPk(u.c, u.s, u.n) + '"]');
+                    if (!card) return;
+                    const base = _hyperEqBase(u.c, u.s);
+                    const setv = function(f, v) { const el = card.querySelector('[data-f="' + f + '"]'); if (el && v !== '' && v != null) el.value = v; };
+                    ['br', 'sp', 'as', 'am', 'mc', 'ce'].forEach(function(f) { setv(f, u[f]); });
+                    Object.keys(u.sx || {}).forEach(function(k) { const el = card.querySelector('[data-sx="' + k + '"]'); if (el) el.value = u.sx[k]; });
+                    const ce = card.querySelector('[data-f="ce"]'); if (ce) checkHyperEqCert(ce);
+                    _hyperRestoreAge(card, u);
+                    const asset = card.querySelector('[data-f="as"]');
+                    if (asset && asset.value) asset.dataset.confirmedManual = asset.value;
+                    _refStatus(base, u.n, u.st !== 'ไม่ใช้งาน');
+                    if (u.cr !== '' && u.cr != null) setCondRating(base + 'CondRating_' + u.n, parseInt(u.cr, 10));
+                });
+                updateHyperEqTotals();
+            }
+
+            function _hyperEqMissingPhotos() {
+                const missing = [];
+                document.querySelectorAll('#content-hyper-eq-survey [data-heu]').forEach(function(card) {
+                    if (!(_accumulatedFiles[card.dataset.pk] || []).filter(Boolean).length) {
+                        missing.push(card.querySelector('.hyper-unit-id').textContent + ' (' + card.dataset.label + ')');
+                    }
+                });
+                return missing;
+            }
+
+            function toggleHyperEqBroken(show) {
+                document.getElementById('hyper-eq-broken-section').classList.toggle('hidden', !show);
+            }
+
+            // --- Branch search (same big-format store list as the Hyper Ref tab) ---
+            function _applyHyperEqStore(s) {
+                const form = document.getElementById('hyper-eq-form');
+                form.branchCode.value = s[0];
+                form.branchName.value = s[2] || s[1];
+                form.storeFormat.value = s[3] || '';
+                form.region.value = s[4] || '';
+                const db = _hyperRefFindStoreDb(s[0]);
+                form.ammMtn.value = db ? (db.ammMtn || '') : '';
+                form.dmArea.value = db ? (db.dmName || '') : '';
+                form.cmArea.value = db ? (db.cmName || '') : '';
+                if (db && db.dmEmail && !form.ccEmail1.value) form.ccEmail1.value = db.dmEmail;
+                if (db && db.cmEmail && !form.ccEmail2.value) form.ccEmail2.value = db.cmEmail;
+                const badge = document.getElementById('hyper-eq-store-badge');
+                badge.innerHTML = '<span class="inline-flex flex-wrap gap-1">' +
+                    '<span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">' + (s[3] || '-') + '</span>' +
+                    (s[4] ? '<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">' + s[4] + '</span>' : '') +
+                    '</span>';
+                badge.classList.remove('hidden');
+                document.getElementById('hyper-eq-rest-form').classList.remove('hidden');
+                renumberHyperEqIds();
+                if (typeof sdsCheck === 'function') sdsCheck('hyperEq');
+            }
+
+            function _clearHyperEqStore() {
+                const form = document.getElementById('hyper-eq-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('hyper-eq-store-badge').classList.add('hidden');
+                document.getElementById('hyper-eq-rest-form').classList.add('hidden');
+                renumberHyperEqIds();
+            }
+
+            function handleHyperEqStationInput(input) {
+                const val = input.value.toLowerCase().trim();
+                const dropdown = document.getElementById('hyper-eq-station-dropdown');
+                if (val.length < 1) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; _clearHyperEqStore(); return; }
+                const matches = HYPER_REF_STORES.filter(function(s) { return _hyperRefStoreLabel(s).toLowerCase().indexOf(val) !== -1; });
+                renderStationDropdown('hyper-eq-station-dropdown', matches.map(_hyperRefStoreLabel), function(selected) {
+                    input.value = selected;
+                    const s = HYPER_REF_STORES.find(function(x) { return _hyperRefStoreLabel(x) === selected; });
+                    if (s) _applyHyperEqStore(s);
+                });
+                const exact = HYPER_REF_STORES.find(function(s) { return _hyperRefStoreLabel(s).toLowerCase() === val || s[0] === val; });
+                if (exact) _applyHyperEqStore(exact); else _clearHyperEqStore();
+            }
+
+            document.addEventListener('click', function(e) {
+                const d = document.getElementById('hyper-eq-station-dropdown');
+                if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden');
+            });
+
+            // --- Local draft ---
+            function _hyperEqCollectFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+                    if (el.name.indexOf('he_') === 0) return; // per-unit inputs travel in unitsJson instead
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+
+                        // Draft object shared by the on-device draft and the server draft (SurveyDraftStore.gs)
+            function _buildHyperEqDraft() {
+                const form = document.getElementById('hyper-eq-form');
+                return { savedAt: new Date().toISOString(), search: document.getElementById('hyper-eq-station-search').value, fields: _hyperEqCollectFields(form), units: collectHyperEqUnits() };
+            }
+
+            function saveHyperEqDraft() {
+                const form = document.getElementById('hyper-eq-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                const draft = { savedAt: new Date().toISOString(), search: document.getElementById('hyper-eq-station-search').value, fields: _hyperEqCollectFields(form), units: collectHyperEqUnits() };
+                try {
+                    localStorage.setItem(HYPER_EQ_DRAFT_KEY, JSON.stringify(draft));
+                    if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (Hyper Equipment Survey)');
+                } catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('hyperEq', null);
+            }
+
+            function _readHyperEqDraft() {
+                try { return JSON.parse(localStorage.getItem(HYPER_EQ_DRAFT_KEY) || 'null'); } catch (e) { return null; }
+            }
+
+            function checkHyperEqDraft() {
+                _ensureHyperBrandOptions();
+                const draft = _readHyperEqDraft();
+                const banner = document.getElementById('hyper-eq-draft-banner');
+                if (!draft || !draft.fields) { banner.classList.add('hidden'); return; }
+                document.getElementById('hyper-eq-draft-info').textContent =
+                    (draft.fields.branchCode || '') + ' ' + (draft.fields.branchName || '') + ' · ' + new Date(draft.savedAt).toLocaleString('en-GB');
+                banner.classList.remove('hidden');
+            }
+
+            function restoreHyperEqDraft(fromServer) {
+                const draft = fromServer || _readHyperEqDraft();
+                if (!draft) return;
+                const form = document.getElementById('hyper-eq-form');
+                const s = HYPER_REF_STORES.find(function(x) { return x[0] === draft.fields.branchCode; });
+                if (s) { document.getElementById('hyper-eq-station-search').value = draft.search || _hyperRefStoreLabel(s); _applyHyperEqStore(s); }
+                Object.keys(draft.fields).forEach(function(name) {
+                    const el = form.elements[name];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList) Array.from(el).forEach(function(r) { r.checked = r.value === draft.fields[name]; });
+                    else el.value = draft.fields[name];
+                });
+                toggleHyperEqBroken(draft.fields.hasBroken === 'Yes');
+                restoreHyperEqUnits(draft.units || []);
+                updateHyperEqTotals();
+                document.getElementById('hyper-eq-draft-banner').classList.add('hidden');
+            }
+
+            function discardHyperEqDraft() {
+                if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return;
+                try { localStorage.removeItem(HYPER_EQ_DRAFT_KEY); } catch (e) {}
+                checkHyperEqDraft();
+            }
+
+            function resetHyperEqForm(askFirst) {
+                if (askFirst && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('hyperEq');
+                const form = document.getElementById('hyper-eq-form');
+                const reporterName = form.reporterName.value, reporterPhone = form.reporterPhone.value;
+                form.reset();
+                form.reporterName.value = reporterName;
+                form.reporterPhone.value = reporterPhone;
+                form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(inp) { delete _accumulatedFiles[inp.dataset.categoryUpload]; });
+                HYPER_EQ_CONFIG.categories.forEach(function(cat) {
+                    cat.sizes.forEach(function(sz) { const g = document.getElementById('hyper-eq-ug-' + cat.id + '-' + sz.sizeKey); g.innerHTML = ''; g.classList.add('hidden'); });
+                });
+                document.querySelectorAll('#content-hyper-eq-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                document.getElementById('hyper-eq-station-search').value = '';
+                toggleHyperEqBroken(false);
+                _clearHyperEqStore();
+                updateHyperEqTotals();
+            }
+
+            // --- Submit ---
+            async function handleHyperEqSurveySubmit(e) {
+                e.preventDefault();
+                const form = e.target;
+                if (!form.reporterName.value.trim()) { alert("กรุณากรอกชื่อผู้แจ้ง (Reporter) ก่อนกดยืนยัน"); form.reporterName.focus(); return; }
+                if (!form.reporterPhone.value.trim()) { alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone) ก่อนกดยืนยัน"); form.reporterPhone.focus(); return; }
+                if (!form.branchCode.value || !form.branchName.value) { alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)"); return; }
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุเครื่องที่ชำรุดและอาการ'); form.brokenDetail.focus(); return; }
+
+                // Same checks as the Aircon Survey: brand on every unit (enum + typo check), every
+                // condition rating tapped, and (unless an admin switched it off) a photo per unit.
+                if (!validateHyperBrands('eq', '#content-hyper-eq-survey')) return;
+                if (!validateHyperAges('#content-hyper-eq-survey')) return;
+                if (!validateCondRatings(form)) return;
+                if (_equipmentPhotoRequired.hyperEq) {
+                    const missingPhotos = _hyperEqMissingPhotos();
+                    if (missingPhotos.length > 0) {
+                        alert('กรุณาแนบรูปถ่ายให้ครบทุกเครื่องก่อนกดยืนยัน — ยังขาดรูปของ ' + missingPhotos.length + ' เครื่อง:\n' + missingPhotos.slice(0, 15).join('\n') + (missingPhotos.length > 15 ? '\n...' : ''));
+                        return;
+                    }
+                }
+
+                // Lifts / escalators / travelators: the certificate expiry is required
+                const noCert = Array.from(document.querySelectorAll('#content-hyper-eq-survey [data-heu]')).filter(function(card) {
+                    const cat = HYPER_EQ_CONFIG.categories.find(function(c) { return c.id === card.dataset.cat; });
+                    const ce = card.querySelector('[data-f="ce"]');
+                    return cat && cat.cert === 'req' && ce && !ce.value;
+                });
+                if (noCert.length) {
+                    alert('กรุณาระบุวันหมดอายุใบตรวจของลิฟต์ / บันไดเลื่อน / ทางเลื่อน ให้ครบ — ยังขาด ' + noCert.length + ' เครื่อง:\n' +
+                        noCert.slice(0, 15).map(function(c) { return c.querySelector('.hyper-unit-id').textContent; }).join('\n'));
+                    noCert[0].classList.add('ring-2', 'ring-red-400');
+                    noCert[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+
+                const totals = updateHyperEqTotals();
+                if (totals.vt + totals.power + totals.fire + totals.water + totals.other === 0 && !confirm('⚠️ ยังไม่ได้กรอกจำนวนอุปกรณ์เลย\n\nยืนยันส่งข้อมูลหรือไม่?')) return;
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    const tasks = [];
+                    const seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('HEQ', form.branchCode.value, tasks, function() { return [800, 800, 0.60]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+
+                    const data = _hyperEqCollectFields(form);
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('hyperEq');
+                    data.unitsJson = JSON.stringify(collectHyperEqUnits());
+
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) {
+                                showSuccess(); sdsReset('hyperEq');
+                                try { localStorage.removeItem(HYPER_EQ_DRAFT_KEY); } catch (e2) {}
+                                checkHyperEqDraft();
+                                resetHyperEqForm(false);
+                            } else {
+                                alert('Error: ' + (res && res.error));
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            hideLoading();
+                            alert('Server Error: ' + err.message);
+                        })
+                        .processHyperEqSurveyForm(data);
+                } catch (err) {
+                    hideLoading();
+                    alert('Error processing form: ' + err.message);
+                }
+            }
+        </script>
+        <datalist id="hyper-eq-contractors">
+            <option value="Mitsubishi Elevator Asia"><option value="Schindler (Thailand)"><option value="KONE Public"><option value="Otis Elevator (Thailand)">
+            <option value="Hitachi Elevator (Thailand)"><option value="TK Elevator (Thailand)"><option value="Fujitec (Thailand)"><option value="ผู้รับเหมาในพื้นที่">
+        </datalist>

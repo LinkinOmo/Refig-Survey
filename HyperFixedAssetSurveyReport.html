@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyper Fixed Asset Pre-Count Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel { background: rgba(255,255,255,.95); border: 1px solid rgba(226,232,240,.8); box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #7c3aed; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: .75rem; font-weight: 600; color: #64748b; min-width: 120px; }
+        .detail-value { font-size: .85rem; color: #1e293b; }
+        .print-only { display: none; }
+        /* @page size is injected by printDetail()/printReport() so detail = A4 portrait, full report = A4 landscape */
+        @media print {
+            body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            /* single-record detail */
+            body.print-detail > *:not(#detailModal) { display: none !important; }
+            body.print-detail #detailModal { position: static !important; display: block !important; background: none !important; }
+            body.print-detail #detailModal > div { max-height: none !important; box-shadow: none !important; max-width: none !important; width: 100% !important; border-radius: 0 !important; display: block !important; }
+            body.print-detail #detailModal #modalBody { overflow: visible !important; padding: 0 !important; }
+            body.print-detail #detailModal > div > div:last-child { display: none !important; }
+            body.print-detail #modalBody > div, body.print-detail #modalBody table, body.print-detail #modalBody tr { break-inside: avoid; }
+            body.print-detail #modalBody img { width: 70px !important; height: 70px !important; }
+            /* whole report (list) */
+            body.print-list #detailModal { display: none !important; }
+            body.print-list nav { position: static !important; }
+            body.print-list .overflow-x-auto { overflow: visible !important; }
+            body.print-list .glass-panel { box-shadow: none !important; }
+            body.print-list table { font-size: 9px !important; width: 100% !important; }
+            body.print-list thead { display: table-header-group; }
+            body.print-list tr { break-inside: avoid; }
+            body.print-list td, body.print-list th { padding: 3px 4px !important; }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap justify-between gap-2 py-3">
+            <div class="flex items-center gap-4">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-slate-500 p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-violet-600 rounded-full"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">🏷️ รายงานพื้นที่เก็บ Fixed Asset &amp; ระดับสีสาขา</h1>
+                    <p class="text-xs text-slate-500 font-medium">Pre-Count Survey · Criteria K1–K6 · Survey colour vs VP rating · Labour budget</p>
+                </div>
+            </div>
+            <div class="no-print flex flex-wrap items-center gap-2">
+                <div class="loader" id="mainLoader"></div>
+                <a href="<?= MANUALS_URL ?>?page=fa-manual" target="_blank" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">📖 คู่มือ</a>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-fa-checklist" target="_blank" class="px-3 py-1.5 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100">🖨️ Checklist</a>
+                <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
+                <button onclick="printReport()" class="no-print px-3 py-1.5 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-100" title="พิมพ์รายงานทั้งหมด (ตามตัวกรองปัจจุบัน) A4 แนวนอน / บันทึก PDF">🖨️ พิมพ์รายงาน PDF</button>
+                <button onclick="downloadToExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
+                <button onclick="window.location.reload()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
+            </div>
+        </div>
+    </nav>
+
+    <button onclick="printReport()" class="no-print fixed bottom-5 right-5 z-30 px-5 py-4 text-base font-bold text-white bg-violet-600 rounded-full shadow-xl active:bg-violet-800" style="min-height:52px" title="พิมพ์รายงานทั้งหมด A4">🖨️ พิมพ์รายงาน</button>
+    <div id="reportRoot" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-slate-500"><p class="text-xs font-semibold text-slate-500 mb-1">สาขาที่สำรวจแล้ว</p><h3 class="text-3xl font-bold"><span id="stStores">0</span><span class="text-base text-slate-400"> / <span id="stTotal">0</span></span></h3></div>
+            <div id="stGapCard" class="hidden glass-panel p-5 rounded-xl border-l-4 border-red-500"><p class="text-xs font-semibold text-slate-500 mb-1">เกณฑ์ประเมินยากกว่า VP (สาขา)</p><h3 class="text-3xl font-bold text-red-600" id="stUp">0</h3><p class="text-[11px] text-slate-400">ง่ายกว่า VP: <b id="stDown">0</b></p></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-violet-500"><p class="text-xs font-semibold text-slate-500 mb-1">งบแรงงาน — สาขาที่สำรวจแล้ว</p><h3 class="text-2xl font-bold text-violet-700"><span id="stBudget">0</span> <span class="text-sm">฿</span></h3></div>
+            <div class="glass-panel p-5 rounded-xl border-l-4 border-indigo-500"><p class="text-xs font-semibold text-slate-500 mb-1">ประมาณการทั้งหมด (ใช้สีสำรวจ / ที่เหลือใช้สี VP)</p><h3 class="text-2xl font-bold text-indigo-700"><span id="stProj">0</span> <span class="text-sm">฿</span></h3></div>
+        </div>
+        <div class="glass-panel p-4 rounded-xl overflow-x-auto">
+            <p class="text-xs font-semibold text-slate-500 mb-2">จำนวนสาขาตามระดับสี — สีจากการสำรวจ (เกณฑ์) เทียบกับ สีที่ VP ประเมิน (จำนวนคนที่ขอ)</p>
+            <table class="min-w-full text-sm" id="colorMatrix"></table>
+        </div>
+
+        <div class="no-print glass-panel p-4 rounded-xl grid grid-cols-1 md:grid-cols-6 gap-3 items-center">
+            <input type="text" id="searchInput" placeholder="ค้นหา รหัส / ชื่อสาขา / VP / ผู้สำรวจ..." class="md:col-span-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="applyFilters()">
+            <select id="vpFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">ทุก VP</option></select>
+            <select id="colorFilter" onchange="applyFilters()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">ทุกสี (สำรวจ)</option></select>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="showAll" onchange="applyFilters()"> แสดงสาขาที่ยังไม่สำรวจ</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="gapOnly" onchange="applyFilters()"> สีไม่ตรง VP</label>
+        </div>
+
+        <div class="glass-panel rounded-xl overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase">
+                    <tr>
+                        <th class="px-3 py-3 text-left">สาขา</th>
+                        <th class="px-3 py-3 text-left">VP</th>
+                        <th class="px-3 py-3 text-center">VP ประเมิน</th>
+                        <th class="px-3 py-3 text-center">ผลสำรวจ</th>
+                        <th class="px-3 py-3 text-center">K1 · K2 · K3 · K4 · K5 · K6</th>
+                        <th class="px-3 py-3 text-right">พื้นที่ · ตร.ม. · ชิ้น</th>
+                        <th class="px-3 py-3 text-right">แหล่งที่มา · Tag</th>
+                        <th class="px-3 py-3 text-right">แรงงาน · ฿</th>
+                        <th class="px-3 py-3 text-left">ผู้สำรวจ / วันที่</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+            <div id="emptyState" class="hidden text-center py-12 text-slate-400">ไม่พบข้อมูล</div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div class="bg-white w-full md:max-w-4xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดการสำรวจพื้นที่เก็บ Fixed Asset</h3><div class="flex items-center gap-3 no-print"><button onclick="printDetail()" class="px-3 py-1 text-xs font-bold text-violet-700 border border-violet-300 rounded-lg hover:bg-violet-50" title="พิมพ์ / บันทึกเป็น PDF (A4)">🖨️ พิมพ์ / PDF</button><button onclick="closeModal()" class="text-slate-400 text-xl">✕</button></div></div>
+            <div class="p-5 overflow-y-auto" id="modalBody"></div>
+            <div class="px-5 py-3 border-t flex justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ</button>
+                <div class="flex gap-2 ml-auto">
+                    <button onclick="printDetail()" class="px-4 py-3 text-sm font-bold text-violet-700 border border-violet-300 rounded-lg">🖨️ พิมพ์ A4</button>
+                    <button onclick="closeModal()" class="px-4 py-3 text-sm border border-slate-300 rounded-lg">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="hidden px-4 py-2 text-sm font-bold text-white bg-violet-600 rounded-lg hover:bg-violet-700">บันทึกหมายเหตุ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let FC = null, STORES = [], allData = [], filtered = [], currentRecord = null, currentId = null;
+        let isAdmin = false, smfCanEdit = false, opsCanEdit = false, _userEmail = '';
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fmt(n) { return Math.round(num(n)).toLocaleString(); }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? '-' : d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }); }
+        function latestPerBranch(rows) { const seen = new Set(); return rows.filter(function(r) { const k = String(r['Branch Code']); if (seen.has(k)) return false; seen.add(k); return true; }); }
+        function color(k) { return ((FC || {}).colors || []).find(function(c) { return c.k === k; }) || null; }
+        function cidx(k) { return ((FC || {}).colors || []).findIndex(function(c) { return c.k === k; }); }
+        function pill(k, extra) { const c = color(k); return c ? '<span class="inline-block px-2 py-0.5 rounded-full font-bold text-white text-xs whitespace-nowrap" style="background:' + c.hex + '">' + c.k + (extra || '') + '</span>' : '<span class="text-slate-300 text-xs">-</span>'; }
+        // Same bands as hyperFaVpColor_() in HyperFixedAssetSurvey.gs
+        function vpColor(need) { if (need === '' || need == null) return ''; need = parseInt(need, 10); return need >= 8 ? 'RED' : need >= 4 ? 'ORG' : need >= 1 ? 'YEL' : 'GRE'; }
+        function storeOf(code) { code = String(code); return STORES.find(function(s) { return s[0] === code; }) || STORES.find(function(s) { return (s[19] || '').split(' ').indexOf(code) > -1; }) || null; }
+        function finalColor(r) { return r['Survey Color'] || ''; }
+        // Until @537 (3 Nov 2026) these codes showed another store's Thai name in the branch search, so a store may
+        // have filed its survey under the wrong code. Flag their earlier records until an admin checks / moves them.
+        const NAME_FIX_CODES = ['11227', '11228', '11229', '11230', '11231', '11232', '11233', '11234', '11235', '11236', '11238', '11239', '11240', '11241',
+                                '11242', '11243', '11245', '11247', '11248', '11249', '11250', '11251', '11252', '11254', '11257', '11258', '11259', '11260'];
+        const NAME_FIX_AT = new Date('2026-11-03T11:10:00+07:00');
+        function suspectBranch(r) { return r && !r['Branch Moved'] && NAME_FIX_CODES.indexOf(String(r['Branch Code'])) > -1 && new Date(r['Timestamp']) < NAME_FIX_AT; }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            loadData();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) {
+                if (!f) return;
+                isAdmin = !!(f.isAdmin || f.isScheduleAdmin); smfCanEdit = !!f.smfEditAllowed; opsCanEdit = !!f.opsEditAllowed;
+                document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+                document.getElementById('stGapCard').classList.toggle('hidden', !isAdmin);   // survey-vs-VP gap card: admins only
+            }).getUserFlags(_userEmail);
+        });
+        let _attempt = 0;
+        function loadData() {
+            const my = ++_attempt;
+            google.script.run.withSuccessHandler(function(res) {
+                if (my !== _attempt) return;
+                if (!res) { if (my < 3) setTimeout(loadData, 1500); return; }
+                document.getElementById('mainLoader').classList.add('hidden');
+                if (!res.success) { alert('โหลดข้อมูลไม่สำเร็จ: ' + res.error); return; }
+                FC = res.faConfig; STORES = res.stores || []; allData = res.data || [];
+                const vps = Array.from(new Set(STORES.map(function(s) { return s[5]; }).filter(Boolean))).sort();
+                document.getElementById('vpFilter').innerHTML = '<option value="">ทุก VP</option>' + vps.map(function(v) { return '<option>' + esc(v) + '</option>'; }).join('');
+                document.getElementById('colorFilter').innerHTML = '<option value="">ทุกสี (สำรวจ)</option>' + FC.colors.map(function(c) { return '<option value="' + c.k + '">' + c.k + ' ' + c.l + '</option>'; }).join('');
+                renderStats(); applyFilters();
+            }).withFailureHandler(function(err) { document.getElementById('mainLoader').classList.add('hidden'); alert('Error: ' + err.message); }).getHyperFaSurveyList(window.ARCHIVE_ON);
+        }
+        function renderStats() {
+            const l = latestPerBranch(allData), C = FC.colors;
+            const done = new Set(l.map(function(r) { return String(r['Branch Code']); }));
+            document.getElementById('stStores').textContent = l.length;
+            document.getElementById('stTotal').textContent = STORES.filter(function(s) { return s[5]; }).length;
+            document.getElementById('stUp').textContent = l.filter(function(r) { return num(r['Color Gap']) > 0; }).length;
+            document.getElementById('stDown').textContent = l.filter(function(r) { return num(r['Color Gap']) < 0; }).length;
+            const surveyed = l.reduce(function(s, r) { return s + num(r['Est. Labor Cost (THB)']); }, 0);
+            document.getElementById('stBudget').textContent = fmt(surveyed);
+            const rest = STORES.filter(function(s) { return s[5] && !done.has(s[0]); }).reduce(function(s, st) { const c = color(vpColor(st[8])); return s + (c ? c.cost : 0); }, 0);
+            document.getElementById('stProj').textContent = fmt(surveyed + rest);
+            // survey colour (rows) × VP colour (columns)
+            const keys = C.map(function(c) { return c.k; }).concat(['']);
+            const m = {};
+            l.forEach(function(r) { const k = (r['Survey Color'] || '') + '|' + (r['VP Color'] || ''); m[k] = (m[k] || 0) + 1; });
+            let h = '<tr class="text-xs text-slate-500"><th class="p-2 text-left">ผลสำรวจ ↓ / VP →</th>' + keys.map(function(k) { return '<th class="p-2 text-center">' + (k ? pill(k) : 'VP ไม่ระบุ') + '</th>'; }).join('') + '<th class="p-2 text-center">รวม</th><th class="p-2 text-right">แรงงาน/สาขา</th><th class="p-2 text-right">งบ/สาขา</th></tr>';
+            C.slice().reverse().forEach(function(c) {
+                let tot = 0;
+                h += '<tr class="border-t"><td class="p-2">' + pill(c.k, ' ' + c.l) + '</td>' + keys.map(function(v) {
+                    const n = m[c.k + '|' + v] || 0; tot += n;
+                    const diag = v === c.k;
+                    return '<td class="p-2 text-center ' + (n ? (diag ? 'font-bold text-green-700' : 'font-bold text-red-600') : 'text-slate-300') + '">' + n + '</td>';
+                }).join('') + '<td class="p-2 text-center font-bold">' + tot + '</td><td class="p-2 text-right text-xs">' + (c.people ? c.people + ' × ' + c.days + ' วัน' : '-') + '</td><td class="p-2 text-right text-xs">' + fmt(c.cost) + '</td></tr>';
+            });
+            const vpTot = C.slice().reverse().map(function(c) { return c.k + ' ' + STORES.filter(function(s) { return s[5] && vpColor(s[8]) === c.k; }).length; }).join(' · ');
+            h += '<tr class="border-t text-xs text-slate-500"><td class="p-2" colspan="' + (keys.length + 4) + '">ทะเบียนทั้งหมด (สีจาก VP): ' + vpTot + ' · ตัวเลขแดง = สีสำรวจไม่ตรงกับ VP</td></tr>';
+            document.getElementById('colorMatrix').innerHTML = h;
+        }
+        function applyFilters() {
+            const q = document.getElementById('searchInput').value.toLowerCase().trim();
+            const vp = document.getElementById('vpFilter').value, cf = document.getElementById('colorFilter').value;
+            const showAll = document.getElementById('showAll').checked, gapOnly = document.getElementById('gapOnly').checked;
+            let rows = latestPerBranch(allData).map(function(r) { return { r: r, s: storeOf(r['Branch Code']) }; });
+            if (showAll) {
+                const done = new Set(rows.map(function(x) { return String(x.r['Branch Code']); }));
+                STORES.filter(function(s) { return s[5] && !done.has(s[0]); }).forEach(function(s) { rows.push({ r: null, s: s }); });
+            }
+            filtered = rows.filter(function(x) {
+                const s = x.s || [], r = x.r;
+                if (vp && s[5] !== vp) return false;
+                if (cf && (!r || r['Survey Color'] !== cf)) return false;
+                if (gapOnly && (!r || !num(r['Color Gap']))) return false;
+                const txt = [r ? r['Branch Code'] : s[0], s[1], s[19], s[2], s[3], s[5], r ? r['Branch Name'] : '', r ? r['Reporter Name'] : ''].join(' ').toLowerCase();
+                return !q || txt.indexOf(q) > -1;
+            });
+            // hardest first: survey colour, then score; unsurveyed by VP colour
+            filtered.sort(function(a, b) {
+                const ka = a.r ? cidx(a.r['Survey Color']) * 100 + num(a.r['Score (0-18)']) : cidx(vpColor((a.s || [])[8])) * 100 - 1000;
+                const kb = b.r ? cidx(b.r['Survey Color']) * 100 + num(b.r['Score (0-18)']) : cidx(vpColor((b.s || [])[8])) * 100 - 1000;
+                return kb - ka;
+            });
+            document.getElementById('recordCount').textContent = filtered.length + ' รายการ';
+            document.getElementById('recordCount').classList.remove('hidden');
+            document.getElementById('emptyState').classList.toggle('hidden', filtered.length > 0);
+            document.getElementById('tableBody').innerHTML = filtered.map(function(x) {
+                const r = x.r, s = x.s || [];
+                const vpK = r ? r['VP Color'] : vpColor(s[8]), need = r ? r['VP Need (people)'] : s[8];
+                const name = '<b>' + esc(r ? r['Branch Code'] : s[0]) + '</b> <span class="text-xs text-slate-400">' + esc(s[4] || '') + '</span><div class="text-xs text-slate-500">' + esc(s[3] || s[2] || (r ? r['Branch Name'] : '')) + '</div>';
+                if (!r) return '<tr class="bg-slate-50/60 text-slate-500"><td class="px-3 py-2">' + name + '</td><td class="px-3 py-2 text-xs">' + esc(s[5]) + '</td><td class="px-3 py-2 text-center">' + pill(vpK, need !== '' ? ' · ' + need + ' คน' : '') + '</td><td class="px-3 py-2 text-center text-xs" colspan="6">ยังไม่สำรวจ · ' + esc([s[14], s[15] ? 'เปิด ' + s[15].slice(0, 4) : '', s[16] !== '' && s[16] != null ? s[16] + ' ชั้น' : ''].filter(Boolean).join(' · ')) + '</td></tr>';
+                const gap = num(r['Color Gap']);
+                const ks = (FC.criteria || []).map(function(c) { const v = num(r[c.k + ' Score']); return '<span class="inline-block w-5 text-center rounded ' + (v >= 3 ? 'bg-red-100 text-red-700 font-bold' : v >= 2 ? 'bg-orange-100 text-orange-700' : v >= 1 ? 'bg-yellow-50' : 'text-slate-400') + '">' + v + '</span>'; }).join('');
+                return '<tr class="hover:bg-violet-50 cursor-pointer" data-id="' + esc(r['ID']) + '">' +
+                    '<td class="px-3 py-2">' + name + (r['Has Broken'] === 'Yes' ? '<div class="text-xs text-red-600">⚠️ จุดอันตราย</div>' : '') +
+                        (suspectBranch(r) ? '<div class="text-[11px] text-amber-700 font-semibold">⚠️ ตรวจสอบสาขา</div>' : '') + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + esc(r['VP'] || s[5] || '-') + '</td>' +
+                    '<td class="px-3 py-2 text-center">' + pill(vpK, need !== '' ? ' · ' + need + ' คน' : '') + '</td>' +
+                    '<td class="px-3 py-2 text-center">' + pill(r['Survey Color'], ' ' + num(r['Score (0-18)'])) +
+                        (gap ? '<div class="text-[11px] font-bold ' + (gap > 0 ? 'text-red-600' : 'text-blue-600') + '">' + (gap > 0 ? '▲' : '▼') + Math.abs(gap) + ' vs VP</div>' : '') +
+                        (r['Proposed Color'] && r['Proposed Color'] !== r['Survey Color'] ? '<div class="text-[11px] text-slate-500">เสนอ ' + esc(r['Proposed Color']) + '</div>' : '') + '</td>' +
+                    '<td class="px-3 py-2 text-center text-xs font-mono">' + ks + '</td>' +
+                    '<td class="px-3 py-2 text-right">' + num(r['FA Areas']) + ' · ' + fmt(r['Storage Area (sqm)']) + ' · ' + fmt(r['Est. Pieces']) + '</td>' +
+                    '<td class="px-3 py-2 text-right">' + (r['Origin Sources'] !== undefined && r['Origin Sources'] !== '' ? num(r['Origin Sources']) + ' ที่' : num(r['Other-Origin %']) + '%') + ' · ' + num(r['Tagged %']) + '%</td>' +
+                    '<td class="px-3 py-2 text-right text-xs">' + esc(r['Labor (people x days)']) + '<div class="font-mono font-semibold">' + fmt(r['Est. Labor Cost (THB)']) + '</div></td>' +
+                    '<td class="px-3 py-2 text-xs">' + esc(r['Reporter Name']) + '<div class="text-slate-400">' + fdate(r['Timestamp']) + '</div></td></tr>';
+            }).join('');
+        }
+        document.getElementById('tableBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        function openModal(id) {
+            currentId = id; currentRecord = null;
+            document.getElementById('modalBody').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังโหลด...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            google.script.run.withSuccessHandler(function(res) {
+                if (id !== currentId) return;
+                if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(res && res.error) + '</p>'; return; }
+                currentRecord = res.data; FC = res.faConfig || FC;
+                renderModal(res.data);
+            }).getHyperFaSurveyRecordById(id);
+        }
+        function _doPrint(mode, pageCss) {
+            const st = document.createElement('style'); st.id = 'printPageStyle'; st.textContent = '@page { size: ' + pageCss + '; margin: 10mm; }';
+            document.head.appendChild(st); document.body.classList.add('print-' + mode);
+            const done = function() { document.body.classList.remove('print-' + mode); const s = document.getElementById('printPageStyle'); if (s) s.remove(); window.removeEventListener('afterprint', done); };
+            window.addEventListener('afterprint', done);
+            window.print();
+        }
+        // iPad/iOS: window.print() inside the Apps Script iframe is unreliable, so open a standalone top-level
+        // page with the report content + its own big Print button (iOS: Share → Print → pinch-out → Save PDF).
+        function _openPrintWindow(title, bodyHtml, pageCss) {
+            const w = window.open('', '_blank');
+            if (!w) return false;
+            w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(title) + '</title>' +
+                '<script src="https://cdn.tailwindcss.com"><\/script><link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">' +
+                '<style>@page{size:' + pageCss + ';margin:10mm}body{font-family:Prompt,sans-serif;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+                'thead{display:table-header-group}tr{break-inside:avoid}.glass-panel{border:1px solid #e2e8f0;border-radius:12px}.detail-row{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9}' +
+                '.detail-label{font-size:.75rem;font-weight:600;color:#64748b;min-width:120px}.detail-value{font-size:.85rem}.print-only{display:block}' +
+                '@media print{.np{display:none!important}table{font-size:9px}}</style></head><body class="p-4">' +
+                '<div class="np" style="position:sticky;top:0;z-index:10;background:#fff;padding:8px 0;display:flex;gap:10px;align-items:center;border-bottom:1px solid #e2e8f0;margin-bottom:12px">' +
+                '<button onclick="window.print()" style="padding:14px 22px;font-size:18px;font-weight:700;color:#fff;background:#7c3aed;border-radius:12px">🖨️ พิมพ์ / บันทึก PDF</button>' +
+                '<button onclick="window.close()" style="padding:14px 22px;font-size:18px;border:1px solid #cbd5e1;border-radius:12px">ปิด</button>' +
+                '<span style="font-size:12px;color:#64748b">iPad: กดปุ่ม → เลือก Print → ถ่างนิ้วบนภาพตัวอย่างเพื่อบันทึกเป็น PDF</span></div>' + bodyHtml + '</body></html>');
+            w.document.close();
+            return true;
+        }
+        function _cleanClone(el) {
+            const c = el.cloneNode(true);
+            c.querySelectorAll('.no-print, button, #emptyState, .hidden').forEach(function(n) { n.remove(); });
+            c.querySelectorAll('textarea,input').forEach(function(n) { n.remove(); });
+            c.classList.remove('hidden');
+            return c.outerHTML;
+        }
+        function printDetail() {
+            if (!currentRecord) { alert('รอโหลดข้อมูลสักครู่'); return; }
+            const r = currentRecord, title = 'Fixed Asset ' + r['Branch Code'] + ' ' + (r['Branch Name'] || '');
+            const body = '<h1 style="font-size:18px;font-weight:700;margin-bottom:6px">🏷️ ' + esc(title) + '</h1>' + _cleanClone(document.getElementById('modalBody'));
+            if (!_openPrintWindow(title, body, 'A4 portrait')) _doPrint('detail', 'A4 portrait');
+        }
+        function printReport() {
+            if (!filtered.length) { alert('ไม่มีข้อมูลให้พิมพ์'); return; }
+            const body = '<h1 style="font-size:18px;font-weight:700">🏷️ รายงานพื้นที่เก็บ Fixed Asset &amp; ระดับสีสาขา</h1>' +
+                '<p style="font-size:11px;color:#64748b;margin-bottom:8px">พิมพ์เมื่อ ' + esc(fdate(new Date())) + ' · ' + filtered.length + ' รายการ (ตามตัวกรองปัจจุบัน)</p>' +
+                _cleanClone(document.getElementById('reportRoot'));
+            if (!_openPrintWindow('Fixed Asset Report', body, 'A4 landscape')) _doPrint('list', 'A4 landscape');
+        }
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); currentId = null; }
+        function canEdit() { return isAdmin || smfCanEdit || opsCanEdit || (currentRecord && _userEmail && String(currentRecord['Reporter Email']).toLowerCase() === _userEmail.toLowerCase()); }
+        function photos(list) { return (list || []).map(function(u) { return '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" class="w-20 h-20 object-cover rounded border"></a>'; }).join(''); }
+        function chips(list, cls) { return (list || []).map(function(x) { return '<span class="inline-block text-[11px] rounded px-1.5 py-0.5 mr-1 mb-1 ' + cls + '">' + esc(x) + '</span>'; }).join(''); }
+
+        function renderModal(r) {
+            const d = r['Asset_JSON'] || {}, att = r['Attachments_JSON'] || {}, sc = d.score || { vals: {}, scores: {} }, t = d.totals || { cnt: {} };
+            const C = FC, col = color(r['Survey Color']) || C.colors[0];
+            let h = '';
+            if (suspectBranch(r)) h += '<div class="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800">⚠️ ส่งก่อนแก้ไขชื่อสาขา (3 Nov 2026) — ช่วงนั้นรหัส ' + esc(r['Branch Code']) +
+                ' แสดงชื่อไทยของสาขาอื่น ผู้สำรวจอาจเลือกสาขาผิด กรุณาตรวจชื่อผู้สำรวจ / เบอร์โทร / รูปแบบฟอร์มกระดาษ ว่าเป็นสาขานี้จริง' + (isAdmin ? ' หากผิดให้ใช้ "ย้ายไปสาขาที่ถูกต้อง" ด้านล่าง' : '') + '</div>';
+            h += '<div class="detail-row"><span class="detail-label">สาขา</span><span class="detail-value">' + esc(r['Branch Code']) + ' - ' + esc(r['Branch Name']) + ' · ' + esc(r['Store Format']) + ' · VP ' + esc(r['VP'] || '-') + '</span></div>' +
+                (r['Branch Moved'] ? '<div class="detail-row"><span class="detail-label">ย้ายสาขา</span><span class="detail-value text-xs">' + esc(r['Branch Moved']) + '</span></div>' : '') +
+                '<div class="detail-row"><span class="detail-label">ผู้สำรวจ / วันที่</span><span class="detail-value">' + esc(r['Reporter Name']) + ' · ' + esc(r['Reporter Phone'] || '') + ' · ' + fdate(r['Timestamp']) + '</span></div>';
+            h += '<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">ผลจากเกณฑ์ ' + pill(r['Survey Color'], ' ' + col.l + ' · ' + num(r['Score (0-18)']) + '/18') +
+                ' <span>แรงงาน <b>' + esc(r['Labor (people x days)']) + '</b> · <b>' + fmt(r['Est. Labor Cost (THB)']) + ' ฿</b></span>' +
+                (r['VP Color'] ? ' <span class="text-slate-500">· VP ประเมิน</span> ' + pill(r['VP Color'], ' ' + r['VP Need (people)'] + ' คน') : '') +
+                (r['Red Override'] === 'Yes' ? ' <span class="text-xs text-red-600 font-bold">แดงอัตโนมัติ (พื้นที่/จำนวนเกินเกณฑ์)</span>' : '') + '</div>';
+            if (d.propose && d.propose.color) h += '<p class="text-xs mt-1">ผู้สำรวจเสนอ ' + pill(d.propose.color) + ' — ' + esc(d.propose.reason || '') + '</p>';
+            h += '<div class="border border-violet-200 rounded-lg p-3 mt-3"><b class="text-xs">📄 หลักฐาน: แบบฟอร์มกระดาษ</b>' +
+                ((att.hfa_paper || []).length ? '<div class="flex flex-wrap gap-2 mt-2">' + photos(att.hfa_paper) + '</div>' : '<p class="text-xs text-slate-400 mt-1">ไม่มีรูป (ส่งก่อนบังคับแนบแบบฟอร์ม)</p>') + '</div>';
+            // criteria table
+            h += '<table class="min-w-full text-xs border-collapse mt-3"><tr class="bg-slate-50"><th class="p-1.5 border text-left">เกณฑ์</th><th class="p-1.5 border text-right">ค่าที่วัดได้</th><th class="p-1.5 border text-center">เกณฑ์ 1/2/3</th><th class="p-1.5 border text-center">คะแนน</th></tr>' +
+                C.criteria.map(function(c) { return '<tr><td class="p-1.5 border"><b>' + c.k + '</b> ' + esc(c.l) + '</td><td class="p-1.5 border text-right">' + esc(Number(sc.vals[c.k] || 0).toLocaleString()) + ' ' + esc(c.unit) + '</td><td class="p-1.5 border text-center text-slate-500">' + c.cuts.map(function(x) { return '≥' + x.toLocaleString(); }).join(' / ') + '</td><td class="p-1.5 border text-center font-bold">' + num(sc.scores[c.k]) + '</td></tr>'; }).join('') + '</table>';
+            if ((t.factors || []).length) h += '<p class="text-[11px] text-orange-700 mt-1">K5: ' + esc(t.factors.join(' · ')) + '</p>';
+            h += '<p class="text-[11px] text-orange-700">K6 โปรไฟล์สาขา: ' + esc((t.profile || []).join(' · ') || 'ไม่เข้าเงื่อนไข') + ' <span class="text-slate-400">(ขนาด ' + esc(r['Store Size Class'] || '-') + ' · อายุ ' + esc(r['Store Age (yrs)'] === '' ? '-' : r['Store Age (yrs)']) + ' ปี · ชั้น/อาคาร ' + esc(r['Levels / Buildings'] || '-') + ')</span></p>';
+            // class totals
+            h += '<div class="mt-3 text-xs"><b>จำนวนชิ้นรวม ~' + fmt(t.pieces) + '</b> · ' + C.classes.map(function(c) { return esc(c.k) + ' <b class="' + (c.other ? 'text-orange-700' : '') + '">' + fmt((t.cnt || {})[c.k]) + '</b>'; }).join(' · ') +
+                ' · ของหนัก ' + fmt(t.heavy) + ' · น่าจะนำกลับมาใช้ได้ ' + fmt(t.reuse) + '</div>';
+            (d.areas || []).forEach(function(a) {
+                const c = a.calc || {};
+                h += '<div class="border ' + ((a.hazard || []).length ? 'border-red-300' : 'border-violet-200') + ' rounded-lg p-3 mt-4">' +
+                    '<div class="flex flex-wrap justify-between gap-2"><b>📦 ' + esc(r['Branch Code'] + '-' + a.aid + ' · ' + (a.name || '-')) + (a.type ? ' · ' + esc(a.type) : '') + (a.floor ? ' · ชั้น ' + esc(a.floor) : '') + '</b>' +
+                        '<span class="text-xs px-2 py-0.5 rounded-full font-bold bg-violet-100 text-violet-800">' + fmt(c.sqm) + ' ตร.ม.' + (a.bays ? ' (' + a.bays + ' ช่องจอด)' : '') + ' · ~' + fmt(c.pieces) + ' ชิ้น</span></div>' +
+                    '<p class="text-xs mt-1">เต็มพื้นที่ ' + esc(a.fill || '-') + ' · สูง ' + esc(a.height || '-') + ' · ' + esc(a.access || '-') + ' · Tag ' + esc(a.tag || '-') + '</p>' +
+                    '<p class="text-xs mt-1">' + C.classes.filter(function(k) { return num((a.cnt || {})[k.k]); }).map(function(k) { return esc(k.l) + ' <b>' + num(a.cnt[k.k]) + '</b>'; }).join(' · ') + (a.heavy ? ' · ของหนัก ' + a.heavy : '') + (a.reuse ? ' · นำกลับมาใช้ได้ ' + a.reuse : '') + '</p>' +
+                    ((a.equip || []).length ? '<div class="mt-1">' + chips(a.equip, 'bg-slate-100 text-slate-700') + '</div>' : '') +
+                    ((a.hazard || []).length ? '<div>' + chips(a.hazard, 'bg-red-50 text-red-700 font-semibold') + '</div>' : '') +
+                    (a.nt ? '<p class="text-xs text-slate-600 mt-1">หมายเหตุ: ' + esc(a.nt) + '</p>' : '') +
+                    '<div class="flex flex-wrap gap-2 mt-2">' + photos(att[a.pk]) + '</div></div>';
+            });
+            const mis = (d.mis || []).filter(function(m) { return m.a || m.b || m.c; });
+            if (mis.length) h += '<div class="border border-sky-200 rounded-lg p-3 mt-4 text-xs"><b>💻 ทรัพย์สิน MIS (นับแยก ไม่คิดคะแนน)</b><table class="min-w-full mt-1 border-collapse"><tr class="bg-sky-50"><th class="p-1 border text-left">ประเภท</th><th class="p-1 border">A</th><th class="p-1 border">B</th><th class="p-1 border">C</th><th class="p-1 border">จากที่อื่น</th><th class="p-1 border">ไม่มี Tag</th><th class="p-1 border text-left">พบที่</th></tr>' +
+                mis.map(function(m) { return '<tr><td class="p-1 border">' + esc(m.t) + '</td><td class="p-1 border text-center">' + num(m.a) + '</td><td class="p-1 border text-center">' + num(m.b) + '</td><td class="p-1 border text-center">' + num(m.c) + '</td><td class="p-1 border text-center">' + num(m.oth) + '</td><td class="p-1 border text-center">' + num(m.notag) + '</td><td class="p-1 border">' + esc(m.loc || '') + '</td></tr>'; }).join('') + '</table></div>';
+            const f = d.floor || {}, sp = d.sup || {}, src = d.src || {};
+            h += '<div class="border border-slate-200 rounded-lg p-3 mt-4 text-xs"><b>แหล่งที่มา / พื้นที่ขาย / Supplier / Pipeline</b>' +
+                '<p class="mt-1">แหล่งที่มาอื่น (K3): <b>' + num(t.sources != null ? t.sources : src.n) + ' ที่</b>' + (src.names ? ' — ' + esc(src.names) : '') + '</p>' +
+                '<p class="mt-1">Tag ในพื้นที่ขาย: ' + esc(f.tag || '-') + ' · สงสัยมาจากสาขาอื่น (A.2) ' + num(f.a2) + ' ชิ้น · พนักงานสาขาช่วยนับ ' + num(f.staff) + ' คน</p>' +
+                '<p class="mt-1">Supplier: ' + esc(sp.names || '-') + ' · ' + (sp.notified === 'Yes' ? 'แจ้งแล้ว' : sp.notified === 'No' ? '<b class="text-red-600">ยังไม่แจ้ง</b>' : '-') + ' · Pipeline ประมูล ' + num((d.pipe || {}).items) + ' รายการ</p>' +
+                (f.nt ? '<p class="mt-1 text-slate-600">' + esc(f.nt) + '</p>' : '') + '</div>';
+            const ed = canEdit() ? '' : ' disabled';
+            h += '<div class="print-only mt-4 text-xs">' + (r['Has Broken'] === 'Yes' ? '<p class="text-red-700 font-bold">⚠️ จุดอันตรายต้องแก้ทันที: ' + esc(r['Broken Detail'] || '') + '</p>' : '') +
+                (r['Comments'] ? '<p class="mt-1"><b>สรุป / ข้อเสนอ:</b> ' + esc(r['Comments']) + '</p>' : '') + '</div>';
+            h += '<div class="no-print mt-5 p-3 bg-red-50 border border-red-200 rounded-lg"><label class="flex items-center gap-2 text-xs font-bold text-red-700"><input type="checkbox" id="editHasBroken"' + (r['Has Broken'] === 'Yes' ? ' checked' : '') + ed + '> ⚠️ มีจุดอันตรายต้องแก้ทันที</label>' +
+                '<textarea id="editBrokenDetail" rows="2" class="mt-2 w-full border border-red-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Broken Detail'] || '') + '</textarea></div>' +
+                '<div class="no-print mt-3"><label class="text-xs font-semibold text-slate-500">สรุป / ข้อเสนอการเคลียร์ทรัพย์สิน</label><textarea id="editComments" rows="3" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + ed + '>' + esc(r['Comments'] || '') + '</textarea></div>' +
+                '<p class="no-print text-[11px] text-slate-400 mt-2">แก้ไขข้อมูลพื้นที่เก็บ: ส่งแบบสำรวจใหม่ (รายงานใช้รายการล่าสุดของสาขา)</p>';
+            if (isAdmin) h += '<div class="no-print mt-4 p-3 border border-slate-300 rounded-lg"><b class="text-xs">🔁 ย้ายไปสาขาที่ถูกต้อง (Admin)</b>' +
+                '<p class="text-[11px] text-slate-500 mt-1">ใช้เมื่อสาขาเลือกรหัสผิด — ข้อมูลพื้นที่/จำนวนชิ้นคงเดิม ระบบคำนวณ VP, K6, คะแนน และสีใหม่ตามสาขาปลายทาง · ใส่รหัสเดิมเพื่อยืนยันว่าสาขาถูกต้อง</p>' +
+                '<div class="flex gap-2 mt-2"><input id="moveCode" list="moveStores" placeholder="พิมพ์รหัส / ชื่อสาขา" value="' + esc(suspectBranch(r) ? r['Branch Code'] : '') + '" class="flex-1 border border-slate-300 rounded px-2 py-1 text-sm">' +
+                '<datalist id="moveStores">' + STORES.map(function(s) { return '<option value="' + esc(s[0]) + '">' + esc(s[0] + ' ' + [s[3], s[2]].filter(Boolean).join(' / ') + ' · ' + s[4]) + '</option>'; }).join('') + '</datalist>' +
+                '<button id="moveBtn" onclick="moveRecord()" class="px-3 py-1 text-sm font-bold text-white bg-slate-700 rounded hover:bg-slate-800">ย้าย</button></div></div>';
+            document.getElementById('modalBody').innerHTML = h;
+            document.getElementById('saveBtn').classList.toggle('hidden', !canEdit());
+        }
+        function saveRecord() {
+            const form = { id: currentId, clientEmail: _userEmail, hasBroken: document.getElementById('editHasBroken').checked ? 'Yes' : 'No',
+                           brokenDetail: document.getElementById('editBrokenDetail').value, comments: document.getElementById('editComments').value };
+            if (form.hasBroken === 'Yes' && !form.brokenDetail.trim()) { alert('กรุณาระบุจุดอันตราย'); return; }
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); }).updateHyperFaSurveyRecord(form);
+        }
+        function moveRecord() {
+            const code = (document.getElementById('moveCode').value || '').trim().split(' ')[0];
+            const s = storeOf(code);
+            if (!s) { alert('ไม่พบรหัสสาขา: ' + code); return; }
+            const others = allData.filter(function(r) { return String(r['Branch Code']) === s[0]; }).length;
+            if (currentRecord && String(currentRecord['Branch Code']) === s[0]) {
+                if (!confirm('ยืนยันว่ารายการนี้เป็นของสาขา ' + s[0] + ' ' + (s[3] || s[2]) + ' ถูกต้อง? (ล้างเครื่องหมาย ⚠️ ตรวจสอบสาขา)')) return;
+            } else if (!confirm('ย้ายรายการนี้จาก ' + (currentRecord ? currentRecord['Branch Code'] : '') + ' ไป ' + s[0] + ' ' + (s[3] || s[2]) + ' ?' +
+                         (others ? '\n\nสาขาปลายทางมีรายการอยู่แล้ว ' + others + ' รายการ — รายงานจะใช้รายการล่าสุด' : ''))) return;
+            const btn = document.getElementById('moveBtn'); btn.disabled = true; btn.textContent = 'กำลังย้าย...';
+            google.script.run.withSuccessHandler(function(res) {
+                if (res && res.success) { closeModal(); loadData(); } else { btn.disabled = false; btn.textContent = 'ย้าย'; alert('ย้ายไม่สำเร็จ: ' + (res && res.error)); }
+            }).withFailureHandler(function(err) { btn.disabled = false; btn.textContent = 'ย้าย'; alert('Server Error: ' + err.message); }).hyperFaMoveRecord(currentId, s[0], _userEmail);
+        }
+        function deleteRecord() {
+            if (!currentId || !confirm('ยืนยันการลบรายการนี้?')) return;
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadData(); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); }).deleteHyperFaSurveyRecord(currentId, _userEmail);
+        }
+
+        function downloadToExcel(btn) {
+            if (!filtered.length) { alert('ไม่มีข้อมูล'); return; }
+            const cols = ['Timestamp', 'Branch Code', 'Branch Name', 'Store Format', 'VP', 'Reporter Name', 'VP Need (people)', 'VP Color', 'Survey Color', 'Score (0-18)', 'Color Gap', 'Proposed Color', 'Red Override',
+                'K1 Score', 'K2 Score', 'K3 Score', 'K4 Score', 'K5 Score', 'K6 Score', 'Store Size Class', 'Store Age (yrs)', 'Levels / Buildings', 'Profile Factors', 'FA Areas', 'Storage Area (sqm)', 'Est. Pieces'].concat(FC.classes.map(function(c) { return 'Pieces ' + c.k; })).concat([
+                'Other-Origin %', 'Origin Sources', 'Origin Source Names', 'Tagged %', 'Heavy Items', 'Reusable Items', 'Handling Factors', 'Labor (people x days)', 'Est. Labor Cost (THB)',
+                'Floor Tagged', 'Floor A2 Suspected', 'Store Staff Available', 'Unknown/Supplier Items (.3)', 'Supplier Notified', 'Pipeline Items', 'Hazard Areas',
+                'MIS Items', 'MIS Not Used', 'MIS Other-Origin', 'MIS No Tag', 'Has Broken', 'Broken Detail', 'Comments', 'Branch Moved']);
+            const rows = [cols.concat(['Status'])];
+            filtered.forEach(function(x) {
+                const s = x.s || [];
+                if (x.r) rows.push(cols.map(function(c) { return c === 'Timestamp' ? fdate(x.r[c]) : (x.r[c] == null ? '' : x.r[c]); }).concat(['Surveyed']));
+                else rows.push(cols.map(function(c) { return c === 'Branch Code' ? s[0] : c === 'Branch Name' ? (s[3] || s[2]) : c === 'Store Format' ? s[4] : c === 'VP' ? s[5] : c === 'VP Need (people)' ? s[8] : c === 'VP Color' ? vpColor(s[8]) : ''; }).concat(['Not surveyed']));
+            });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Stores');
+            const areas = [['Branch Code', 'Branch Name', 'Survey ID', 'พื้นที่', 'ชื่อพื้นที่', 'ประเภท', 'ชั้น', 'ตร.ม.', 'ช่องจอด', 'ตร.ม.รวม', 'เต็มพื้นที่', 'ความสูง', 'การเข้าถึง', 'Tag']
+                .concat(FC.classes.map(function(c) { return c.l; })).concat(['รวมชิ้น', 'ของหนัก', 'นำกลับมาใช้ได้', 'อุปกรณ์', 'ความเสี่ยง', 'หมายเหตุ'])];
+            const surveyed = filtered.filter(function(x) { return x.r; });
+            let pending = surveyed.length;
+            const finish = function() {
+                if (--pending > 0) return;
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(areas), 'Storage Areas');
+                XLSX.writeFile(wb, 'hyper_fixed_asset_precount_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+                if (btn) { btn.disabled = false; btn.textContent = '⬇ Export Excel'; }
+            };
+            if (btn) { btn.disabled = true; btn.textContent = 'กำลังเตรียมข้อมูล...'; }
+            if (!pending) { pending = 1; finish(); return; }
+            surveyed.forEach(function(x) {
+                const r = x.r;
+                google.script.run.withSuccessHandler(function(res) {
+                    const d = res && res.success ? res.data['Asset_JSON'] || {} : {};
+                    (d.areas || []).forEach(function(a) {
+                        areas.push([r['Branch Code'], r['Branch Name'], r['ID'], a.aid, a.name, a.type, a.floor, a.sqm || '', a.bays || '', (a.calc || {}).sqm, a.fill, a.height, a.access, a.tag]
+                            .concat(FC.classes.map(function(c) { return num((a.cnt || {})[c.k]) || ''; })).concat([(a.calc || {}).pieces, a.heavy || '', a.reuse || '', (a.equip || []).join(', '), (a.hazard || []).join(', '), a.nt]));
+                    });
+                    finish();
+                }).withFailureHandler(finish).getHyperFaSurveyRecordById(r['ID']);
+            });
+        }
+    </script>
+</body>
+</html>

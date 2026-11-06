@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fresh Food Register Upload</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }
+        .tbl th { position: sticky; top: 0; background: #f8fafc; }
+    </style>
+</head>
+
+<body>
+
+    <?!= include('auth') ?>
+
+    <div id="access-denied" class="hidden min-h-screen flex items-center justify-center">
+        <div class="text-center bg-white rounded-xl shadow-lg p-10 max-w-sm">
+            <div class="text-6xl mb-4">🔒</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
+            <p class="text-gray-500 mb-6">หน้านี้สำหรับ Admin เท่านั้น</p>
+            <a href="<?= ScriptApp.getService().getUrl() ?>" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">Back to App</a>
+        </div>
+    </div>
+
+    <div id="main-page" class="hidden min-h-screen">
+        <header class="bg-violet-700 text-white shadow-md">
+            <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center gap-3">
+                <div>
+                    <h1 class="text-lg sm:text-xl font-bold">📥 ทะเบียนอุปกรณ์ Fresh Food — อัปโหลด</h1>
+                    <p class="text-violet-200 text-xs mt-0.5">ข้อมูลที่ใช้เติมการ์ด "📥 เติมการ์ดจากทะเบียน" ในแบบสำรวจ 🍞 Fresh Food Hyper และแสดงเทียบในรายงาน</p>
+                </div>
+                <div class="text-right shrink-0">
+                    <div id="user-email-display" class="text-xs text-violet-200"></div>
+                    <a href="<?= ScriptApp.getService().getUrl() ?>" class="text-sm underline">กลับหน้าหลัก</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+            <!-- Current register -->
+            <section class="bg-white rounded-xl shadow p-5">
+                <h2 class="font-bold text-gray-800 mb-3">ทะเบียนที่ใช้งานอยู่ตอนนี้</h2>
+                <div id="cur-box" class="text-sm text-gray-500">กำลังโหลด…</div>
+                <div class="flex flex-wrap gap-2 mt-4">
+                    <button type="button" onclick="downloadCurrent()" class="px-3 py-1.5 rounded-lg border border-gray-300 text-sm hover:bg-gray-50">⬇️ ดาวน์โหลดทะเบียนปัจจุบัน (.xlsx)</button>
+                    <button type="button" id="btn-undo" onclick="undoUpload()" class="hidden px-3 py-1.5 rounded-lg border border-amber-300 text-amber-800 bg-amber-50 text-sm hover:bg-amber-100">↩️ ย้อนกลับไปไฟล์ก่อนหน้า</button>
+                    <button type="button" id="btn-builtin" onclick="useBuiltIn()" class="hidden px-3 py-1.5 rounded-lg border border-red-200 text-red-700 text-sm hover:bg-red-50">หยุดใช้ไฟล์อัปโหลด (กลับไปใช้ข้อมูลตั้งต้น)</button>
+                </div>
+                <div id="action-status" class="text-xs mt-2"></div>
+            </section>
+
+            <!-- Upload -->
+            <section class="bg-white rounded-xl shadow p-5">
+                <h2 class="font-bold text-gray-800 mb-2">อัปโหลดทะเบียนใหม่</h2>
+                <ol class="list-decimal list-inside text-sm text-gray-600 space-y-1 mb-4">
+                    <li>เลือกไฟล์ Excel <b>FF Inspection</b> (.xlsx) — ใช้ชีต <b>main machine</b> (หรือชีตแรกที่มีหัวคอลัมน์ครบ)</li>
+                    <li>ระบบอ่านเฉพาะแถวที่ <b>category name = FF equipment</b> แล้วแสดง <b>ตัวอย่างผลลัพธ์</b> ให้ตรวจก่อน — ยังไม่บันทึก</li>
+                    <li>กด <b>✅ ยืนยันใช้ทะเบียนนี้</b> — มีผลกับแบบสำรวจทันที (ไฟล์เดิมเก็บไว้ ย้อนกลับได้)</li>
+                </ol>
+                <details class="text-xs text-gray-500 mb-4">
+                    <summary class="cursor-pointer text-violet-700 font-semibold">หัวคอลัมน์ที่ต้องมี</summary>
+                    <p class="mt-2"><code>store code</code> · <code>category name</code> · <code>service type name</code> · <code>asset name</code> · <code>quantity</code> · <code>installation year</code> · <code>ราคาซื้อใหม่ (THB)</code> · <code>มูลค่างานซ่อม 5 ปี (THB)</code> · <code>Remark</code> (ไม่บังคับ)</p>
+                    <p class="mt-1">ประเภทอุปกรณ์จับคู่จาก <code>service type name</code> (เช่น RACK OVEN, Spiral Mixer 80L, Fryer + คำว่า Delica/Seafood ในชื่อ asset) — ชื่อที่ระบบไม่รู้จักจะถูกข้ามและแสดงรายการให้ดู</p>
+                </details>
+                <label class="flex flex-col sm:flex-row sm:items-center gap-3 border-2 border-dashed border-violet-300 bg-violet-50 rounded-xl p-4 cursor-pointer hover:bg-violet-100">
+                    <span class="text-3xl">📄</span>
+                    <span class="flex-1 text-sm text-violet-800"><b>เลือกไฟล์ .xlsx</b><br><span id="file-name" class="text-violet-600 text-xs">ยังไม่ได้เลือกไฟล์</span></span>
+                    <input type="file" id="file" accept=".xlsx,.xls" class="hidden" onchange="onFile(this)">
+                </label>
+                <div id="parse-status" class="text-sm mt-3"></div>
+                <div id="preview" class="hidden mt-4"></div>
+            </section>
+
+            <!-- Stores in current register -->
+            <section class="bg-white rounded-xl shadow p-5">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <h2 class="font-bold text-gray-800">สาขาในทะเบียนปัจจุบัน</h2>
+                    <input id="store-q" oninput="renderStores()" placeholder="ค้นหารหัส / ชื่อสาขา" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-56">
+                </div>
+                <div class="max-h-96 overflow-auto border border-gray-200 rounded-lg">
+                    <table class="tbl w-full text-sm">
+                        <thead><tr class="text-left text-gray-600"><th class="p-2">รหัส</th><th class="p-2">สาขา</th><th class="p-2 text-right">เครื่อง</th><th class="p-2 text-right">ประเภท</th></tr></thead>
+                        <tbody id="store-body"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const FO_CATS = <?!= JSON.stringify(getHyperFoConfig_().categories.map(function(c) { return { id: c.id, title: c.title }; })) ?>;
+        let _info = null, _raw = null, _fileName = '';
+
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) updateUserUI(CURRENT_USER);
+        });
+
+        // Called by auth.html after login, or by the listener above
+        function updateUserUI(user) {
+            const d = document.getElementById('user-email-display');
+            if (d) d.textContent = user ? (user.name || user.email) : '';
+            const ok = user && (user.isAdmin || user.isSysAdmin);
+            document.getElementById('access-denied').classList.toggle('hidden', !!ok);
+            document.getElementById('main-page').classList.toggle('hidden', !ok);
+            if (ok) loadInfo();
+        }
+
+        function _email() { return (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.email : ''; }
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function fmt(n) { return Number(n || 0).toLocaleString('en-US'); }
+        function setStatus(id, html, cls) { const el = document.getElementById(id); el.className = 'text-sm mt-3 ' + (cls || ''); el.innerHTML = html; }
+
+        function loadInfo() {
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (!res || !res.success) { document.getElementById('cur-box').textContent = 'โหลดไม่สำเร็จ: ' + ((res && res.error) || 'no response'); return; }
+                    _info = res;
+                    const m = res.meta || {};
+                    const st = res.stats;
+                    document.getElementById('cur-box').innerHTML =
+                        '<div class="flex flex-wrap items-center gap-2 mb-2">' +
+                            (res.uploaded
+                                ? '<span class="px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 text-xs font-bold">ไฟล์ที่อัปโหลด</span>'
+                                : '<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-bold">ข้อมูลตั้งต้น (ในโค้ด)</span>') +
+                            '<b class="text-gray-800">' + esc(res.source || '-') + '</b>' +
+                        '</div>' +
+                        '<div class="grid grid-cols-3 gap-3 max-w-md">' +
+                            stat('สาขา', st.stores) + stat('แถว', st.rows) + stat('เครื่อง', st.units) +
+                        '</div>' +
+                        (res.uploaded && m.updatedAt ? '<p class="text-xs text-gray-500 mt-2">อัปโหลดเมื่อ ' + esc(m.updatedAt) + ' โดย ' + esc(m.updatedBy) + (m.fileName ? ' · ไฟล์ ' + esc(m.fileName) : '') + '</p>' : '') +
+                        (res.prev ? '<p class="text-xs text-gray-500 mt-1">ไฟล์ก่อนหน้า: ' + esc(res.prev.source) + ' (' + esc(res.prev.updatedAt || '') + ')</p>' : '');
+                    document.getElementById('btn-undo').classList.toggle('hidden', !res.prev);
+                    document.getElementById('btn-builtin').classList.toggle('hidden', !res.uploaded);
+                    renderStores();
+                })
+                .withFailureHandler(function (e) { document.getElementById('cur-box').textContent = 'โหลดไม่สำเร็จ: ' + e.message; })
+                .getHyperFoRegisterAdminInfo(_email());
+        }
+        function stat(label, n) { return '<div class="bg-gray-50 border border-gray-200 rounded-lg p-2 text-center"><div class="text-lg font-bold text-gray-800">' + fmt(n) + '</div><div class="text-xs text-gray-500">' + label + '</div></div>'; }
+
+        function renderStores() {
+            const body = document.getElementById('store-body');
+            if (!_info) return;
+            const q = (document.getElementById('store-q').value || '').toLowerCase().trim();
+            const rows = _info.stores.filter(function (r) { return !q || (r[0] + ' ' + r[1]).toLowerCase().indexOf(q) !== -1; });
+            body.innerHTML = rows.map(function (r) {
+                return '<tr class="border-t border-gray-100"><td class="p-2 font-mono">' + esc(r[0]) + '</td><td class="p-2">' + esc(r[1]) + '</td><td class="p-2 text-right">' + fmt(r[2]) + '</td><td class="p-2 text-right">' + fmt(r[3]) + '</td></tr>';
+            }).join('') || '<tr><td colspan="4" class="p-4 text-center text-gray-400">ไม่พบสาขา</td></tr>';
+        }
+
+        // ── Read the Excel in the browser ──────────────────────────────────────
+        const NEED = {
+            store: ['store code'], cat: ['category name'], svc: ['service type name'], asset: ['asset name'],
+            qty: ['quantity'], year: ['installation year'], price: ['ราคาซื้อใหม่ (thb)', 'ราคาซื้อใหม่'], repair: ['มูลค่างานซ่อม 5 ปี (thb)2', 'มูลค่างานซ่อม 5 ปี (thb)', 'มูลค่างานซ่อม 5 ปี']
+        };
+        function _norm(h) { return String(h == null ? '' : h).replace(/\s+/g, ' ').trim().toLowerCase(); }
+        function _findCols(hdr) {
+            const n = hdr.map(_norm), ix = {}, missing = [];
+            Object.keys(NEED).forEach(function (k) {
+                let i = -1;
+                NEED[k].some(function (want) { i = n.indexOf(want); if (i === -1) i = n.findIndex(function (h) { return h.indexOf(want) === 0; }); return i !== -1; });
+                if (i === -1) missing.push(NEED[k][0]); else ix[k] = i;
+            });
+            ix.remark = n.indexOf('remark');
+            ix.name = n.indexOf('store name');   // optional — lets the server catch known wrong codes in the file
+            return { ix: ix, missing: missing };
+        }
+
+        function onFile(input) {
+            const f = input.files && input.files[0];
+            document.getElementById('preview').classList.add('hidden');
+            _raw = null;
+            if (!f) return;
+            _fileName = f.name;
+            document.getElementById('file-name').textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
+            setStatus('parse-status', '⏳ กำลังอ่านไฟล์…', 'text-gray-600');
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+                    const names = wb.SheetNames.slice().sort(function (a, b) { return (_norm(b) === 'main machine') - (_norm(a) === 'main machine'); });
+                    let found = null, lastMissing = [];
+                    names.some(function (name) {
+                        const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
+                        if (!rows.length) return false;
+                        const c = _findCols(rows[0]);
+                        if (c.missing.length) { if (_norm(name) === 'main machine') lastMissing = c.missing; return false; }
+                        found = { name: name, rows: rows, ix: c.ix };
+                        return true;
+                    });
+                    if (!found) {
+                        setStatus('parse-status', '❌ ไม่พบชีตที่มีหัวคอลัมน์ครบ' + (lastMissing.length ? ' — ชีต main machine ขาด: <b>' + esc(lastMissing.join(', ')) + '</b>' : ''), 'text-red-600');
+                        return;
+                    }
+                    const ix = found.ix;
+                    const raw = [];
+                    let total = 0;
+                    found.rows.slice(1).forEach(function (r) {
+                        if (!r || r[ix.store] == null || r[ix.store] === '') return;
+                        total++;
+                        if (_norm(r[ix.cat]) !== 'ff equipment') return;
+                        raw.push([r[ix.store], r[ix.svc], r[ix.asset], r[ix.qty], r[ix.year], r[ix.price], r[ix.repair], ix.remark >= 0 ? r[ix.remark] : '', ix.name >= 0 ? r[ix.name] : '']);
+                    });
+                    if (!raw.length) { setStatus('parse-status', '❌ ชีต <b>' + esc(found.name) + '</b> ไม่มีแถว category name = FF equipment', 'text-red-600'); return; }
+                    _raw = raw;
+                    setStatus('parse-status', '⏳ อ่านชีต <b>' + esc(found.name) + '</b>: ' + fmt(total) + ' แถว → FF equipment ' + fmt(raw.length) + ' แถว — กำลังตรวจสอบกับระบบ…', 'text-gray-600');
+                    google.script.run
+                        .withSuccessHandler(function (res) { showPreview(res, found.name); })
+                        .withFailureHandler(function (err) { setStatus('parse-status', '❌ ตรวจสอบไม่สำเร็จ: ' + esc(err.message), 'text-red-600'); })
+                        .previewHyperFoRegisterUpload(_email(), raw);
+                } catch (err) {
+                    setStatus('parse-status', '❌ อ่านไฟล์ไม่ได้: ' + esc(err.message), 'text-red-600');
+                }
+            };
+            reader.readAsArrayBuffer(f);
+        }
+
+        function showPreview(res, sheetName) {
+            if (!res || !res.success) { setStatus('parse-status', '❌ ' + esc((res && res.error) || 'no response'), 'text-red-600'); return; }
+            setStatus('parse-status', '✅ ตรวจสอบแล้ว — ชีต <b>' + esc(sheetName) + '</b> (ยังไม่ได้บันทึก)', 'text-green-700');
+            const s = res.stats, c = res.current;
+            const diff = function (a, b) { const d = a - b; return d === 0 ? '<span class="text-gray-400">±0</span>' : '<span class="' + (d > 0 ? 'text-green-700' : 'text-red-600') + '">' + (d > 0 ? '+' : '') + fmt(d) + '</span>'; };
+            const unm = Object.keys(res.unmatched || {});
+            const unp = Object.keys(res.unmapped || {});
+            let h = '<div class="grid grid-cols-3 gap-3 max-w-lg mb-3">' +
+                ['stores|สาขา', 'rows|แถว', 'units|เครื่อง'].map(function (x) {
+                    const k = x.split('|');
+                    return '<div class="bg-violet-50 border border-violet-200 rounded-lg p-2 text-center"><div class="text-lg font-bold text-violet-800">' + fmt(s[k[0]]) + '</div><div class="text-xs text-gray-500">' + k[1] + ' (เดิม ' + fmt(c[k[0]]) + ' ' + diff(s[k[0]], c[k[0]]) + ')</div></div>';
+                }).join('') + '</div>';
+            if (unp.length) {
+                h += '<div class="bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-900 mb-3"><b>⚠️ ประเภทอุปกรณ์ที่ระบบไม่รู้จัก ' + unp.length + ' แบบ (' + fmt(unp.reduce(function (a, k) { return a + res.unmapped[k]; }, 0)) + ' แถว) — จะถูกข้าม</b>' +
+                    '<ul class="list-disc list-inside text-xs mt-1">' + unp.slice(0, 20).map(function (k) { return '<li>' + esc(k) + ' × ' + res.unmapped[k] + '</li>'; }).join('') + (unp.length > 20 ? '<li>…</li>' : '') + '</ul>' +
+                    '<p class="text-xs mt-1">ถ้าเป็นอุปกรณ์ที่ต้องการ ให้แจ้งผู้ดูแลระบบเพิ่มการจับคู่ (HFO_REG_MAP) ก่อนอัปโหลด</p></div>';
+            }
+            if (unm.length) {
+                h += '<div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 mb-3"><b>รหัสสาขาที่ไม่อยู่ในรายชื่อ Hyper (ข้าม) ' + unm.length + ' สาขา:</b> ' + unm.map(esc).join(', ') + '</div>';
+            }
+            if (res.removed && res.removed.length) {
+                h += '<div class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 mb-3"><b>สาขาที่มีในทะเบียนเดิมแต่ไม่มีในไฟล์นี้ ' + res.removed.length + ' สาขา</b> (จะไม่มีข้อมูลให้เติม): ' + res.removed.map(esc).join(', ') + '</div>';
+            }
+            h += '<div class="max-h-72 overflow-auto border border-gray-200 rounded-lg mb-4"><table class="tbl w-full text-sm"><thead><tr class="text-left text-gray-600"><th class="p-2">รหัส</th><th class="p-2">สาขา</th><th class="p-2 text-right">เครื่อง (ใหม่)</th><th class="p-2 text-right">เดิม</th><th class="p-2 text-right">ประเภท</th></tr></thead><tbody>' +
+                res.stores.map(function (r) {
+                    const was = r[5];
+                    const changed = was === null || was !== r[2];
+                    return '<tr class="border-t border-gray-100' + (changed ? ' bg-amber-50' : '') + '"><td class="p-2 font-mono">' + esc(r[0]) + '</td><td class="p-2">' + esc(r[1]) + '</td><td class="p-2 text-right font-semibold">' + fmt(r[2]) + '</td><td class="p-2 text-right text-gray-500">' + (was === null ? '<span class="text-green-700 text-xs">ใหม่</span>' : fmt(was)) + '</td><td class="p-2 text-right">' + fmt(r[3]) + '</td></tr>';
+                }).join('') + '</tbody></table></div>';
+            h += '<div class="flex flex-wrap items-center gap-3">' +
+                '<button type="button" id="btn-commit" onclick="commitUpload()" class="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-5 py-2 rounded-lg shadow">✅ ยืนยันใช้ทะเบียนนี้</button>' +
+                '<button type="button" onclick="cancelPreview()" class="text-gray-600 text-sm hover:underline">ยกเลิก</button>' +
+                '<span class="text-xs text-gray-500">แถวสีเหลือง = จำนวนเปลี่ยนจากเดิม / สาขาใหม่</span></div>';
+            const p = document.getElementById('preview');
+            p.innerHTML = h;
+            p.classList.remove('hidden');
+        }
+
+        function cancelPreview() {
+            _raw = null;
+            document.getElementById('preview').classList.add('hidden');
+            document.getElementById('file').value = '';
+            document.getElementById('file-name').textContent = 'ยังไม่ได้เลือกไฟล์';
+            setStatus('parse-status', '', '');
+        }
+
+        function commitUpload() {
+            if (!_raw) return;
+            const btn = document.getElementById('btn-commit');
+            btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (res && res.success) {
+                        cancelPreview();
+                        setStatus('parse-status', '✅ บันทึกแล้ว — แบบสำรวจ Fresh Food ใช้ทะเบียน <b>' + esc(res.meta.source) + '</b> ตั้งแต่ตอนนี้', 'text-green-700');
+                        loadInfo();
+                    } else {
+                        btn.disabled = false; btn.textContent = '✅ ยืนยันใช้ทะเบียนนี้';
+                        setStatus('parse-status', '❌ ' + esc((res && res.error) || 'บันทึกไม่สำเร็จ'), 'text-red-600');
+                    }
+                })
+                .withFailureHandler(function (e) { btn.disabled = false; btn.textContent = '✅ ยืนยันใช้ทะเบียนนี้'; setStatus('parse-status', '❌ ' + esc(e.message), 'text-red-600'); })
+                .commitHyperFoRegisterUpload(_email(), _raw, _fileName);
+        }
+
+        function _action(fn, confirmMsg) {
+            if (!confirm(confirmMsg)) return;
+            const st = document.getElementById('action-status');
+            st.className = 'text-xs mt-2 text-gray-600'; st.textContent = '⏳ กำลังดำเนินการ…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    st.className = 'text-xs mt-2 ' + (res && res.success ? 'text-green-700' : 'text-red-600');
+                    st.textContent = res && res.success ? '✅ เรียบร้อย' : '❌ ' + ((res && res.error) || 'ไม่สำเร็จ');
+                    loadInfo();
+                })
+                .withFailureHandler(function (e) { st.className = 'text-xs mt-2 text-red-600'; st.textContent = '❌ ' + e.message; })[fn](_email());
+        }
+        function undoUpload() { _action('restorePrevHyperFoRegister', 'ย้อนกลับไปใช้ทะเบียนไฟล์ก่อนหน้า?\n(ไฟล์ปัจจุบันจะถูกเก็บเป็น "ไฟล์ก่อนหน้า" แทน)'); }
+        function useBuiltIn() { _action('useBuiltInHyperFoRegister', 'หยุดใช้ไฟล์ที่อัปโหลด และกลับไปใช้ข้อมูลตั้งต้นในโค้ด?\n(ไฟล์ที่อัปโหลดจะเก็บไว้ ย้อนกลับได้)'); }
+
+        function downloadCurrent() {
+            const st = document.getElementById('action-status');
+            st.className = 'text-xs mt-2 text-gray-600'; st.textContent = '⏳ กำลังเตรียมไฟล์…';
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    if (!res || !res.success) { st.className = 'text-xs mt-2 text-red-600'; st.textContent = '❌ ' + ((res && res.error) || 'ไม่สำเร็จ'); return; }
+                    const title = {}; FO_CATS.forEach(function (c) { title[c.id] = c.title; });
+                    const names = {}; (_info ? _info.stores : []).forEach(function (r) { names[r[0]] = r[1]; });
+                    const aoa = [['Store Code', 'Store Name', 'Category', 'Equipment', 'Size', 'Qty', 'Install Year', 'New Price (THB)', 'Repair 5y (THB)', 'Remark']]
+                        .concat(res.rows.map(function (r) { return [r[0], names[r[0]] || '', r[1], title[r[1]] || r[1], r[2], r[3], r[4], r[5], r[6], r[7]]; }));
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'FF Register');
+                    XLSX.writeFile(wb, 'FF_Register_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+                    st.className = 'text-xs mt-2 text-green-700'; st.textContent = '✅ ดาวน์โหลดแล้ว (' + res.source + ')';
+                })
+                .withFailureHandler(function (e) { st.className = 'text-xs mt-2 text-red-600'; st.textContent = '❌ ' + e.message; })
+                .exportHyperFoRegister(_email());
+        }
+    </script>
+</body>
+
+</html>

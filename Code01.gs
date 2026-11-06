@@ -1,5 +1,12 @@
 function doGet(e) {
   var page = e.parameter.page;
+
+  if (page === 'outbox') {
+    return handleOutboxRequest_(e);
+  }
+
+  if (MANUAL_PAGES_.indexOf(page) > -1) return manualMovedPage_(e);   // manuals moved to the MTN Manuals project
+
   var userEmail = Session.getActiveUser().getEmail();
   
   // LOGGING - Disabled to prevent logging Google Account Email (noise). 
@@ -22,7 +29,7 @@ function doGet(e) {
     var resetTemplate = HtmlService.createTemplateFromFile('reset-password');
     resetTemplate.token = e.parameter.token || '';
     return resetTemplate.evaluate()
-        .setTitle('Reset Password - Mini Big C Maintenance')
+        .setTitle('Reset Password - Big C Maintenance')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "admin-activity-dashboard") {
@@ -102,6 +109,115 @@ function doGet(e) {
         .setTitle('EDMI Solar Meter Survey Report')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "equip") {
+    var eqT = HtmlService.createTemplateFromFile('HyperEquipment');
+    eqT.startId = String((e.parameter && e.parameter.id) || '').substring(0, 40);
+    return eqT.evaluate()
+        .setTitle('Hyper Equipment')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_pk_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperParkingSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Parking & Accessibility Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "store-close-checklist") {
+    var scT = HtmlService.createTemplateFromFile('StoreClosingChecklistPrint');
+    scT.storeCode = String((e.parameter && e.parameter.store) || '').substring(0, 10);
+    return scT.evaluate()
+        .setTitle('Store Closing Checklist')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "store_close_report") {
+    return HtmlService.createTemplateFromFile('StoreClosingChecklistReport')
+        .evaluate()
+        .setTitle('Store Closing Checklist Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "vendor-fire") {
+    // Vendor Portal entry to the fire survey — no app login; the pass in ?t= is checked on every call (HyperFireSurvey.gs)
+    var vfTpl = HtmlService.createTemplateFromFile('vendor-fire');
+    vfTpl.passToken = String((e && e.parameter && e.parameter.t) || '').replace(/[^A-Za-z0-9]/g, '').substring(0, 80);
+    return vfTpl.evaluate()
+        .setTitle('Big C Fire Prevention Survey — Vendor')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_fi_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperFireSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Fire Prevention Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_hb_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperHandBlowerSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Hand Blower Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_fa_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperFixedAssetSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Fixed Asset Pre-Count Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper-fi-checklist") {
+    var fiT = HtmlService.createTemplateFromFile('HyperFireChecklist');
+    fiT.storeCode = String((e.parameter && e.parameter.store) || '').substring(0, 10);
+    return fiT.evaluate()
+        .setTitle('Fire Risk Paper Form')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper-fa-checklist") {
+    var faT = HtmlService.createTemplateFromFile('HyperFixedAssetChecklist');
+    faT.storeCode = String((e.parameter && e.parameter.store) || '').substring(0, 10);
+    faT.edition = e.parameter && e.parameter.v === 'store' ? 'store' : 'ho';
+    return faT.evaluate()
+        .setTitle('Fixed Asset Rating Checklist')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "cctv_survey_report") {
+    return HtmlService.createTemplateFromFile('CctvSurveyReport')
+        .evaluate()
+        .setTitle('CCTV Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_to_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperToiletSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Toilet Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_li_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperLightingSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Lighting Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_fo_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperFreshFoodSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Fresh Food Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_eq_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperEquipSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Equipment Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_ac_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperAirconSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Aircon Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper_ref_survey_report") {
+    return HtmlService.createTemplateFromFile('HyperRefSurveyReport')
+        .evaluate()
+        .setTitle('Hyper Refrigerator Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "layout_survey_report") {
     return HtmlService.createTemplateFromFile('LayoutSurveyReport')
         .evaluate()
@@ -112,6 +228,16 @@ function doGet(e) {
     return HtmlService.createTemplateFromFile('TradingHoursSurveyReport')
         .evaluate()
         .setTitle('Trading Hours Survey Report')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "survey_dashboard") {
+    // One shared template for all 5 survey dashboards, parameterized by
+    // ?type= — same reuse pattern as RefSurveyReport.html serving both Ref
+    // and NP via defaultTab. See SurveyDashboard.gs for the per-type backend.
+    var dashTemplate = HtmlService.createTemplateFromFile('SurveyDashboard');
+    dashTemplate.dashType = e.parameter.type || 'ref';
+    return dashTemplate.evaluate()
+        .setTitle('Survey Dashboard')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "np_survey") {
@@ -142,6 +268,26 @@ function doGet(e) {
     return HtmlService.createTemplateFromFile('upload-schedule')
         .evaluate()
         .setTitle('Survey Upload Schedule')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper-status") {
+    // Data loads async via getHyperSubmissionStatus — no synchronous sheet reads in doGet.
+    return HtmlService.createTemplateFromFile('hyper-status')
+        .evaluate()
+        .setTitle('Hyper Submission & Review Status')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "hyper-schedule") {
+    return HtmlService.createTemplateFromFile('hyper-schedule')
+        .evaluate()
+        .setTitle('Hyper Upload Schedule')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "exec-summary") {
+    // AI executive summary of survey results — data loads async (ExecSummary.gs), nothing read in doGet.
+    return HtmlService.createTemplateFromFile('exec-summary')
+        .evaluate()
+        .setTitle('AI Executive Summary')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "safety-incident-report") {
@@ -192,52 +338,28 @@ function doGet(e) {
         .setTitle('Access Console - Super Admin')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "followup-email") {
+    return HtmlService.createTemplateFromFile('followup-email')
+        .evaluate()
+        .setTitle('AMM MTN Follow-up Email')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "fo-register") {
+    return HtmlService.createTemplateFromFile('fo-register')
+        .evaluate()
+        .setTitle('Fresh Food Register Upload')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else if (page == "to-tracking") {
+    return HtmlService.createTemplateFromFile('to-tracking')
+        .evaluate()
+        .setTitle('Restroom Tracking Upload')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page == "email-config") {
     return HtmlService.createTemplateFromFile('email-config')
         .evaluate()
         .setTitle('Email Delivery Config')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } else if (page == "survey-manual") {
-    return HtmlService.createTemplateFromFile('survey-manual')
-        .evaluate()
-        .setTitle('คู่มือแบบสำรวจแอร์ & ตู้แช่')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } else if (page == "aircon-manual") {
-    return HtmlService.createTemplateFromFile('aircon-manual')
-        .evaluate()
-        .setTitle('คู่มือแบบสำรวจเครื่องปรับอากาศ')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } else if (page == "ref-manual") {
-    return HtmlService.createTemplateFromFile('ref-manual')
-        .evaluate()
-        .setTitle('คู่มือแบบสำรวจตู้แช่')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } else if (page == "np-manual") {
-    return HtmlService.createTemplateFromFile('np-manual')
-        .evaluate()
-        .setTitle('คู่มือแบบสำรวจ New Product')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } else if (page == "layout-manual") {
-    return HtmlService.createTemplateFromFile('layout-manual')
-        .evaluate()
-        .setTitle('คู่มือแบบสำรวจพื้นที่ก่อนติดตั้ง')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } else if (page == "hours-manual") {
-    return HtmlService.createTemplateFromFile('hours-manual')
-        .evaluate()
-        .setTitle('คู่มือแบบสำรวจความพร้อมปรับลดเวลาทำการ')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } else if (page == "edmi-manual") {
-    return HtmlService.createTemplateFromFile('edmi-manual')
-        .evaluate()
-        .setTitle('คู่มือกรอกแบบฟอร์ม EDMI Solar Meter')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else if (page && page.trim().toLowerCase() == "survey-config") {
@@ -508,6 +630,15 @@ function updateEmployee(form) {
 
 function processForm(formObject) {
   try {
+    // Self-registration can be switched off in the Access Console; an Admin/System
+    // Admin registering someone from the Register Profile tab is still allowed.
+    if (!_loginLinkEnabled_('register')) {
+      var regEmail = formObject && formObject.clientEmail;
+      var regCaller = regEmail ? checkAdminStatus(regEmail) : {};
+      if (!regCaller.isAdmin && !regCaller.isSysAdmin) {
+        return { success: false, error: "ปิดการลงทะเบียนด้วยตนเองอยู่ กรุณาติดต่อผู้ดูแลระบบ (Self-registration is disabled — please contact an admin.)" };
+      }
+    }
     var _wlock = _acquireWriteLock_();
     // 0. Check for duplicate email
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
@@ -846,8 +977,10 @@ function checkAdminStatus(clientEmail) {
     var isAdmin = false;
     var isSMF = false;
     var isMMS = false;
+    var isBF = false; // Big Format team (Note column = 'BF' / 'BIG FORMAT')
     var isScheduleAdmin = false;
     var isSysAdmin = false;
+    var department = '';
     var logs = [];
     
     logs.push("Auth Check Start");
@@ -879,6 +1012,7 @@ function checkAdminStatus(clientEmail) {
         var emailIdx = -1;
         var userTypeIdx = -1;
         var noteIdx = -1;
+        var deptIdx = -1;
         
         for (var h = 0; h < headers.length; h++) {
             var header = String(headers[h]).trim().toLowerCase();
@@ -888,6 +1022,8 @@ function checkAdminStatus(clientEmail) {
                 userTypeIdx = h;
             } else if (header === "note" || header === "notes") {
                 noteIdx = h;
+            } else if (header === "department") {
+                deptIdx = h;
             }
         }
         
@@ -911,6 +1047,8 @@ function checkAdminStatus(clientEmail) {
             if (rowEmail === effectiveEmail) {
                 matchFound = true;
                 logs.push(`Match Row ${i+1}: ${rowEmail}`);
+                // Department drives the per-department landing tab (getDeptLandingTabs)
+                if (deptIdx > -1 && !department) department = String(data[i][deptIdx] || '').trim();
                 
                 if (userTypeIdx > -1) {
                     var role = String(data[i][userTypeIdx]).trim().toLowerCase();
@@ -926,6 +1064,10 @@ function checkAdminStatus(clientEmail) {
                         if (!isMMS && teamNote === 'MMS') {
                             isMMS = true;
                             logs.push("MMS team member identified.");
+                        }
+                        if (!isBF && (teamNote === 'BF' || teamNote === 'BIG FORMAT')) {
+                            isBF = true;
+                            logs.push("Big Format team member identified.");
                         }
                     }
 
@@ -949,6 +1091,7 @@ function checkAdminStatus(clientEmail) {
                         var teamNote = String(data[i][noteIdx]).trim().toUpperCase();
                         if (!isSMF && teamNote === 'SMF') { isSMF = true; }
                         if (!isMMS && teamNote === 'MMS') { isMMS = true; }
+                        if (!isBF && (teamNote === 'BF' || teamNote === 'BIG FORMAT')) { isBF = true; }
                     }
                 }
                 // Do NOT break here; continue searching in case there's another entry for this email with Admin role.
@@ -962,8 +1105,8 @@ function checkAdminStatus(clientEmail) {
         console.error("Admin Check Error", e);
     }
 
-    console.log("Admin Check Result:", { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, email: effectiveEmail, logs: logs });
-    var _acResult = { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, email: effectiveEmail, logs: logs };
+    console.log("Admin Check Result:", { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isBF: isBF, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, email: effectiveEmail, logs: logs });
+    var _acResult = { isAdmin: isAdmin, isSMF: isSMF, isMMS: isMMS, isBF: isBF, isScheduleAdmin: isScheduleAdmin, isSysAdmin: isSysAdmin, department: department, email: effectiveEmail, logs: logs };
     if (effectiveEmail) {
         try { CacheService.getScriptCache().put('ADMIN_STATUS_' + effectiveEmail, JSON.stringify(_acResult), 300); } catch (e) {}
     }
@@ -1533,6 +1676,8 @@ function loginUser(emailOrId, password) {
                      role: 'User', // Basic role for now
                      isAdmin: adminCheck.isAdmin, // Admin flag
                      isSMF: adminCheck.isSMF || false, // SMF team flag
+                     isBF: adminCheck.isBF || false, // Big Format team flag
+                     department: adminCheck.department || '', // Landing tab per department (e.g. SGM → Fixed Asset)
                      isScheduleAdmin: adminCheck.isScheduleAdmin || false, // Schedule/Survey Admin flag
                      isSysAdmin: adminCheck.isSysAdmin || false // System Admin flag
                  }
@@ -1605,6 +1750,7 @@ function adminResetPassword(adminEmail, targetEmail, newPassword) {
         var sheet = findEmployeeSheet();
         if (!sheet) return { success: false, error: "Employee database sheet not found." };
         
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
 
@@ -1709,6 +1855,7 @@ function adminEditUser(adminEmail, targetEmailOriginal, updates) {
 
         var sheet = findEmployeeSheet();
         if (!sheet) return { success: false, error: "Employee database sheet not found." };
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
 
@@ -1771,6 +1918,7 @@ function adminSetUserStatus(adminEmail, targetEmail, active) {
 
         var sheet = findEmployeeSheet();
         if (!sheet) return { success: false, error: "Employee database sheet not found." };
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
         var emailIdx = headers.indexOf("Email"); if (emailIdx === -1) emailIdx = 6;
@@ -1819,6 +1967,9 @@ var PASSWORD_RESET_TTL_MIN = 30;
 
 function requestPasswordReset(emailOrId) {
     try {
+        if (!_loginLinkEnabled_('forgot')) {
+            return { success: false, error: "ปิดการรีเซ็ตรหัสผ่านด้วยตนเองอยู่ กรุณาติดต่อผู้ดูแลระบบ (Self-service password reset is disabled — please contact an admin.)" };
+        }
         var sheet = findEmployeeSheet();
         if (!sheet) return { success: false, error: "Employee database sheet not found." };
         var data = sheet.getDataRange().getValues();
@@ -1859,14 +2010,14 @@ function requestPasswordReset(emailOrId) {
         var htmlBody = '<div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#1f2937;">'
             + '<h2 style="color:#1e40af;">รีเซ็ตรหัสผ่าน (Password Reset)</h2>'
             + '<p>สวัสดีคุณ ' + (targetName || targetEmail) + ',</p>'
-            + '<p>มีการร้องขอรีเซ็ตรหัสผ่านสำหรับบัญชี Mini Big C Maintenance ของคุณ คลิกปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่ '
+            + '<p>มีการร้องขอรีเซ็ตรหัสผ่านสำหรับบัญชี Big C Maintenance ของคุณ คลิกปุ่มด้านล่างเพื่อตั้งรหัสผ่านใหม่ '
             + '(ลิงก์นี้ใช้ได้ภายใน ' + PASSWORD_RESET_TTL_MIN + ' นาที และใช้ได้เพียงครั้งเดียว):</p>'
             + '<p><a href="' + resetUrl + '" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:bold;">ตั้งรหัสผ่านใหม่</a></p>'
             + '<p style="color:#9ca3af;font-size:12px;margin-top:20px;">หากคุณไม่ได้ร้องขอ กรุณาเพิกเฉยต่ออีเมลนี้ — รหัสผ่านของคุณจะไม่มีการเปลี่ยนแปลง</p>'
             + '</div>';
 
         try {
-            sendAppEmail_({ to: targetEmail, subject: "รีเซ็ตรหัสผ่าน - Mini Big C Maintenance", htmlBody: htmlBody });
+            sendAppEmail_({ to: targetEmail, subject: "รีเซ็ตรหัสผ่าน - Big C Maintenance", htmlBody: htmlBody });
         } catch (mailErr) {
             return { success: false, error: "ส่งอีเมลไม่สำเร็จ: " + mailErr };
         }

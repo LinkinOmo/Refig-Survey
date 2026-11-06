@@ -39,6 +39,7 @@
 </head>
 
 <body class="p-6">
+    <?!= include('ArchiveToggle') ?>
 
     <!-- Auth Overlay (Shared Component) -->
     <div id="auth-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 z-[100] flex items-center justify-center p-4">
@@ -389,7 +390,7 @@
                         </div>
                     `;
                 })
-                .getAllTripPlansReport(getCurrentUserEmail());
+                .getAllTripPlansReport(getCurrentUserEmail(), window.ARCHIVE_ON);
         };
 
         function initReport(jsonString) {
@@ -660,7 +661,7 @@
             // Reload all data to refresh status
             google.script.run
                 .withSuccessHandler(initReport)
-                .getAllTripPlansReport(getCurrentUserEmail());
+                .getAllTripPlansReport(getCurrentUserEmail(), window.ARCHIVE_ON);
         }
 
         function viewDetails(order) {

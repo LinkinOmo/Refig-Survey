@@ -488,7 +488,7 @@ function approveBigCWorkOrder(workOrderId, approverName, rating) {
         return { success: false, error: e.toString() };
     }
 }
-function getAllBigCWorkOrdersReport(userEmail) {
+function getAllBigCWorkOrdersReport(userEmail, includeArchive) {
     try {
         // Use passed email from frontend auth, fallback to session email
         if (!userEmail) {
@@ -499,11 +499,11 @@ function getAllBigCWorkOrdersReport(userEmail) {
         // Cache 60s — full BigC_Work_Orders + Employee_Database scan on every call,
         // fired on every report load and after every save/delete/approve.
         var _bwoCache = CacheService.getScriptCache();
-        var _bwoKey = 'BWO_REPORT_V1_' + String(userEmail || '').trim().toLowerCase();
+        var _bwoKey = 'BWO_REPORT_V1_' + (includeArchive ? 'ARC_' : '') + String(userEmail || '').trim().toLowerCase();
         var _bwoHit = _bwoCache.get(_bwoKey);
         if (_bwoHit) return JSON.parse(_bwoHit);
 
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BigC_Work_Orders");
+        var sheet = _archSheetFor_("BigC_Work_Orders", includeArchive);
         if (!sheet) return { orders: [], isAdmin: isAdmin };
 
         var data = sheet.getDataRange().getValues();

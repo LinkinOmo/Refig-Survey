@@ -89,6 +89,7 @@ function uploadWorkOrderEvidence(id, fileData) {
         
         // 2. Update Sheet
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var rowIndex = -1;
         
@@ -118,6 +119,7 @@ function approveWorkOrder(workOrderId, approverName, rating) {
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
         if (!sheet) return { success: false, error: "Sheet not found" };
         
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var rowIndex = -1;
         var empId = null;
@@ -209,7 +211,7 @@ function approveWorkOrder(workOrderId, approverName, rating) {
     }
 }
 
-function getAllWorkOrdersReport(email) {
+function getAllWorkOrdersReport(email, includeArchive) {
     try {
         // Use provided email or fallback to Session user
         var userEmail = email || Session.getActiveUser().getEmail();
@@ -251,11 +253,11 @@ function getAllWorkOrdersReport(email) {
         // on every report/dashboard load and after every save/delete/approve. Cache
         // key includes admin/empId since confidential rows are filtered per-caller.
         var _worCache = CacheService.getScriptCache();
-        var _worKey = 'WO_REPORT_V1_' + (isAdmin ? 'ADMIN' : String(currentUserEmpId || userEmail || '').toLowerCase());
+        var _worKey = 'WO_REPORT_V1_' + (includeArchive ? 'ARC_' : '') + (isAdmin ? 'ADMIN' : String(currentUserEmpId || userEmail || '').toLowerCase());
         var _worHit = _worCache.get(_worKey);
         if (_worHit) return JSON.parse(_worHit);
 
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
+        var sheet = _archSheetFor_("Work_Orders", includeArchive);
         if (!sheet) return { orders: [], isAdmin: isAdmin };
 
         var data = sheet.getDataRange().getValues();
@@ -378,6 +380,7 @@ function updateWorkOrder(form) {
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
         if (!sheet) return { success: false, error: "Sheet not found" };
         
+        _acquireWriteLock_();
         ensureWorkOrderHeaders(sheet);
 
         var data = sheet.getDataRange().getValues();
@@ -473,6 +476,7 @@ function deleteWorkOrder(id) {
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
         if (!sheet) return { success: false, error: "Sheet not found" };
 
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var rowIndex = -1;
 
@@ -500,6 +504,7 @@ function batchUpdateWorkOrders(updates) {
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Work_Orders");
         if (!sheet) return { success: false, error: "Sheet not found" };
 
+        _acquireWriteLock_();
         var data = sheet.getDataRange().getValues();
         var idMap = {}; // Map ID -> Row Index (0-based compatible with data array)
         

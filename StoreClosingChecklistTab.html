@@ -1,0 +1,506 @@
+        <!-- CONTENT: STORE CLOSING CHECKLIST — closure plan → asset-disposition cards → phased closing tasks → cost roll-up.
+             Store list = STORE_CLOSE_PLAN (2027 closures) first, then any store of HYPER_FA_STORES for unplanned closures. -->
+        <div id="content-hyper-sc-survey" class="tab-content hidden">
+            <form id="hyper-sc-form" onsubmit="handleHyperScSubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">🏁 เช็คลิสต์ปิดสาขา (Store Closing Checklist)</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= MANUALS_URL ?>?page=sc-manual" target="_blank" class="text-emerald-600 hover:underline text-sm font-medium">📖 คู่มือ</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=store-close-checklist" target="_blank" class="text-rose-700 hover:underline text-sm font-medium">🖨️ แบบฟอร์ม</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=store_close_report" target="_blank" class="report-view-link hidden text-rose-700 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+                <p class="text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded px-3 py-2 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>เดินสำรวจสาขาที่มีแผนปิด <b>ร่วมกับ VP OPT</b> — บันทึกทรัพย์สินทีละกลุ่ม และตัดสินใจว่า <b>โอนไปสาขาไหน / เก็บ FWH / ขายซาก / ส่งมอบพร้อมพื้นที่</b>
+                    แล้วติดตามงานปิดสาขาทุกขั้น (Solar · EV · น้ำยา · มิเตอร์ · สัญญา · ส่งมอบพื้นที่) จนถึง PPT Approval <b><?= getStoreCloseConfig_().approval ?></b> และเคลียร์ของภายใน 2 สัปดาห์หลังปิด
+                    · กลับมาแก้ไข / อัปเดตสถานะได้ตลอด (💾 Save Draft) — Submit ใหม่ได้ รายงานใช้รายการล่าสุดของสาขา</span>
+                </p>
+                <div id="hyper-sc-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="hyper-sc-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreHyperScDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardHyperScDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">ผู้สำรวจ (Surveyor) *</label><input type="text" name="reporterName" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ (Phone) *</label><input type="tel" name="reporterPhone" inputmode="tel" maxlength="20" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) * <span class="font-normal text-rose-700">— 🏁 = อยู่ในแผนปิดสาขา 2027</span></label>
+                            <div class="relative">
+                                <input type="text" id="hyper-sc-station-search" autocomplete="off" class="input-field w-full border p-2 rounded text-sm bg-rose-50" placeholder="พิมพ์รหัสสาขา หรือชื่อสาขา ไทย/อังกฤษ..." oninput="handleHyperScStationInput(this)" onfocus="handleHyperScStationInput(this)">
+                                <div id="hyper-sc-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-64 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly><input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat"><input type="hidden" name="region"><input type="hidden" name="ammMtn"><input type="hidden" name="dmArea"><input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                    <div id="hyper-sc-store-ref" class="hidden mt-2"></div>
+                </div>
+
+                <div id="hyper-sc-rest-form" class="hidden">
+                    <div id="hsc-sticky" class="sticky top-0 z-30 bg-white/95 backdrop-blur border-2 border-rose-300 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span class="flex items-center gap-2"><span class="w-24 h-2.5 bg-gray-200 rounded-full overflow-hidden inline-block"><span id="hsc-sum-bar" class="block h-full bg-rose-600" style="width:0%"></span></span><b id="hsc-sum-pct">0%</b></span>
+                        <span>งาน <b id="hsc-sum-done">0</b>/<b id="hsc-sum-total">0</b></span>
+                        <span id="hsc-sum-overdue" class="hidden text-red-700 font-bold"></span>
+                        <span>ทรัพย์สิน <b id="hsc-sum-qty">0</b> ชิ้น · รอตัดสินใจ <b id="hsc-sum-pending">0</b></span>
+                        <span class="ml-auto font-bold text-rose-800">สุทธิ <span id="hsc-sum-net">0</span> ฿</span>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">2. แผนปิดสาขา</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">วันปิดสาขา (หยุดขาย)</label><input id="hsc-close-date" type="date" onchange="hscDueRefresh();hscRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">เงื่อนไขส่งมอบพื้นที่ *</label><select id="hsc-handover" onchange="hscRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white"></select></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">แผนหลังปิด</label><input id="hsc-after" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น OSX + TWC, Sublease, หาพื้นที่ Mini Big C"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">VP OPT ที่ร่วมเดิน / ตัดสินใจ *</label><input id="hsc-vp" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="ชื่อ VP OPT"></div>
+                            <div class="sm:col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">ทีมที่ร่วมเดิน</label><input id="hsc-team" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น Area MTN, Setup, FAD, ผู้จัดการสาขา"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">☀️ Solar Rooftop</label><input id="hsc-solar" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="ไม่มี / Phase · Investor"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">🔌 EV Charger</label><input id="hsc-ev" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="ไม่มี / มี / Plan Install"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">3. ทรัพย์สิน &amp; การตัดสินใจ (การ์ดทีละรายการ / กลุ่ม)</h3>
+                        <p class="text-xs text-gray-500 mb-2">1 การ์ด = 1 รายการ หรือกลุ่มของชิ้นที่เหมือนกัน (เช่น “ตู้แช่ Remote 4 ประตู × 12”) · ของที่ตัดสินใจต่างกันให้แยกการ์ด · <b>โอนย้าย / FWH ต้องระบุปลายทาง</b> · ค่าขนย้าย / มูลค่าซากเป็นตัวเลขประมาณการ (บาท)</p>
+                        <div id="hsc-assets" class="space-y-4 mt-3"></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                            <button type="button" onclick="hscAddAsset()" class="border-2 border-dashed border-rose-400 text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-lg py-2 text-sm font-semibold">＋ เพิ่มรายการทรัพย์สิน</button>
+                            <button type="button" onclick="hscAddAllGroups()" class="border-2 border-dashed border-gray-300 text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg py-2 text-sm font-semibold">☰ เพิ่มการ์ดครบทุกกลุ่มระบบ (เริ่มสำรวจ)</button>
+                        </div>
+                        <datalist id="hsc-target-list"></datalist>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">4. งานปิดสาขา (ติดตามสถานะ)</h3>
+                        <p class="text-xs text-gray-500 mb-2">กำหนดเสร็จคำนวณจากวันปิดสาขาให้อัตโนมัติ (แก้ได้) · “ไม่เกี่ยวข้อง” ไม่นับในความคืบหน้า</p>
+                        <div id="hsc-tasks" class="space-y-4"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-rose-300 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">5. ค่าใช้จ่ายปิดสาขา (ประมาณการ, บาท)</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">ค่าขนย้าย (รวมจากการ์ด)</label><input id="hsc-c-move" readonly class="w-full border border-gray-200 bg-gray-50 rounded p-2 text-sm font-semibold"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">ค่ารื้อถอน / ทุบอาคาร</label><input id="hsc-c-demolish" type="number" min="0" inputmode="numeric" oninput="hscRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">Solar (ยกเลิก PPA / ย้ายระบบ)</label><input id="hsc-c-solar" type="number" min="0" inputmode="numeric" oninput="hscRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">EV Charger (ค่าเสียหาย)</label><input id="hsc-c-ev" type="number" min="0" inputmode="numeric" oninput="hscRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">อื่นๆ</label><input id="hsc-c-other" type="number" min="0" inputmode="numeric" oninput="hscRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="0"></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">หัก มูลค่าซาก (รวมจากการ์ด)</label><input id="hsc-c-scrap" readonly class="w-full border border-gray-200 bg-gray-50 rounded p-2 text-sm font-semibold text-green-700"></div>
+                        </div>
+                        <input id="hsc-c-nt" class="w-full border border-gray-300 rounded p-2 text-sm mt-2" placeholder="หมายเหตุค่าใช้จ่าย เช่น อ้างอิง BOQ รื้อถอนศรีนครินทร์, ราคาจาก Investor">
+                        <div id="hsc-cost-sum" class="mt-3 text-sm"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">6. ประเด็นเร่งด่วน / ความเสี่ยง</h3>
+                        <div class="flex gap-4 mb-3">
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" onchange="document.getElementById('hsc-broken-section').classList.remove('hidden')"> <span class="text-sm">มี (Yes)</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" checked onchange="document.getElementById('hsc-broken-section').classList.add('hidden')"> <span class="text-sm">ไม่มี (No)</span></label>
+                        </div>
+                        <div id="hsc-broken-section" class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ระบุประเด็น *</label>
+                            <textarea name="brokenDetail" rows="3" class="input-field w-full border border-red-300 p-2 rounded text-sm" placeholder="เช่น Landlord ไม่ยอมให้ทิ้งซากในพื้นที่, น้ำยาตู้แช่รั่ว, ไม่มีพื้นที่รับของที่ FWH"></textarea>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-2 border-b pb-2">7. สรุป / ข้อเสนอ</h3>
+                        <textarea name="comments" rows="3" class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50" placeholder="เช่น ตู้แช่ Remote 20 ตู้ โอนไปบ้านโป่ง / ร่มเกล้า, Chiller ขายซาก, ขอให้ OPT ยืนยันสาขาปลายทางภายใน 7/11 (Optional)"></textarea>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">8. CC Email Notification (Optional)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1</label><input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm"></div>
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2</label><input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetHyperScForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveHyperScDraft()" class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 text-sm">&#128190; Save Draft</button>
+                            <button type="submit" class="bg-rose-700 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-rose-800">Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div> <!-- End content-hyper-sc-survey -->
+
+        <script>
+            const STORE_CLOSE_CONFIG = <?!= JSON.stringify(getStoreCloseConfig_()) ?>;
+            const HYPER_SC_DRAFT_KEY = 'store_close_checklist_draft_v1';
+            const HSC = { seq: 0 };
+            function hscEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+            function _hscOpts(list, sel, ph) { return '<option value="">' + (ph || '-- เลือก --') + '</option>' + list.map(function(o) { return '<option' + (o === sel ? ' selected' : '') + '>' + hscEsc(o) + '</option>'; }).join(''); }
+            function _hscDispo(k) { return STORE_CLOSE_CONFIG.dispo.find(function(d) { return d.k === k; }) || null; }
+            function _hscBranch() { const f = document.getElementById('hyper-sc-form'); return f && f.branchCode.value ? f.branchCode.value : '[Branch]'; }
+            function _hscFmt(n) { return Math.round(Number(n) || 0).toLocaleString(); }
+            function _hscToday() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+            function _hscAddDays(iso, n) { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+            // Same rule as _sclTaskDue_() in StoreClosingChecklist.gs
+            function _hscTaskDue(due, closeDate) { if (due === 'approval') return STORE_CLOSE_CONFIG.approval; if (!closeDate) return ''; return due === 'close' ? closeDate : _hscAddDays(closeDate, due); }
+
+            // stores: closure-plan stores first (🏁), then the asset-register store master
+            const HSC_STORES = (function() {
+                const out = [], seen = {};
+                STORE_CLOSE_CONFIG.plan.forEach(function(p) {
+                    // the plan may use the current store code where the register still has the old one (17004 = 15074)
+                    const reg = HYPER_FA_STORES.find(function(s) { return s[0] === p[0]; }) ||
+                                HYPER_FA_STORES.find(function(s) { return (s[19] || '').split(' ').indexOf(p[0]) > -1 || (p[1] && s[1] === p[1]); });
+                    out.push({ code: p[0], oracle: p[1], name: p[3], th: p[4], format: p[2].trim(), plan: p, reg: reg || null }); seen[p[0]] = 1;
+                    if (reg) seen[reg[0]] = 1;
+                });
+                HYPER_FA_STORES.forEach(function(s) { if (s[0] && !seen[s[0]]) out.push({ code: s[0], oracle: s[1], name: s[2], th: s[3], format: s[4], plan: null, reg: s }); });
+                return out;
+            })();
+            function _hscStoreLabel(s) { return (s.plan ? '🏁 ' : '') + s.code + ' ' + [s.th, s.name].filter(Boolean).join(' / ') + ' · ' + s.format; }
+
+            (function() {
+                const C = STORE_CLOSE_CONFIG;
+                document.getElementById('hsc-handover').innerHTML = _hscOpts(C.handover);
+                document.getElementById('hsc-target-list').innerHTML = ['FWH ตลาดทิพย์นิมิตร (บางพลี)', 'FWH รามอินทรา'].concat(HSC_STORES.filter(function(s) { return !s.plan; }).map(function(s) { return s.code + ' ' + (s.th || s.name); }))
+                    .map(function(t) { return '<option value="' + hscEsc(t) + '">'; }).join('');
+                let h = '';
+                C.tasks.forEach(function(ph, pi) {
+                    h += '<div class="border border-gray-200 rounded-lg overflow-hidden"><div class="bg-rose-50 px-3 py-2 text-sm font-bold text-rose-900 flex justify-between"><span>' + (pi + 1) + '. ' + hscEsc(ph.p) + '</span><span class="text-xs font-semibold" data-phase-sum="' + pi + '"></span></div><div class="divide-y">';
+                    ph.items.forEach(function(it) {
+                        h += '<div class="p-2" data-task="' + it[0] + '" data-due-rule="' + ph.due + '">' +
+                            '<p class="text-sm text-gray-800"><b class="text-gray-500 text-xs">' + it[0] + '</b> ' + hscEsc(it[1]) + '</p>' +
+                            '<div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-1">' +
+                                '<select data-t="s" onchange="hscRecalc()" class="border border-gray-300 rounded p-1.5 text-xs bg-white">' + C.status.map(function(s) { return '<option>' + hscEsc(s) + '</option>'; }).join('') + '</select>' +
+                                '<input data-t="who" class="border border-gray-300 rounded p-1.5 text-xs" placeholder="ผู้รับผิดชอบ">' +
+                                '<input data-t="due" type="date" data-auto="1" oninput="this.dataset.auto=\'\';hscRecalc()" class="border border-gray-300 rounded p-1.5 text-xs">' +
+                                '<input data-t="nt" class="border border-gray-300 rounded p-1.5 text-xs" placeholder="หมายเหตุ">' +
+                            '</div></div>';
+                    });
+                    h += '</div></div>';
+                });
+                document.getElementById('hsc-tasks').innerHTML = h;
+            })();
+            function hscDueRefresh() {
+                const cd = document.getElementById('hsc-close-date').value;
+                document.querySelectorAll('#hsc-tasks [data-task]').forEach(function(row) {
+                    const inp = row.querySelector('[data-t="due"]');
+                    if (inp.dataset.auto) { const r = row.dataset.dueRule; inp.value = _hscTaskDue(isNaN(r) ? r : parseInt(r, 10), cd); }
+                });
+            }
+
+            // ── Asset card ──
+            function hscAddAsset(a) {
+                a = a || {};
+                const aid = a.aid || ('CA' + String(++HSC.seq).padStart(2, '0'));
+                const n = parseInt(aid.replace(/\D/g, ''), 10); if (n > HSC.seq) HSC.seq = n;
+                const C = STORE_CLOSE_CONFIG;
+                const sel = function(k, list, v) { return '<select data-r="' + k + '" onchange="hscRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _hscOpts(list, v) + '</select>'; };
+                const inp = function(k, v, ph, extra) { return '<input data-r="' + k + '" value="' + hscEsc(v == null ? '' : v) + '" placeholder="' + ph + '" ' + (extra || '') + ' class="w-full border border-gray-300 rounded p-2 text-sm">'; };
+                const html = '<div class="border border-rose-300 rounded-lg overflow-hidden" data-asset="' + aid + '">' +
+                    '<div class="bg-rose-700 text-white px-3 py-2 flex items-center justify-between gap-2"><b class="text-sm">📦 <span data-aid-label>' + hscEsc(_hscBranch() + '-' + aid) + '</span> <span class="font-normal" data-out="aname"></span></b>' +
+                        '<span class="ml-auto text-xs font-bold bg-white text-rose-700 px-2 py-0.5 rounded-full" data-out="adispo">รอตัดสินใจ</span>' +
+                        '<button type="button" onclick="hscRemove(\'' + aid + '\')" class="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5">ลบ</button></div>' +
+                    '<div class="p-3 space-y-2 bg-white">' +
+                        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">กลุ่มระบบ *</label>' + sel('grp', C.groups, a.grp) + '</div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">รายการ / รุ่น / ขนาด *</label>' + inp('item', a.item, 'เช่น ตู้แช่ Remote 4 ประตู, Chiller 300 TR', 'oninput="hscRecalc()"') + '</div>' +
+                        '</div>' +
+                        '<div class="grid grid-cols-3 gap-2">' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">จำนวน *</label>' + inp('qty', a.qty || '', '0', 'type="number" min="0" inputmode="numeric" oninput="hscRecalc()"') + '</div>' +
+                            '<div class="col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">สภาพ *</label>' + sel('cond', C.cond, a.cond) + '</div>' +
+                        '</div>' +
+                        '<div class="grid grid-cols-3 gap-2">' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">อายุ (ปี)</label>' + inp('age', a.age || '', '-', 'type="number" min="0" inputmode="numeric"') + '</div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">เจ้าของ</label>' + sel('owner', C.owner, a.owner) + '</div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">Asset No.</label>' + inp('assetNo', a.assetNo, 'BGCFA...') + '</div>' +
+                        '</div>' +
+                        '<div class="border border-rose-200 bg-rose-50/40 rounded-lg p-2">' +
+                            '<label class="block text-xs font-bold text-rose-900 mb-1">🧭 การตัดสินใจ *</label>' +
+                            '<select data-r="dispo" onchange="hscRecalc()" class="w-full border border-rose-300 rounded p-2 text-sm bg-white">' + C.dispo.map(function(d) { return '<option value="' + d.k + '"' + ((a.dispo || 'pending') === d.k ? ' selected' : '') + '>' + hscEsc(d.l) + '</option>'; }).join('') + '</select>' +
+                            '<div data-target-wrap class="hidden mt-2"><label class="block text-xs font-semibold text-gray-600 mb-1">ปลายทาง (สาขา / FWH) *</label>' + inp('target', a.target, 'พิมพ์รหัส / ชื่อสาขา หรือ FWH', 'list="hsc-target-list"') + '</div>' +
+                            '<div class="grid grid-cols-2 gap-2 mt-2">' +
+                                '<div><label class="block text-[11px] font-semibold text-gray-600 mb-1">ค่าขนย้าย (฿)</label>' + inp('move', a.move || '', '0', 'type="number" min="0" inputmode="numeric" oninput="hscRecalc()"') + '</div>' +
+                                '<div><label class="block text-[11px] font-semibold text-green-700 mb-1">มูลค่าซาก (฿)</label>' + inp('scrap', a.scrap || '', '0', 'type="number" min="0" inputmode="numeric" oninput="hscRecalc()"') + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div><label class="block text-xs font-semibold text-gray-600 mb-1">หมายเหตุ</label><textarea data-r="nt" rows="2" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น น้ำยา R404A ต้อง Recovery, ติดตั้งปี 2015, Gondola Slim ≤ 60 กก.">' + hscEsc(a.nt || '') + '</textarea></div>' +
+                        photoUpload('ทรัพย์สิน ' + aid, 'hsc_asset_' + aid) +
+                    '</div></div>';
+                document.getElementById('hsc-assets').insertAdjacentHTML('beforeend', html);
+                hscRecalc();
+            }
+            function hscAddAllGroups() {
+                const have = Array.from(document.querySelectorAll('#hsc-assets [data-asset]')).map(function(el) { return el.querySelector('[data-r="grp"]').value; });
+                STORE_CLOSE_CONFIG.groups.forEach(function(g) { if (have.indexOf(g) < 0 && g !== 'อื่นๆ') hscAddAsset({ grp: g }); });
+            }
+            function hscRemove(aid) {
+                if (!confirm('ลบรายการ ' + aid + '?')) return;
+                delete _accumulatedFiles['hsc_asset_' + aid];
+                document.querySelector('[data-asset="' + aid + '"]').remove();
+                hscRecalc();
+            }
+            function _hscAsset(el) {
+                const g = function(k) { const x = el.querySelector('[data-r="' + k + '"]'); return x ? x.value : ''; };
+                return { aid: el.dataset.asset, grp: g('grp'), item: g('item'), qty: g('qty'), cond: g('cond'), age: g('age'), owner: g('owner'), assetNo: g('assetNo'),
+                         dispo: g('dispo') || 'pending', target: g('target'), move: g('move'), scrap: g('scrap'), nt: g('nt'), pk: 'hsc_asset_' + el.dataset.asset };
+            }
+            function collectHyperSc() {
+                const v = function(id) { return document.getElementById(id).value; };
+                const tasks = {};
+                document.querySelectorAll('#hsc-tasks [data-task]').forEach(function(row) {
+                    const g = function(k) { return row.querySelector('[data-t="' + k + '"]').value; };
+                    tasks[row.dataset.task] = { s: g('s'), who: g('who'), due: g('due'), nt: g('nt') };
+                });
+                return {
+                    plan: { closeDate: v('hsc-close-date'), handover: v('hsc-handover'), after: v('hsc-after'), vpOpt: v('hsc-vp'), team: v('hsc-team'), solar: v('hsc-solar'), ev: v('hsc-ev') },
+                    assets: Array.from(document.querySelectorAll('#hsc-assets [data-asset]')).map(_hscAsset),
+                    tasks: tasks,
+                    cost: { demolish: v('hsc-c-demolish'), solar: v('hsc-c-solar'), ev: v('hsc-c-ev'), other: v('hsc-c-other'), nt: v('hsc-c-nt') }
+                };
+            }
+            // Mirrors storeCloseTotals_() in StoreClosingChecklist.gs (the server recomputes on submit)
+            function hscTotals(d) {
+                const C = STORE_CLOSE_CONFIG, n = function(x) { const v = parseFloat(String(x == null ? '' : x).replace(/,/g, '')); return isNaN(v) || v < 0 ? 0 : v; };
+                const t = { groups: 0, qty: 0, byDispo: {}, move: 0, scrap: 0, pending: 0, targets: [] }, seen = {};
+                C.dispo.forEach(function(x) { t.byDispo[x.k] = 0; });
+                d.assets.forEach(function(a) {
+                    const q = Math.round(n(a.qty));
+                    if (a.grp && !seen[a.grp]) { seen[a.grp] = 1; t.groups++; }
+                    t.qty += q; t.byDispo[a.dispo] += q; t.move += n(a.move); t.scrap += n(a.scrap);
+                    if (a.dispo === 'pending') t.pending++;
+                    if ((a.dispo === 'transfer' || a.dispo === 'fwh') && a.target.trim() && t.targets.indexOf(a.target.trim()) < 0) t.targets.push(a.target.trim());
+                });
+                const today = _hscToday();
+                t.tasksTotal = 0; t.tasksDone = 0; t.tasksOverdue = 0;
+                Object.keys(d.tasks).forEach(function(k) {
+                    const x = d.tasks[k];
+                    if (x.s === C.status[3]) return;
+                    t.tasksTotal++;
+                    if (x.s === C.status[2]) t.tasksDone++; else if (x.due && x.due < today) t.tasksOverdue++;
+                });
+                t.progress = t.tasksTotal ? Math.round(t.tasksDone / t.tasksTotal * 100) : 0;
+                t.costOut = t.move + n(d.cost.demolish) + n(d.cost.solar) + n(d.cost.ev) + n(d.cost.other);
+                t.net = t.costOut - t.scrap;
+                return t;
+            }
+            function hscRecalc() {
+                const C = STORE_CLOSE_CONFIG, d = collectHyperSc(), t = hscTotals(d), today = _hscToday();
+                const set = function(id, v) { document.getElementById(id).textContent = v; };
+                document.querySelectorAll('#hsc-assets [data-asset]').forEach(function(el) {
+                    const a = _hscAsset(el), dp = _hscDispo(a.dispo);
+                    el.querySelector('[data-aid-label]').textContent = _hscBranch() + '-' + el.dataset.asset;
+                    el.querySelector('[data-out="aname"]').textContent = a.item ? '· ' + a.item + (a.qty ? ' × ' + a.qty : '') : (a.grp ? '· ' + a.grp : '');
+                    const badge = el.querySelector('[data-out="adispo"]');
+                    badge.textContent = dp ? dp.l.split(' (')[0] + (dp.needTarget && a.target ? ' → ' + a.target : '') : '-';
+                    badge.className = 'ml-auto text-xs font-bold px-2 py-0.5 rounded-full ' + (a.dispo === 'pending' ? 'bg-amber-200 text-amber-900' : 'bg-white text-rose-700');
+                    el.querySelector('[data-target-wrap]').classList.toggle('hidden', !(dp && dp.needTarget));
+                });
+                // task rows: colour by status / overdue, phase summaries
+                C.tasks.forEach(function(ph, pi) {
+                    let done = 0, tot = 0;
+                    ph.items.forEach(function(it) {
+                        const row = document.querySelector('#hsc-tasks [data-task="' + it[0] + '"]'), x = d.tasks[it[0]];
+                        const na = x.s === C.status[3], ok = x.s === C.status[2], late = !ok && !na && x.due && x.due < today;
+                        row.className = 'p-2 ' + (ok ? 'bg-green-50' : late ? 'bg-red-50' : na ? 'bg-gray-50 opacity-70' : x.s === C.status[1] ? 'bg-amber-50' : '');
+                        if (!na) { tot++; if (ok) done++; }
+                    });
+                    document.querySelector('[data-phase-sum="' + pi + '"]').textContent = done + '/' + tot;
+                });
+                set('hsc-sum-pct', t.progress + '%'); document.getElementById('hsc-sum-bar').style.width = t.progress + '%';
+                set('hsc-sum-done', t.tasksDone); set('hsc-sum-total', t.tasksTotal); set('hsc-sum-qty', t.qty.toLocaleString()); set('hsc-sum-pending', t.pending); set('hsc-sum-net', _hscFmt(t.net));
+                const od = document.getElementById('hsc-sum-overdue'); od.classList.toggle('hidden', !t.tasksOverdue); od.textContent = '⚠️ เลยกำหนด ' + t.tasksOverdue;
+                document.getElementById('hsc-c-move').value = _hscFmt(t.move);
+                document.getElementById('hsc-c-scrap').value = _hscFmt(t.scrap);
+                document.getElementById('hsc-cost-sum').innerHTML = '<div class="flex flex-wrap gap-x-4 gap-y-1">' +
+                    C.dispo.filter(function(x) { return t.byDispo[x.k]; }).map(function(x) { return '<span>' + hscEsc(x.l.split(' (')[0]) + ' <b>' + t.byDispo[x.k].toLocaleString() + '</b></span>'; }).join('') + '</div>' +
+                    '<p class="mt-1">ค่าใช้จ่าย <b>' + _hscFmt(t.costOut) + '</b> − มูลค่าซาก <b class="text-green-700">' + _hscFmt(t.scrap) + '</b> = <b class="text-rose-800 text-base">สุทธิ ' + _hscFmt(t.net) + ' ฿</b>' +
+                    (t.targets.length ? '<br><span class="text-xs text-gray-600">ปลายทาง: ' + hscEsc(t.targets.join(' · ')) + '</span>' : '') + '</p>';
+                return t;
+            }
+
+            function _hscCurPlan() { const c = document.getElementById('hyper-sc-form').branchCode.value; const s = HSC_STORES.find(function(x) { return x.code === c; }); return s ? s.plan : null; }
+            function _applyHyperScStore(s, keep) {
+                const form = document.getElementById('hyper-sc-form'), r = s.reg || [], p = s.plan;
+                // switching to another store: drop the previous store's plan defaults (a restored draft keeps its own values)
+                if (!keep && form.branchCode.value && form.branchCode.value !== s.code) ['hsc-handover', 'hsc-after', 'hsc-solar', 'hsc-ev'].forEach(function(id) { document.getElementById(id).value = ''; });
+                form.branchCode.value = s.code; form.branchName.value = s.th || s.name; form.storeFormat.value = s.format || ''; form.region.value = r[7] || '';
+                form.dmArea.value = r[6] || ''; form.ammMtn.value = ''; form.cmArea.value = '';
+                const cell = function(l, v) { return '<div><span class="text-gray-500">' + l + '</span> <b>' + hscEsc(v || '-') + '</b></div>'; };
+                document.getElementById('hyper-sc-store-ref').innerHTML = '<div class="text-xs bg-gray-50 border rounded-lg p-2 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1">' +
+                    (p ? '<div class="col-span-2 sm:col-span-4 text-rose-800 font-bold">🏁 อยู่ในแผนปิดสาขา 2027 · Oracle ' + hscEsc(p[1]) + '</div>' : '<div class="col-span-2 sm:col-span-4 text-gray-500">ไม่อยู่ในแผนปิดสาขา 2027 — กรอกแผนเอง</div>') +
+                    cell('รูปแบบ', s.format) + cell('VP', r[5]) + cell('SGM/DM', r[6]) + cell('เปิด', p ? p[5] : r[15]) +
+                    (p ? cell('กรรมสิทธิ์', p[6]) + cell('Solar', p[7] ? 'Phase ' + p[7] + ' · ' + p[8] : 'ไม่มี') + cell('EV', p[9]) + cell('ส่งมอบพื้นที่', p[10]) +
+                        '<div class="col-span-2"><span class="text-gray-500">แผนหลังปิด</span> <b>' + hscEsc(p[11] || '-') + '</b></div>' +
+                        '<div class="col-span-2"><span class="text-gray-500">นัดสำรวจ MTN</span> <b>' + hscEsc([p[12], p[13]].filter(Boolean).join(' · ') || '-') + '</b></div>' : '') + '</div>';
+                document.getElementById('hyper-sc-store-ref').classList.remove('hidden');
+                document.getElementById('hyper-sc-rest-form').classList.remove('hidden');
+                // plan defaults — never overwrite what the surveyor already typed
+                const def = function(id, v) { const el = document.getElementById(id); if (!el.value && v) el.value = v; };
+                if (p) { def('hsc-handover', p[10]); def('hsc-after', p[11]); def('hsc-solar', p[7] ? 'Phase ' + p[7] + ' · ' + p[8] : 'ไม่มี'); def('hsc-ev', p[9]); }
+                hscDueRefresh();
+                hscRecalc();
+                if (typeof sdsCheck === 'function') sdsCheck('hyperSc');
+            }
+            function _clearHyperScStore() {
+                const form = document.getElementById('hyper-sc-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('hyper-sc-store-ref').classList.add('hidden');
+                document.getElementById('hyper-sc-rest-form').classList.add('hidden');
+            }
+            function handleHyperScStationInput(input) {
+                const val = input.value.toLowerCase().trim().replace(/^🏁\s*/, '');
+                const matches = val ? HSC_STORES.filter(function(s) { return (_hscStoreLabel(s) + ' ' + s.oracle).toLowerCase().indexOf(val) !== -1; }) : HSC_STORES.filter(function(s) { return s.plan; });
+                renderStationDropdown('hyper-sc-station-dropdown', matches.map(_hscStoreLabel), function(sel) {
+                    input.value = sel;
+                    const s = HSC_STORES.find(function(x) { return _hscStoreLabel(x) === sel; });
+                    if (s) _applyHyperScStore(s);
+                });
+                if (!val) { _clearHyperScStore(); return; }
+                const exact = HSC_STORES.find(function(s) { return _hscStoreLabel(s).toLowerCase().replace(/^🏁\s*/, '') === val || s.code === val || s.oracle === val; });
+                if (exact) _applyHyperScStore(exact); else _clearHyperScStore();
+            }
+            document.addEventListener('click', function(e) { const d = document.getElementById('hyper-sc-station-dropdown'); if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden'); });
+
+            function _hyperScFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+            function _clearHyperScCards() {
+                document.querySelectorAll('#hsc-assets [data-asset]').forEach(function(r) { delete _accumulatedFiles['hsc_asset_' + r.dataset.asset]; r.remove(); });
+                HSC.seq = 0;
+            }
+            function _applyHyperScStoreLevel(d) {
+                const set = function(id, v) { document.getElementById(id).value = v == null || v === 0 ? '' : v; };
+                const p = d.plan || {}, c = d.cost || {}, tk = d.tasks || {};
+                set('hsc-close-date', p.closeDate); set('hsc-handover', p.handover); set('hsc-after', p.after); set('hsc-vp', p.vpOpt); set('hsc-team', p.team); set('hsc-solar', p.solar); set('hsc-ev', p.ev);
+                set('hsc-c-demolish', c.demolish); set('hsc-c-solar', c.solar); set('hsc-c-ev', c.ev); set('hsc-c-other', c.other); set('hsc-c-nt', c.nt);
+                document.querySelectorAll('#hsc-tasks [data-task]').forEach(function(row) {
+                    const x = tk[row.dataset.task] || {}, g = function(k) { return row.querySelector('[data-t="' + k + '"]'); };
+                    g('s').value = x.s || STORE_CLOSE_CONFIG.status[0]; g('who').value = x.who || ''; g('nt').value = x.nt || '';
+                    const due = g('due'), auto = _hscTaskDue(isNaN(row.dataset.dueRule) ? row.dataset.dueRule : parseInt(row.dataset.dueRule, 10), p.closeDate || '');
+                    due.value = x.due || auto; due.dataset.auto = !x.due || x.due === auto ? '1' : '';
+                });
+            }
+            // Draft object shared by the on-device draft and the server draft (SurveyDraftStore.gs)
+            function _buildHyperScDraft() {
+                const form = document.getElementById('hyper-sc-form');
+                return Object.assign({ savedAt: new Date().toISOString(), search: document.getElementById('hyper-sc-station-search').value, fields: _hyperScFields(form) }, collectHyperSc());
+            }
+            function saveHyperScDraft() {
+                const form = document.getElementById('hyper-sc-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                try {
+                    localStorage.setItem(HYPER_SC_DRAFT_KEY, JSON.stringify(_buildHyperScDraft()));
+                    if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (ปิดสาขา)');
+                } catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('hyperSc', null);
+            }
+            function _readHyperScDraft() { try { return JSON.parse(localStorage.getItem(HYPER_SC_DRAFT_KEY) || 'null'); } catch (e) { return null; } }
+            function checkHyperScDraft() {
+                const d = _readHyperScDraft(), b = document.getElementById('hyper-sc-draft-banner');
+                if (!d || !d.fields) { b.classList.add('hidden'); return; }
+                document.getElementById('hyper-sc-draft-info').textContent = (d.fields.branchCode || '') + ' ' + (d.fields.branchName || '') + ' · ' + new Date(d.savedAt).toLocaleString('en-GB');
+                b.classList.remove('hidden');
+            }
+            function restoreHyperScDraft(fromServer) {
+                const d = fromServer || _readHyperScDraft();
+                if (!d) return;
+                const form = document.getElementById('hyper-sc-form');
+                const s = HSC_STORES.find(function(x) { return x.code === (d.fields || {}).branchCode; });
+                _clearHyperScCards();
+                _applyHyperScStoreLevel(d);
+                if (s) { document.getElementById('hyper-sc-station-search').value = d.search || _hscStoreLabel(s); _applyHyperScStore(s, true); }
+                Object.keys(d.fields || {}).forEach(function(n) {
+                    const el = form.elements[n];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList) Array.from(el).forEach(function(r) { r.checked = r.value === d.fields[n]; });
+                    else el.value = d.fields[n];
+                });
+                document.getElementById('hsc-broken-section').classList.toggle('hidden', (d.fields || {}).hasBroken !== 'Yes');
+                (d.assets || []).forEach(function(a) { hscAddAsset(a); });
+                hscRecalc();
+                document.getElementById('hyper-sc-draft-banner').classList.add('hidden');
+            }
+            function discardHyperScDraft() { if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return; try { localStorage.removeItem(HYPER_SC_DRAFT_KEY); } catch (e) {} checkHyperScDraft(); }
+            function resetHyperScForm(ask) {
+                if (ask && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('hyperSc');
+                const form = document.getElementById('hyper-sc-form');
+                const rn = form.reporterName.value, rp = form.reporterPhone.value;
+                form.reset(); form.reporterName.value = rn; form.reporterPhone.value = rp;
+                document.querySelectorAll('#content-hyper-sc-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                _clearHyperScCards();
+                _applyHyperScStoreLevel({});
+                document.getElementById('hyper-sc-station-search').value = '';
+                document.getElementById('hsc-broken-section').classList.add('hidden');
+                _clearHyperScStore();
+            }
+
+            function _hscFlash(el, msg) {
+                alert(msg);
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-2', 'ring-red-400'); setTimeout(function() { el.classList.remove('ring-2', 'ring-red-400'); }, 2000);
+            }
+            async function handleHyperScSubmit(e) {
+                e.preventDefault();
+                const form = e.target;
+                if (!form.reporterName.value.trim()) { alert('กรุณากรอกชื่อผู้สำรวจ'); form.reporterName.focus(); return; }
+                if (!form.reporterPhone.value.trim()) { alert('กรุณากรอกเบอร์โทรศัพท์'); form.reporterPhone.focus(); return; }
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน'); return; }
+                const d = collectHyperSc(), needPhoto = _equipmentPhotoRequired.hyperSc;
+                if (!d.plan.handover) { _hscFlash(document.getElementById('hsc-handover'), 'ข้อ 2: กรุณาเลือกเงื่อนไขส่งมอบพื้นที่'); return; }
+                if (!d.plan.vpOpt.trim()) { _hscFlash(document.getElementById('hsc-vp'), 'ข้อ 2: กรุณาระบุ VP OPT ที่ร่วมเดิน / ตัดสินใจ'); return; }
+                const hasPhoto = function(k) { return (_accumulatedFiles[k] || []).filter(Boolean).length > 0; };
+                for (const el of document.querySelectorAll('#hsc-assets [data-asset]')) {
+                    const a = _hscAsset(el), dp = _hscDispo(a.dispo);
+                    const msg = !a.grp ? 'ยังไม่ได้เลือกกลุ่มระบบ' : !a.item.trim() ? 'ยังไม่ได้ระบุรายการ' : !(parseInt(a.qty, 10) > 0) ? 'ยังไม่ได้ใส่จำนวน'
+                        : !a.cond ? 'ยังไม่ได้เลือกสภาพ' : dp && dp.needTarget && !a.target.trim() ? 'ยังไม่ได้ระบุปลายทาง (สาขา / FWH)'
+                        : needPhoto && !hasPhoto(a.pk) ? 'ยังไม่ได้แนบรูปถ่าย' : '';
+                    if (msg) { _hscFlash(el, 'รายการ ' + a.aid + ': ' + msg); return; }
+                }
+                if (!d.assets.length && !confirm('ยังไม่มีรายการทรัพย์สินเลย — ยืนยันส่งเฉพาะแผนและสถานะงานปิดสาขาใช่หรือไม่?')) return;
+                const t = hscRecalc();
+                if (t.pending && !confirm('ยังมีรายการ "รอตัดสินใจ" ' + t.pending + ' รายการ — ส่งไปก่อน แล้วกลับมาอัปเดตภายหลัง?')) return;
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุประเด็นเร่งด่วน'); form.brokenDetail.focus(); return; }
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    const tasks = [], seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('HSC', form.branchCode.value, tasks, function() { return [1024, 1024, 0.65]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+                    const data = _hyperScFields(form);
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('hyperSc');
+                    data.closeJson = JSON.stringify(d);
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) { showSuccess(); sdsReset('hyperSc'); try { localStorage.removeItem(HYPER_SC_DRAFT_KEY); } catch (e2) {} checkHyperScDraft(); resetHyperScForm(false); }
+                            else alert('Error: ' + (res && res.error));
+                        })
+                        .withFailureHandler(function(err) { hideLoading(); alert('Server Error: ' + err.message); })
+                        .processStoreCloseForm(data);
+                } catch (err) { hideLoading(); alert('Error processing form: ' + err.message); }
+            }
+        </script>

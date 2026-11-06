@@ -1,0 +1,807 @@
+        <!-- CONTENT: HYPER AIRCON SURVEY (big-format stores — HVAC counted per type/size).
+             Reuses HYPER_REF_STORES / HYPER_REF_COLORS / _hyperRefStoreLabel /
+             _hyperRefFindStoreDb from HyperRefSurveyTab.html, included just before this. -->
+        <div id="content-hyper-ac-survey" class="tab-content hidden">
+            <form id="hyper-ac-form" onsubmit="handleHyperAcSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">❄️ สำรวจแอร์ Hyper</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= MANUALS_URL ?>?page=hyper-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=equip" target="_blank" class="text-indigo-600 hover:underline text-sm font-medium">🔎 อุปกรณ์ / QR</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_ac_survey_report" target="_blank"
+                            class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+
+                <p class="text-xs text-cyan-800 bg-cyan-50 border border-cyan-200 rounded px-3 py-2 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>แบบสำรวจระบบปรับอากาศสำหรับสาขา <b>Hyper / Market / Foodplace</b> — ใส่ <b>จำนวนเครื่อง</b> ตามประเภทและขนาด (ใส่ 0 หากไม่มี) แล้วระบบจะสร้าง <b>การ์ดเครื่องทีละเครื่อง</b> ให้กรอก Equipment ID, ยี่ห้อ (บังคับ), รุ่น/ขนาด, Asset No., สถานะ, สภาพ และอุณหภูมิลมจ่าย/ลมกลับของเครื่องแต่ละเครื่อง เหมือนแบบสำรวจแอร์ปกติ</span>
+                </p>
+
+                <div id="hyper-ac-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="hyper-ac-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreHyperAcDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardHyperAcDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <!-- 1. General Info -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เทรนเนอร์ / ผู้แจ้ง (Reporter) *</label>
+                            <input type="text" name="reporterName"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                                required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="hyper-ac-station-search" autocomplete="off"
+                                    class="input-field w-full border p-2 rounded text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-500"
+                                    placeholder="พิมพ์รหัสสาขา หรือชื่อสาขา (ไทย/อังกฤษ)..." oninput="handleHyperAcStationInput(this)">
+                                <div id="hyper-ac-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div id="hyper-ac-store-badge" class="hidden self-end text-xs"></div>
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly>
+                            <input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat">
+                            <input type="hidden" name="region">
+                            <input type="hidden" name="ammMtn">
+                            <input type="hidden" name="dmArea">
+                            <input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="hyper-ac-rest-form" class="hidden">
+                    <div class="sticky top-0 z-30 bg-white/95 backdrop-blur border border-cyan-200 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span class="font-semibold text-gray-600">รวม:</span>
+                        <span class="text-blue-700">AHU/FCU <b id="hyper-ac-total-chw">0</b></span>
+                        <span class="text-teal-700">แอร์ DX <b id="hyper-ac-total-dx">0</b></span>
+                        <span class="text-amber-700">พัดลม/ม่านอากาศ <b id="hyper-ac-total-vent">0</b></span>
+                    </div>
+
+                    <div class="bg-rose-50 border border-rose-200 rounded-lg p-3 mt-6">
+                        <p class="text-sm font-bold text-rose-700 mb-1">🌡️ เครื่องมือวัดอุณหภูมิ (Temperature Instrument)</p>
+                        <p class="text-xs text-rose-600 mb-2">ค่าที่แสดงบนรีโมท / Chiller / BMS อาจไม่ตรงความจริง — วัดด้วยเครื่องมือ (เช่น Temp Gun) ที่ <b>หน้ากากลมจ่าย (Supply)</b> และ <b>ช่องลมกลับ (Return)</b> ของ<b>เครื่องแต่ละเครื่อง</b> — ผลต่าง (ΔT) ปกติประมาณ 8–12°C</p>
+                        <select name="tempInstrument" id="hyper-ac-temp-instrument" class="input-field w-full sm:w-80 border border-rose-300 p-2 rounded text-sm bg-white focus:ring-rose-400"></select>
+                    </div>
+
+                    <!-- 2. Chilled-water system -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">2. ระบบน้ำเย็น (Chiller Plant / AHU / FCU)</h3>
+                        <div class="pb-4 bg-slate-50 rounded-lg p-3 border border-slate-200 mb-6">
+                            <h4 class="font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                <span class="inline-block w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                                2.1) Chiller Plant (ห้องเครื่อง Chiller)
+                            </h4>
+                            <p class="text-xs text-slate-600 bg-slate-100 border border-slate-200 rounded px-2 py-1 mb-3 flex items-start gap-1.5">
+                                <span class="mt-0.5">💡</span>
+                                <span>ถ้าสาขาไม่มี Chiller (ใช้แอร์ DX ทั้งหมด) ให้เลือก "ไม่มี Chiller" แล้วข้ามไปข้อ 3</span>
+                            </p>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div class="sm:col-span-2">
+                                    <label class="block text-xs text-gray-500 mb-1">ประเภท Chiller</label>
+                                    <select name="chillerType" id="hyper-ac-chiller-type" onchange="toggleHyperAcChiller()" class="input-field w-full border border-gray-300 p-2 rounded text-sm bg-white"></select>
+                                </div>
+                            </div>
+                            <div id="hyper-ac-chiller-detail" class="mt-4 space-y-4">
+                                <p class="text-xs text-slate-600">ใส่จำนวน Chiller / Cooling Tower / ปั๊ม แล้วระบบจะสร้างการ์ดทีละเครื่อง (Equipment ID + QR) ให้กรอกยี่ห้อ รุ่น ขนาด TR ปีที่ผลิต และถ่ายรูป</p>
+                                <div id="hyper-ac-plant-cats" class="space-y-4"></div>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-xs text-gray-500 mb-1">ระบบ BMS</label>
+                                        <select name="bms" data-hac-options="bms" class="input-field w-full border border-gray-300 p-2 rounded text-sm bg-white"></select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div class="bg-white border border-blue-200 rounded-lg p-2">
+                                        <p class="text-xs font-semibold text-blue-700 mb-1">🌡️ น้ำเย็นจ่าย CHWS (°C) <span class="font-normal text-gray-400">ปกติ ~6–7°C</span></p>
+                                        <div class="grid grid-cols-2 gap-2" data-temp-pair data-temp-rule="gap" data-temp-threshold="2">
+                                            <div><label class="block text-[11px] text-gray-500 mb-1">Chiller/BMS แสดง</label><input type="number" step="0.1" inputmode="decimal" name="chwsCtrlTemp" class="input-field w-full border border-gray-300 p-2 rounded text-sm bg-gray-50" placeholder="เช่น 7.0" oninput="checkHyperAcTempPair(this)"></div>
+                                            <div><label class="block text-[11px] text-gray-500 mb-1">วัดจริง (ที่ท่อ)</label><input type="number" step="0.1" inputmode="decimal" name="chwsMeasTemp" class="input-field w-full border border-rose-300 p-2 rounded text-sm bg-white" placeholder="เช่น 8.5" oninput="checkHyperAcTempPair(this)"></div>
+                                        </div>
+                                        <p class="hidden text-[11px] text-amber-700 mt-1" data-temp-warn></p>
+                                    </div>
+                                    <div class="bg-white border border-blue-200 rounded-lg p-2">
+                                        <p class="text-xs font-semibold text-blue-700 mb-1">🌡️ น้ำเย็นกลับ CHWR (°C) <span class="font-normal text-gray-400">ปกติ ~12–13°C</span></p>
+                                        <div class="grid grid-cols-2 gap-2" data-temp-pair data-temp-rule="gap" data-temp-threshold="2">
+                                            <div><label class="block text-[11px] text-gray-500 mb-1">Chiller/BMS แสดง</label><input type="number" step="0.1" inputmode="decimal" name="chwrCtrlTemp" class="input-field w-full border border-gray-300 p-2 rounded text-sm bg-gray-50" placeholder="เช่น 12.0" oninput="checkHyperAcTempPair(this)"></div>
+                                            <div><label class="block text-[11px] text-gray-500 mb-1">วัดจริง (ที่ท่อ)</label><input type="number" step="0.1" inputmode="decimal" name="chwrMeasTemp" class="input-field w-full border border-rose-300 p-2 rounded text-sm bg-white" placeholder="เช่น 13.5" oninput="checkHyperAcTempPair(this)"></div>
+                                        </div>
+                                        <p class="hidden text-[11px] text-amber-700 mt-1" data-temp-warn></p>
+                                    </div>
+                                </div>
+                                <div id="hyper-ac-photo-plant"></div>
+                            </div>
+                        </div>
+                        <div id="hyper-ac-chw-cats" class="space-y-6"></div>
+                    </div>
+
+                    <!-- 3. DX units -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">3. แอร์ DX (Split / Package / VRF)</h3>
+                        <div id="hyper-ac-dx-cats" class="space-y-6"></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">VRF/VRV — จำนวนคอยล์ร้อน (Outdoor)</label>
+                                <input type="number" name="vrfOutdoorQty" min="0" value="0" inputmode="numeric" class="input-field w-full border border-gray-300 p-2 rounded text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">สารทำความเย็นหลักของแอร์ DX</label>
+                                <select name="dxRefrigerant" data-hac-options="dxRefrigerant" class="input-field w-full border border-gray-300 p-2 rounded text-sm bg-white"></select>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">แอร์อื่นๆ (ถ้ามี) — โปรดระบุรูปแบบ / จำนวน</label>
+                            <textarea name="dxOther" rows="2" class="input-field w-full border border-gray-300 p-2 rounded text-sm" placeholder="เช่น Precision AC ห้อง Server 2 เครื่อง"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 4. Ventilation -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">4. ระบบระบายอากาศ (Ventilation)</h3>
+                        <div id="hyper-ac-vent-cats" class="space-y-6"></div>
+                    </div>
+
+                    <!-- 5. Sales-floor temperature -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">5. อุณหภูมิพื้นที่ขาย (วัดด้วยเครื่องมือ ที่ระดับ ~1.5 ม.)</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">ค่าที่ตั้ง Thermostat/BMS</label>
+                                <input type="number" step="0.1" inputmode="decimal" name="thermostatSet" class="input-field w-full border border-gray-300 p-2 rounded text-sm bg-gray-50" placeholder="เช่น 25">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">ด้านหน้า / ทางเข้า</label>
+                                <input type="number" step="0.1" inputmode="decimal" name="salesFrontTemp" data-hot-area class="input-field w-full border border-rose-300 p-2 rounded text-sm" placeholder="°C" oninput="checkHyperAcHotArea(this)">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">กลางร้าน</label>
+                                <input type="number" step="0.1" inputmode="decimal" name="salesMidTemp" data-hot-area class="input-field w-full border border-rose-300 p-2 rounded text-sm" placeholder="°C" oninput="checkHyperAcHotArea(this)">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">ด้านใน / โซนสด</label>
+                                <input type="number" step="0.1" inputmode="decimal" name="salesBackTemp" data-hot-area class="input-field w-full border border-rose-300 p-2 rounded text-sm" placeholder="°C" oninput="checkHyperAcHotArea(this)">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">Food Court</label>
+                                <input type="number" step="0.1" inputmode="decimal" name="foodCourtTemp" data-hot-area class="input-field w-full border border-rose-300 p-2 rounded text-sm" placeholder="°C" oninput="checkHyperAcHotArea(this)">
+                            </div>
+                        </div>
+                        <p id="hyper-ac-hot-warn" class="hidden text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1 mt-2"></p>
+                        <div class="mt-3">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">จุดที่ร้อน / ลูกค้าร้องเรียน (ถ้ามี)</label>
+                            <textarea name="hotSpot" rows="2" class="input-field w-full border border-gray-300 p-2 rounded text-sm" placeholder="เช่น โซนเสื้อผ้าชั้น 2 ร้อนช่วงบ่าย / Checkout ร้อน"></textarea>
+                        </div>
+                        <div id="hyper-ac-photo-area"></div>
+                    </div>
+
+                    <!-- 6. Broken units -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">6. แอร์ / อุปกรณ์ที่ชำรุด หรือไม่เย็น</h3>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">มีเครื่องที่ชำรุด / ไม่เย็น หรือไม่?</label>
+                        <div class="flex gap-4 mb-3">
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" class="text-blue-600 focus:ring-blue-500" onchange="toggleHyperAcBroken(true)"> <span class="text-sm">มี (Yes)</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" class="text-blue-600 focus:ring-blue-500" onchange="toggleHyperAcBroken(false)" checked> <span class="text-sm">ไม่มี (No)</span></label>
+                        </div>
+                        <div id="hyper-ac-broken-section" class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ระบุเครื่องที่ชำรุด และอาการ *</label>
+                            <textarea name="brokenDetail" rows="3" class="input-field w-full border border-red-300 p-2 rounded text-sm focus:ring-red-400" placeholder="เช่น AHU-3 โซนเสื้อผ้า มอเตอร์พัดลมเสียงดัง / Chiller #2 Trip บ่อย"></textarea>
+                            <div id="hyper-ac-photo-broken"></div>
+                        </div>
+                    </div>
+
+                    <!-- 7. Notes -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-2 border-b pb-2">7. สรุปปัญหา (Additional Findings)</h3>
+                        <textarea name="comments" rows="3"
+                            class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+                            placeholder="ระบุปัญหาเพิ่มเติมที่พบ... (Optional)"></textarea>
+                    </div>
+
+                    <!-- 8. CC Emails -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">8. CC Email Notification (Optional)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1 (DM)</label>
+                                <input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm" placeholder="email1@example.com">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2 (CM)</label>
+                                <input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm" placeholder="email2@example.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetHyperAcForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveHyperAcDraft()"
+                                class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 transition text-sm">
+                                &#128190; Save Draft
+                            </button>
+                            <button type="submit"
+                                class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-blue-700 transition transform hover:-translate-y-0.5">
+                                Submit
+                            </button>
+                        </div>
+                    </div>
+                </div> <!-- End hidden hyper-ac-rest-form -->
+            </form>
+        </div> <!-- End content-hyper-ac-survey -->
+
+        <script>
+            const HYPER_AC_CONFIG = <?!= JSON.stringify(getHyperAcConfig_()) ?>;
+            const HYPER_AC_DRAFT_KEY = 'hyper_ac_survey_draft_v1';
+            const HYPER_AC_NO_CHILLER = 'ไม่มี Chiller (ใช้แอร์ DX ทั้งหมด)';
+
+            (function renderHyperAcForm() {
+                const counters = { chw: 1, dx: 0, vent: 0, plant: 0 }; // 2.1 is the Chiller plant card
+                const sectionNo = { chw: 2, dx: 3, vent: 4, plant: '2.1' };
+                HYPER_AC_CONFIG.categories.forEach(function(cat) {
+                    const c = HYPER_REF_COLORS[cat.color] || HYPER_REF_COLORS.blue;
+                    const num = sectionNo[cat.group] + '.' + (++counters[cat.group]);   // plant: 2.1.1, 2.1.2 ...
+                    const sizes = cat.sizes.map(function(s) {
+                        return '<div>' +
+                            '<label class="block text-xs text-gray-500 mb-1">[' + s.label + '] — จำนวน (เครื่อง)</label>' +
+                            '<input type="number" name="' + s.key + '" min="0" value="0" inputmode="numeric" data-hac-cat="' + cat.id + '"' +
+                                ' class="input-field w-full border border-gray-300 p-2 rounded text-sm" placeholder="0"' +
+                                ' oninput="onHyperAcCountInput(\'' + cat.id + '\')" onfocus="if(this.value===\'0\')this.select()">' +
+                        '</div>';
+                    }).join('');
+                    const html =
+                        '<div class="pb-4 rounded-lg p-3 border ' + c.box + '">' +
+                            '<h4 class="font-semibold ' + c.title + ' mb-1 flex flex-wrap items-center gap-2">' +
+                                '<span class="inline-block w-2.5 h-2.5 rounded-full ' + c.dot + '"></span>' +
+                                num + ') ' + cat.title +
+                                '<span class="ml-auto text-xs font-bold bg-white border border-gray-200 text-gray-700 px-2 py-0.5 rounded-full">รวม <span id="hyper-ac-sum-' + cat.id + '">0</span> เครื่อง</span>' +
+                            '</h4>' +
+                            (cat.hint ? '<p class="text-xs border rounded px-2 py-1 mb-3 flex items-start gap-1.5 ' + c.hint + '"><span class="mt-0.5">💡</span><span>' + cat.hint + '</span></p>' : '<div class="mb-3"></div>') +
+                            '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-' + Math.min(cat.sizes.length, 5) + ' gap-3">' + sizes + '</div>' +
+                            '<div id="hyper-ac-units-' + cat.id + '" class="mt-3 space-y-4">' +
+                                cat.sizes.map(function(sz) { return '<div id="hyper-ac-ug-' + cat.id + '-' + sz.sizeKey + '" class="hidden space-y-3"></div>'; }).join('') +
+                            '</div>' +
+                        '</div>';
+                    document.getElementById('hyper-ac-' + cat.group + '-cats').insertAdjacentHTML('beforeend', html);
+                });
+                document.getElementById('hyper-ac-photo-plant').innerHTML = photoUpload('ห้องเครื่อง Chiller / Nameplate', 'hac_plant');
+                document.getElementById('hyper-ac-photo-area').innerHTML = photoUpload('อุณหภูมิพื้นที่ขาย / จุดที่ร้อน', 'hac_area');
+                document.getElementById('hyper-ac-photo-broken').innerHTML = photoUpload('เครื่องที่ชำรุด', 'hac_broken');
+
+                // Select options come from the server config
+                function fillSelect(sel, key, placeholder) {
+                    const f = HYPER_AC_CONFIG.system.find(function(x) { return x.key === key; });
+                    sel.innerHTML = '<option value="">' + placeholder + '</option>' +
+                        (f ? f.options : []).map(function(o) { return '<option value="' + o + '">' + o + '</option>'; }).join('');
+                }
+                fillSelect(document.getElementById('hyper-ac-temp-instrument'), 'tempInstrument', '-- เลือกเครื่องมือที่ใช้วัด --');
+                fillSelect(document.getElementById('hyper-ac-chiller-type'), 'chillerType', '-- เลือก --');
+                document.querySelectorAll('#content-hyper-ac-survey [data-hac-options]').forEach(function(sel) { fillSelect(sel, sel.dataset.hacOptions, '-- เลือก --'); });
+            })();
+
+            function updateHyperAcTotals() {
+                const form = document.getElementById('hyper-ac-form');
+                const totals = { chw: 0, dx: 0, vent: 0 };
+                HYPER_AC_CONFIG.categories.forEach(function(cat) {
+                    let sum = 0;
+                    cat.sizes.forEach(function(s) { sum += Math.max(0, parseInt(form.elements[s.key].value, 10) || 0); });
+                    document.getElementById('hyper-ac-sum-' + cat.id).textContent = sum;
+                    totals[cat.group] = (totals[cat.group] || 0) + sum;
+                });
+                Object.keys(totals).forEach(function(g) {
+                    const el = document.getElementById('hyper-ac-total-' + g);
+                    if (el) el.textContent = totals[g];
+                });
+                return totals;
+            }
+
+            // ─── Per-unit cards (same fields as the Aircon Survey's unit card) ────────────
+            // Mirrors the Hyper Ref tab: cards keyed by (category, size, n) so changing a count only
+            // appends/removes trailing cards; Equipment ID renumbered per category across sizes.
+            // Brand helpers (_hyperBrandHtml, validateHyperBrands ...) come from the Ref tab include.
+            // Temps: ct = Supply air, mt = Return air (ΔT < threshold flags), tc = controller/set.
+            const HYPER_AC_UNIT_MAX_PER_SIZE = 200;
+            function _hyperAcBase(catId, sizeKey) { return 'ha_' + catId + '_' + sizeKey; }
+            function _hyperAcPk(catId, sizeKey, n) { return 'hau_' + catId + '_' + sizeKey + '_' + n; }
+            function _hyperAcBranchCode() { return (document.getElementById('hyper-ac-form').branchCode.value || '').trim(); }
+
+            function _hyperAcCardHtml(cat, size, n) {
+                const base = _hyperAcBase(cat.id, size.sizeKey);
+                const pk = _hyperAcPk(cat.id, size.sizeKey, n);
+                const label = cat.title.replace(/\s*[—(].*$/, '') + ' [' + size.label + '] #' + n;
+                const assetId = 'aiFormHyperAc_' + base + '_' + n;
+                const ct = HYPER_AC_CONFIG.catTemp;
+                const tempBlock = cat.hasTemp ?
+                    '<div class="border-t border-gray-100 pt-2 mt-1" data-temp-unit data-threshold="' + ct.threshold + '">' +
+                        '<div class="grid grid-cols-3 gap-2">' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">🌡️ Controller / Setpoint (°C)</label>' +
+                                '<input type="number" step="0.1" inputmode="decimal" name="' + base + 'Ctrl_' + n + '" data-f="tc" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="ที่รีโมท"></div>' +
+                            '<div><label class="block text-xs font-semibold text-rose-700 mb-1">ลมจ่าย Supply (°C)</label>' +
+                                '<input type="number" step="0.1" inputmode="decimal" name="' + base + 'Supply_' + n + '" data-f="ct" oninput="checkHyperAcUnitTemp(this)" class="hac-meas w-full border border-rose-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-rose-400" placeholder="เช่น 14"></div>' +
+                            '<div><label class="block text-xs font-semibold text-rose-700 mb-1">ลมกลับ Return (°C)</label>' +
+                                '<input type="number" step="0.1" inputmode="decimal" name="' + base + 'Return_' + n + '" data-f="mt" oninput="checkHyperAcUnitTemp(this)" class="hac-meas w-full border border-rose-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-rose-400" placeholder="เช่น 25"></div>' +
+                        '</div>' +
+                        '<p class="hidden text-[11px] text-amber-700 mt-1" data-unit-warn></p>' +
+                    '</div>' : '';
+                return '' +
+                '<div class="hyper-unit-card border border-cyan-200 rounded-lg overflow-hidden shadow-sm bg-white" data-card data-hau data-cat="' + cat.id + '" data-size="' + size.sizeKey + '" data-n="' + n + '" data-pk="' + pk + '" data-label="' + label.replace(/"/g, '&quot;') + '">' +
+                    '<div class="bg-cyan-700 text-white px-3 py-2 flex items-center justify-between gap-2 min-h-[38px]">' +
+                        '<span class="font-bold text-sm">' + label + '</span>' +
+                        '<div class="flex items-center gap-2">' +
+                            '<span class="text-xs font-mono text-cyan-100 hyper-unit-id">-</span>' +
+                            '<button type="button" onclick="showQrModal(this.closest(\'[data-hau]\').querySelector(\'.hyper-unit-id\').textContent, this.closest(\'[data-hau]\').dataset.label)" class="flex items-center gap-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2 py-1 rounded text-xs shadow-sm">QR</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="p-3 space-y-2">' +
+                        _hyperBrandHtml('ac', base + 'Brand_' + n) +
+                        _hyperYearHtml(base, n) +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">รุ่น / ขนาดจริง (Model / Capacity)</label>' +
+                            '<input type="text" name="' + base + 'Spec_' + n + '" data-f="sp" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="เช่น รุ่น, BTU / TR จริงที่ป้ายเครื่อง">' +
+                        '</div>' +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">Asset No. (ถ้ามี)</label>' +
+                            '<div class="flex gap-1">' +
+                                '<input id="' + assetId + '" type="text" name="' + base + 'AssetNo_' + n + '" data-f="as" onblur="_confirmManualAssetEntry(this)" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="ระบุ Asset No. หรือกด 🔗 เลือกจากทะเบียน">' +
+                                '<button type="button" onclick="openAssetMapPicker(_hyperAcBranchCode(), \'' + assetId + '\')" class="shrink-0 px-2 border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">สถานะการใช้งาน</label>' +
+                            '<div class="flex gap-2 mt-1">' +
+                                '<label id="rfSt_use_' + base + '_' + n + '" onclick="_refStatus(\'' + base + '\',' + n + ',true)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-green-100 border-green-400 text-green-700 transition-colors">' +
+                                    '<input type="radio" name="' + base + 'Status_' + n + '" value="ใช้งาน" checked class="hidden">✓ ใช้งาน</label>' +
+                                '<label id="rfSt_no_' + base + '_' + n + '" onclick="_refStatus(\'' + base + '\',' + n + ',false)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-white border-gray-300 text-gray-500 transition-colors">' +
+                                    '<input type="radio" name="' + base + 'Status_' + n + '" value="ไม่ใช้งาน" class="hidden">✗ ไม่ใช้งาน</label>' +
+                            '</div>' +
+                        '</div>' +
+                        condRatingRow(base + 'CondRating_' + n) +
+                        tempBlock +
+                        _hyperFFHtml(cat, base, n) +
+                        (_userIsTechTeam ?
+                        '<div class="bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1">' +
+                            '<label class="block text-xs text-amber-700 font-semibold mb-1">🔧 กระแสไฟ (A) <span class="font-normal text-amber-500">(เฉพาะช่าง)</span></label>' +
+                            '<input type="number" step="0.01" name="' + base + 'Amps_' + n + '" data-f="am" class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-amber-400" placeholder="A">' +
+                        '</div>' : '') +
+                        _hyperNoteHtml(base, n) +
+                        photoUpload(label, pk) +
+                    '</div>' +
+                '</div>';
+            }
+
+            // ΔT = return − supply; below the threshold the unit is not cooling enough
+            function checkHyperAcUnitTemp(input) {
+                const box = input.closest('[data-temp-unit]');
+                const sup = parseFloat(box.querySelector('[data-f="ct"]').value), ret = parseFloat(box.querySelector('[data-f="mt"]').value);
+                const th = parseFloat(box.dataset.threshold);
+                const warn = box.querySelector('[data-unit-warn]');
+                const bad = !isNaN(sup) && !isNaN(ret) && (ret - sup) < th;
+                warn.textContent = bad ? '⚠️ ΔT ลมกลับ − ลมจ่าย = ' + (ret - sup).toFixed(1) + '°C (ต่ำกว่า ' + th + '°C) — เครื่องอาจเย็นไม่พอ (น้ำยาน้อย / คอยล์สกปรก / น้ำเย็นไม่พอ) แจ้งในข้อเครื่องชำรุดหากผิดปกติ' : '';
+                warn.classList.toggle('hidden', !bad);
+            }
+
+            function _hyperAcCardHasData(card) {
+                const typed = Array.from(card.querySelectorAll('input[type="text"], input[type="number"]')).some(function(el) { return el.value.trim() !== ''; });
+                const photos = (_accumulatedFiles[card.dataset.pk] || []).filter(Boolean).length > 0;
+                const rated = card.querySelector('input[name*="CondRating"]').getAttribute('data-confirmed') === '1';
+                return typed || photos || rated;
+            }
+
+            function syncHyperAcUnits(catId) {
+                const form = document.getElementById('hyper-ac-form');
+                const cat = HYPER_AC_CONFIG.categories.find(function(c) { return c.id === catId; });
+                cat.sizes.forEach(function(sz) {
+                    const input = form.elements[sz.key];
+                    let want = Math.max(0, parseInt(input.value, 10) || 0);
+                    if (want > HYPER_AC_UNIT_MAX_PER_SIZE) { want = HYPER_AC_UNIT_MAX_PER_SIZE; input.value = want; }
+                    const group = document.getElementById('hyper-ac-ug-' + catId + '-' + sz.sizeKey);
+                    let cards = group.querySelectorAll('[data-hau]');
+                    if (want < cards.length) {
+                        const doomed = Array.from(cards).slice(want);
+                        if (doomed.some(_hyperAcCardHasData) && !confirm('ลดจำนวน [' + sz.label + '] — การ์ดที่ถูกลบมีข้อมูลที่กรอกไว้แล้ว ยืนยันลบหรือไม่?')) {
+                            input.value = cards.length;
+                            return;
+                        }
+                        doomed.forEach(function(card) { delete _accumulatedFiles[card.dataset.pk]; card.remove(); });
+                    }
+                    cards = group.querySelectorAll('[data-hau]');
+                    for (let n = cards.length + 1; n <= want; n++) group.insertAdjacentHTML('beforeend', _hyperAcCardHtml(cat, sz, n));
+                    group.classList.toggle('hidden', want === 0);
+                    let head = group.querySelector('[data-ug-head]');
+                    if (want > 0) {
+                        if (!head) { group.insertAdjacentHTML('afterbegin', '<p data-ug-head class="text-xs font-bold text-gray-600"></p>'); head = group.querySelector('[data-ug-head]'); }
+                        head.textContent = '▼ ' + sz.label + ' — ' + want + ' เครื่อง';
+                    } else if (head) head.remove();
+                });
+                renumberHyperAcIds(catId);
+            }
+
+            function onHyperAcCountInput(catId) {
+                _ensureHyperBrandOptions();
+                updateHyperAcTotals();
+                syncHyperAcUnits(catId);
+            }
+
+            // Equipment ID = <branch code>-<type prefix><NN>, NN running across the sizes of one type
+            function renumberHyperAcIds(onlyCatId) {
+                const code = _hyperAcBranchCode() || '[Branch]';
+                HYPER_AC_CONFIG.categories.forEach(function(cat) {
+                    if (onlyCatId && cat.id !== onlyCatId) return;
+                    let idx = 0;
+                    document.querySelectorAll('#hyper-ac-units-' + cat.id + ' [data-hau]').forEach(function(card) {
+                        idx++;
+                        card.querySelector('.hyper-unit-id').textContent = code + '-' + cat.eqPrefix + (idx < 10 ? '0' + idx : idx);
+                    });
+                });
+            }
+
+            function _hyperAcVal(card, f) {
+                const el = card.querySelector('[data-f="' + f + '"]');
+                return el ? el.value : '';
+            }
+
+            function collectHyperAcUnits() {
+                const units = [];
+                HYPER_AC_CONFIG.categories.forEach(function(cat) {
+                    document.querySelectorAll('#hyper-ac-units-' + cat.id + ' [data-hau]').forEach(function(card) {
+                        const rating = card.querySelector('input[name*="CondRating"]');
+                        const statusEl = card.querySelector('input[type="radio"]:checked');
+                        units.push(Object.assign(_hyperFFCollect(card), {
+                            c: cat.id, s: card.dataset.size, n: parseInt(card.dataset.n, 10),
+                            id: card.querySelector('.hyper-unit-id').textContent,
+                            br: _hyperAcVal(card, 'br'), sp: _hyperAcVal(card, 'sp'), as: _hyperAcVal(card, 'as'),
+                            yr: _hyperYearVal(card), yrSel: card.querySelector('[data-f="yr"]').value, ys: _hyperAcVal(card, 'ys'), nt: _hyperAcVal(card, 'nt'),
+                            st: statusEl ? statusEl.value : 'ใช้งาน',
+                            cr: rating.getAttribute('data-confirmed') === '1' ? rating.value : '',
+                            ct: _hyperAcVal(card, 'ct'), mt: _hyperAcVal(card, 'mt'), tc: _hyperAcVal(card, 'tc'), am: _hyperAcVal(card, 'am'),
+                            pk: card.dataset.pk
+                        }));
+                    });
+                });
+                return units;
+            }
+
+            function restoreHyperAcUnits(units) {
+                const form = document.getElementById('hyper-ac-form');
+                const counts = {};
+                (units || []).forEach(function(u) { const k = u.c + '|' + u.s; counts[k] = (counts[k] || 0) + 1; });
+                HYPER_AC_CONFIG.categories.forEach(function(cat) {
+                    cat.sizes.forEach(function(sz) { form.elements[sz.key].value = counts[cat.id + '|' + sz.sizeKey] || 0; });
+                    syncHyperAcUnits(cat.id);
+                });
+                (units || []).forEach(function(u) {
+                    const card = document.querySelector('[data-hau][data-pk="' + _hyperAcPk(u.c, u.s, u.n) + '"]');
+                    if (!card) return;
+                    const base = _hyperAcBase(u.c, u.s);
+                    const setv = function(f, v) { const el = card.querySelector('[data-f="' + f + '"]'); if (el && v !== '' && v != null) el.value = v; };
+                    ['br', 'sp', 'as', 'ct', 'mt', 'tc', 'am'].forEach(function(f) { setv(f, u[f]); });
+                    _hyperRestoreAge(card, u);
+                    _hyperFFRestore(card, u);
+                    const asset = card.querySelector('[data-f="as"]');
+                    if (asset && asset.value) asset.dataset.confirmedManual = asset.value;
+                    _refStatus(base, u.n, u.st !== 'ไม่ใช้งาน');
+                    if (u.cr !== '' && u.cr != null) setCondRating(base + 'CondRating_' + u.n, parseInt(u.cr, 10));
+                    const sup = card.querySelector('[data-f="ct"]');
+                    if (sup) checkHyperAcUnitTemp(sup);
+                });
+                updateHyperAcTotals();
+            }
+
+            function _hyperAcMissingPhotos() {
+                const missing = [];
+                document.querySelectorAll('#content-hyper-ac-survey [data-hau]').forEach(function(card) {
+                    if (!(_accumulatedFiles[card.dataset.pk] || []).filter(Boolean).length) {
+                        missing.push(card.querySelector('.hyper-unit-id').textContent + ' (' + card.dataset.label + ')');
+                    }
+                });
+                return missing;
+            }
+
+            function toggleHyperAcChiller() {
+                const none = document.getElementById('hyper-ac-chiller-type').value === HYPER_AC_NO_CHILLER;
+                if (none) {
+                    // "no Chiller" — drop any plant cards (cooling tower / pumps belong to the plant too)
+                    const hasCards = document.querySelectorAll('#hyper-ac-plant-cats [data-hau]').length > 0;
+                    if (hasCards && !confirm('เลือก “ไม่มี Chiller” — การ์ด Chiller / Cooling Tower / ปั๊ม ที่สร้างไว้จะถูกลบ ยืนยันหรือไม่?')) {
+                        document.getElementById('hyper-ac-chiller-type').value = '';
+                        return;
+                    }
+                    HYPER_AC_CONFIG.categories.filter(function(c) { return c.group === 'plant'; }).forEach(function(c) {
+                        c.sizes.forEach(function(sz) { document.getElementById('hyper-ac-form').elements[sz.key].value = 0; });
+                        syncHyperAcUnits(c.id);
+                    });
+                }
+                document.getElementById('hyper-ac-chiller-detail').classList.toggle('hidden', none);
+            }
+
+            // data-temp-rule on the pair decides the check:
+            //   'gap'    — display vs instrument differs by more than threshold
+            //   'deltaT' — return − supply below threshold (unit not cooling enough)
+            function checkHyperAcTempPair(input) {
+                const pair = input.closest('[data-temp-pair]');
+                const warn = pair.parentElement.querySelector('[data-temp-warn]');
+                const ins = pair.querySelectorAll('input');
+                const a = parseFloat(ins[0].value), b = parseFloat(ins[1].value);
+                const th = parseFloat(pair.dataset.tempThreshold);
+                let msg = '';
+                if (!isNaN(a) && !isNaN(b)) {
+                    if (pair.dataset.tempRule === 'deltaT' && (b - a) < th) {
+                        msg = '⚠️ ΔT ลมกลับ − ลมจ่าย = ' + (b - a).toFixed(1) + '°C (ต่ำกว่า ' + th + '°C) — เครื่องอาจเย็นไม่พอ (น้ำยาน้อย / คอยล์สกปรก / น้ำเย็นไม่พอ) แจ้งในข้อ 6 หากผิดปกติ';
+                    } else if (pair.dataset.tempRule === 'gap' && Math.abs(a - b) > th) {
+                        msg = '⚠️ ค่าที่วัดได้ต่างจากที่แสดง ' + Math.abs(a - b).toFixed(1) + '°C — Sensor อาจคลาดเคลื่อน กรุณาตรวจสอบ';
+                    }
+                }
+                warn.textContent = msg;
+                warn.classList.toggle('hidden', !msg);
+            }
+
+            function checkHyperAcHotArea() {
+                const limit = HYPER_AC_CONFIG.hotAreaC;
+                const hot = Array.from(document.querySelectorAll('#content-hyper-ac-survey [data-hot-area]')).filter(function(el) {
+                    const v = parseFloat(el.value);
+                    el.classList.toggle('bg-red-50', !isNaN(v) && v > limit);
+                    return !isNaN(v) && v > limit;
+                });
+                const warn = document.getElementById('hyper-ac-hot-warn');
+                warn.textContent = hot.length ? '🔥 มี ' + hot.length + ' จุดที่อุณหภูมิเกิน ' + limit + '°C — กรุณาระบุจุดที่ร้อนด้านล่าง และถ่ายรูปประกอบ' : '';
+                warn.classList.toggle('hidden', !hot.length);
+            }
+
+            function toggleHyperAcBroken(show) {
+                document.getElementById('hyper-ac-broken-section').classList.toggle('hidden', !show);
+            }
+
+            // --- Branch search (same big-format store list as the Hyper Ref tab) ---
+            function _applyHyperAcStore(s) {
+                const form = document.getElementById('hyper-ac-form');
+                form.branchCode.value = s[0];
+                form.branchName.value = s[2] || s[1];
+                form.storeFormat.value = s[3] || '';
+                form.region.value = s[4] || '';
+                const db = _hyperRefFindStoreDb(s[0]);
+                form.ammMtn.value = db ? (db.ammMtn || '') : '';
+                form.dmArea.value = db ? (db.dmName || '') : '';
+                form.cmArea.value = db ? (db.cmName || '') : '';
+                if (db && db.dmEmail && !form.ccEmail1.value) form.ccEmail1.value = db.dmEmail;
+                if (db && db.cmEmail && !form.ccEmail2.value) form.ccEmail2.value = db.cmEmail;
+                const badge = document.getElementById('hyper-ac-store-badge');
+                badge.innerHTML = '<span class="inline-flex flex-wrap gap-1">' +
+                    '<span class="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 font-semibold">' + (s[3] || '-') + '</span>' +
+                    (s[4] ? '<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">' + s[4] + '</span>' : '') +
+                    '</span>';
+                badge.classList.remove('hidden');
+                document.getElementById('hyper-ac-rest-form').classList.remove('hidden');
+                renumberHyperAcIds();
+                if (typeof sdsCheck === 'function') sdsCheck('hyperAc');
+            }
+
+            function _clearHyperAcStore() {
+                const form = document.getElementById('hyper-ac-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('hyper-ac-store-badge').classList.add('hidden');
+                document.getElementById('hyper-ac-rest-form').classList.add('hidden');
+                renumberHyperAcIds();
+            }
+
+            function handleHyperAcStationInput(input) {
+                const val = input.value.toLowerCase().trim();
+                const dropdown = document.getElementById('hyper-ac-station-dropdown');
+                if (val.length < 1) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; _clearHyperAcStore(); return; }
+                const matches = HYPER_REF_STORES.filter(function(s) { return _hyperRefStoreLabel(s).toLowerCase().indexOf(val) !== -1; });
+                renderStationDropdown('hyper-ac-station-dropdown', matches.map(_hyperRefStoreLabel), function(selected) {
+                    input.value = selected;
+                    const s = HYPER_REF_STORES.find(function(x) { return _hyperRefStoreLabel(x) === selected; });
+                    if (s) _applyHyperAcStore(s);
+                });
+                const exact = HYPER_REF_STORES.find(function(s) { return _hyperRefStoreLabel(s).toLowerCase() === val || s[0] === val; });
+                if (exact) _applyHyperAcStore(exact); else _clearHyperAcStore();
+            }
+
+            document.addEventListener('click', function(e) {
+                const d = document.getElementById('hyper-ac-station-dropdown');
+                if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden');
+            });
+
+            // --- Local draft ---
+            function _hyperAcCollectFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+                    if (el.name.indexOf('ha_') === 0) return; // per-unit inputs travel in unitsJson instead
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+
+                        // Draft object shared by the on-device draft and the server draft (SurveyDraftStore.gs)
+            function _buildHyperAcDraft() {
+                const form = document.getElementById('hyper-ac-form');
+                return { savedAt: new Date().toISOString(), search: document.getElementById('hyper-ac-station-search').value, fields: _hyperAcCollectFields(form), units: collectHyperAcUnits() };
+            }
+
+            function saveHyperAcDraft() {
+                const form = document.getElementById('hyper-ac-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                const draft = { savedAt: new Date().toISOString(), search: document.getElementById('hyper-ac-station-search').value, fields: _hyperAcCollectFields(form), units: collectHyperAcUnits() };
+                try {
+                    localStorage.setItem(HYPER_AC_DRAFT_KEY, JSON.stringify(draft));
+                    if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (Hyper Aircon Survey)');
+                } catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('hyperAc', null);
+            }
+
+            function _readHyperAcDraft() {
+                try { return JSON.parse(localStorage.getItem(HYPER_AC_DRAFT_KEY) || 'null'); } catch (e) { return null; }
+            }
+
+            function checkHyperAcDraft() {
+                _ensureHyperBrandOptions();
+                const draft = _readHyperAcDraft();
+                const banner = document.getElementById('hyper-ac-draft-banner');
+                if (!draft || !draft.fields) { banner.classList.add('hidden'); return; }
+                document.getElementById('hyper-ac-draft-info').textContent =
+                    (draft.fields.branchCode || '') + ' ' + (draft.fields.branchName || '') + ' · ' + new Date(draft.savedAt).toLocaleString('en-GB');
+                banner.classList.remove('hidden');
+            }
+
+            function restoreHyperAcDraft(fromServer) {
+                const draft = fromServer || _readHyperAcDraft();
+                if (!draft) return;
+                const form = document.getElementById('hyper-ac-form');
+                const s = HYPER_REF_STORES.find(function(x) { return x[0] === draft.fields.branchCode; });
+                if (s) { document.getElementById('hyper-ac-station-search').value = draft.search || _hyperRefStoreLabel(s); _applyHyperAcStore(s); }
+                Object.keys(draft.fields).forEach(function(name) {
+                    const el = form.elements[name];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList) Array.from(el).forEach(function(r) { r.checked = r.value === draft.fields[name]; });
+                    else el.value = draft.fields[name];
+                });
+                toggleHyperAcBroken(draft.fields.hasBroken === 'Yes');
+                toggleHyperAcChiller();
+                restoreHyperAcUnits(draft.units || []);
+                updateHyperAcTotals();
+                document.querySelectorAll('#content-hyper-ac-survey [data-temp-pair] input').forEach(checkHyperAcTempPair);
+                checkHyperAcHotArea();
+                document.getElementById('hyper-ac-draft-banner').classList.add('hidden');
+            }
+
+            function discardHyperAcDraft() {
+                if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return;
+                try { localStorage.removeItem(HYPER_AC_DRAFT_KEY); } catch (e) {}
+                checkHyperAcDraft();
+            }
+
+            function resetHyperAcForm(askFirst) {
+                if (askFirst && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('hyperAc');
+                const form = document.getElementById('hyper-ac-form');
+                const reporterName = form.reporterName.value, reporterPhone = form.reporterPhone.value;
+                form.reset();
+                form.reporterName.value = reporterName;
+                form.reporterPhone.value = reporterPhone;
+                form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(inp) { delete _accumulatedFiles[inp.dataset.categoryUpload]; });
+                HYPER_AC_CONFIG.categories.forEach(function(cat) {
+                    cat.sizes.forEach(function(sz) { const g = document.getElementById('hyper-ac-ug-' + cat.id + '-' + sz.sizeKey); g.innerHTML = ''; g.classList.add('hidden'); });
+                });
+                document.querySelectorAll('#content-hyper-ac-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                document.querySelectorAll('#content-hyper-ac-survey [data-temp-warn]').forEach(function(el) { el.classList.add('hidden'); });
+                document.getElementById('hyper-ac-station-search').value = '';
+                toggleHyperAcBroken(false);
+                toggleHyperAcChiller();
+                checkHyperAcHotArea();
+                _clearHyperAcStore();
+                updateHyperAcTotals();
+            }
+
+            // --- Submit ---
+            async function handleHyperAcSurveySubmit(e) {
+                e.preventDefault();
+                const form = e.target;
+                if (!form.reporterName.value.trim()) { alert("กรุณากรอกชื่อผู้แจ้ง (Reporter) ก่อนกดยืนยัน"); form.reporterName.focus(); return; }
+                if (!form.reporterPhone.value.trim()) { alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone) ก่อนกดยืนยัน"); form.reporterPhone.focus(); return; }
+                if (!form.branchCode.value || !form.branchName.value) { alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)"); return; }
+                if (!form.chillerType.value) {
+                    alert('กรุณาเลือกประเภท Chiller (หรือ "ไม่มี Chiller" หากสาขาใช้แอร์ DX ทั้งหมด)');
+                    form.chillerType.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    form.chillerType.focus();
+                    return;
+                }
+                if (form.chillerType.value && form.chillerType.value !== HYPER_AC_NO_CHILLER && !document.querySelectorAll('#hyper-ac-plant-cats [data-hau][data-cat="chiller"]').length) {
+                    alert('กรุณาใส่จำนวน Chiller อย่างน้อย 1 เครื่อง (หรือเลือก “ไม่มี Chiller”)');
+                    document.getElementById('hyper-ac-plant-cats').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุเครื่องที่ชำรุดและอาการ'); form.brokenDetail.focus(); return; }
+
+                // Same checks as the Aircon Survey: brand on every unit (enum + typo check), every
+                // condition rating tapped, and (unless an admin switched it off) a photo per unit.
+                if (!validateHyperBrands('ac', '#content-hyper-ac-survey')) return;
+                if (!validateHyperAges('#content-hyper-ac-survey')) return;
+                if (!validateHyperFF('#content-hyper-ac-survey')) return;
+                if (!validateCondRatings(form)) return;
+                if (_equipmentPhotoRequired.hyperAc) {
+                    const missingPhotos = _hyperAcMissingPhotos();
+                    if (missingPhotos.length > 0) {
+                        alert('กรุณาแนบรูปถ่ายให้ครบทุกเครื่องก่อนกดยืนยัน — ยังขาดรูปของ ' + missingPhotos.length + ' เครื่อง:\n' + missingPhotos.slice(0, 15).join('\n') + (missingPhotos.length > 15 ? '\n...' : ''));
+                        return;
+                    }
+                }
+
+                // Any instrument reading needs to say which instrument it came from
+                const tempInputs = form.querySelectorAll('[data-temp-pair] input, [data-hot-area], .hac-meas');
+                const anyMeasured = Array.from(tempInputs).some(function(el) { return el.value !== ''; });
+                if (anyMeasured && !form.tempInstrument.value) {
+                    alert('กรุณาเลือกเครื่องมือวัดอุณหภูมิที่ใช้ (เช่น Temp Gun)');
+                    form.tempInstrument.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    form.tempInstrument.focus();
+                    return;
+                }
+
+                const totals = updateHyperAcTotals();
+                if (totals.chw + totals.dx === 0 && !confirm('⚠️ ยังไม่ได้กรอกจำนวนแอร์ / AHU / FCU เลย\n\nยืนยันส่งข้อมูลหรือไม่?')) return;
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    const tasks = [];
+                    const seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('HAC', form.branchCode.value, tasks, function() { return [800, 800, 0.60]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+
+                    const data = _hyperAcCollectFields(form);
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('hyperAc');
+                    data.unitsJson = JSON.stringify(collectHyperAcUnits());
+
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) {
+                                showSuccess(); sdsReset('hyperAc');
+                                try { localStorage.removeItem(HYPER_AC_DRAFT_KEY); } catch (e2) {}
+                                checkHyperAcDraft();
+                                resetHyperAcForm(false);
+                            } else {
+                                alert('Error: ' + (res && res.error));
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            hideLoading();
+                            alert('Server Error: ' + err.message);
+                        })
+                        .processHyperAcSurveyForm(data);
+                } catch (err) {
+                    hideLoading();
+                    alert('Error processing form: ' + err.message);
+                }
+            }
+        </script>

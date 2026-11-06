@@ -171,15 +171,16 @@ function _invalidateTradingHoursSlimCache() {
             _sc.removeAll(_keys);
         }
     } catch (e) {}
+    try { _cacheClearChunked_('DASH_HOURS_V2'); } catch (e) {}
 }
 
 // ─── Lightweight list for report table (cached 5 min) ─────────────────────────
-function getTradingHoursSurveyListSlim() {
+function getTradingHoursSurveyListSlim(includeArchive) {
     try {
         try {
             var _sc = CacheService.getScriptCache();
             var _nStr = _sc.get('HOURS_SLIM_V1_n');
-            if (_nStr !== null) {
+            if (_nStr !== null && !includeArchive) {
                 var _n = parseInt(_nStr, 10), _json = '', _ok = true;
                 for (var _ci = 0; _ci < _n; _ci++) {
                     var _ch = _sc.get('HOURS_SLIM_V1_' + _ci);
@@ -190,7 +191,7 @@ function getTradingHoursSurveyListSlim() {
             }
         } catch (_scE) {}
 
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TRADING_HOURS_SURVEY_SHEET);
+        var sheet = _archSheetFor_(TRADING_HOURS_SURVEY_SHEET, includeArchive);
         if (!sheet || sheet.getLastRow() < 2) return { success: true, data: [] };
 
         var lastCol = sheet.getLastColumn();
@@ -233,7 +234,7 @@ function getTradingHoursSurveyListSlim() {
                 _store['HOURS_SLIM_V1_' + _nc++] = _cj.substring(_cs, _cs + 90000);
             }
             _store['HOURS_SLIM_V1_n'] = String(_nc);
-            _co.putAll(_store, 300);
+            if (!includeArchive) _co.putAll(_store, 300);
         } catch (_we) {}
 
         return { success: true, data: results };
@@ -245,7 +246,7 @@ function getTradingHoursSurveyListSlim() {
 // ─── Single full record by ID — used for lazy modal loading ──────────────────
 function getTradingHoursSurveyRecordById(id) {
     try {
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TRADING_HOURS_SURVEY_SHEET);
+        var sheet = _archLookupSheet_(TRADING_HOURS_SURVEY_SHEET, id);
         if (!sheet) return { success: false, error: 'Sheet not found' };
         var lastRow = sheet.getLastRow();
         var lastCol = sheet.getLastColumn();
@@ -441,11 +442,13 @@ function addTradingHoursSurveyPhotos(id, unitKey, files, clientEmail) {
         var attachCol = colMap["Attachments_JSON"];
         if (!attachCol) return { success: false, error: "Attachments_JSON column not found." };
 
-        var existing = {};
-        try { existing = JSON.parse(data[rowIndex - 1][attachCol - 1] || "{}"); } catch(e) {}
-        existing[unitKey] = (existing[unitKey] || []).concat(newUrls);
+        // Re-read + merge under the write lock: the row was looked up before the
 
-        sheet.getRange(rowIndex, attachCol).setValue(JSON.stringify(existing));
+        // (slow) Drive uploads, so another edit may have changed or moved it since.
+
+        var merged = _appendAttachmentUrls_(sheet, id, idColIdx, attachCol, unitKey, newUrls);
+
+        if (!merged.success) return merged;
         _invalidateTradingHoursSlimCache();
         return { success: true, newUrls: newUrls };
     } catch(e) {

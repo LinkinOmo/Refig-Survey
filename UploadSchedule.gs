@@ -37,8 +37,17 @@ function _readMeta() {
     if (!sheet || sheet.getLastRow() < 2) return {};
     var rows = sheet.getDataRange().getValues();
     var meta = {};
+    // Sheets auto-converts the stored text — "2026-09-30" → Date, "08:00" → a time anchored on
+    // 1899-12-30 — which broke the page labels ("NaN undefined NaN") and every
+    // new Date(deadline + 'T23:59:59') here (Invalid Date). Normalise back to the text form.
     for (var i = 1; i < rows.length; i++) {
-        meta[rows[i][0]] = rows[i][1];
+        var k = rows[i][0], v = rows[i][1];
+        if (v instanceof Date) {
+            if (/At$/.test(k)) v = v.toISOString();
+            else if (v.getFullYear() < 1901) v = Utilities.formatDate(v, 'Asia/Bangkok', 'HH:mm');
+            else v = Utilities.formatDate(v, 'Asia/Bangkok', 'yyyy-MM-dd');
+        }
+        meta[k] = v;
     }
     return meta;
 }
@@ -48,11 +57,12 @@ function _writeMeta(key, value) {
     var rows = sheet.getDataRange().getValues();
     for (var i = 1; i < rows.length; i++) {
         if (rows[i][0] === key) {
-            sheet.getRange(i + 1, 2).setValue(value);
+            sheet.getRange(i + 1, 2).setNumberFormat('@').setValue(value);   // keep as text (see _readMeta)
             return;
         }
     }
     sheet.appendRow([key, value]);
+    sheet.getRange(sheet.getLastRow(), 2).setNumberFormat('@').setValue(value);
 }
 
 // Round label of the currently active Upload Schedule plan (e.g. "2026-Q1").
@@ -971,6 +981,76 @@ function setGuestButtonSetting(enabled) {
     }
 }
 
+// ─── Login-screen links: Register / Forgot Password ──────────
+// Both default ON (unset property = on) so nothing changes until a Super Admin
+// turns one off in the Access Console. The flags are also enforced server-side
+// in processForm / requestPasswordReset, so hiding the link can't be bypassed.
+var LOGIN_LINK_PROPS = { register: 'REGISTER_LINK_ENABLED', forgot: 'FORGOT_PASSWORD_ENABLED' };
+
+function _loginLinkEnabled_(key) {
+    var val = PropertiesService.getScriptProperties().getProperty(LOGIN_LINK_PROPS[key]);
+    return val === null ? true : (val === 'true');
+}
+
+function getLoginScreenSettings() {
+    return {
+        guest: getGuestButtonSetting(),
+        register: _loginLinkEnabled_('register'),
+        forgot: _loginLinkEnabled_('forgot')
+    };
+}
+
+function setLoginLinkSetting(key, enabled, clientEmail) {
+    try {
+        if (!LOGIN_LINK_PROPS[key]) return { success: false, error: "Unknown setting: " + key };
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin) return { success: false, error: "Super Admin privileges required." };
+        PropertiesService.getScriptProperties().setProperty(LOGIN_LINK_PROPS[key], enabled ? 'true' : 'false');
+        return { success: true, enabled: !!enabled };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+// ─── Registration: Department field ──────────────────────────
+// Super Admin config for the Register Profile page's Department dropdown:
+// which options are listed, which one is pre-selected, and whether it is locked
+// to that default. REG_DEPT_DEFAULT applies until a Super Admin saves the config
+// (current rollout: Operation staff register → pre-select SGM).
+var REG_DEPT_DEFAULT = { options: [{ v: 'BCM', l: 'BCM' }, { v: 'PPT', l: 'PPT' }, { v: 'SGM', l: 'SGM (Operation)' }], def: 'SGM', lock: false };
+
+function getRegDeptConfig() {
+    try {
+        var val = PropertiesService.getScriptProperties().getProperty('REG_DEPT_CONFIG_V1');
+        return { success: true, data: val ? JSON.parse(val) : REG_DEPT_DEFAULT };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function setRegDeptConfig(cfg, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin) return { success: false, error: "Super Admin privileges required." };
+        var seen = {};
+        var options = ((cfg && cfg.options) || []).map(function (o) {
+            return { v: String(o.v || '').trim(), l: String(o.l || o.v || '').trim() };
+        }).filter(function (o) {
+            if (!o.v || o.v === 'Other' || seen[o.v.toUpperCase()]) return false;
+            seen[o.v.toUpperCase()] = true;
+            return true;
+        });
+        if (!options.length) return { success: false, error: "ต้องมีอย่างน้อย 1 หน่วยงาน" };
+        var def = String((cfg && cfg.def) || '').trim();
+        if (def && !options.some(function (o) { return o.v === def; })) def = '';
+        var clean = { options: options, def: def, lock: !!(cfg && cfg.lock && def) };
+        PropertiesService.getScriptProperties().setProperty('REG_DEPT_CONFIG_V1', JSON.stringify(clean));
+        return { success: true, data: clean };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
 // ─── General-User Tab Visibility Setting ──────────────────────
 // Lets an Admin/System Admin temporarily restrict which of the general-user
 // tabs (Aircon/Ref/NP/EDMI surveys, Register Profile) are shown to non-admin
@@ -1006,14 +1086,48 @@ function setGeneralTabVisibility(config, defaultTab, clientEmail) {
     }
 }
 
+// ─── Landing Tab per Department ────────────────────────────────
+// Users whose Employee_Database "Department" matches a key here open straight on
+// that tab after Sign In (e.g. Operation = SGM → Fixed Asset Hyper). `only: true`
+// also hides every other general tab for that department. {DEPT: {tab, only}}.
+// DEPT_LANDING_DEFAULTS is used until an Admin saves the map (keep in sync with
+// the same constant in index.html).
+var DEPT_LANDING_DEFAULTS = { 'SGM': { tab: 'tab-hyper-fa-survey', only: false } };
+
+function getDeptLandingTabs() {
+    try {
+        var val = PropertiesService.getScriptProperties().getProperty('DEPT_LANDING_TAB_V1');
+        return { success: true, data: val ? JSON.parse(val) : DEPT_LANDING_DEFAULTS };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
+function setDeptLandingTabs(config, clientEmail) {
+    try {
+        var status = checkAdminStatus(clientEmail);
+        if (!status.isAdmin && !status.isSysAdmin) return { success: false, error: "Administrator privileges required." };
+        var clean = {};
+        Object.keys(config || {}).forEach(function (k) {
+            var key = String(k).trim().toUpperCase();
+            var r = config[k] || {};
+            if (key && r.tab) clean[key] = { tab: String(r.tab), only: !!r.only };
+        });
+        PropertiesService.getScriptProperties().setProperty('DEPT_LANDING_TAB_V1', JSON.stringify(clean));
+        return { success: true, data: clean };
+    } catch (e) {
+        return { success: false, error: e.toString() };
+    }
+}
+
 // ─── Team-Restricted Tab Access ────────────────────────────────
 // Generalizes the Trading Hours Survey's "SMF team only" requirement so any future
 // tab can be locked to a specific team (rather than all general/Operation users) via
-// admin config instead of a hardcoded check. Stored as {tabId: 'SMF'|'MMS'|'ALL'};
+// admin config instead of a hardcoded check. Stored as {tabId: 'SMF'|'MMS'|'BF'|'ALL'};
 // a tab missing from the stored config falls back to TEAM_TAB_DEFAULTS below, so a
 // newly added restricted tab is never silently opened to everyone before an Admin
 // configures it. Mirrors General Tab Visibility above (same modal on the client).
-var TEAM_TAB_DEFAULTS = { 'tab-hours-survey': 'SMF' };
+var TEAM_TAB_DEFAULTS = { 'tab-hours-survey': 'SMF', 'tab-hyper-sc-survey': 'BF' };
 
 function getTeamTabAccess() {
     try {
@@ -1189,15 +1303,19 @@ function setBrandChipSelection(config, clientEmail) {
 // network-poor bulk collection day. Stored as {type: true|false}; a type missing
 // from the stored config defaults to true (required) so the requirement is never
 // silently disabled by an incomplete/older saved config.
-var EQUIPMENT_PHOTO_TYPES = ['aircon', 'ref', 'np'];
+// V2 (2026-10-05): covers every survey with a required photo, and the default
+// flipped to OFF (faster field collection) — the V1 property is ignored so all
+// types start off; an admin turns individual types back on in the Access Console.
+var EQUIPMENT_PHOTO_TYPES = ['aircon', 'ref', 'np', 'hyperRef', 'hyperAc', 'hyperEq', 'hyperFo', 'hyperTo', 'hyperPk', 'hyperFa', 'hyperHb', 'hyperFi', 'hyperSc', 'edmi', 'layout', 'hours'];
+var EQUIPMENT_PHOTO_PROP = 'EQUIPMENT_PHOTO_REQUIRED_V2';
 
 function getEquipmentPhotoRequired() {
     try {
-        var val = PropertiesService.getScriptProperties().getProperty('EQUIPMENT_PHOTO_REQUIRED_V1');
+        var val = PropertiesService.getScriptProperties().getProperty(EQUIPMENT_PHOTO_PROP);
         var stored = val ? JSON.parse(val) : {};
         var merged = {};
         EQUIPMENT_PHOTO_TYPES.forEach(function(k) {
-            merged[k] = stored.hasOwnProperty(k) ? !!stored[k] : true;
+            merged[k] = stored.hasOwnProperty(k) ? !!stored[k] : false;
         });
         return { success: true, data: merged };
     } catch (e) {
@@ -1213,7 +1331,7 @@ function setEquipmentPhotoRequired(config, clientEmail) {
         EQUIPMENT_PHOTO_TYPES.forEach(function(k) {
             clean[k] = !!(config || {})[k];
         });
-        PropertiesService.getScriptProperties().setProperty('EQUIPMENT_PHOTO_REQUIRED_V1', JSON.stringify(clean));
+        PropertiesService.getScriptProperties().setProperty(EQUIPMENT_PHOTO_PROP, JSON.stringify(clean));
         return { success: true, data: clean };
     } catch (e) {
         return { success: false, error: e.toString() };

@@ -131,6 +131,7 @@ function upsertLayoutTargetDoc(code, unitKey, file, clientEmail) {
         driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         var url = "https://drive.google.com/file/d/" + driveFile.getId() + "/view";
 
+        _acquireWriteLock_();
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         var sheet = ss.getSheetByName(LAYOUT_TARGET_DOCS_SHEET);
         if (!sheet) {
@@ -177,6 +178,7 @@ function removeLayoutTargetStore(code, clientEmail) {
         code = String(code || '').trim();
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LAYOUT_TARGET_DOCS_SHEET);
         if (!sheet) return { success: false, error: "Sheet not found" };
+        _acquireWriteLock_();
         var lastRow = sheet.getLastRow();
         if (lastRow < 2) return { success: false, error: "Store not found" };
         var codes = sheet.getRange(2, 1, lastRow - 1, 1).getValues();

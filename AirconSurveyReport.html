@@ -147,6 +147,7 @@
 </head>
 
 <body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
 
     <!-- Top Navigation Bar -->
     <nav class="bg-white border-b border-slate-200 sticky top-0 z-40 bg-opacity-95 backdrop-blur-sm">
@@ -173,6 +174,12 @@
 
                 <!-- Right side: Actions & User Info -->
                 <div class="flex items-center gap-4">
+                    <a href="<?= ScriptApp.getService().getUrl() ?>?page=survey_dashboard&type=aircon"
+                        class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all shadow-sm">📊 Dashboard</a>
+                    <button id="acTypeCleanupBtn" onclick="_openAcTypeCleanup()"
+                        class="hidden flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm">🧹 ทำความสะอาดประเภทแอร์</button>
+                    <button id="acTypeCleanupUndoBtn" onclick="_undoAcTypeCleanup()"
+                        class="hidden flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm">↩️ Undo Cleanup</button>
                     <button onclick="window.location.reload()"
                         class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-blue-600 transition-all shadow-sm">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -869,7 +876,11 @@
                             // flipped independently (previously only ran on an isAdmin flip,
                             // which left SMF/Operation-only users' UI stale after this call).
                             applyAdminUI();
-                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed));
+                            if (window.__dupSetSuperAdmin) window.__dupSetSuperAdmin(!!(flags.isAdmin || flags.sysAdminDedupAllowed || flags.smfDedupAllowed));
+                            var typeCleanupBtn = document.getElementById('acTypeCleanupBtn');
+                            if (typeCleanupBtn) typeCleanupBtn.classList.toggle('hidden', !flags.isAdmin);
+                            var typeCleanupUndoBtn = document.getElementById('acTypeCleanupUndoBtn');
+                            if (typeCleanupUndoBtn) typeCleanupUndoBtn.classList.toggle('hidden', !flags.isAdmin);
                         })
                         .getUserFlags(_acUserEmail);
                 }
@@ -906,7 +917,7 @@
                     console.error(err);
                     document.getElementById('loading').innerHTML = '<div class="text-red-500 text-sm text-center">\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08: ' + (err.message || err) + '</div>';
                 })
-                .getAirconSurveyListSlim();
+                .getAirconSurveyListSlim(window.ARCHIVE_ON);
         }
 
         function init(res) {
@@ -1161,7 +1172,12 @@
                 const ctQty = parseInt(_acSrc.ctQty) || 0;
                 const fsQty = parseInt(_acSrc.fsQty) || 0;
                 const ptQty = parseInt(_acSrc.ptQty) || 0;
-                const acTotalQty = wtQty + htQty + ctQty + fsQty + ptQty;
+                // otherQty = units whose "Unit N Type" is a free-text value outside the
+                // 5 known types (e.g. a Thai label typed directly, like "ติดฝาเพดาน") —
+                // without this bucket those units silently dropped out of the total,
+                // showing "WT0 HT0 CT0..." even when units genuinely had a type entered.
+                const otherQty = parseInt(_acSrc.otherQty) || 0;
+                const acTotalQty = wtQty + htQty + ctQty + fsQty + ptQty + otherQty;
                 const acBadge = '<div class="flex flex-col gap-0.5">' +
                       '<span class="text-xs font-bold text-slate-700">รวม ' + acTotalQty + ' เครื่อง</span>' +
                       '<span class="text-[11px] font-mono leading-tight flex flex-wrap gap-x-1.5 gap-y-0.5">' +
@@ -1170,6 +1186,7 @@
                         _acChip('CT', ctQty, 'text-violet-700') +
                         _acChip('FS', fsQty, 'text-emerald-700') +
                         _acChip('PT', ptQty, 'text-amber-700') +
+                        _acChip('อื่นๆ', otherQty, 'text-rose-700') +
                       '</span>' +
                       '</div>';
                 tr.innerHTML = `
@@ -1737,18 +1754,26 @@
         function printAcModal() {
             const title  = document.getElementById('modalTitle').textContent;
             const sub    = document.getElementById('modalSubtitle').textContent;
-            const genHtml = document.getElementById('generalInfoSection').innerHTML;
-            const unitHtml = document.getElementById('unitSection').innerHTML;
+
+            // Clone (not just read innerHTML) so we can strip interactive/edit-only
+            // controls (delete-photo buttons, add-photo/history buttons, status
+            // panel) before printing — don't rely on CSS alone to hide them.
+            const genClone = document.getElementById('generalInfoSection').cloneNode(true);
+            const unitClone = document.getElementById('unitSection').cloneNode(true);
+            [genClone, unitClone].forEach(c => c.querySelectorAll('button, .no-print').forEach(el => el.remove()));
+
             const area = document.getElementById('printArea');
             area.innerHTML =
                 '<div style="font-family:sans-serif;color:#1e293b;">' +
                 '<div style="background:#1d4ed8;color:white;padding:14px 18px;margin-bottom:16px;border-radius:6px;">' +
-                '<h2 style="margin:0 0 4px 0;font-size:16pt;">🌬️ ' + title + '</h2>' +
-                '<p style="margin:0;font-size:10pt;opacity:0.85;">' + sub + '</p>' +
+                '<h2 style="margin:0 0 4px 0;font-size:16pt;">🌬️ ' + htmlEscape(title) + '</h2>' +
+                '<p style="margin:0;font-size:10pt;opacity:0.85;">' + htmlEscape(sub) + '</p>' +
                 '</div>' +
-                '<div style="margin-bottom:16px;">' + genHtml + '</div>' +
-                unitHtml +
+                '<div style="margin-bottom:16px;" id="_printGenWrap"></div>' +
+                '<div id="_printUnitWrap"></div>' +
                 '</div>';
+            document.getElementById('_printGenWrap').appendChild(genClone);
+            document.getElementById('_printUnitWrap').appendChild(unitClone);
             window.print();
             setTimeout(function() { area.innerHTML = ''; }, 1500);
         }
@@ -2120,11 +2145,21 @@
             let html = '';
             for (let n = 1; n <= qty; n++) {
                 const u = unitMap[n] || {};
-                const equipmentId = makeEqId(u.type, n);
+                // Fixed to exactly these 5 — NOT _mergedOptions() (no "add new" free
+                // text). See project_aircon_type_badge_fix: free-text entry here is
+                // what let non-standard values into the sheet in the first place.
                 const AC_TYPE_DEFAULTS = ['Wall Type', 'Hanging Type', 'Cassette Type', 'Floor Standing', 'Package Type'];
-                const AC_TYPES = _mergedOptions('aircon_type', AC_TYPE_DEFAULTS);
                 const currentType = u.type || '';
-                const typeOpts = AC_TYPES.map(function(opt) { return `<option value="${opt}">`; }).join('');
+                // A blank or non-standard existing value (e.g. an un-cleaned legacy
+                // row) defaults the dropdown to "Hanging Type" rather than showing
+                // nothing selected — matches the submission form's default and the
+                // cleanup tool's own fallback choice.
+                const isStandardType = AC_TYPE_DEFAULTS.indexOf(currentType) !== -1;
+                const selectedType = isStandardType ? currentType : 'Hanging Type';
+                const equipmentId = makeEqId(selectedType, n);
+                const typeOpts = AC_TYPE_DEFAULTS.map(function(opt) {
+                    return `<option value="${opt}" ${selectedType === opt ? 'selected' : ''}>${opt}</option>`;
+                }).join('');
                 const AC_BRANDS = _mergedOptions('aircon_brand', ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train']);
                 const currentBrand = u.brand || '';
                 const brandOpts = AC_BRANDS.map(function(b) { return `<option value="${b}">`; }).join('');
@@ -2139,11 +2174,12 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                             <label class="block text-xs text-slate-500 mb-1">ประเภท</label>
-                            <input type="text" list="acTypeList_${n}" data-ac-edit-field="Unit ${n} Type" autocomplete="off" value="${htmlEscape(currentType)}"
-                                placeholder="พิมพ์เพื่อค้นหา หรือระบุประเภทใหม่..."
-                                oninput="(function(sel){var codes={'Wall Type':'WT','Hanging Type':'HT','Cassette Type':'CT','Floor Standing':'FS','Package Type':'PT'};var code=codes[sel.value]||'AC';var bc='${htmlEscape(branchCode)}';var eid=bc?bc+'-'+code+String(${n}).padStart(2,'0'):code+String(${n}).padStart(2,'0');var lbl=document.getElementById('acEditEqId_${n}');if(lbl)lbl.textContent=eid;})(this)"
+                            <select data-ac-edit-field="Unit ${n} Type"
+                                onchange="(function(sel){var codes={'Wall Type':'WT','Hanging Type':'HT','Cassette Type':'CT','Floor Standing':'FS','Package Type':'PT'};var code=codes[sel.value]||'AC';var bc='${htmlEscape(branchCode)}';var eid=bc?bc+'-'+code+String(${n}).padStart(2,'0'):code+String(${n}).padStart(2,'0');var lbl=document.getElementById('acEditEqId_${n}');if(lbl)lbl.textContent=eid;})(this)"
                                 class="w-full border border-slate-300 rounded p-1.5 text-sm bg-white">
-                            <datalist id="acTypeList_${n}">${typeOpts}</datalist>
+                                <option value="">-- เลือกประเภท --</option>
+                                ${typeOpts}
+                            </select>
                         </div>
                         <div>
                             <label class="block text-xs text-slate-500 mb-1">ยี่ห้อ</label>
@@ -2155,7 +2191,7 @@
                         <div>
                             <label class="block text-xs text-slate-500 mb-1">Asset No</label>
                             <div class="flex gap-1">
-                                <input id="aiAc_${n}" data-ac-edit-field="Unit ${n} Asset No" type="text" value="${htmlEscape(u.assetNo || '')}" class="w-full border border-slate-300 rounded p-1.5 text-sm">
+                                <input id="aiAc_${n}" data-ac-edit-field="Unit ${n} Asset No" type="text" value="${htmlEscape(u.assetNo || '')}" onblur="_confirmManualAssetEntry(this)" class="w-full border border-slate-300 rounded p-1.5 text-sm">
                                 ${branchCode ? `<button type="button" onclick="openAssetMapPicker('${branchCode}','aiAc_${n}')" class="shrink-0 px-2 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>` : ''}
                             </div>
                         </div>
@@ -2509,44 +2545,74 @@
         }
 
         // ── Asset register mapping picker (edit mode) ───────────────────────
-        // Lets an editor pick a unit's Asset No. from the store's real
-        // fixed-asset ledger (getStoreAssetRegisterForMapping, Survey.gs)
-        // instead of free-typing it. Results are cached per branch code for
-        // the life of the page since the ledger doesn't change mid-session.
-        let _assetMapCache = {};
+        // Lets an editor pick a unit's Asset No. from one of TWO SEPARATE,
+        // unmatched asset ledgers instead of free-typing it:
+        //   - BGCFA: accounting fixed-asset register (getStoreAssetRegisterForMapping)
+        //   - CMS:   CMS service/equipment asset register (getStoreCmsAssetRegisterForMapping)
+        // The two systems track different asset codes for the same store — a
+        // physical unit may appear in one, both (under different codes), or
+        // neither. Switching tabs does NOT cross-reference/match them; the
+        // in-modal banner says so explicitly. Results cached per source+branch
+        // code for the life of the page since neither ledger changes mid-session.
+        let _assetMapCache = { bgcfa: {}, cms: {} };
         let _assetMapCurrentTarget = null;
         let _assetMapCurrentItems = [];
+        let _assetMapSource = 'bgcfa';
 
         function openAssetMapPicker(branchCode, targetInputId) {
             const code = String(branchCode || '').trim();
             if (!code) return;
             _assetMapCurrentTarget = targetInputId;
-            const modal = document.getElementById('assetMapModal');
-            const listEl = document.getElementById('assetMapList');
             const searchEl = document.getElementById('assetMapSearch');
             if (searchEl) searchEl.value = '';
-            modal.classList.remove('hidden');
-            if (_assetMapCache[code]) {
-                _assetMapCurrentItems = _assetMapCache[code];
+            document.getElementById('assetMapModal').classList.remove('hidden');
+            document.getElementById('assetMapBranchCode').textContent = code;
+            _setAssetMapSourceTab('bgcfa');
+            _loadAssetMapSource(code, 'bgcfa');
+        }
+
+        function switchAssetMapSource(source) {
+            const code = document.getElementById('assetMapBranchCode').textContent;
+            _setAssetMapSourceTab(source);
+            _loadAssetMapSource(code, source);
+        }
+
+        function _setAssetMapSourceTab(source) {
+            _assetMapSource = source;
+            const activeCls = ['border-b-2','border-amber-500','text-amber-700','bg-amber-50'];
+            [['assetMapTabBgcfa','bgcfa'], ['assetMapTabCms','cms']].forEach(function(pair) {
+                const btn = document.getElementById(pair[0]);
+                if (!btn) return;
+                if (pair[1] === source) { btn.classList.add.apply(btn.classList, activeCls); btn.classList.remove('text-slate-500'); }
+                else { btn.classList.remove.apply(btn.classList, activeCls); btn.classList.add('text-slate-500'); }
+            });
+        }
+
+        function _loadAssetMapSource(code, source) {
+            const listEl = document.getElementById('assetMapList');
+            if (_assetMapCache[source][code]) {
+                _assetMapCurrentItems = _assetMapCache[source][code];
                 _renderAssetMapList();
                 return;
             }
             listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">กำลังโหลด...</p>';
+            const fn = source === 'cms' ? 'getStoreCmsAssetRegisterForMapping' : 'getStoreAssetRegisterForMapping';
             google.script.run.withSuccessHandler(function(res) {
                 if (!res || !res.success) {
                     listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ: ' + htmlEscape(res && res.error || '') + '</p>';
                     return;
                 }
-                _assetMapCache[code] = res.items || [];
-                _assetMapCurrentItems = _assetMapCache[code];
+                _assetMapCache[source][code] = res.items || [];
+                if (source !== _assetMapSource) return; // user switched tabs before this returned
+                _assetMapCurrentItems = _assetMapCache[source][code];
                 if (!res.prebuilt || !_assetMapCurrentItems.length) {
-                    listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลทะเบียนทรัพย์สินสำหรับสาขานี้</p>';
+                    listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ยังไม่มีข้อมูลทะเบียนทรัพย์สิน' + (source === 'cms' ? ' CMS' : '') + 'สำหรับสาขานี้</p>';
                     return;
                 }
                 _renderAssetMapList();
             }).withFailureHandler(function(err) {
                 listEl.innerHTML = '<p class="text-xs text-rose-500 text-center py-6">โหลดข้อมูลไม่สำเร็จ</p>';
-            }).getStoreAssetRegisterForMapping(code);
+            })[fn](code);
         }
 
         function _renderAssetMapList() {
@@ -2556,14 +2622,17 @@
             const items = _assetMapCurrentItems.filter(function(it) {
                 return !q || String(it.assetNo).toLowerCase().indexOf(q) > -1 ||
                     String(it.name).toLowerCase().indexOf(q) > -1 ||
-                    String(it.category).toLowerCase().indexOf(q) > -1;
+                    String(it.category).toLowerCase().indexOf(q) > -1 ||
+                    String(it.brand || '').toLowerCase().indexOf(q) > -1 ||
+                    String(it.serialNo || '').toLowerCase().indexOf(q) > -1;
             });
             if (!items.length) { listEl.innerHTML = '<p class="text-xs text-slate-400 text-center py-6">ไม่พบรายการ</p>'; return; }
             listEl.innerHTML = items.slice(0, 200).map(function(it) {
+                const sub = [it.brand, it.model].filter(Boolean).join(' ');
                 return '<button type="button" onclick="_pickAssetForMapping(\'' + htmlEscape(it.assetNo) + '\')" class="w-full text-left border border-slate-200 hover:border-amber-400 hover:bg-amber-50 rounded-lg px-2.5 py-1.5 mb-1.5 transition">' +
                     '<p class="font-mono font-semibold text-amber-700 text-xs">' + htmlEscape(it.assetNo) + '</p>' +
                     '<p class="text-slate-600 text-xs truncate">' + htmlEscape(it.name || '-') + '</p>' +
-                    '<p class="text-slate-400 text-[10px]">' + htmlEscape(it.category || '') + '</p>' +
+                    '<p class="text-slate-400 text-[10px]">' + htmlEscape([it.category, sub].filter(Boolean).join(' · ')) + '</p>' +
                     '</button>';
             }).join('');
         }
@@ -2571,7 +2640,7 @@
         function _pickAssetForMapping(assetNo) {
             if (_assetMapCurrentTarget) {
                 const input = document.getElementById(_assetMapCurrentTarget);
-                if (input) input.value = assetNo;
+                if (input) { input.value = assetNo; input.dataset.picked = assetNo; }
             }
             _closeAssetMapPicker();
         }
@@ -2580,15 +2649,42 @@
             document.getElementById('assetMapModal').classList.add('hidden');
             _assetMapCurrentTarget = null;
         }
+
+        // "Force select" nudge: if an editor types an Asset No. by hand instead
+        // of using the 🔗 picker, confirm on blur that they really checked the
+        // register first — manual entry stays allowed (many units genuinely
+        // aren't in either ledger yet), this just guards against skipping the
+        // picker out of habit. Same confirm-on-blur UX as other type-mismatch
+        // confirms elsewhere in this app family (once per distinct value).
+        function _confirmManualAssetEntry(inputEl) {
+            const val = (inputEl.value || '').trim();
+            if (!val) { inputEl.dataset.confirmedManual = ''; return; }
+            if (inputEl.dataset.picked === val) return;
+            if (inputEl.dataset.confirmedManual === val) return;
+            const ok = confirm('⚠️ กรุณายืนยัน\n\nคุณพิมพ์เลข Asset นี้เอง ("' + val + '") แทนที่จะเลือกจากทะเบียนทรัพย์สิน (กด 🔗)\n\nกด OK หากค้นหาในทะเบียนแล้วไม่พบเลขนี้จริง หรือกด Cancel เพื่อกลับไปลองเลือกจากทะเบียนก่อน');
+            if (ok) {
+                inputEl.dataset.confirmedManual = val;
+            } else {
+                inputEl.focus();
+                inputEl.select();
+            }
+        }
     </script>
 
     <!-- Asset register mapping picker modal -->
     <div id="assetMapModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
             <div class="p-3 border-b border-slate-200 flex items-center justify-between">
-                <p class="text-sm font-semibold text-slate-700">เลือก Asset จากทะเบียนทรัพย์สิน</p>
+                <p class="text-sm font-semibold text-slate-700">เลือก Asset — สาขา <span id="assetMapBranchCode" class="font-mono"></span></p>
                 <button onclick="_closeAssetMapPicker()" class="text-slate-400 hover:text-slate-600">✕</button>
             </div>
+            <div class="flex border-b border-slate-200 text-sm font-medium">
+                <button type="button" id="assetMapTabBgcfa" onclick="switchAssetMapSource('bgcfa')" class="flex-1 px-3 py-2 border-b-2 border-amber-500 text-amber-700 bg-amber-50">🧾 บัญชี (BGCFA)</button>
+                <button type="button" id="assetMapTabCms" onclick="switchAssetMapSource('cms')" class="flex-1 px-3 py-2 text-slate-500">🔧 CMS (Service)</button>
+            </div>
+            <p class="text-[11px] text-slate-500 bg-slate-50 border-b border-slate-100 px-3 py-1.5 leading-snug">
+                ⚠️ ทะเบียน 2 ระบบนี้แยกกันคนละระบบ ไม่ได้จับคู่กันอัตโนมัติ — อุปกรณ์ชิ้นเดียวกันอาจมีเลข Asset คนละเลขในแต่ละระบบ (บัญชี = ทะเบียนทรัพย์สินบัญชี/BGCFA, CMS = ทะเบียนอุปกรณ์บริการของระบบ CMS) กรุณาเลือกจากระบบที่ตรงกับป้าย/เอกสารที่หน้างานจริง
+            </p>
             <div class="p-3 border-b border-slate-100">
                 <input id="assetMapSearch" type="text" placeholder="ค้นหาชื่อ/หมวด/เลข Asset..." oninput="_renderAssetMapList()" class="w-full border border-slate-300 rounded-lg p-2 text-sm">
             </div>
@@ -2601,6 +2697,91 @@
 
     <script>var DUP_TYPE_KEY = 'aircon'; var DUP_TYPE_LABEL = 'Aircon Survey';</script>
     <?!= include('DupCleanupWidget') ?>
+
+    <script>
+        // ── AC Unit Type cleanup (Super Admin only) ─────────────────────────────
+        // Historical "Unit N Type" cells that are blank or not one of the 5
+        // standard types (the form's dropdown now enforces this going forward —
+        // see project_aircon_type_badge_fix) get normalized to "Hanging Type" per
+        // explicit Super Admin instruction. Backend backs up every touched row
+        // before writing (Aircon_Survey_Database_TypeCleanupBackup).
+        function _acCleanupClientEmail() {
+            try {
+                var u = JSON.parse(localStorage.getItem('app_user_data') || 'null');
+                return (u && u.email) ? u.email : '';
+            } catch (e) { return ''; }
+        }
+
+        function _openAcTypeCleanup() {
+            var btn = document.getElementById('acTypeCleanupBtn');
+            var orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ กำลังตรวจสอบ...'; }
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                    if (!res || !res.success) {
+                        alert('โหลดข้อมูลไม่สำเร็จ: ' + (res ? res.error : 'Unknown error'));
+                        return;
+                    }
+                    if (res.affectedRows === 0) {
+                        alert('✅ ไม่พบข้อมูล "ประเภทแอร์" ที่ว่างหรือไม่ตรงมาตรฐาน — ไม่ต้องทำความสะอาด');
+                        return;
+                    }
+                    var msg = 'พบ ' + res.affectedRows + ' รายการ (' + res.affectedCells + ' ช่อง) ที่ "ประเภทแอร์" ว่างหรือไม่ตรงมาตรฐาน 5 ประเภท\n\n' +
+                        'ระบบจะสำรองข้อมูลเดิมไว้ก่อน (Aircon_Survey_Database_TypeCleanupBackup) แล้วเติมค่า "Hanging Type" ให้ทุกช่องที่ว่าง/ไม่ตรงมาตรฐาน — ไม่พยายามเดาประเภทที่ถูกต้องจากค่าที่มีอยู่\n\n' +
+                        'การเปลี่ยนแปลงนี้ไม่สามารถย้อนกลับได้ในหน้าจอ (แต่มีข้อมูลสำรองไว้) ต้องการดำเนินการต่อหรือไม่?';
+                    if (!confirm(msg)) return;
+
+                    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ กำลังทำความสะอาด...'; }
+                    google.script.run
+                        .withSuccessHandler(function(runRes) {
+                            if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                            if (runRes && runRes.success) {
+                                alert('✅ ทำความสะอาดสำเร็จ — แก้ไข ' + runRes.affectedRows + ' รายการ (' + runRes.affectedCells + ' ช่อง)\nกรุณารีเฟรชหน้าเพื่อดูข้อมูลล่าสุด');
+                            } else {
+                                alert('ไม่สำเร็จ: ' + (runRes ? runRes.error : 'Unknown error'));
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                            alert('Error: ' + ((err && err.message) || err));
+                        })
+                        .runAcUnitTypeCleanup(_acCleanupClientEmail());
+                })
+                .withFailureHandler(function(err) {
+                    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                    alert('Error: ' + ((err && err.message) || err));
+                })
+                .getAcUnitTypeCleanupPreview(_acCleanupClientEmail());
+        }
+
+        // Undo — restores every row touched by a prior runAcUnitTypeCleanup() call
+        // from Aircon_Survey_Database_TypeCleanupBackup (full pre-cleanup values).
+        // Added after the first cleanup version scanned units beyond each row's
+        // real AC Quantity, stamping "Hanging Type" into non-existent units and
+        // inflating badge totals — use this to revert that, then re-run cleanup
+        // (now fixed to respect AC Quantity).
+        function _undoAcTypeCleanup() {
+            if (!confirm('↩️ คืนค่าข้อมูล "ประเภทแอร์" กลับไปเป็นก่อนทำความสะอาดล่าสุด (จากข้อมูลสำรอง)?\n\nใช้เมื่อผลลัพธ์การทำความสะอาดครั้งก่อนไม่ถูกต้อง')) return;
+            var btn = document.getElementById('acTypeCleanupUndoBtn');
+            var orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ กำลังคืนค่า...'; }
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                    if (res && res.success) {
+                        alert('✅ คืนค่าสำเร็จ — ' + res.restored + ' รายการ\nกรุณารีเฟรชหน้าเพื่อดูข้อมูลล่าสุด');
+                    } else {
+                        alert('ไม่สำเร็จ: ' + (res ? res.error : 'Unknown error'));
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                    alert('Error: ' + ((err && err.message) || err));
+                })
+                .restoreAcUnitTypeCleanupBackup(_acCleanupClientEmail());
+        }
+    </script>
 </body>
 
 </html>

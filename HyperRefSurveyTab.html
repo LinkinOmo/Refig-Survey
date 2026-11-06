@@ -1,0 +1,1262 @@
+        <!-- CONTENT: HYPER REF SURVEY (big-format stores — cabinets counted per type/size) -->
+        <div id="content-hyper-ref-survey" class="tab-content hidden">
+            <form id="hyper-ref-form" onsubmit="handleHyperRefSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">🏬 สำรวจตู้แช่ Hyper</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= MANUALS_URL ?>?page=hyper-manual" target="_blank"
+                            class="text-emerald-600 hover:underline text-sm font-medium flex items-center gap-1">📖 คู่มือการใช้งาน</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=equip" target="_blank" class="text-indigo-600 hover:underline text-sm font-medium">🔎 อุปกรณ์ / QR</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_ref_survey_report" target="_blank"
+                            class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+
+                <p class="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2 flex items-start gap-1.5">
+                    <span class="mt-0.5">💡</span>
+                    <span>แบบสำรวจสำหรับสาขา <b>Hyper / Market / Foodplace</b> — ใส่ <b>จำนวนตู้</b> ตามประเภทและขนาด (ใส่ 0 หากไม่มี) แล้วระบบจะสร้าง <b>การ์ดตู้ทีละใบ</b> ให้กรอก Equipment ID, Asset No., ยี่ห้อ/รุ่น, สถานะ, สภาพ, อุณหภูมิ Controller และ <b>IR (Temp Gun)</b> ของตู้แต่ละใบ เหมือนแบบสำรวจตู้แช่ปกติ</span>
+                </p>
+
+                <div id="hyper-ref-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="hyper-ref-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreHyperRefDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardHyperRefDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <!-- 1. General Info -->
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เทรนเนอร์ / ผู้แจ้ง (Reporter) *</label>
+                            <input type="text" name="reporterName"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                                required placeholder="เช่น ชื่อ-นามสกุลของคุณ (พิมพ์แก้ไขได้อิสระ)">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ผู้แจ้ง (Phone) *</label>
+                            <input type="tel" name="reporterPhone" inputmode="tel" maxlength="20"
+                                class="input-field w-full border p-2 rounded text-sm bg-white focus:ring-2 focus:ring-blue-500"
+                                required placeholder="เช่น 081-234-5678">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="hyper-ref-station-search" autocomplete="off"
+                                    class="input-field w-full border p-2 rounded text-sm bg-blue-50 focus:ring-2 focus:ring-blue-500"
+                                    placeholder="พิมพ์รหัสสาขา หรือชื่อสาขา (ไทย/อังกฤษ)..." oninput="handleHyperRefStationInput(this)">
+                                <div id="hyper-ref-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div id="hyper-ref-store-badge" class="hidden self-end text-xs"></div>
+                        <!-- Auto-filled from Search Branch above — hidden, still submitted -->
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly>
+                            <input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat">
+                            <input type="hidden" name="region">
+                            <input type="hidden" name="ammMtn">
+                            <input type="hidden" name="dmArea">
+                            <input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="hyper-ref-rest-form" class="hidden">
+                    <!-- Running totals — sticky so the surveyor always sees the count while walking the floor -->
+                    <div class="sticky top-0 z-30 bg-white/95 backdrop-blur border border-blue-200 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span class="font-semibold text-gray-600">รวมตู้:</span>
+                        <span class="text-blue-700">ชุดบวก <b id="hyper-ref-total-pos">0</b></span>
+                        <span class="text-indigo-700">ชุดลบ <b id="hyper-ref-total-neg">0</b></span>
+                        <span class="ml-auto font-bold text-gray-800">ทั้งหมด <span id="hyper-ref-total-all">0</span> ตู้</span>
+                    </div>
+
+                    <!-- Sales-floor layout + cabinet pins -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">📐 ผังพื้นที่ขาย (Sales-floor Layout) & ตำแหน่งตู้แช่</h3>
+                        <p class="text-xs text-gray-500 mb-2">แนบรูปผังพื้นที่ขาย (ถ่ายจากแบบ / ผังที่ติดไว้) แล้วกด <b>วางหมุดตำแหน่งตู้</b> เพื่อปักหมุดตู้แต่ละใบบนผัง — รายงานจะแสดงอุณหภูมิ / สถานะของตู้ตามตำแหน่งจริงบนผัง (ทำหลังกรอกการ์ดตู้แล้ว)</p>
+                        <div id="hyper-ref-photo-layout"></div>
+                        <button type="button" onclick="openHyperPinEditor()" class="mt-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg">📍 วางหมุดตำแหน่งตู้บนผัง</button>
+                        <span id="hyper-pin-summary" class="ml-2 text-xs text-gray-500"></span>
+                        <div id="hyper-pin-editor" class="hidden mt-3 border border-indigo-200 rounded-lg p-3 bg-indigo-50">
+                            <p class="text-xs text-indigo-700 mb-2">① เลือกตู้จากรายการ &nbsp;② แตะบนผังตำแหน่งที่ตู้ตั้งอยู่ (แตะใหม่เพื่อย้ายหมุด)</p>
+                            <div class="flex flex-wrap gap-2 mb-2">
+                                <select id="hyper-pin-select" class="flex-1 min-w-[180px] border border-indigo-300 rounded-md text-sm p-2 bg-white"></select>
+                                <button type="button" onclick="removeHyperPin()" class="text-red-600 text-xs border border-red-300 rounded-md px-2 bg-white">ลบหมุดตู้นี้</button>
+                                <button type="button" onclick="document.getElementById('hyper-pin-editor').classList.add('hidden')" class="text-gray-600 text-xs border border-gray-300 rounded-md px-2 bg-white">ปิด</button>
+                            </div>
+                            <div id="hyper-pin-stage" class="relative inline-block max-w-full border border-gray-300 bg-white" style="touch-action:manipulation">
+                                <img id="hyper-pin-img" class="block max-w-full" alt="layout">
+                                <div id="hyper-pin-layer" class="absolute inset-0 pointer-events-none"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Temperature instrument — controller displays are often off, so each
+                         cabinet type below also takes a reading from a real instrument -->
+                    <div class="bg-rose-50 border border-rose-200 rounded-lg p-3 mt-6">
+                        <p class="text-sm font-bold text-rose-700 mb-1">🌡️ เครื่องมือวัดอุณหภูมิ (Temperature Instrument)</p>
+                        <p class="text-xs text-rose-600 mb-2">อุณหภูมิที่แสดงบน Controller อาจไม่ตรงกับความจริง — กรุณาวัดด้วยเครื่องมือ (เช่น Temp Gun) แล้วกรอกค่า IR <b>3 จุด</b> ของตู้<b>แต่ละใบ</b> (จุดวัดแตกต่างตามชนิดตู้ — ดูในการ์ด) เพื่อดูการกระจายอุณหภูมิ</p>
+                        <select name="tempInstrument" id="hyper-ref-temp-instrument" class="input-field w-full sm:w-80 border border-rose-300 p-2 rounded text-sm bg-white focus:ring-rose-400"></select>
+                    </div>
+
+                    <!-- 2. Positive (chill) cabinets -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">2. ตู้แช่ชุดบวก (Chill / Positive)</h3>
+                        <div id="hyper-ref-pos-cats" class="space-y-6"></div>
+                        <div class="mt-4">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ตู้แช่ชุดบวกอื่นๆ (ถ้ามี) — โปรดระบุรูปแบบ / จำนวนตู้</label>
+                            <textarea name="posOther" rows="2" class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-blue-400" placeholder="เช่น ตู้ Sushi 1.5 m. × 2"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 3. Negative (frozen) cabinets -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">3. ตู้แช่ชุดลบ (Frozen / Negative)</h3>
+                        <div id="hyper-ref-neg-cats" class="space-y-6"></div>
+                        <div class="mt-4">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ตู้แช่ชุดลบอื่นๆ (ถ้ามี) — โปรดระบุรูปแบบ / จำนวนตู้</label>
+                            <textarea name="negOther" rows="2" class="input-field w-full border border-gray-300 p-2 rounded text-sm focus:ring-indigo-400" placeholder="เช่น ตู้ไอศกรีม Island 2.5 m. × 1"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 4. Cold rooms & machine room -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">4. ห้องเย็น ห้องเครื่อง และเครื่องทำน้ำแข็ง (Cold Room / Rack / CDU / Ice Maker)</h3>
+                        <div class="space-y-6">
+                            <div class="border-b border-emerald-200 pb-4 bg-emerald-50 rounded-lg p-3">
+                                <h4 class="font-semibold text-emerald-700 mb-3 flex items-center gap-2">
+                                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                                    4.1) ห้องเย็น (Back Stock Cold Room)
+                                </h4>
+                                <p class="text-xs text-emerald-700 mb-2">ใส่จำนวนห้องเย็นแต่ละชุด แล้วระบบจะสร้างการ์ดทีละห้อง (Equipment ID + QR) ให้กรอกเหมือนตู้แช่ — รวมถึงอุณหภูมิ Controller เทียบ IR 3 จุด และรูปถ่าย</p>
+                                <div id="hyper-ref-room-cats" class="space-y-4"></div>
+                            </div>
+
+                            <div class="pb-4 bg-slate-50 rounded-lg p-3 border border-slate-200">
+                                <h4 class="font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                                    4.2) ห้องเครื่อง — Rack Multiset / CDU
+                                </h4>
+                                <p class="text-xs text-slate-600 bg-slate-100 border border-slate-200 rounded px-2 py-1 mb-3 flex items-start gap-1.5">
+                                    <span class="mt-0.5">💡</span>
+                                    <span>ดูที่ป้าย Nameplate ของคอมเพรสเซอร์ เพื่อระบุยี่ห้อ/รุ่น (เช่น Bitzer 4NES-20Y) — นับพัดลม Condenser เป็นจำนวนตัว</span>
+                                </p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="bg-white border border-blue-200 rounded-lg p-3 space-y-3">
+                                        <p class="text-xs font-bold text-blue-700">Multiset Positive (ชุดบวก)</p>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">จำนวนคอมเพรสเซอร์</label>
+                                                <input type="number" name="msPosComp" min="0" value="0" inputmode="numeric" class="input-field w-full border border-gray-300 p-2 rounded text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">จำนวนพัดลม Condenser</label>
+                                                <input type="number" name="msPosFan" min="0" value="0" inputmode="numeric" class="input-field w-full border border-gray-300 p-2 rounded text-sm">
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-500 mb-1">ยี่ห้อ / รุ่นคอมเพรสเซอร์</label>
+                                            <input type="text" name="msPosModel" list="hyper-ref-comp-brands" class="input-field w-full border border-gray-300 p-2 rounded text-sm" placeholder="เช่น Bitzer 4NES-20Y">
+                                        </div>
+                                    </div>
+                                    <div class="bg-white border border-indigo-200 rounded-lg p-3 space-y-3">
+                                        <p class="text-xs font-bold text-indigo-700">Multiset Negative (ชุดลบ)</p>
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">จำนวนคอมเพรสเซอร์</label>
+                                                <input type="number" name="msNegComp" min="0" value="0" inputmode="numeric" class="input-field w-full border border-gray-300 p-2 rounded text-sm">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-gray-500 mb-1">จำนวนพัดลม Condenser</label>
+                                                <input type="number" name="msNegFan" min="0" value="0" inputmode="numeric" class="input-field w-full border border-gray-300 p-2 rounded text-sm">
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-500 mb-1">ยี่ห้อ / รุ่นคอมเพรสเซอร์</label>
+                                            <input type="text" name="msNegModel" list="hyper-ref-comp-brands" class="input-field w-full border border-gray-300 p-2 rounded text-sm" placeholder="เช่น Bitzer 4FES-5Y">
+                                        </div>
+                                    </div>
+                                    <datalist id="hyper-ref-comp-brands">
+                                        <option value="Bitzer"><option value="Copeland"><option value="Emerson"><option value="Danfoss"><option value="Dorin"><option value="Frascold"><option value="Tecumseh">
+                                    </datalist>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                                    <div>
+                                        <label class="block text-xs text-gray-500 mb-1">CDU ชุดบวก (จำนวนเครื่อง)</label>
+                                        <input type="number" name="cduPos" min="0" value="0" inputmode="numeric" class="input-field w-full border border-gray-300 p-2 rounded text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-500 mb-1">CDU ชุดลบ (จำนวนเครื่อง)</label>
+                                        <input type="number" name="cduNeg" min="0" value="0" inputmode="numeric" class="input-field w-full border border-gray-300 p-2 rounded text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-500 mb-1">สารทำความเย็น (Refrigerant)</label>
+                                        <select name="refrigerant" id="hyper-ref-refrigerant" class="input-field w-full border border-gray-300 p-2 rounded text-sm bg-white"></select>
+                                    </div>
+                                </div>
+                                <div id="hyper-ref-photo-rack"></div>
+                                <p class="text-xs font-semibold text-slate-700 mt-4 mb-1">📋 การ์ดรายเครื่อง — ชุดคอมเพรสเซอร์ / Condenser</p>
+                                <p class="text-xs text-slate-600 mb-2">ใส่จำนวนชุดแต่ละประเภท แล้วกรอกข้อมูลทีละเครื่อง (Serial, Capacity, ปีที่ติดตั้ง, คะแนนประเมิน) ตามทะเบียนเครื่องจักรหลัก</p>
+                                <div id="hyper-ref-rack-cats" class="space-y-4"></div>
+                            </div>
+
+                            <div class="pb-4 bg-cyan-50 rounded-lg p-3 border border-cyan-200">
+                                <h4 class="font-semibold text-cyan-700 mb-1 flex items-center gap-2">
+                                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                                    4.3) เครื่องผลิตน้ำแข็ง (Ice Maker)
+                                </h4>
+                                <div id="hyper-ref-ice-cats" class="space-y-4"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Broken units -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">5. ตู้แช่ / ห้องเย็นที่ชำรุด</h3>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">มีตู้แช่หรือห้องเย็นที่ชำรุดหรือไม่?</label>
+                        <div class="flex gap-4 mb-3">
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" class="text-blue-600 focus:ring-blue-500" onchange="toggleHyperRefBroken(true)"> <span class="text-sm">มี (Yes)</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" class="text-blue-600 focus:ring-blue-500" onchange="toggleHyperRefBroken(false)" checked> <span class="text-sm">ไม่มี (No)</span></label>
+                        </div>
+                        <div id="hyper-ref-broken-section" class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ระบุตู้ที่ชำรุด และอาการ *</label>
+                            <textarea name="brokenDetail" rows="3" class="input-field w-full border border-red-300 p-2 rounded text-sm focus:ring-red-400" placeholder="เช่น Remote Glass Door 4 door โซนนม 1 ตู้ — ความเย็นไม่ถึง / น้ำแข็งเกาะคอยล์"></textarea>
+                            <div id="hyper-ref-photo-broken"></div>
+                        </div>
+                    </div>
+
+                    <!-- 6. Notes -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-2 border-b pb-2">6. สรุปปัญหา (Additional Findings)</h3>
+                        <textarea name="comments" rows="3"
+                            class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors"
+                            placeholder="ระบุปัญหาเพิ่มเติมที่พบ... (Optional)"></textarea>
+                    </div>
+
+                    <!-- 7. CC Emails -->
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">7. CC Email Notification (Optional)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1 (DM)</label>
+                                <input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm" placeholder="email1@example.com">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2 (CM)</label>
+                                <input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm" placeholder="email2@example.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetHyperRefForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveHyperRefDraft()"
+                                class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 transition text-sm">
+                                &#128190; Save Draft
+                            </button>
+                            <button type="submit"
+                                class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-blue-700 transition transform hover:-translate-y-0.5">
+                                Submit
+                            </button>
+                        </div>
+                    </div>
+                </div> <!-- End hidden hyper-ref-rest-form -->
+            </form>
+        </div> <!-- End content-hyper-ref-survey -->
+
+        <script>
+            // Config + store list come from HyperRefSurvey.gs (single source of truth
+            // shared with the sheet headers and the report page).
+            const HYPER_REF_CONFIG = <?!= JSON.stringify(getHyperRefConfig_()) ?>;
+            const HYPER_REF_STORES = <?!= JSON.stringify(HYPER_REF_STORES) ?>;
+            const HYPER_REF_DRAFT_KEY = 'hyper_ref_survey_draft_v1';
+
+            // Tailwind Play CDN only generates classes it sees in the DOM, so the
+            // per-category colours are spelled out in full here rather than built
+            // from string fragments.
+            const HYPER_REF_COLORS = {
+                blue:   { box: 'border-blue-200 bg-blue-50',     title: 'text-blue-700',   dot: 'bg-blue-400',   hint: 'text-blue-600 bg-blue-100 border-blue-200' },
+                sky:    { box: 'border-sky-200 bg-sky-50',       title: 'text-sky-700',    dot: 'bg-sky-400',    hint: 'text-sky-600 bg-sky-100 border-sky-200' },
+                orange: { box: 'border-orange-200 bg-orange-50', title: 'text-orange-700', dot: 'bg-orange-400', hint: 'text-orange-600 bg-orange-100 border-orange-200' },
+                teal:   { box: 'border-teal-200 bg-teal-50',     title: 'text-teal-700',   dot: 'bg-teal-400',   hint: 'text-teal-600 bg-teal-100 border-teal-200' },
+                amber:  { box: 'border-amber-200 bg-amber-50',   title: 'text-amber-700',  dot: 'bg-amber-400',  hint: 'text-amber-700 bg-amber-100 border-amber-200' },
+                lime:   { box: 'border-lime-200 bg-lime-50',     title: 'text-lime-700',   dot: 'bg-lime-500',   hint: 'text-lime-700 bg-lime-100 border-lime-200' },
+                pink:   { box: 'border-pink-200 bg-pink-50',     title: 'text-pink-700',   dot: 'bg-pink-400',   hint: 'text-pink-600 bg-pink-100 border-pink-200' },
+                indigo: { box: 'border-indigo-200 bg-indigo-50', title: 'text-indigo-700', dot: 'bg-indigo-400', hint: 'text-indigo-600 bg-indigo-100 border-indigo-200' },
+                violet: { box: 'border-violet-200 bg-violet-50', title: 'text-violet-700', dot: 'bg-violet-400', hint: 'text-violet-600 bg-violet-100 border-violet-200' },
+                cyan:   { box: 'border-cyan-200 bg-cyan-50',     title: 'text-cyan-700',   dot: 'bg-cyan-400',   hint: 'text-cyan-700 bg-cyan-100 border-cyan-200' },
+                stone:  { box: 'border-amber-400 bg-amber-50 border-2', title: 'text-amber-700', dot: 'bg-amber-400', hint: 'text-amber-700 bg-amber-100 border-amber-200' },
+                emerald: { box: 'border-emerald-200 bg-white', title: 'text-emerald-700', dot: 'bg-emerald-400', hint: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+                slate:  { box: 'border-slate-300 bg-white', title: 'text-slate-700', dot: 'bg-slate-400', hint: 'text-slate-700 bg-slate-100 border-slate-200' }
+            };
+
+            function _hyperUnitWord(cat) { return cat.group === 'room' ? 'ห้อง' : (cat.group === 'rack' || cat.group === 'ice' || cat.group === 'plant') ? 'เครื่อง' : 'ตู้'; }
+
+            (function renderHyperRefForm() {
+                let posN = 0, negN = 0, roomN = 0, rackN = 0, iceN = 0;
+                HYPER_REF_CONFIG.categories.forEach(function(cat) {
+                    const c = HYPER_REF_COLORS[cat.color] || HYPER_REF_COLORS.blue;
+                    const num = cat.group === 'pos' ? ('2.' + (++posN)) : cat.group === 'neg' ? ('3.' + (++negN)) :
+                        cat.group === 'rack' ? ('4.2.' + (++rackN)) : cat.group === 'ice' ? ('4.3.' + (++iceN)) : ('4.1.' + (++roomN));
+                    const sizes = cat.sizes.map(function(s) {
+                        return '<div>' +
+                            '<label class="block text-xs text-gray-500 mb-1">[' + s.label + '] — จำนวน (' + _hyperUnitWord(cat) + ')</label>' +
+                            '<input type="number" name="' + s.key + '" min="0" value="0" inputmode="numeric" data-hyper-cat="' + cat.id + '"' +
+                                ' class="input-field w-full border border-gray-300 p-2 rounded text-sm" placeholder="0"' +
+                                ' oninput="this.dataset.touched=\'1\'; onHyperRefCountInput(\'' + cat.id + '\')" onfocus="if(this.value===\'0\')this.select()">' +
+                        '</div>';
+                    }).join('');
+                    const extraBadge = cat.id === 'negStainless'
+                        ? ' <span class="text-[10px] font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full">⚠️ ข้อมูลสำคัญ — ห้ามข้าม</span>' : '';
+                    const html =
+                        '<div class="pb-4 rounded-lg p-3 border ' + c.box + '" id="hyper-ref-cat-' + cat.id + '">' +
+                            '<h4 class="font-semibold ' + c.title + ' mb-1 flex flex-wrap items-center gap-2">' +
+                                '<span class="inline-block w-2.5 h-2.5 rounded-full ' + c.dot + '"></span>' +
+                                num + ') ' + cat.title + extraBadge +
+                                '<span class="ml-auto text-xs font-bold bg-white border border-gray-200 text-gray-700 px-2 py-0.5 rounded-full">รวม <span id="hyper-ref-sum-' + cat.id + '">0</span> ' + _hyperUnitWord(cat) + '</span>' +
+                            '</h4>' +
+                            (cat.hint ? '<p class="text-xs border rounded px-2 py-1 mb-3 flex items-start gap-1.5 ' + c.hint + '"><span class="mt-0.5">💡</span><span>' + cat.hint + '</span></p>' : '<div class="mb-3"></div>') +
+                            '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-' + Math.min(cat.sizes.length, 5) + ' gap-3">' + sizes + '</div>' +
+                            // One card per cabinet, grouped by size — built by syncHyperRefUnits()
+                            '<div id="hyper-ref-units-' + cat.id + '" class="mt-3 space-y-4">' +
+                                cat.sizes.map(function(sz) { return '<div id="hyper-ref-ug-' + cat.id + '-' + sz.sizeKey + '" class="hidden space-y-3"></div>'; }).join('') +
+                            '</div>' +
+                        '</div>';
+                    document.getElementById('hyper-ref-' + (['pos', 'neg', 'rack', 'ice'].indexOf(cat.group) > -1 ? cat.group : 'room') + '-cats').insertAdjacentHTML('beforeend', html);
+                });
+                document.getElementById('hyper-ref-photo-layout').innerHTML = photoUpload('ผังพื้นที่ขาย (Layout)', 'hyp_layout');
+                document.getElementById('hyper-ref-photo-rack').innerHTML = photoUpload('ห้องเครื่อง / Nameplate คอมเพรสเซอร์', 'hyp_rack');
+                document.getElementById('hyper-ref-photo-broken').innerHTML = photoUpload('ตู้/ห้องเย็นที่ชำรุด', 'hyp_broken');
+
+                const instField = HYPER_REF_CONFIG.system.find(function(f) { return f.key === 'tempInstrument'; });
+                document.getElementById('hyper-ref-temp-instrument').innerHTML = '<option value="">-- เลือกเครื่องมือที่ใช้วัด --</option>' +
+                    (instField ? instField.options : []).map(function(o) { return '<option value="' + o + '">' + o + '</option>'; }).join('');
+
+                const refrigField = HYPER_REF_CONFIG.system.find(function(f) { return f.key === 'refrigerant'; });
+                document.getElementById('hyper-ref-refrigerant').innerHTML = '<option value="">-- เลือก --</option>' +
+                    (refrigField ? refrigField.options : []).map(function(o) { return '<option value="' + o + '">' + o + '</option>'; }).join('');
+            })();
+
+            function updateHyperRefTotals() {
+                const form = document.getElementById('hyper-ref-form');
+                let pos = 0, neg = 0;
+                HYPER_REF_CONFIG.categories.forEach(function(cat) {
+                    let sum = 0;
+                    cat.sizes.forEach(function(s) { sum += Math.max(0, parseInt(form.elements[s.key].value, 10) || 0); });
+                    document.getElementById('hyper-ref-sum-' + cat.id).textContent = sum;
+                    if (cat.group === 'pos') pos += sum; else if (cat.group === 'neg') neg += sum;
+                });
+                document.getElementById('hyper-ref-total-pos').textContent = pos;
+                document.getElementById('hyper-ref-total-neg').textContent = neg;
+                document.getElementById('hyper-ref-total-all').textContent = pos + neg;
+                return { pos: pos, neg: neg };
+            }
+
+            // ─── Brand: required, enum-backed (shared with the Ac tab, which loads after this one) ──
+            // Same pattern as the Ref/Aircon surveys: one-tap chips (admin-configurable) + a
+            // searchable datalist over the auto-growing enum, with a typo check on submit. The list
+            // is the shared enum plus brands already used in the Hyper survey (getHyperRefBrandOptions).
+            const HYPER_BRAND_KINDS = {
+                ref: { cache: 'hyper_ref_brand', chip: 'ref_brand' },
+                ac:  { cache: 'hyper_ac_brand',  chip: 'aircon_brand' },
+                eq:  { cache: 'hyper_eq_brand',  chip: 'hyper_eq_brand' },
+                fo:  { cache: 'hyper_fo_brand',  chip: 'hyper_fo_brand' }
+            };
+            const HYPER_AC_BRAND_FALLBACK = ['Carrier', 'Toshiba', 'York', 'Daikin', 'Star Air', 'Eminent', 'Panasonic', 'Train', 'Trane', 'McQuay', 'Mitsubishi Electric', 'Mitsubishi Heavy', 'Hitachi', 'LG', 'Samsung', 'Midea', 'Gree'];
+            const HYPER_EQ_BRAND_FALLBACK = ['Mitsubishi Electric', 'Schindler', 'KONE', 'Otis', 'Hitachi', 'TK Elevator (Thyssenkrupp)', 'Fujitec', 'Cummins', 'Caterpillar', 'Perkins', 'ABB', 'Schneider Electric', 'Siemens', 'Grundfos', 'Ebara', 'Atlas Copco'];
+            const HYPER_FO_BRAND_FALLBACK = ['Rational', 'Unox', 'Sinmag', 'Salva', 'Bongard', 'Mono', 'Winkler', 'Kolb', 'Revent', 'Electrolux', 'Frymaster', 'Henny Penny', 'Pitco', 'Hobart', 'Berkel', 'Bizerba', 'Rondo', 'Sammic', 'Henkelman'];
+            function _hyperBrandDefaults(kind) {
+                return kind === 'fo' ? HYPER_FO_BRAND_FALLBACK : kind === 'eq' ? HYPER_EQ_BRAND_FALLBACK : kind === 'ac' ? HYPER_AC_BRAND_FALLBACK : (typeof REF_BRAND_DEFAULTS !== 'undefined' ? REF_BRAND_DEFAULTS : []);
+            }
+            function _hyperBrandList(kind) {
+                const k = HYPER_BRAND_KINDS[kind];
+                return _enumCache[k.cache] || _enumCache[k.chip] || _hyperBrandDefaults(kind);
+            }
+            function _hyperBrandHtml(kind, inputName) {
+                const k = HYPER_BRAND_KINDS[kind];
+                const list = _hyperBrandList(kind);
+                const listId = inputName + '_list';
+                return '<div class="mb-1">' +
+                    '<label class="block text-xs font-semibold text-gray-600 mb-1">ยี่ห้อ (Brand) <span class="text-red-500">*</span></label>' +
+                    _brandChipsHtml(list, inputName, k.chip) +
+                    '<input type="text" list="' + listId + '" name="' + inputName + '" id="' + inputName + '" data-f="br" autocomplete="off" ' +
+                        'class="w-full text-sm border border-gray-300 rounded-md shadow-sm p-2 focus:border-cyan-500 focus:ring-cyan-500" placeholder="พิมพ์เพื่อค้นหา หรือระบุยี่ห้อใหม่...">' +
+                    '<datalist id="' + listId + '">' + list.map(function(b) { return '<option value="' + String(b).replace(/"/g, '&quot;') + '">'; }).join('') + '</datalist>' +
+                '</div>';
+            }
+            // Fetched one after the other (back-to-back google.script.run callbacks can get dropped)
+            let _hyperBrandLoading = false;
+            function _ensureHyperBrandOptions() {
+                if (_hyperBrandLoading || (_enumCache.hyper_ref_brand && _enumCache.hyper_ac_brand && _enumCache.hyper_eq_brand && _enumCache.hyper_fo_brand)) return;
+                _hyperBrandLoading = true;
+                const done = function() { _hyperBrandLoading = false; };
+                google.script.run
+                    .withSuccessHandler(function(res) {
+                        if (res && res.success) _enumCache.hyper_ref_brand = res.options;
+                        google.script.run
+                            .withSuccessHandler(function(res2) {
+                                if (res2 && res2.success) _enumCache.hyper_ac_brand = res2.options;
+                                google.script.run
+                                    .withSuccessHandler(function(res3) {
+                                        if (res3 && res3.success) _enumCache.hyper_eq_brand = res3.options;
+                                        google.script.run
+                                            .withSuccessHandler(function(res4) { if (res4 && res4.success) _enumCache.hyper_fo_brand = res4.options; done(); })
+                                            .withFailureHandler(done)
+                                            .getHyperFoBrandOptions();
+                                    })
+                                    .withFailureHandler(done)
+                                    .getHyperEqBrandOptions();
+                            })
+                            .withFailureHandler(done)
+                            .getHyperAcBrandOptions();
+                    })
+                    .withFailureHandler(done)
+                    .getHyperRefBrandOptions();
+            }
+            // Brand is required on every card; likely typos get the same "did you mean ...?" prompt
+            // as the Ref survey. Returns false (and points at the first empty card) if blocked.
+            function validateHyperBrands(kind, rootSelector) {
+                const inputs = Array.from(document.querySelectorAll(rootSelector + ' [data-f="br"]'));
+                const empty = inputs.filter(function(el) { return !el.value.trim(); });
+                if (empty.length) {
+                    const names = empty.slice(0, 15).map(function(el) { return el.closest('[data-card]').querySelector('.hyper-unit-id').textContent; });
+                    alert('กรุณาเลือก/ระบุยี่ห้อ (Brand) ให้ครบทุกเครื่อง — ยังขาด ' + empty.length + ' รายการ:\n' + names.join('\n') + (empty.length > 15 ? '\n...' : ''));
+                    const card = empty[0].closest('[data-card]');
+                    card.classList.add('ring-2', 'ring-red-400');
+                    empty[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    empty[0].focus();
+                    empty.forEach(function(el) { el.addEventListener('input', function() { el.closest('[data-card]').classList.remove('ring-2', 'ring-red-400'); }, { once: true }); });
+                    return false;
+                }
+                _fuzzyCheckAndConfirm(inputs.map(function(el) {
+                    return {
+                        value: el.value, groupKey: HYPER_BRAND_KINDS[kind].cache, fallbackDefaults: _hyperBrandDefaults(kind),
+                        label: 'ยี่ห้อ (' + el.closest('[data-card]').querySelector('.hyper-unit-id').textContent + ')',
+                        apply: function(v) { el.value = v; }
+                    };
+                }));
+                return true;
+            }
+
+            // ─── Layout pins: one pin per cabinet on the attached sales-floor layout ────────
+            // HYPER_PINS: card pk -> {x, y} as 0..1 fractions of the layout image (so they stay valid
+            // after the upload is compressed). Saved with the draft and submitted as pinsJson.
+            const HYPER_PINS = {};
+            function _hyperPinCards() {
+                return Array.from(document.querySelectorAll('#content-hyper-ref-survey [data-hu]')).map(function(c) {
+                    return { pk: c.dataset.pk, id: c.querySelector('.hyper-unit-id').textContent };
+                });
+            }
+            function openHyperPinEditor() {
+                const files = (_accumulatedFiles['hyp_layout'] || []).filter(Boolean);
+                if (!files.length) { alert('กรุณาแนบรูปผังพื้นที่ขายก่อน (ปุ่มถ่ายรูป / เลือกจาก Gallery ด้านบน)'); return; }
+                if (!_hyperPinCards().length) { alert('ยังไม่มีการ์ดตู้ — ใส่จำนวนตู้ในข้อ 2–3 ก่อน แล้วค่อยวางหมุด'); return; }
+                const img = document.getElementById('hyper-pin-img');
+                if (img.dataset.src) URL.revokeObjectURL(img.dataset.src);
+                img.dataset.src = _sdsObjUrl(files[0]);
+                img.src = img.dataset.src;
+                document.getElementById('hyper-pin-editor').classList.remove('hidden');
+                refreshHyperPinEditor();
+            }
+            function refreshHyperPinEditor() {
+                const cards = _hyperPinCards();
+                const alive = {};
+                cards.forEach(function(c) { alive[c.pk] = true; });
+                Object.keys(HYPER_PINS).forEach(function(pk) { if (!alive[pk]) delete HYPER_PINS[pk]; });
+                const sel = document.getElementById('hyper-pin-select');
+                const keep = sel.value;
+                sel.innerHTML = cards.map(function(c) { return '<option value="' + c.pk + '">' + (HYPER_PINS[c.pk] ? '✓ ' : '○ ') + c.id + '</option>'; }).join('');
+                if (keep && alive[keep]) sel.value = keep;
+                renderHyperPins();
+            }
+            function renderHyperPins() {
+                const layer = document.getElementById('hyper-pin-layer');
+                const sel = document.getElementById('hyper-pin-select');
+                const labels = {};
+                _hyperPinCards().forEach(function(c) { labels[c.pk] = c.id; });
+                layer.innerHTML = Object.keys(HYPER_PINS).filter(function(pk) { return labels[pk]; }).map(function(pk) {
+                    const p = HYPER_PINS[pk];
+                    const on = pk === sel.value;
+                    return '<div style="position:absolute;left:' + (p.x * 100) + '%;top:' + (p.y * 100) + '%;transform:translate(-50%,-50%);padding:1px 5px;border-radius:9999px;font-size:10px;font-weight:700;white-space:nowrap;' +
+                        'background:' + (on ? '#4f46e5' : '#e11d48') + ';color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5)">' + labels[pk].split('-').pop() + '</div>';
+                }).join('');
+                const n = Object.keys(HYPER_PINS).filter(function(pk) { return labels[pk]; }).length;
+                document.getElementById('hyper-pin-summary').textContent = n ? ('วางหมุดแล้ว ' + n + ' / ' + Object.keys(labels).length + ' ตู้') : '';
+            }
+            function removeHyperPin() {
+                const pk = document.getElementById('hyper-pin-select').value;
+                if (pk) { delete HYPER_PINS[pk]; refreshHyperPinEditor(); }
+            }
+            document.getElementById('hyper-pin-stage').addEventListener('click', function(e) {
+                const sel = document.getElementById('hyper-pin-select');
+                if (!sel.value) return;
+                const r = document.getElementById('hyper-pin-img').getBoundingClientRect();
+                if (!r.width || !r.height) return;
+                const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+                HYPER_PINS[sel.value] = { x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000 };
+                // jump to the next cabinet that has no pin yet
+                const cards = _hyperPinCards();
+                const idx = cards.findIndex(function(c) { return c.pk === sel.value; });
+                const next = cards.slice(idx + 1).concat(cards.slice(0, idx + 1)).find(function(c) { return !HYPER_PINS[c.pk]; });
+                const cur = sel.value;
+                refreshHyperPinEditor();
+                sel.value = next ? next.pk : cur;
+                renderHyperPins();
+            });
+            function collectHyperPins() {
+                const alive = {};
+                _hyperPinCards().forEach(function(c) { alive[c.pk] = true; });
+                return Object.keys(HYPER_PINS).filter(function(pk) { return alive[pk]; }).map(function(pk) { return { pk: pk, x: HYPER_PINS[pk].x, y: HYPER_PINS[pk].y }; });
+            }
+
+            // ─── Per-cabinet cards (same fields as the Ref Survey's unit card) ───────────
+            // Cards are keyed by (category, size, n) — NOT by Equipment ID — so changing a
+            // count only appends/removes trailing cards and never wipes what was typed.
+            // The visible Equipment ID is renumbered per category across sizes.
+            const HYPER_UNIT_MAX_PER_SIZE = 200;
+            function _hyperUnitBase(catId, sizeKey) { return 'hu_' + catId + '_' + sizeKey; }
+            function _hyperUnitPk(catId, sizeKey, n) { return 'hyu_' + catId + '_' + sizeKey + '_' + n; }
+            function _hyperRefBranchCode() { return (document.getElementById('hyper-ref-form').branchCode.value || '').trim(); }
+            function _hyperUnitCats() { return HYPER_REF_CONFIG.categories; }
+
+            // Controller display + 3 IR (Temp Gun) points per cabinet — the point set depends on the
+            // cabinet shape (see HYPER_REF_TEMP_SETS in HyperRefSurvey.gs) so the surveyor sees the
+            // temperature distribution. The point marked "เทียบกับ Controller" drives the >3°C gap warning.
+            function hyperTempRangeText(rg) {
+                if (rg.min == null) return '≤ ' + rg.max + '°C';
+                if (rg.max == null) return '≥ ' + rg.min + '°C';
+                return rg.min + ' ถึง ' + rg.max + '°C';
+            }
+            function hyperTempOutOfRange(v, rg) {
+                return (rg.min != null && v < rg.min) || (rg.max != null && v > rg.max);
+            }
+            function _hyperTempBlockHtml(cat, base, n, ctrlPh) {
+                const pts = cat.tempPoints || [];
+                let irPh = cat.id === 'negColdRoom' ? ['เช่น -12', 'เช่น -18', 'เช่น -20'] : cat.group === 'neg' ? ['เช่น -22', 'เช่น -18', 'เช่น -14'] : cat.id === 'posColdRoom' ? ['เช่น 6', 'เช่น 3', 'เช่น 2'] : ['เช่น 1.5', 'เช่น 4.5', 'เช่น 8'];
+                const rg = cat.tempRange;
+                if (rg && rg.min != null && rg.max != null) irPh = [0, 1, 2].map(function() { return 'เช่น ' + ((rg.min + rg.max) / 2); });
+                return '<div class="border-t border-gray-100 pt-2 mt-1" data-temp-unit data-cmp="' + (cat.tpCmp || 0) + '"' +
+                    (rg ? ' data-tmin="' + (rg.min == null ? '' : rg.min) + '" data-tmax="' + (rg.max == null ? '' : rg.max) + '" data-norange="' + pts.map(function(pt, i) { return pt.noRange ? i + 1 : ''; }).join('') + '"' : '') + '>' +
+                    (rg ? '<p class="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 mb-2">🎯 เกณฑ์อุณหภูมิตู้ประเภทนี้: <b>' + hyperTempRangeText(rg) + '</b></p>' : '') +
+                    '<label class="block text-xs font-semibold text-gray-600 mb-1">🌡️ อุณหภูมิที่ Controller (°C)</label>' +
+                    '<div class="flex gap-1">' + tempSignBtn() + '<input type="text" inputmode="decimal" data-temp autocomplete="off" name="' + base + 'Ctrl_' + n + '" data-f="ct" oninput="checkHyperUnitTemp(this)" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="' + ctrlPh + '"></div>' +
+                    '<p class="text-xs font-semibold text-rose-700 mt-3 mb-1">🔫 IR / Temp Gun 3 จุด — ' + (cat.tpName || '') + '</p>' +
+                    pts.map(function(pt, i) {
+                        return '<div class="mb-2"><label class="block text-xs text-gray-700 mb-0.5"><span class="inline-block w-5 h-5 rounded-full bg-rose-600 text-white text-[11px] text-center leading-5 font-bold mr-1">' + (i + 1) + '</span><b>' + pt.label + '</b>' +
+                            (i === (cat.tpCmp || 0) ? ' <span class="text-[10px] text-rose-600 font-semibold">(เทียบกับ Controller)</span>' : '') + '</label>' +
+                            '<div class="text-[11px] text-gray-400 mb-0.5">' + pt.hint + '</div>' +
+                            '<div class="flex gap-1">' + tempSignBtn() + '<input type="text" inputmode="decimal" data-temp autocomplete="off" name="' + base + 'IR' + (i + 1) + '_' + n + '" data-f="t' + (i + 1) + '" oninput="checkHyperUnitTemp(this)" class="hu-ir w-full border border-rose-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-rose-400" placeholder="' + irPh[i] + '"></div></div>';
+                    }).join('') +
+                    '<p class="hidden text-[11px] text-red-700 font-semibold mt-1" data-unit-range></p>' +
+                    '<p class="hidden text-[11px] text-amber-700 mt-1" data-unit-warn></p>' +
+                    '<p class="hidden text-[11px] text-slate-500 mt-0.5" data-unit-spread></p>' +
+                '</div>';
+            }
+
+            // What is stored inside the cabinet — enum dropdown (multi-select) per cabinet type, with an
+            // 'อื่นๆ' free-text. Required: at least one product per cabinet.
+            function _hyperProductHtml(cat, base, n) {
+                const opts = cat.products || [];
+                if (!opts.length) return '';
+                return '<div class="mb-1" data-prod>' +
+                    '<label class="block text-xs font-semibold text-gray-600 mb-1">สินค้าที่วางในตู้ <span class="text-red-500">*</span></label>' +
+                    '<details class="border border-gray-300 rounded-md bg-white"><summary class="p-2 text-sm cursor-pointer select-none" data-prod-sum>-- เลือกสินค้า (เลือกได้หลายอย่าง) --</summary>' +
+                        '<div class="p-2 grid grid-cols-1 gap-1 border-t border-gray-200">' +
+                        opts.map(function(o) {
+                            return '<label class="flex items-center gap-2 text-sm text-gray-700"><input type="checkbox" name="' + base + 'Prod_' + n + '" value="' + o.replace(/"/g, '&quot;') + '" data-f="pd" onchange="onHyperProductChange(this)" class="rounded border-gray-300 text-cyan-600"> ' + o + '</label>';
+                        }).join('') +
+                        '</div></details>' +
+                    '<input type="text" data-f="po" name="' + base + 'ProdOther_' + n + '" class="hidden mt-1 w-full border border-gray-300 rounded text-sm p-2" placeholder="ระบุสินค้าอื่นๆ">' +
+                '</div>';
+            }
+            function onHyperProductChange(cb) {
+                const box = cb.closest('[data-prod]');
+                const picked = Array.from(box.querySelectorAll('input[data-f="pd"]:checked')).map(function(x) { return x.value; });
+                box.querySelector('[data-prod-sum]').textContent = picked.length ? picked.join(', ') : '-- เลือกสินค้า (เลือกได้หลายอย่าง) --';
+                const other = box.querySelector('input[data-f="po"]');
+                other.classList.toggle('hidden', picked.indexOf('อื่นๆ') === -1);
+                const card = box.closest('[data-card]');
+                if (card && picked.length) card.classList.remove('ring-2', 'ring-red-400');
+            }
+            function validateHyperProducts(rootSelector) {
+                const cards = Array.from(document.querySelectorAll(rootSelector + ' [data-hu]')).filter(function(c) { return c.querySelector('[data-prod]'); });
+                const bad = cards.filter(function(c) {
+                    const picked = Array.from(c.querySelectorAll('input[data-f="pd"]:checked')).map(function(x) { return x.value; });
+                    if (!picked.length) return true;
+                    return picked.indexOf('อื่นๆ') !== -1 && !c.querySelector('input[data-f="po"]').value.trim();
+                });
+                if (!bad.length) return true;
+                alert('กรุณาเลือกสินค้าที่วางในตู้ให้ครบทุกตู้ (ถ้าเลือก “อื่นๆ” ให้ระบุชื่อสินค้า) — ยังขาด ' + bad.length + ' ตู้:\n' +
+                    bad.slice(0, 15).map(function(c) { return c.querySelector('.hyper-unit-id').textContent; }).join('\n') + (bad.length > 15 ? '\n...' : ''));
+                bad[0].classList.add('ring-2', 'ring-red-400');
+                bad[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return false;
+            }
+
+            // ─── Age + note per unit (shared with the Ac tab) ─────────────────────────────
+            // Year of manufacture / installation dropdown (current year back 35 years + "ไม่ทราบ"), where the
+            // year came from, and a free-text note. Age is calculated and shown; the year is required
+            // (choosing "ไม่ทราบ" counts as an answer).
+            function _hyperYearOptions() {
+                const y = new Date().getFullYear();
+                let h = '<option value="">-- เลือกปีที่ผลิต / ติดตั้ง --</option>';
+                for (let i = y; i >= y - 35; i--) h += '<option value="' + i + '">' + i + ' (อายุ ' + (y - i) + ' ปี)</option>';
+                return h + '<option value="unknown">ไม่ทราบ (Unknown)</option>';
+            }
+            function _hyperYearHtml(base, n) {
+                return '<div class="grid grid-cols-2 gap-2 mb-1">' +
+                    '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ปีที่ผลิต / ติดตั้ง (Installation year) <span class="text-red-500">*</span></label>' +
+                        '<select name="' + base + 'Year_' + n + '" data-f="yr" onchange="onHyperYearChange(this)" class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-cyan-500">' + _hyperYearOptions() + '</select>' +
+                        '<div class="text-[11px] mt-0.5 text-gray-500" data-age></div></div>' +
+                    '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ดูปีจากที่ไหน</label>' +
+                        '<select name="' + base + 'YearSrc_' + n + '" data-f="ys" class="w-full border border-gray-300 rounded text-sm p-2 bg-white">' +
+                            '<option value="">-</option><option value="ป้าย Nameplate">ป้าย Nameplate</option><option value="ทะเบียนทรัพย์สิน">ทะเบียนทรัพย์สิน</option><option value="ประมาณการ">ประมาณการ</option></select></div>' +
+                '</div>';
+            }
+            function _hyperNoteHtml(base, n) {
+                return '<div class="mb-1"><label class="block text-xs font-semibold text-gray-600 mb-1">หมายเหตุ / ข้อสังเกตของตู้ (เครื่อง) นี้</label>' +
+                    '<textarea name="' + base + 'Note_' + n + '" data-f="nt" rows="2" class="w-full border border-gray-300 rounded text-sm p-2" placeholder="เช่น เคยซ่อมคอมเพรสเซอร์ปี 2567, มีเสียงดัง, น้ำแข็งเกาะบ่อย"></textarea></div>';
+            }
+            function onHyperYearChange(sel) {
+                const box = sel.closest('[data-age]') ? null : sel.parentElement.querySelector('[data-age]');
+                const card = sel.closest('[data-card]');
+                const v = parseInt(sel.value, 10);
+                if (box) {
+                    const age = isNaN(v) ? null : (new Date().getFullYear() - v);
+                    box.textContent = age === null ? '' : 'อายุ ≈ ' + age + ' ปี' + (age >= 15 ? ' ⚠️ เก่ามาก' : age >= 10 ? ' · เก่า' : '');
+                    box.style.color = age !== null && age >= 15 ? '#b91c1c' : age !== null && age >= 10 ? '#b45309' : '#6b7280';
+                }
+                if (card && sel.value !== '') card.classList.remove('ring-2', 'ring-red-400');
+                if (card) _hyperFFUpdateScore(card);
+            }
+            function validateHyperAges(rootSelector) {
+                const cards = Array.from(document.querySelectorAll(rootSelector + ' [data-hu], ' + rootSelector + ' [data-hau], ' + rootSelector + ' [data-heu]'));
+                const bad = cards.filter(function(c) { return c.querySelector('[data-f="yr"]').value === ''; });
+                if (!bad.length) return true;
+                alert('กรุณาเลือกปีที่ผลิต / ติดตั้ง ให้ครบทุกตู้ / เครื่อง (ไม่ทราบให้เลือก “ไม่ทราบ”) — ยังขาด ' + bad.length + ' รายการ:\n' +
+                    bad.slice(0, 15).map(function(c) { return c.querySelector('.hyper-unit-id').textContent; }).join('\n') + (bad.length > 15 ? '\n...' : ''));
+                bad[0].classList.add('ring-2', 'ring-red-400');
+                bad[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return false;
+            }
+            // value to submit: '' for unknown / not chosen, else the year
+            function _hyperYearVal(card) {
+                const v = card.querySelector('[data-f="yr"]').value;
+                return v === 'unknown' ? '' : v;
+            }
+            function _hyperRestoreAge(card, u) {
+                const sel = card.querySelector('[data-f="yr"]');
+                const want = u.yrSel !== undefined ? u.yrSel : (u.yr ? String(u.yr) : '');
+                if (want !== '' && Array.from(sel.options).some(function(o) { return o.value === want; })) sel.value = want;
+                onHyperYearChange(sel);
+                const ys = card.querySelector('[data-f="ys"]'); if (u.ys) ys.value = u.ys;
+                const nt = card.querySelector('[data-f="nt"]'); if (u.nt) nt.value = u.nt;
+            }
+
+            // ─── Main-machine register attributes (shared with the Ac tab's Chiller cards) ──────────
+            // Serial / capacity / price / 5-year repair cost + 3 scores (1–5, 5 = worst) that C7 fills per
+            // machine, and the register's replacement score (บทสรุป) shown live. Mirrors _hsFFScore_ in
+            // HyperSurveyEngine.gs; the ratings list comes from the server (HS_FF_RATINGS).
+            const HYPER_FF_KEYS = ['sn', 'cp', 'pn', 'rc', 'se', 'si', 'ss'];
+            function hyperFFScore(u, w) {   // w = category scheme weights (cat.ff.w)
+                const y = parseInt(u.yr, 10);
+                const age = isNaN(y) ? null : Math.max(0, new Date().getFullYear() - y);
+                const ag = age === null ? null : age > 15 ? 5 : age > 10 ? 4 : 3;
+                const rp = (parseFloat(u.rc) || 0) > (parseFloat(u.pn) || 0) ? 5 : 4;
+                if (!w || ag === null) return { rp: rp, ag: ag, total: null };
+                let total = rp * w.rp + ag * w.ag, ok = true;
+                ['se', 'si', 'ss'].forEach(function(k) { if (!w[k]) return; const v = parseInt(u[k], 10) || 0; if (!v) ok = false; total += v * w[k]; });
+                return { rp: rp, ag: ag, total: ok ? Math.round(total * 100) / 100 : null };
+            }
+            function hyperFFBand(t) {
+                return t >= 4.5 ? { color: '#b91c1c', text: 'ควรพิจารณาเปลี่ยน' } : t >= 4 ? { color: '#b45309', text: 'วางแผน / เฝ้าระวัง' } : { color: '#15803d', text: 'ซ่อมบำรุงตามปกติ' };
+            }
+            function _hyperFFHtml(cat, base, n) {
+                if (!cat.ff) return '';
+                const ratings = cat.ff.ratings || [];
+                const fld = function(label, f, type, ph) {
+                    return '<div><label class="block text-xs font-semibold text-gray-600 mb-1">' + label + '</label>' +
+                        '<input type="' + type + '" name="' + base + 'FF' + f + '_' + n + '" data-f="' + f + '"' + (type === 'number' ? ' min="0" step="1" inputmode="numeric"' : '') +
+                        ' oninput="onHyperFFChange(this)" class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-violet-400" placeholder="' + ph + '"></div>';
+                };
+                return '<div class="border border-violet-200 bg-violet-50 rounded-lg p-2 mt-1" data-ff data-w="' + JSON.stringify(cat.ff.w).replace(/"/g, '&quot;') + '">' +
+                    '<p class="text-xs font-bold text-violet-700 mb-2">📋 ข้อมูลทะเบียนเครื่อง &amp; คะแนนประเมินการเปลี่ยน</p>' +
+                    '<div class="grid grid-cols-2 gap-2">' +
+                        fld('Serial No.', 'sn', 'text', 'ดูจากป้าย Nameplate') +
+                        fld('Capacity (ขนาด)', 'cp', 'text', 'เช่น 350 TR, 10 HP, 500 kg/วัน') +
+                        fld('ราคาซื้อใหม่ (บาท) — ถ้าทราบ', 'pn', 'number', 'เช่น 120000') +
+                        fld('ค่าซ่อม 5 ปีย้อนหลัง (บาท) — ถ้าทราบ', 'rc', 'number', 'เช่น 35000') +
+                    '</div>' +
+                    ratings.map(function(r) {
+                        return '<div class="mt-2"><label class="block text-xs font-semibold text-gray-600 mb-1">' + r.label + ' <span class="text-red-500">*</span></label>' +
+                            '<select name="' + base + 'FF' + r.k + '_' + n + '" data-f="' + r.k + '" onchange="onHyperFFChange(this)" class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-violet-400">' +
+                            '<option value="">-- เลือก 1–5 (5 = แย่ที่สุด) --</option>' +
+                            r.opts.map(function(o, i) { return '<option value="' + (i + 1) + '">' + (i + 1) + ' — ' + o + '</option>'; }).join('') +
+                            '</select></div>';
+                    }).join('') +
+                    '<div class="mt-2 text-xs font-semibold" data-ff-score></div>' +
+                '</div>';
+            }
+            function _hyperFFCollect(card) {
+                const o = {};
+                if (!card.querySelector('[data-ff]')) return o;
+                HYPER_FF_KEYS.forEach(function(f) { const el = card.querySelector('[data-ff] [data-f="' + f + '"]'); o[f] = el ? el.value.trim() : ''; });
+                return o;
+            }
+            function _hyperFFUpdateScore(card) {
+                const box = card.querySelector('[data-ff-score]');
+                if (!box) return;
+                const u = Object.assign(_hyperFFCollect(card), { yr: _hyperYearVal(card) });
+                let w = null;
+                try { w = JSON.parse(card.querySelector('[data-ff]').dataset.w); } catch (e) {}
+                const sc = hyperFFScore(u, w);
+                if (sc.total === null) { box.innerHTML = '<span class="text-gray-500 font-normal">คะแนนรวม (บทสรุป): เลือกปีที่ติดตั้ง + ให้คะแนนให้ครบทุกข้อ</span>'; return; }
+                const b = hyperFFBand(sc.total);
+                box.innerHTML = 'คะแนนรวม (บทสรุป): <b style="color:' + b.color + '">' + sc.total.toFixed(2) + ' — ' + b.text + '</b>' +
+                    ' <span class="text-gray-500 font-normal">(สัดส่วนซ่อม ' + sc.rp + ' · อายุ ' + sc.ag + ')</span>';
+            }
+            function onHyperFFChange(el) {
+                const card = el.closest('[data-card]');
+                if (!card) return;
+                _hyperFFUpdateScore(card);
+                if (el.tagName === 'SELECT' && el.value) card.classList.remove('ring-2', 'ring-red-400');
+            }
+            function _hyperFFRestore(card, u) {
+                if (!card.querySelector('[data-ff]')) return;
+                HYPER_FF_KEYS.forEach(function(f) {
+                    const el = card.querySelector('[data-ff] [data-f="' + f + '"]');
+                    if (el && u[f] !== undefined && u[f] !== null && u[f] !== '') el.value = u[f];
+                });
+                _hyperFFUpdateScore(card);
+            }
+            // The 3 scores are required on every card that has the block (serial / capacity / prices are optional)
+            function validateHyperFF(rootSelector) {
+                const cards = Array.from(document.querySelectorAll(rootSelector + ' [data-card]')).filter(function(c) { return c.querySelector('[data-ff]'); });
+                const bad = cards.filter(function(c) { return Array.from(c.querySelectorAll('[data-ff] select')).some(function(el) { return !el.value; }); });
+                if (!bad.length) return true;
+                alert('กรุณาให้คะแนนประเมิน (ผลกระทบสาขา / ความเสี่ยงอะไหล่ ฯลฯ) ให้ครบทุกเครื่อง — ยังขาด ' + bad.length + ' รายการ:\n' +
+                    bad.slice(0, 15).map(function(c) { return c.querySelector('.hyper-unit-id').textContent; }).join('\n') + (bad.length > 15 ? '\n...' : ''));
+                bad[0].classList.add('ring-2', 'ring-red-400');
+                bad[0].querySelector('[data-ff]').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return false;
+            }
+
+            function _hyperUnitCardHtml(cat, size, n) {
+                const base = _hyperUnitBase(cat.id, size.sizeKey);
+                const pk = _hyperUnitPk(cat.id, size.sizeKey, n);
+                const label = cat.title.replace(/\s*\(.*$/, '') + ' [' + size.label + '] #' + n;
+                const assetId = 'aiFormHyper_' + base + '_' + n;
+                const ctrlPh = cat.tempRange ? 'เกณฑ์ ' + hyperTempRangeText(cat.tempRange) : (cat.group === 'pos' || cat.id === 'posColdRoom') ? 'เช่น 3.0' : 'เช่น -18';
+                const irPh = cat.group === 'pos' ? 'เช่น 5.5' : 'เช่น -15';
+                return '' +
+                '<div class="hyper-unit-card border border-cyan-200 rounded-lg overflow-hidden shadow-sm bg-white" data-card data-hu data-cat="' + cat.id + '" data-size="' + size.sizeKey + '" data-n="' + n + '" data-pk="' + pk + '" data-label="' + label.replace(/"/g, '&quot;') + '">' +
+                    '<div class="bg-cyan-600 text-white px-3 py-2 flex items-center justify-between gap-2 min-h-[38px]">' +
+                        '<span class="font-bold text-sm">' + label + '</span>' +
+                        '<div class="flex items-center gap-2">' +
+                            '<span class="text-xs font-mono text-cyan-100 hyper-unit-id">-</span>' +
+                            '<button type="button" onclick="showQrModal(this.closest(\'[data-hu]\').querySelector(\'.hyper-unit-id\').textContent, this.closest(\'[data-hu]\').dataset.label)" class="flex items-center gap-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2 py-1 rounded text-xs shadow-sm">QR</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="p-3 space-y-2">' +
+                        _hyperBrandHtml('ref', base + 'Brand_' + n) +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">รุ่น / สเปคเพิ่มเติม (Model / Spec)</label>' +
+                            '<input type="text" name="' + base + 'Spec_' + n + '" data-f="sp" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="เช่น รุ่น, ความยาวจริง, จำนวนชั้น/ประตู ที่ต่างจากขนาดที่เลือก">' +
+                        '</div>' +
+                        _hyperProductHtml(cat, base, n) +
+                        _hyperYearHtml(base, n) +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">Asset No. (ถ้ามี)</label>' +
+                            '<div class="flex gap-1">' +
+                                '<input id="' + assetId + '" type="text" name="' + base + 'AssetNo_' + n + '" data-f="as" onblur="_confirmManualAssetEntry(this)" class="w-full border border-gray-300 rounded text-sm p-2 bg-gray-50 focus:ring-1 focus:ring-cyan-500" placeholder="ระบุ Asset No. หรือกด 🔗 เลือกจากทะเบียน">' +
+                                '<button type="button" onclick="openAssetMapPicker(_hyperRefBranchCode(), \'' + assetId + '\')" class="shrink-0 px-2 border border-cyan-300 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 rounded text-xs" title="เลือกจากทะเบียนทรัพย์สิน">🔗</button>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div>' +
+                            '<label class="block text-xs font-semibold text-gray-600 mb-1">สถานะการใช้งาน</label>' +
+                            '<div class="flex gap-2 mt-1">' +
+                                '<label id="rfSt_use_' + base + '_' + n + '" onclick="_refStatus(\'' + base + '\',' + n + ',true)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-green-100 border-green-400 text-green-700 transition-colors">' +
+                                    '<input type="radio" name="' + base + 'Status_' + n + '" value="ใช้งาน" checked class="hidden">✓ ใช้งาน</label>' +
+                                '<label id="rfSt_no_' + base + '_' + n + '" onclick="_refStatus(\'' + base + '\',' + n + ',false)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer text-xs font-semibold bg-white border-gray-300 text-gray-500 transition-colors">' +
+                                    '<input type="radio" name="' + base + 'Status_' + n + '" value="ไม่ใช้งาน" class="hidden">✗ ไม่ใช้งาน</label>' +
+                            '</div>' +
+                        '</div>' +
+                        condRatingRow(base + 'CondRating_' + n) +
+                        (cat.hasTemp ? _hyperTempBlockHtml(cat, base, n, ctrlPh) : '') +
+                        _hyperFFHtml(cat, base, n) +
+                        (_userIsTechTeam ?
+                        '<div class="bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1">' +
+                            '<label class="block text-xs text-amber-700 font-semibold mb-1">🔧 กระแสไฟ (A) <span class="font-normal text-amber-500">(เฉพาะช่าง)</span></label>' +
+                            '<input type="number" step="0.01" name="' + base + 'Amps_' + n + '" data-f="am" class="w-full border border-gray-300 rounded text-sm p-2 bg-white focus:ring-1 focus:ring-amber-400" placeholder="A">' +
+                        '</div>' : '') +
+                        _hyperNoteHtml(base, n) +
+                        photoUpload(label, pk) +
+                    '</div>' +
+                '</div>';
+            }
+
+            function checkHyperUnitTemp(input) {
+                const box = input.closest('[data-temp-unit]');
+                const cmp = parseInt(box.dataset.cmp, 10) || 0;
+                const num = function(f) { const v = parseFloat(box.querySelector('[data-f="' + f + '"]').value); return isNaN(v) ? null : v; };
+                const ctrl = num('ct'), ref = num('t' + (cmp + 1));
+                const warn = box.querySelector('[data-unit-warn]');
+                const bad = ctrl !== null && ref !== null && Math.abs(ctrl - ref) > 3;
+                warn.textContent = bad ? '⚠️ จุดอ้างอิง (จุดที่ ' + (cmp + 1) + ') ต่างจาก Controller ' + Math.abs(ctrl - ref).toFixed(1) + '°C — Controller/Sensor อาจคลาดเคลื่อน กรุณาตรวจสอบ และแจ้งในข้อ 10 หากผิดปกติ' : '';
+                warn.classList.toggle('hidden', !bad);
+                // Per-type guideline (cat.tempRange) — flag every reading outside it, except noRange points
+                const rangeEl = box.querySelector('[data-unit-range]');
+                if (box.dataset.tmax !== undefined) {
+                    const rg = { min: box.dataset.tmin === '' ? null : parseFloat(box.dataset.tmin), max: box.dataset.tmax === '' ? null : parseFloat(box.dataset.tmax) };
+                    const out = [];
+                    ['ct', 't1', 't2', 't3'].forEach(function(f, i) {
+                        const el = box.querySelector('[data-f="' + f + '"]');
+                        if (!el) return;
+                        const v = num(f);
+                        const bad = v !== null && (i === 0 || box.dataset.norange.indexOf(String(i)) === -1) && hyperTempOutOfRange(v, rg);
+                        el.classList.toggle('bg-red-50', bad);
+                        el.classList.toggle('border-red-500', bad);
+                        if (bad) out.push((i === 0 ? 'Controller' : 'จุดที่ ' + i) + ' ' + v + '°C');
+                    });
+                    rangeEl.textContent = out.length ? '🚨 นอกเกณฑ์ ' + hyperTempRangeText(rg) + ': ' + out.join(', ') + ' — กรุณาตรวจสอบตู้ / แจ้งในหมายเหตุ' : '';
+                    rangeEl.classList.toggle('hidden', !out.length);
+                }
+                const vals = [num('t1'), num('t2'), num('t3')].filter(function(v) { return v !== null; });
+                const sp = box.querySelector('[data-unit-spread]');
+                if (vals.length >= 2) { sp.textContent = 'การกระจายอุณหภูมิ 3 จุด: ต่ำสุด ' + Math.min.apply(null, vals) + ' · สูงสุด ' + Math.max.apply(null, vals) + ' · ต่าง ' + (Math.max.apply(null, vals) - Math.min.apply(null, vals)).toFixed(1) + '°C'; sp.classList.remove('hidden'); }
+                else sp.classList.add('hidden');
+            }
+
+            function _hyperCardHasData(card) {
+                const typed = Array.from(card.querySelectorAll('input[type="text"], input[type="number"]')).some(function(el) { return el.value.trim() !== ''; });
+                const photos = (_accumulatedFiles[card.dataset.pk] || []).filter(Boolean).length > 0;
+                const rated = card.querySelector('input[name*="CondRating"]').getAttribute('data-confirmed') === '1';
+                return typed || photos || rated;
+            }
+
+            function _hyperRemoveCard(card) {
+                delete _accumulatedFiles[card.dataset.pk];
+                card.remove();
+            }
+
+            // Make the number of cards under each size match its count input.
+            function syncHyperRefUnits(catId) {
+                const form = document.getElementById('hyper-ref-form');
+                const cat = _hyperUnitCats().find(function(c) { return c.id === catId; });
+                cat.sizes.forEach(function(sz) {
+                    const input = form.elements[sz.key];
+                    let want = Math.max(0, parseInt(input.value, 10) || 0);
+                    if (want > HYPER_UNIT_MAX_PER_SIZE) { want = HYPER_UNIT_MAX_PER_SIZE; input.value = want; }
+                    const group = document.getElementById('hyper-ref-ug-' + catId + '-' + sz.sizeKey);
+                    let cards = group.querySelectorAll('[data-hu]');
+                    // Removing cards that already hold data needs a confirmation — revert the count if declined
+                    if (want < cards.length) {
+                        const doomed = Array.from(cards).slice(want);
+                        if (doomed.some(_hyperCardHasData) && !confirm('ลดจำนวนตู้ [' + sz.label + '] — การ์ดตู้ที่ถูกลบมีข้อมูลที่กรอกไว้แล้ว ยืนยันลบหรือไม่?')) {
+                            input.value = cards.length;
+                            return;
+                        }
+                        doomed.forEach(_hyperRemoveCard);
+                    }
+                    cards = group.querySelectorAll('[data-hu]');
+                    for (let n = cards.length + 1; n <= want; n++) group.insertAdjacentHTML('beforeend', _hyperUnitCardHtml(cat, sz, n));
+                    group.classList.toggle('hidden', want === 0);
+                    let head = group.querySelector('[data-ug-head]');
+                    if (want > 0) {
+                        if (!head) { group.insertAdjacentHTML('afterbegin', '<p data-ug-head class="text-xs font-bold text-gray-600"></p>'); head = group.querySelector('[data-ug-head]'); }
+                        head.textContent = '▼ ' + sz.label + ' — ' + want + ' ' + _hyperUnitWord(cat);
+                    } else if (head) head.remove();
+                });
+                renumberHyperRefIds(catId);
+                if (!document.getElementById('hyper-pin-editor').classList.contains('hidden')) refreshHyperPinEditor();
+            }
+
+            function onHyperRefCountInput(catId) {
+                _ensureHyperBrandOptions();
+                updateHyperRefTotals();
+                syncHyperRefUnits(catId);
+            }
+
+            // Equipment ID = <branch code>-<type prefix><NN>, NN running across the sizes of one type
+            function renumberHyperRefIds(onlyCatId) {
+                const code = _hyperRefBranchCode() || '[Branch]';
+                _hyperUnitCats().forEach(function(cat) {
+                    if (onlyCatId && cat.id !== onlyCatId) return;
+                    let idx = 0;
+                    document.querySelectorAll('#hyper-ref-units-' + cat.id + ' [data-hu]').forEach(function(card) {
+                        idx++;
+                        card.querySelector('.hyper-unit-id').textContent = code + '-' + cat.eqPrefix + (idx < 10 ? '0' + idx : idx);
+                    });
+                });
+                if (document.getElementById('hyper-pin-editor') && !document.getElementById('hyper-pin-editor').classList.contains('hidden')) refreshHyperPinEditor();
+            }
+
+            function _hyperUnitVal(card, f) {
+                const el = card.querySelector('[data-f="' + f + '"]');
+                return el ? el.value : '';
+            }
+
+            // All cards → the array stored in Units_JSON (short keys, see HyperSurveyEngine.gs)
+            function collectHyperRefUnits() {
+                const units = [];
+                _hyperUnitCats().forEach(function(cat) {
+                    document.querySelectorAll('#hyper-ref-units-' + cat.id + ' [data-hu]').forEach(function(card) {
+                        const rating = card.querySelector('input[name*="CondRating"]');
+                        const statusEl = card.querySelector('input[type="radio"]:checked');
+                        units.push(Object.assign(_hyperFFCollect(card), {
+                            c: cat.id, s: card.dataset.size, n: parseInt(card.dataset.n, 10),
+                            id: card.querySelector('.hyper-unit-id').textContent,
+                            pd: Array.from(card.querySelectorAll('input[data-f="pd"]:checked')).map(function(x) { return x.value; }), po: _hyperUnitVal(card, 'po'),
+                            yr: _hyperYearVal(card), yrSel: card.querySelector('[data-f="yr"]').value, ys: _hyperUnitVal(card, 'ys'), nt: _hyperUnitVal(card, 'nt'),
+                            br: _hyperUnitVal(card, 'br'),
+                            sp: _hyperUnitVal(card, 'sp'), as: _hyperUnitVal(card, 'as'),
+                            st: statusEl ? statusEl.value : 'ใช้งาน',
+                            cr: rating.getAttribute('data-confirmed') === '1' ? rating.value : '',
+                            ct: _hyperUnitVal(card, 'ct'), t1: _hyperUnitVal(card, 't1'), t2: _hyperUnitVal(card, 't2'), t3: _hyperUnitVal(card, 't3'),
+                            mt: _hyperUnitVal(card, 't' + ((cat.tpCmp || 0) + 1)), am: _hyperUnitVal(card, 'am'),
+                            pk: card.dataset.pk
+                        }));
+                    });
+                });
+                return units;
+            }
+
+            // Draft restore: set the counts, build the cards, then pour the saved values in
+            function restoreHyperRefUnits(units) {
+                const form = document.getElementById('hyper-ref-form');
+                const counts = {};
+                (units || []).forEach(function(u) { const k = u.c + '|' + u.s; counts[k] = (counts[k] || 0) + 1; });
+                _hyperUnitCats().forEach(function(cat) {
+                    cat.sizes.forEach(function(sz) { form.elements[sz.key].value = counts[cat.id + '|' + sz.sizeKey] || 0; });
+                    syncHyperRefUnits(cat.id);
+                });
+                (units || []).forEach(function(u) {
+                    const card = document.querySelector('[data-hu][data-pk="' + _hyperUnitPk(u.c, u.s, u.n) + '"]');
+                    if (!card) return;
+                    const base = _hyperUnitBase(u.c, u.s);
+                    const setv = function(sel, v) { const el = card.querySelector(sel); if (el && v !== '' && v != null) el.value = v; };
+                    setv('[data-f="br"]', u.br);
+                    (u.pd || []).forEach(function(v) {
+                        const cb = Array.from(card.querySelectorAll('input[data-f="pd"]')).find(function(x) { return x.value === v; });
+                        if (cb) { cb.checked = true; onHyperProductChange(cb); }
+                    });
+                    setv('[data-f="po"]', u.po);
+                    _hyperRestoreAge(card, u);
+                    _hyperFFRestore(card, u);
+                    setv('[data-f="sp"]', u.sp); setv('[data-f="as"]', u.as);
+                    const asset = card.querySelector('[data-f="as"]');
+                    if (asset && asset.value) asset.dataset.confirmedManual = asset.value;
+                    setv('[data-f="ct"]', u.ct); setv('[data-f="t1"]', u.t1); setv('[data-f="t2"]', u.t2); setv('[data-f="t3"]', u.t3); setv('[data-f="am"]', u.am);
+                    _refStatus(base, u.n, u.st !== 'ไม่ใช้งาน');
+                    if (u.cr !== '' && u.cr != null) setCondRating(base + 'CondRating_' + u.n, parseInt(u.cr, 10));
+                    const ct = card.querySelector('[data-f="ct"]');
+                    if (ct) checkHyperUnitTemp(ct);
+                });
+                updateHyperRefTotals();
+            }
+
+            function _hyperMissingUnitPhotos() {
+                const missing = [];
+                document.querySelectorAll('#content-hyper-ref-survey [data-hu]').forEach(function(card) {
+                    if (!(_accumulatedFiles[card.dataset.pk] || []).filter(Boolean).length) {
+                        missing.push(card.querySelector('.hyper-unit-id').textContent + ' (' + card.dataset.label + ')');
+                    }
+                });
+                return missing;
+            }
+
+            // Flag a controller-vs-measured gap > 3°C right where it was typed (the report
+            // flags it too), so the surveyor can re-check the reading on the spot.
+            function checkHyperRefTempPair(input) {
+                const pair = input.closest('[data-temp-pair]');
+                const warn = pair.parentElement.querySelector('[data-temp-warn]');
+                const ins = pair.querySelectorAll('input');
+                const ctrl = parseFloat(ins[0].value), meas = parseFloat(ins[1].value);
+                const bad = !isNaN(ctrl) && !isNaN(meas) && Math.abs(ctrl - meas) > 3;
+                warn.textContent = bad ? '⚠️ ค่าที่วัดได้ต่างจาก Controller ' + Math.abs(ctrl - meas).toFixed(1) + '°C — Controller/Sensor อาจคลาดเคลื่อน กรุณาตรวจสอบ และแจ้งในข้อ 5 หากผิดปกติ' : '';
+                warn.classList.toggle('hidden', !bad);
+            }
+
+            function toggleHyperRefBroken(show) {
+                document.getElementById('hyper-ref-broken-section').classList.toggle('hidden', !show);
+            }
+
+            // --- Branch search: big-format store list from the Excel, enriched with
+            // DM/CM/AMM from the main store DB (globalStoreData) when the code matches.
+            // That DB may key Hyper stores by the 6-digit code or the 5-digit form
+            // without the leading "1" (111101 → 11101), so both are tried.
+            function _hyperRefStoreLabel(s) {
+                const names = [s[2], s[1]].filter(Boolean).join(' / ');
+                return s[0] + ' ' + names + ' · ' + s[3];
+            }
+
+            function _hyperRefFindStoreDb(code) {
+                if (typeof globalStoreData === 'undefined' || !globalStoreData) return null;
+                // Match the store DB's Oracle (6-digit) column. Never strip the leading "1" to get the gold code —
+                // they differ from ~11220 (111236 is Ban Phai = gold 11230; gold 11236 is Nam Yuen). A Pure store can
+                // share the Oracle code, so prefer the Hyper/BMK row (gold code starting with "1").
+                const hits = globalStoreData.filter(function(x) { return String(x.oracle || '').trim() === code || String(x.id || '').trim() === code; });
+                return hits.find(function(x) { return String(x.id || '').charAt(0) === '1'; }) || hits[0] || null;
+            }
+
+            function _applyHyperRefStore(s) {
+                const form = document.getElementById('hyper-ref-form');
+                form.branchCode.value = s[0];
+                form.branchName.value = s[2] || s[1];
+                form.storeFormat.value = s[3] || '';
+                form.region.value = s[4] || '';
+                const db = _hyperRefFindStoreDb(s[0]);
+                form.ammMtn.value = db ? (db.ammMtn || '') : '';
+                form.dmArea.value = db ? (db.dmName || '') : '';
+                form.cmArea.value = db ? (db.cmName || '') : '';
+                if (db && db.dmEmail && !form.ccEmail1.value) form.ccEmail1.value = db.dmEmail;
+                if (db && db.cmEmail && !form.ccEmail2.value) form.ccEmail2.value = db.cmEmail;
+                // Pre-select the refrigerant already on record in the PM price sheet —
+                // the surveyor confirms or corrects it from the nameplate.
+                if (s[5] && !form.refrigerant.value) {
+                    const opt = Array.from(form.refrigerant.options).find(function(o) { return o.value.toLowerCase() === String(s[5]).toLowerCase(); });
+                    if (opt) form.refrigerant.value = opt.value;
+                }
+                const badge = document.getElementById('hyper-ref-store-badge');
+                badge.innerHTML = '<span class="inline-flex flex-wrap gap-1">' +
+                    '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">' + (s[3] || '-') + '</span>' +
+                    (s[4] ? '<span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">' + s[4] + '</span>' : '') +
+                    (s[5] ? '<span class="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700">น้ำยาเดิม: ' + s[5] + '</span>' : '') +
+                    '</span>';
+                badge.classList.remove('hidden');
+                document.getElementById('hyper-ref-rest-form').classList.remove('hidden');
+                renumberHyperRefIds();
+                if (typeof sdsCheck === 'function') sdsCheck('hyperRef');
+            }
+
+            function _clearHyperRefStore() {
+                const form = document.getElementById('hyper-ref-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('hyper-ref-store-badge').classList.add('hidden');
+                document.getElementById('hyper-ref-rest-form').classList.add('hidden');
+                renumberHyperRefIds();
+            }
+
+            function handleHyperRefStationInput(input) {
+                const val = input.value.toLowerCase().trim();
+                const dropdown = document.getElementById('hyper-ref-station-dropdown');
+                if (val.length < 1) { dropdown.classList.add('hidden'); dropdown.innerHTML = ''; _clearHyperRefStore(); return; }
+                const matches = HYPER_REF_STORES.filter(function(s) { return _hyperRefStoreLabel(s).toLowerCase().indexOf(val) !== -1; });
+                renderStationDropdown('hyper-ref-station-dropdown', matches.map(_hyperRefStoreLabel), function(selected) {
+                    input.value = selected;
+                    const s = HYPER_REF_STORES.find(function(x) { return _hyperRefStoreLabel(x) === selected; });
+                    if (s) _applyHyperRefStore(s);
+                });
+                const exact = HYPER_REF_STORES.find(function(s) { return _hyperRefStoreLabel(s).toLowerCase() === val || s[0] === val; });
+                if (exact) _applyHyperRefStore(exact); else _clearHyperRefStore();
+            }
+
+            document.addEventListener('click', function(e) {
+                const d = document.getElementById('hyper-ref-station-dropdown');
+                if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden');
+            });
+
+            // --- Local draft (same idea as the Ref tab's Save Draft: stays on this device) ---
+            function _hyperRefCollectFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+                    if (el.name.indexOf('hu_') === 0) return; // per-cabinet inputs travel in unitsJson instead
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+
+                        // Draft object shared by the on-device draft and the server draft (SurveyDraftStore.gs)
+            function _buildHyperRefDraft() {
+                const form = document.getElementById('hyper-ref-form');
+                return { savedAt: new Date().toISOString(), search: document.getElementById('hyper-ref-station-search').value, fields: _hyperRefCollectFields(form), units: collectHyperRefUnits(), pins: collectHyperPins() };
+            }
+
+            function saveHyperRefDraft() {
+                const form = document.getElementById('hyper-ref-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                const draft = { savedAt: new Date().toISOString(), search: document.getElementById('hyper-ref-station-search').value, fields: _hyperRefCollectFields(form), units: collectHyperRefUnits(), pins: collectHyperPins() };
+                try {
+                    localStorage.setItem(HYPER_REF_DRAFT_KEY, JSON.stringify(draft));
+                    if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (Hyper Ref Survey)');
+                } catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('hyperRef', null);
+            }
+
+            function _readHyperRefDraft() {
+                try { return JSON.parse(localStorage.getItem(HYPER_REF_DRAFT_KEY) || 'null'); } catch (e) { return null; }
+            }
+
+            function checkHyperRefDraft() {
+                _ensureHyperBrandOptions();
+                const draft = _readHyperRefDraft();
+                const banner = document.getElementById('hyper-ref-draft-banner');
+                if (!draft || !draft.fields) { banner.classList.add('hidden'); return; }
+                document.getElementById('hyper-ref-draft-info').textContent =
+                    (draft.fields.branchCode || '') + ' ' + (draft.fields.branchName || '') + ' · ' + new Date(draft.savedAt).toLocaleString('en-GB');
+                banner.classList.remove('hidden');
+            }
+
+            function restoreHyperRefDraft(fromServer) {
+                const draft = fromServer || _readHyperRefDraft();
+                if (!draft) return;
+                const form = document.getElementById('hyper-ref-form');
+                const s = HYPER_REF_STORES.find(function(x) { return x[0] === draft.fields.branchCode; });
+                if (s) { document.getElementById('hyper-ref-station-search').value = draft.search || _hyperRefStoreLabel(s); _applyHyperRefStore(s); }
+                Object.keys(draft.fields).forEach(function(name) {
+                    const el = form.elements[name];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList || (el.length && el[0] && el[0].type === 'radio')) {
+                        Array.from(el).forEach(function(r) { r.checked = r.value === draft.fields[name]; });
+                    } else {
+                        el.value = draft.fields[name];
+                        if (el.dataset && el.dataset.hyperCat) el.dataset.touched = '1';
+                    }
+                });
+                toggleHyperRefBroken(draft.fields.hasBroken === 'Yes');
+                restoreHyperRefUnits(draft.units || []);
+                Object.keys(HYPER_PINS).forEach(function(k) { delete HYPER_PINS[k]; });
+                (draft.pins || []).forEach(function(p) { HYPER_PINS[p.pk] = { x: p.x, y: p.y }; });
+                renderHyperPins();
+                updateHyperRefTotals();
+                document.querySelectorAll('#content-hyper-ref-survey [data-temp-pair] input').forEach(checkHyperRefTempPair);
+                document.getElementById('hyper-ref-draft-banner').classList.add('hidden');
+            }
+
+            function discardHyperRefDraft() {
+                if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return;
+                try { localStorage.removeItem(HYPER_REF_DRAFT_KEY); } catch (e) {}
+                checkHyperRefDraft();
+            }
+
+            function resetHyperRefForm(askFirst) {
+                if (askFirst && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('hyperRef');
+                const form = document.getElementById('hyper-ref-form');
+                const reporterName = form.reporterName.value, reporterPhone = form.reporterPhone.value;
+                form.reset();
+                // Keep the logged-in reporter's name/phone — they were pre-filled from the profile
+                form.reporterName.value = reporterName;
+                form.reporterPhone.value = reporterPhone;
+                form.querySelectorAll('[data-hyper-cat]').forEach(function(el) { delete el.dataset.touched; });
+                form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(inp) { delete _accumulatedFiles[inp.dataset.categoryUpload]; });
+                _hyperUnitCats().forEach(function(cat) {
+                    cat.sizes.forEach(function(sz) { const g = document.getElementById('hyper-ref-ug-' + cat.id + '-' + sz.sizeKey); g.innerHTML = ''; g.classList.add('hidden'); });
+                });
+                Object.keys(HYPER_PINS).forEach(function(k) { delete HYPER_PINS[k]; });
+                document.getElementById('hyper-pin-editor').classList.add('hidden');
+                renderHyperPins();
+                document.querySelectorAll('#content-hyper-ref-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                document.getElementById('hyper-ref-station-search').value = '';
+                toggleHyperRefBroken(false);
+                document.querySelectorAll('#content-hyper-ref-survey [data-temp-warn]').forEach(function(el) { el.classList.add('hidden'); });
+                _clearHyperRefStore();
+                updateHyperRefTotals();
+            }
+
+            // --- Submit ---
+            async function handleHyperRefSurveySubmit(e) {
+                e.preventDefault();
+                const form = e.target;
+                if (!form.reporterName.value.trim()) { alert("กรุณากรอกชื่อผู้แจ้ง (Reporter) ก่อนกดยืนยัน"); form.reporterName.focus(); return; }
+                if (!form.reporterPhone.value.trim()) { alert("กรุณากรอกเบอร์โทรศัพท์ผู้แจ้ง (Phone) ก่อนกดยืนยัน"); form.reporterPhone.focus(); return; }
+                if (!form.branchCode.value || !form.branchName.value) { alert("กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน (Please select a valid Branch first)"); return; }
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุตู้ที่ชำรุดและอาการ'); form.brokenDetail.focus(); return; }
+
+                // Same checks as the Ref Survey: every cabinet's condition rating must be tapped,
+                // and (unless an admin switched it off) every cabinet needs a photo.
+                if (!validateHyperBrands('ref', '#content-hyper-ref-survey')) return;
+                if (!validateHyperProducts('#content-hyper-ref-survey')) return;
+                if (!validateHyperAges('#content-hyper-ref-survey')) return;
+                if (!validateHyperFF('#content-hyper-ref-survey')) return;
+                if (!validateCondRatings(form)) return;
+                if (_equipmentPhotoRequired.hyperRef) {
+                    const missingPhotos = _hyperMissingUnitPhotos();
+                    if (missingPhotos.length > 0) {
+                        alert('กรุณาแนบรูปถ่ายให้ครบทุกตู้ก่อนกดยืนยัน — ยังขาดรูปของ ' + missingPhotos.length + ' ตู้:\n' + missingPhotos.slice(0, 15).join('\n') + (missingPhotos.length > 15 ? '\n...' : ''));
+                        return;
+                    }
+                }
+
+                const anyMeasured = Array.from(form.querySelectorAll('[data-temp-pair] input[name*="MeasTemp"], .hu-ir')).some(function(el) { return el.value !== ''; });
+                if (anyMeasured && !form.tempInstrument.value) {
+                    alert('กรุณาเลือกเครื่องมือวัดอุณหภูมิที่ใช้ (เช่น Temp Gun)');
+                    form.tempInstrument.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    form.tempInstrument.focus();
+                    return;
+                }
+
+                const totals = updateHyperRefTotals();
+                if (totals.pos + totals.neg === 0 && !confirm('⚠️ ยังไม่ได้กรอกจำนวนตู้แช่เลย (รวม 0 ตู้)\n\nยืนยันส่งข้อมูลหรือไม่?')) return;
+
+                // Stainless cabinets sit in the stock room/kitchen, not the sales floor —
+                // same "easy to miss" confirmation as the Ref tab's ตู้ 4 ประตู Stainless.
+                const ssCat = HYPER_REF_CONFIG.categories.find(function(c) { return c.id === 'negStainless'; });
+                if (ssCat) {
+                    const ssInputs = ssCat.sizes.map(function(s) { return form.elements[s.key]; });
+                    const touched = ssInputs.some(function(el) { return el.dataset.touched === '1'; });
+                    if (!touched) {
+                        const ok = confirm('⚠️ กรุณายืนยัน\n\nคุณยังไม่ได้ระบุจำนวน "Plug-In แบบ Stainless Steel"\n\n📦 ตู้นี้มักอยู่ที่ห้องสต๊อก / ครัว ไม่ใช่หน้าร้าน\n\nยืนยันหรือไม่ว่าสาขานี้ไม่มีตู้ประเภทนี้จริง?\n\nกด Cancel เพื่อกลับไปกรอกจำนวน');
+                        if (!ok) { ssInputs[0].scrollIntoView({ behavior: 'smooth', block: 'center' }); ssInputs[0].focus(); return; }
+                        ssInputs.forEach(function(el) { el.dataset.touched = '1'; });
+                    }
+                }
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    // Compress + collect photos (same pipeline as the other survey tabs)
+                    const tasks = [];
+                    const seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('HREF', form.branchCode.value, tasks, function(cat) { return cat === 'hyp_layout' ? [1600, 1600, 0.72] : [800, 800, 0.60]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+
+                    const data = _hyperRefCollectFields(form);
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('hyperRef');
+                    data.unitsJson = JSON.stringify(collectHyperRefUnits());
+                    data.pinsJson = JSON.stringify(collectHyperPins());
+
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) {
+                                showSuccess(); sdsReset('hyperRef');
+                                try { localStorage.removeItem(HYPER_REF_DRAFT_KEY); } catch (e2) {}
+                                checkHyperRefDraft();
+                                resetHyperRefForm(false);
+                            } else {
+                                alert('Error: ' + (res && res.error));
+                            }
+                        })
+                        .withFailureHandler(function(err) {
+                            hideLoading();
+                            alert('Server Error: ' + err.message);
+                        })
+                        .processHyperRefSurveyForm(data);
+                } catch (err) {
+                    hideLoading();
+                    alert('Error processing form: ' + err.message);
+                }
+            }
+        </script>

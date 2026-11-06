@@ -6,8 +6,9 @@
      include itself when evaluated. Injects its own trigger button next to
      #access-level-display; stays hidden until the host page calls
      window.__dupSetSuperAdmin(true) — Super Admin (isAdmin) always, plus
-     System Admin (isSysAdmin) only when a Super Admin has turned on the
-     SYSADMIN_DUP_CLEANUP_ENABLED_V1 toggle (flags.sysAdminDedupAllowed).
+     System Admin (isSysAdmin) or SMF Team (isSMF) only when a Super Admin
+     has turned on their respective toggle (SYSADMIN_DUP_CLEANUP_ENABLED_V1 /
+     SMF_DUP_CLEANUP_ENABLED_V1 — flags.sysAdminDedupAllowed / flags.smfDedupAllowed).
      Never isScheduleAdmin — this is a destructive action. Host page must
      define DUP_TYPE_KEY ('ref'|'aircon'|'edmi'|'layout'|'hours') and
      DUP_TYPE_LABEL (display name) before this include. Backend: DuplicateCleanup.gs

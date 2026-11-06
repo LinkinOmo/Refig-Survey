@@ -291,108 +291,14 @@ function updateSafetyIncident(form) {
 }
 
 // Helper functions for email
-function getEmployeeEmail(empId) {
-    try {
-        var sheet = findEmployeeSheet();
-        var data = sheet.getDataRange().getValues();
-        
-        for (var i = 1; i < data.length; i++) {
-            if (String(data[i][1]).trim() === String(empId).trim()) { // Col 1 is EmpID
-                return data[i][6]; // Col 6 is Email
-            }
-        }
-        return null;
-    } catch (e) {
-        console.warn("getEmployeeEmail Error: " + e.toString());
-        return null;
-    }
-}
+// getEmployeeEmail() lives in Code01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.
 
-function getManagerEmailForEmployee(empId) {
-    try {
-        var sheet = findEmployeeSheet();
-        var data = sheet.getDataRange().getValues();
-        
-        // 1. Find the Employee's Manager Name
-        var managerName = "";
-        for (var i = 1; i < data.length; i++) {
-            if (String(data[i][1]).trim() === String(empId).trim()) { // Col 1 is EmpID
-                managerName = data[i][4]; // Col 4 is Manager Name
-                break;
-            }
-        }
-        
-        if (!managerName) return null;
-        
-        // 2. Find Manager's Email by Name
-        for (var i = 1; i < data.length; i++) {
-            if (String(data[i][2]).trim().toLowerCase() === String(managerName).trim().toLowerCase()) { // Col 2 is Name
-                return data[i][6]; // Col 6 is Email
-            }
-        }
-        
-        return null;
-    } catch (e) {
-        console.warn("getManagerEmailForEmployee Error: " + e.toString());
-        return null;
-    }
-}
+// getManagerEmailForEmployee() lives in Code01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.
 
-function getManagersManagerEmail(empId) {
-    try {
-        var sheet = findEmployeeSheet();
-        if (!sheet) return null;
-        
-        var data = sheet.getDataRange().getValues();
-        
-        // First, find the employee's direct manager (n+1)
-        var directManagerName = null;
-        for (var i = 1; i < data.length; i++) {
-            if (String(data[i][1]).trim() === String(empId).trim()) { // Col 1 is Employee ID
-                directManagerName = data[i][4]; // Col 4 is Direct Manager
-                break;
-            }
-        }
-        
-        if (!directManagerName) return null;
-        
-        // Now find the direct manager's manager (n+2)
-        for (var i = 1; i < data.length; i++) {
-            if (data[i][2] && String(data[i][2]).trim().toLowerCase() === String(directManagerName).trim().toLowerCase()) { // Col 2 is Full Name
-                var managersManagerName = data[i][4]; // This manager's Direct Manager
-                if (!managersManagerName) return null;
-                
-                // Find the email of n+2
-                for (var j = 1; j < data.length; j++) {
-                    if (data[j][2] && String(data[j][2]).trim().toLowerCase() === String(managersManagerName).trim().toLowerCase()) {
-                        return data[j][6]; // Col 6 is Email
-                    }
-                }
-            }
-        }
-        
-        return null;
-    } catch (e) {
-        console.error("Error getting manager's manager: " + e.toString());
-        return null;
-    }
-}
+// getManagersManagerEmail() lives in Code01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.
 
-function findEmployeeSheet() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName("Employee_Database");
-    if (sheet) return sheet;
-
-    // Fallback
-    var sheets = ss.getSheets();
-    for (var i = 0; i < sheets.length; i++) {
-        var s = sheets[i];
-        var headers = s.getRange(1, 1, 1, 15).getValues()[0];
-        if (headers.indexOf("Direct Manager") !== -1 || headers.indexOf("Full Name") !== -1) {
-            return s;
-        }
-    }
-    
-    Logger.log("Could not identify Employee Sheet.");
-    return ss.getSheets()[0];
-}
+// findEmployeeSheet() lives in Code01.gs — Apps Script shares one global namespace, so a second
+// definition here would silently override it depending on file load order.

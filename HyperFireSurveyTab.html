@@ -1,0 +1,528 @@
+        <!-- CONTENT: HYPER FIRE PREVENTION SURVEY — ค้นหา → ลด → ตรวจซ้ำ. One card per physical spot, grouped by the
+             zones in HYPER_FI_ZONES (HyperFireSurvey.gs); every item ok / risk / n/a, risks carry severity + action +
+             status + due + before/after photos. Re-check loads the store's latest survey (getHyperFiLatestForStore).
+             Reuses HYPER_REF_STORES / _hyperRefStoreLabel / _hyperRefFindStoreDb from HyperRefSurveyTab.html. -->
+        <div id="content-hyper-fi-survey" class="tab-content hidden">
+            <form id="hyper-fi-form" onsubmit="handleHyperFiSurveySubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">🧯 สำรวจความเสี่ยงอัคคีภัย Hyper</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-fi-checklist" target="_blank" class="text-red-600 hover:underline text-sm font-medium">🖨️ แบบฟอร์มกระดาษ</a>
+                        <a href="<?= MANUALS_URL ?>?page=fi-manual" target="_blank" class="text-red-600 hover:underline text-sm font-medium">📖 คู่มือ</a>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_fi_survey_report" target="_blank" class="report-view-link hidden text-red-700 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+                <div class="text-xs text-red-900 bg-red-50 border border-red-200 rounded px-3 py-2 space-y-1">
+                    <p><b>🔍 ค้นหาความเสี่ยง → 🧹 ลดความเสี่ยงด้วยการจัดพื้นที่ → 🔁 ตรวจซ้ำ</b></p>
+                    <p>เดินตรวจทีละพื้นที่ (ตู้ไฟ · เหนือฝ้า · ห้องสต็อก · ห้องแม่บ้าน · ห้องเย็น · ครัว · Food Court · Town Center · ร้านค้าเช่า · ลานรับสินค้า · หลังคา · ภายนอก) ตอบทุกข้อ
+                        <b>✅ ปกติ / ⚠️ พบความเสี่ยง / — ไม่มี</b> · ถ้าพบความเสี่ยง: <b>แก้ทันทีถ้าทำได้</b> (ย้ายของ ตีเทปแดง-ดำ ปิดฝาตู้) แล้วถ่ายรูป <b>ก่อน / หลัง</b> · ที่แก้เองไม่ได้ให้ระบุผู้แก้และกำหนดเสร็จ</p>
+                    <p class="text-red-700">บทเรียนพังงา 27/10/69: สายไฟเก่าเหนือฝ้าไม่ร้อยท่อ ต่อสายด้วยเทป ลัดวงจรลามเข้าห้องเก็บกระดาษชำระ — ให้เปิดช่อง Service ตรวจเหนือฝ้าทุกครั้ง</p>
+                </div>
+                <div id="hyper-fi-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="hyper-fi-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreHyperFiDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardHyperFiDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลสาขา (Branch Information)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">ผู้ตรวจ (Surveyor) *</label><input type="text" name="reporterName" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ (Phone) *</label><input type="tel" name="reporterPhone" inputmode="tel" maxlength="20" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="relative">
+                                <input type="text" id="hyper-fi-station-search" autocomplete="off" class="input-field w-full border p-2 rounded text-sm bg-red-50" placeholder="พิมพ์รหัสสาขา หรือชื่อสาขา (ไทย/อังกฤษ)..." oninput="handleHyperFiStationInput(this)">
+                                <div id="hyper-fi-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-56 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div id="hyper-fi-store-badge" class="hidden self-end text-xs"></div>
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly><input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat"><input type="hidden" name="region"><input type="hidden" name="ammMtn"><input type="hidden" name="dmArea"><input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="hyper-fi-rest-form" class="hidden">
+                    <!-- Re-check: start from the store's last survey -->
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm">
+                        <span class="font-semibold text-indigo-900">🔁 ตรวจซ้ำ</span>
+                        <button type="button" onclick="hfiLoadLast()" id="hfi-load-last" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">📥 โหลดผลตรวจครั้งก่อนของสาขานี้</button>
+                        <span id="hfi-last-info" class="text-xs text-indigo-800"></span>
+                    </div>
+
+                    <div class="sticky top-0 z-30 bg-white/95 backdrop-blur border border-red-300 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mt-4">
+                        <span><b id="hfi-sum-areas">0</b> พื้นที่ · <b id="hfi-sum-checked">0</b> ข้อ</span>
+                        <span class="text-red-700">ความเสี่ยง <b id="hfi-sum-risks">0</b> (สูง <b id="hfi-sum-high">0</b>)</span>
+                        <span class="text-green-700">แก้แล้ว <b id="hfi-sum-fixed">0</b></span>
+                        <span class="text-amber-700">ค้าง <b id="hfi-sum-open">0</b></span>
+                        <span class="text-slate-500">ยังไม่ตอบ <b id="hfi-sum-blank">0</b></span>
+                        <span id="hfi-sum-rating" class="ml-auto text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-800">-</span>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">2. ตรวจทีละพื้นที่ (การ์ดละ 1 จุด)</h3>
+                        <p class="text-xs text-gray-500 mb-1">พื้นที่ที่ไม่มีในสาขา ให้ติ๊ก <b>“ไม่มีพื้นที่นี้”</b> · พื้นที่ที่มีหลายจุด (ตู้ไฟย่อย ห้องสต็อก ร้านค้าเช่า …) กด <b>＋ เพิ่มจุด</b> · พบความเสี่ยงต้องแนบรูป <b>ก่อนแก้ไข</b> และถ้าแก้แล้วแนบรูป <b>หลังแก้ไข</b></p>
+                        <div id="hfi-zones" class="space-y-5 mt-4"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">3. ระบบป้องกันอัคคีภัยทั้งสาขา</h3>
+                        <p class="text-xs text-gray-500 mb-3">ตรวจที่ตู้ FCP / ห้องปั๊ม / บันทึกถังดับเพลิง · สปริงเกอร์: ระบุตามพื้นที่จริง (มาตรการพังงา: พิจารณาให้ครอบคลุมพื้นที่ขายและ Plaza)</p>
+                        <div id="hfi-prot" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-red-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">4. สรุปความเสี่ยงทั้งสาขา (คำนวณอัตโนมัติ)</h3>
+                        <div id="hfi-summary" class="text-sm"></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">📅 นัดตรวจซ้ำ (แนะนำตามระดับความเสี่ยง — แก้ได้)</label>
+                                <input type="date" id="hfi-recheck" data-auto="1" onchange="this.dataset.auto=''" class="w-full border border-gray-300 rounded p-2 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">5. จุดเสี่ยงสูงที่ต้องแก้ทันที</h3>
+                        <div class="flex gap-4 mb-3">
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" onchange="document.getElementById('hfi-broken-section').classList.remove('hidden')"> <span class="text-sm">มี (Yes)</span></label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" checked onchange="document.getElementById('hfi-broken-section').classList.add('hidden')"> <span class="text-sm">ไม่มี (No)</span></label>
+                        </div>
+                        <div id="hfi-broken-section" class="hidden">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ระบุจุด และสิ่งที่ทำไปแล้ว * <span class="font-normal">(เติมให้จากความเสี่ยงสูงที่ยังค้าง — แก้ได้)</span></label>
+                            <textarea name="brokenDetail" rows="3" class="input-field w-full border border-red-300 p-2 rounded text-sm"></textarea>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-2 border-b pb-2">6. สรุป / ข้อเสนอภาพรวมสาขา</h3>
+                        <textarea name="comments" rows="3" class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50" placeholder="เช่น ต้องของบเดินสายไฟใหม่เหนือฝ้าโซน Plaza 120 ม. · ขอติดตั้งสปริงเกอร์พื้นที่ขาย (Optional)"></textarea>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">7. CC Email Notification (Optional)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1</label><input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm"></div>
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2</label><input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetHyperFiForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveHyperFiDraft()" class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 text-sm">&#128190; Save Draft</button>
+                            <button type="submit" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-red-700">Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div> <!-- End content-hyper-fi-survey -->
+
+        <script>
+            const HYPER_FI_CONFIG = <?!= JSON.stringify(getHyperFiConfig_()) ?>;
+            const HYPER_FI_DRAFT_KEY = 'hyper_fi_survey_draft_v1';
+            const HFI = { seq: 0, prevId: '' };
+            function hfiEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+            function _hfiOpts(list, sel, ph) { return '<option value="">' + (ph || '-- เลือก --') + '</option>' + list.map(function(o) { return '<option' + (o === sel ? ' selected' : '') + '>' + hfiEsc(o) + '</option>'; }).join(''); }
+            function _hfiZone(k) { return HYPER_FI_CONFIG.zones.find(function(z) { return z.k === k; }); }
+            function _hfiBranch() { const f = document.getElementById('hyper-fi-form'); return f && f.branchCode.value ? f.branchCode.value : '[Branch]'; }
+            const HFI_RES_BTN = { ok: ['✅ ปกติ', 'bg-green-600 text-white border-green-600'], risk: ['⚠️ เสี่ยง', 'bg-red-600 text-white border-red-600'], na: ['— ไม่มี', 'bg-slate-500 text-white border-slate-500'] };
+
+            // ── Zone groups (one container per zone; cards inside) ──
+            function hfiBuildZones() {
+                document.getElementById('hfi-zones').innerHTML = HYPER_FI_CONFIG.zones.map(function(z) {
+                    return '<div data-zone="' + z.k + '" class="border border-red-200 rounded-xl">' +
+                        '<div class="bg-red-50 rounded-t-xl px-3 py-2 flex flex-wrap items-center gap-2"><b class="text-sm text-red-900">' + z.icon + ' ' + hfiEsc(z.l) + '</b>' +
+                        '<span class="text-xs text-red-700" data-zone-sum></span>' +
+                        (z.multi ? '<button type="button" onclick="hfiAddCard(\'' + z.k + '\')" class="ml-auto text-xs border border-red-300 bg-white text-red-800 rounded px-2 py-1 font-semibold">＋ เพิ่มจุด</button>' : '') + '</div>' +
+                        '<div data-cards class="p-3 space-y-3"></div></div>';
+                }).join('');
+            }
+            function hfiAddCard(zk, c) {
+                c = c || {};
+                const z = _hfiZone(zk); if (!z) return;
+                const cid = c.cid || ('C' + String(++HFI.seq).padStart(2, '0'));
+                const n = parseInt(cid.replace(/\D/g, ''), 10); if (n > HFI.seq) HFI.seq = n;
+                const it = c.items || {};
+                const items = z.items.map(function(x) {
+                    const a = it[x.k] || {};
+                    return '<div class="border-b border-gray-100 py-2" data-item="' + x.k + '" data-r="' + (a.r || '') + '"' + (x.crit ? ' data-crit="1"' : '') + '>' +
+                        '<div class="flex flex-wrap items-center gap-2"><span class="text-xs text-gray-800 flex-1 min-w-[180px]">' + (x.crit ? '<b class="text-red-600">●</b> ' : '') + hfiEsc(x.l) + '</span>' +
+                        '<span class="flex gap-1">' + ['ok', 'risk', 'na'].map(function(r) {
+                            return '<button type="button" data-res="' + r + '" onclick="hfiSetRes(this)" class="text-[11px] border rounded px-2 py-1 font-semibold ' + (a.r === r ? HFI_RES_BTN[r][1] : 'bg-white text-gray-500 border-gray-300') + '">' + HFI_RES_BTN[r][0] + '</button>';
+                        }).join('') + '</span></div>' +
+                        (a.was ? '<p class="text-[11px] text-indigo-700 mt-1">🔁 ครั้งก่อน: ' + hfiEsc(a.was) + (a.act ? ' · ' + hfiEsc(a.act) : '') + '</p>' : '') +
+                        '<div data-riskbox class="' + (a.r === 'risk' ? '' : 'hidden') + ' mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 bg-red-50 border border-red-200 rounded p-2">' +
+                            '<div><label class="block text-[11px] font-semibold text-red-800">ระดับ *</label><select data-f="sev" onchange="hfiRecalc()" class="w-full border border-gray-300 rounded p-1.5 text-xs bg-white">' + _hfiOpts(HYPER_FI_CONFIG.severity, a.sev || (a.r === 'risk' ? '' : '')) + '</select></div>' +
+                            '<div class="col-span-2 sm:col-span-1"><label class="block text-[11px] font-semibold text-red-800">ลดความเสี่ยง / ดำเนินการ *</label><select data-f="act" onchange="hfiRecalc()" class="w-full border border-gray-300 rounded p-1.5 text-xs bg-white">' + _hfiOpts(HYPER_FI_CONFIG.actions, a.act) + '</select></div>' +
+                            '<div><label class="block text-[11px] font-semibold text-red-800">สถานะ *</label><select data-f="st" onchange="hfiRecalc()" class="w-full border border-gray-300 rounded p-1.5 text-xs bg-white">' + _hfiOpts(HYPER_FI_CONFIG.status, a.st) + '</select></div>' +
+                            '<div><label class="block text-[11px] font-semibold text-red-800">กำหนดเสร็จ</label><input type="date" data-f="due" value="' + hfiEsc(a.due || '') + '" class="w-full border border-gray-300 rounded p-1.5 text-xs"></div>' +
+                            '<div class="col-span-2 sm:col-span-4"><input data-f="nt" value="' + hfiEsc(a.nt || '') + '" class="w-full border border-gray-300 rounded p-1.5 text-xs" placeholder="รายละเอียดที่พบ / ใครรับผิดชอบ (เช่น ร้าน True, MTN สาขา)"></div>' +
+                            (a.was ? '<input type="hidden" data-f="was" value="' + hfiEsc(a.was) + '">' : '') +
+                        '</div></div>';
+                }).join('');
+                const prev = (c.prevB || []).length ? '<div class="mt-2"><p class="text-[11px] text-indigo-700 font-semibold">🔁 รูปจากการตรวจครั้งก่อน</p><div class="flex flex-wrap gap-1 mt-1" data-prevb="' + hfiEsc(JSON.stringify(c.prevB)) + '">' +
+                    c.prevB.map(function(u) { return '<a href="' + hfiEsc(u) + '" target="_blank"><img src="' + hfiEsc(u) + '" class="w-14 h-14 object-cover rounded border"></a>'; }).join('') + '</div></div>' : '';
+                const html = '<div class="border border-gray-300 rounded-lg overflow-hidden" data-card="' + cid + '" data-z="' + zk + '"' + (c.prevId ? ' data-previd="' + hfiEsc(c.prevId) + '"' : '') + '>' +
+                    '<div class="bg-slate-700 text-white px-3 py-2 flex flex-wrap items-center gap-2 text-sm"><b>' + z.icon + ' <span data-cid-label>' + hfiEsc(_hfiBranch() + '-' + cid) + '</span></b>' +
+                        '<span data-out="cstatus" class="text-xs font-bold px-2 py-0.5 rounded-full bg-white text-slate-700">-</span>' +
+                        '<button type="button" onclick="hfiRemove(\'' + cid + '\')" class="ml-auto text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5">ลบ</button></div>' +
+                    '<div class="p-3 bg-white">' +
+                        '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' +
+                            '<div class="col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">จุด / ชื่อพื้นที่ *</label><input data-c="place" value="' + hfiEsc(c.place || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น DB-3 หลังแผนกเครื่องดื่ม · ร้าน True ชั้น 1"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ชั้น</label><input data-c="floor" value="' + hfiEsc(c.floor || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="G, 2"></div>' +
+                            '<label class="flex items-end gap-1.5 text-xs text-slate-600 pb-2"><input type="checkbox" data-c="none"' + (c.none ? ' checked' : '') + ' onchange="hfiNone(this)"> ไม่มีพื้นที่นี้ในสาขา</label>' +
+                        '</div>' +
+                        '<div data-body class="' + (c.none ? 'hidden' : '') + '">' +
+                            '<div class="mt-2">' + items + '</div>' +
+                            (z.tape ? '<label class="flex items-center gap-1.5 text-xs text-red-800 mt-2 font-semibold"><input type="checkbox" data-c="tape"' + (c.tape ? ' checked' : '') + '> 🟥⬛ ตีเทปแดง-ดำกำหนดพื้นที่ห้ามวางแล้ว</label>' : '') +
+                            '<input data-c="nt" value="' + hfiEsc(c.nt || '') + '" class="mt-2 w-full border border-gray-300 rounded p-2 text-xs" placeholder="หมายเหตุพื้นที่ (ถ้ามี)">' +
+                            prev +
+                            '<div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">' +
+                                '<div data-photo-before>' + photoUpload('จุดเสี่ยง — ก่อนแก้ไข (' + cid + ')', 'hfi_' + cid + '_b') + '</div>' +
+                                '<div data-photo-after>' + photoUpload('หลังแก้ไข / ลดความเสี่ยง (' + cid + ')', 'hfi_' + cid + '_a') + '</div>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div></div>';
+                document.querySelector('#hfi-zones [data-zone="' + zk + '"] [data-cards]').insertAdjacentHTML('beforeend', html);
+                hfiRecalc();
+            }
+            function hfiSetRes(btn) {
+                const row = btn.closest('[data-item]'), r = btn.dataset.res;
+                row.dataset.r = row.dataset.r === r ? '' : r;
+                row.querySelectorAll('[data-res]').forEach(function(b) {
+                    b.className = 'text-[11px] border rounded px-2 py-1 font-semibold ' + (b.dataset.res === row.dataset.r ? HFI_RES_BTN[b.dataset.res][1] : 'bg-white text-gray-500 border-gray-300');
+                });
+                const box = row.querySelector('[data-riskbox]');
+                box.classList.toggle('hidden', row.dataset.r !== 'risk');
+                const sev = box.querySelector('[data-f="sev"]');
+                if (row.dataset.r === 'risk' && !sev.value) sev.value = HYPER_FI_CONFIG.severity[row.dataset.crit ? 0 : 1];
+                hfiRecalc();
+            }
+            function hfiNone(cb) { cb.closest('[data-card]').querySelector('[data-body]').classList.toggle('hidden', cb.checked); hfiRecalc(); }
+            function hfiRemove(cid) {
+                if (!confirm('ลบจุด ' + cid + '?')) return;
+                delete _accumulatedFiles['hfi_' + cid + '_b']; delete _accumulatedFiles['hfi_' + cid + '_a'];
+                document.querySelector('[data-card="' + cid + '"]').remove();
+                hfiRecalc();
+            }
+            function _hfiCard(el) {
+                const g = function(k) { const x = el.querySelector('[data-c="' + k + '"]'); return x ? (x.type === 'checkbox' ? x.checked : x.value) : ''; };
+                const items = {};
+                el.querySelectorAll('[data-item]').forEach(function(row) {
+                    const f = function(k) { const x = row.querySelector('[data-f="' + k + '"]'); return x ? x.value : ''; };
+                    items[row.dataset.item] = row.dataset.r === 'risk' ? { r: 'risk', sev: f('sev'), act: f('act'), st: f('st'), due: f('due'), nt: f('nt'), was: f('was') } : { r: row.dataset.r || '' };
+                });
+                const pv = el.querySelector('[data-prevb]');
+                return { cid: el.dataset.card, z: el.dataset.z, place: g('place'), floor: g('floor'), none: g('none'), tape: g('tape'), nt: g('nt'), items: items,
+                         prevB: pv ? JSON.parse(pv.dataset.prevb || '[]') : [], prevId: el.dataset.previd || '' };
+            }
+            function _hfiProt() {
+                const o = {};
+                document.querySelectorAll('#hfi-prot [data-p]').forEach(function(x) { o[x.dataset.p] = x.value; });
+                return o;
+            }
+            function collectHyperFi() {
+                return { cards: Array.from(document.querySelectorAll('#hfi-zones [data-card]')).map(_hfiCard), prot: _hfiProt(),
+                         recheck: document.getElementById('hfi-recheck').value, prevId: HFI.prevId };
+            }
+            function hfiBuildProt(p) {
+                p = p || {};
+                document.getElementById('hfi-prot').innerHTML = HYPER_FI_CONFIG.prot.map(function(f) {
+                    const v = p[f.k] == null ? '' : p[f.k];
+                    const input = f.t === 'sel' ? '<select data-p="' + f.k + '" onchange="hfiRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _hfiOpts(f.o, v) + '</select>'
+                        : f.t === 'num' ? '<input data-p="' + f.k + '" type="number" min="0" inputmode="numeric" value="' + hfiEsc(v) + '" oninput="hfiRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm">'
+                        : '<input data-p="' + f.k + '" type="date" value="' + hfiEsc(v) + '" class="w-full border border-gray-300 rounded p-2 text-sm">';
+                    return '<div><label class="block text-xs font-semibold text-gray-600 mb-1">' + hfiEsc(f.l) + ' *</label>' + input + '</div>';
+                }).join('');
+            }
+            // Mirrors _hfiRisks_ / _hfiProtBad_ / _hfiRating_ in HyperFireSurvey.gs — keep in sync.
+            function _hfiRisks(d) {
+                const out = [];
+                d.cards.forEach(function(c) {
+                    if (c.none) return;
+                    const z = _hfiZone(c.z);
+                    z.items.forEach(function(it) { const a = c.items[it.k]; if (a && a.r === 'risk') out.push({ zone: z.l, z: z.k, cid: c.cid, place: c.place, item: it.l, sev: a.sev, act: a.act, st: a.st, due: a.due, open: a.st !== HYPER_FI_CONFIG.status[0] }); });
+                });
+                return out;
+            }
+            function _hfiProtBad(d) {
+                return HYPER_FI_CONFIG.prot.filter(function(p) {
+                    const v = d.prot[p.k];
+                    if (p.badIfPositive) return parseInt(v, 10) > 0;
+                    return p.bad && v !== '' && p.bad.indexOf(p.o.indexOf(v)) > -1;
+                });
+            }
+            function _hfiRating(d, risks) {
+                const S = HYPER_FI_CONFIG.severity, ST = HYPER_FI_CONFIG.status, open = risks.filter(function(r) { return r.open; });
+                const pb = _hfiProtBad(d).map(function(p) { return p.k; });
+                if (open.some(function(r) { return r.sev === S[0] && r.st !== ST[1]; }) || pb.indexOf('alarm') > -1 || pb.indexOf('pump') > -1 || pb.indexOf('exits') > -1) return 'RED';
+                if (open.some(function(r) { return r.sev === S[1] && r.st !== ST[1]; }) || pb.length) return 'ORG';
+                return open.length ? 'YEL' : 'GRE';
+            }
+            const HFI_COLOR_CLS = { GRE: 'bg-green-600 text-white', YEL: 'bg-yellow-400 text-yellow-950', ORG: 'bg-orange-500 text-white', RED: 'bg-red-600 text-white' };
+            function hfiRecalc() {
+                const C = HYPER_FI_CONFIG, d = collectHyperFi(), risks = _hfiRisks(d), S = C.severity, ST = C.status;
+                let checked = 0, blank = 0;
+                document.querySelectorAll('#hfi-zones [data-card]').forEach(function(el, i) {
+                    const c = d.cards[i];
+                    el.querySelector('[data-cid-label]').textContent = _hfiBranch() + '-' + c.cid;
+                    const b = el.querySelector('[data-out="cstatus"]');
+                    if (c.none) { b.textContent = 'ไม่มีพื้นที่นี้'; b.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-slate-300 text-slate-700'; return; }
+                    const vals = Object.keys(c.items).map(function(k) { return c.items[k]; });
+                    const nb = vals.filter(function(a) { return !a.r; }).length, nr = vals.filter(function(a) { return a.r === 'risk'; }).length;
+                    const no = vals.filter(function(a) { return a.r === 'risk' && a.st !== ST[0]; }).length;
+                    checked += vals.length - nb; blank += nb;
+                    b.textContent = nb ? 'ยังไม่ตอบ ' + nb : nr ? (no ? '⚠️ ค้าง ' + no + '/' + nr : '✅ แก้แล้ว ' + nr) : '✅ ปกติ';
+                    b.className = 'text-xs font-bold px-2 py-0.5 rounded-full ' + (nb ? 'bg-white text-slate-700' : no ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-800');
+                    // before photo matters only when a risk was found
+                    el.querySelector('[data-photo-before]').classList.toggle('opacity-50', !nr);
+                });
+                document.querySelectorAll('#hfi-zones [data-zone]').forEach(function(zel) {
+                    const zr = risks.filter(function(r) { return r.z === zel.dataset.zone; }), zo = zr.filter(function(r) { return r.open; });
+                    zel.querySelector('[data-zone-sum]').textContent = zr.length ? '· เสี่ยง ' + zr.length + (zo.length ? ' (ค้าง ' + zo.length + ')' : ' (แก้แล้ว)') : '';
+                });
+                const open = risks.filter(function(r) { return r.open; });
+                const set = function(id, v) { document.getElementById(id).textContent = v; };
+                set('hfi-sum-areas', d.cards.filter(function(c) { return !c.none; }).length); set('hfi-sum-checked', checked); set('hfi-sum-blank', blank);
+                set('hfi-sum-risks', risks.length); set('hfi-sum-high', risks.filter(function(r) { return r.sev === S[0]; }).length);
+                set('hfi-sum-fixed', risks.filter(function(r) { return r.st === ST[0]; }).length); set('hfi-sum-open', open.length);
+                const rating = _hfiRating(d, risks), col = C.colors.find(function(c) { return c.k === rating; });
+                const rb = document.getElementById('hfi-sum-rating');
+                rb.textContent = col.k + ' · ' + col.l; rb.className = 'ml-auto text-xs font-bold px-2 py-0.5 rounded-full ' + HFI_COLOR_CLS[rating];
+                const rc = document.getElementById('hfi-recheck');
+                if (rc.dataset.auto) { const dt = new Date(Date.now() + col.recheck * 864e5); rc.value = dt.toISOString().slice(0, 10); }
+                const pb = _hfiProtBad(d);
+                let h = '<p class="mb-2"><span class="px-2 py-0.5 rounded-full font-bold ' + HFI_COLOR_CLS[rating] + '">' + col.k + ' ' + hfiEsc(col.l) + '</span> · ความเสี่ยง ' + risks.length + ' · แก้แล้ว ' + (risks.length - open.length) + ' · <b class="text-red-700">ค้าง ' + open.length + '</b></p>';
+                if (pb.length) h += '<p class="text-xs text-red-700 mb-2">🧯 ระบบป้องกันที่ต้องแก้: ' + pb.map(function(p) { return hfiEsc(p.l); }).join(', ') + '</p>';
+                if (open.length) {
+                    h += '<div class="overflow-x-auto"><table class="min-w-full text-xs border-collapse"><tr class="bg-red-50"><th class="p-1.5 border text-left">พื้นที่</th><th class="p-1.5 border text-left">ความเสี่ยงค้าง</th><th class="p-1.5 border">ระดับ</th><th class="p-1.5 border">สถานะ</th><th class="p-1.5 border">กำหนด</th></tr>' +
+                        open.sort(function(a, b) { return S.indexOf(a.sev) - S.indexOf(b.sev); }).map(function(r) {
+                            return '<tr><td class="p-1.5 border">' + hfiEsc(r.cid + ' ' + (r.place || r.zone)) + '</td><td class="p-1.5 border">' + hfiEsc(r.item) + '</td><td class="p-1.5 border ' + (r.sev === S[0] ? 'text-red-700 font-bold' : '') + '">' + hfiEsc((r.sev || '-').split(' ')[0]) + '</td><td class="p-1.5 border">' + hfiEsc(r.st || '-') + '</td><td class="p-1.5 border">' + hfiEsc(r.due || '-') + '</td></tr>';
+                        }).join('') + '</table></div>';
+                } else if (checked) h += '<p class="text-xs text-green-700">✅ ไม่มีความเสี่ยงค้าง</p>';
+                document.getElementById('hfi-summary').innerHTML = h;
+            }
+
+            // ── Re-check: load the store's latest survey ──
+            function hfiLoadLast() {
+                const form = document.getElementById('hyper-fi-form'), info = document.getElementById('hfi-last-info'), code = form.branchCode.value;
+                if (!code) return;
+                if (document.querySelector('#hfi-zones [data-item][data-r="ok"], #hfi-zones [data-item][data-r="risk"]') && !confirm('แทนที่ข้อมูลที่กรอกไว้ด้วยผลตรวจครั้งก่อน?')) return;
+                info.textContent = 'กำลังโหลด…';
+                const run = google.script.run.withSuccessHandler(function(res) {
+                    if (!res || !res.success) { info.textContent = '❌ ' + ((res && res.error) || 'โหลดไม่สำเร็จ'); return; }
+                    if (!res.found) { info.textContent = 'ยังไม่เคยตรวจสาขานี้ — กรอกใหม่ได้เลย'; return; }
+                    _hfiApplySurvey(res.fire || {}, res.id);
+                    HFI.prevId = res.id;
+                    info.textContent = '✅ โหลดผลตรวจ ' + new Date(res.ts).toLocaleDateString('en-GB') + ' (' + (res.rating || '-') + ') — ทบทวนทุกข้อ อัปเดตสถานะความเสี่ยงเดิม และแนบรูปหลังแก้ไข';
+                }).withFailureHandler(function(e) { info.textContent = '❌ ' + e.message; });
+                // Opened from the Vendor Portal (vendor-fire.html sets HFI_VENDOR_TOKEN): the pass is checked server-side
+                if (window.HFI_VENDOR_TOKEN) run.getHyperFiLatestForStoreVendor(window.HFI_VENDOR_TOKEN, code); else run.getHyperFiLatestForStore(code);
+            }
+            // recheckOf = the earlier survey's ID: its answers become the starting point and each risk remembers
+            // its earlier status (was). Without it (draft restore) the data is put back exactly as saved.
+            function _hfiApplySurvey(d, recheckOf) {
+                _clearHyperFiCards();
+                const byZone = {};
+                (d.cards || []).forEach(function(c) { (byZone[c.z] = byZone[c.z] || []).push(c); });
+                HYPER_FI_CONFIG.zones.forEach(function(z) {
+                    const list = byZone[z.k] || [{}];
+                    list.forEach(function(c) {
+                        if (recheckOf && c.items) Object.keys(c.items).forEach(function(k) { const a = c.items[k]; if (a.r === 'risk') a.was = a.st || a.was || ''; });
+                        if (recheckOf && c.cid) c.prevId = recheckOf;
+                        hfiAddCard(z.k, c.cid ? c : null);
+                    });
+                });
+                hfiBuildProt(d.prot || {});
+                hfiRecalc();
+            }
+
+            function _applyHyperFiStore(s) {
+                const form = document.getElementById('hyper-fi-form');
+                form.branchCode.value = s[0]; form.branchName.value = s[2] || s[1]; form.storeFormat.value = s[3] || ''; form.region.value = s[4] || '';
+                const db = _hyperRefFindStoreDb(s[0]);
+                form.ammMtn.value = db ? (db.ammMtn || '') : ''; form.dmArea.value = db ? (db.dmName || '') : ''; form.cmArea.value = db ? (db.cmName || '') : '';
+                if (db && db.dmEmail && !form.ccEmail1.value) form.ccEmail1.value = db.dmEmail;
+                if (db && db.cmEmail && !form.ccEmail2.value) form.ccEmail2.value = db.cmEmail;
+                const badge = document.getElementById('hyper-fi-store-badge');
+                badge.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-800 font-semibold">' + (s[3] || '-') + '</span>' + (s[4] ? ' <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">' + s[4] + '</span>' : '');
+                badge.classList.remove('hidden');
+                document.getElementById('hyper-fi-rest-form').classList.remove('hidden');
+                document.getElementById('hfi-last-info').textContent = '';
+                if (!document.querySelector('#hfi-zones [data-card]')) { hfiBuildZones(); HYPER_FI_CONFIG.zones.forEach(function(z) { hfiAddCard(z.k); }); hfiBuildProt({}); }
+                hfiRecalc();
+                if (typeof sdsCheck === 'function') sdsCheck('hyperFi');
+            }
+            function _clearHyperFiStore() {
+                const form = document.getElementById('hyper-fi-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('hyper-fi-store-badge').classList.add('hidden');
+                document.getElementById('hyper-fi-rest-form').classList.add('hidden');
+            }
+            function handleHyperFiStationInput(input) {
+                const val = input.value.toLowerCase().trim();
+                const dd = document.getElementById('hyper-fi-station-dropdown');
+                if (val.length < 1) { dd.classList.add('hidden'); dd.innerHTML = ''; _clearHyperFiStore(); return; }
+                const matches = HYPER_REF_STORES.filter(function(s) { return _hyperRefStoreLabel(s).toLowerCase().indexOf(val) !== -1; });
+                renderStationDropdown('hyper-fi-station-dropdown', matches.map(_hyperRefStoreLabel), function(sel) {
+                    input.value = sel;
+                    const s = HYPER_REF_STORES.find(function(x) { return _hyperRefStoreLabel(x) === sel; });
+                    if (s) _applyHyperFiStore(s);
+                });
+                const exact = HYPER_REF_STORES.find(function(s) { return _hyperRefStoreLabel(s).toLowerCase() === val || s[0] === val; });
+                if (exact) _applyHyperFiStore(exact); else _clearHyperFiStore();
+            }
+            document.addEventListener('click', function(e) { const d = document.getElementById('hyper-fi-station-dropdown'); if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden'); });
+
+            function _hyperFiFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button') return;
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+            function _clearHyperFiCards() {
+                document.querySelectorAll('#hfi-zones [data-card]').forEach(function(r) { delete _accumulatedFiles['hfi_' + r.dataset.card + '_b']; delete _accumulatedFiles['hfi_' + r.dataset.card + '_a']; });
+                hfiBuildZones();
+                HFI.seq = 0;
+            }
+            // Draft object shared by the on-device draft and the server draft (SurveyDraftStore.gs)
+            function _buildHyperFiDraft() {
+                const form = document.getElementById('hyper-fi-form');
+                return Object.assign({ savedAt: new Date().toISOString(), search: document.getElementById('hyper-fi-station-search').value, fields: _hyperFiFields(form) }, collectHyperFi());
+            }
+            function saveHyperFiDraft() {
+                const form = document.getElementById('hyper-fi-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                try {
+                    localStorage.setItem(HYPER_FI_DRAFT_KEY, JSON.stringify(_buildHyperFiDraft()));
+                    if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (ป้องกันอัคคีภัย)');
+                } catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('hyperFi', null);
+            }
+            function _readHyperFiDraft() { try { return JSON.parse(localStorage.getItem(HYPER_FI_DRAFT_KEY) || 'null'); } catch (e) { return null; } }
+            function checkHyperFiDraft() {
+                const d = _readHyperFiDraft(), b = document.getElementById('hyper-fi-draft-banner');
+                if (!d || !d.fields) { b.classList.add('hidden'); return; }
+                document.getElementById('hyper-fi-draft-info').textContent = (d.fields.branchCode || '') + ' ' + (d.fields.branchName || '') + ' · ' + new Date(d.savedAt).toLocaleString('en-GB');
+                b.classList.remove('hidden');
+            }
+            function restoreHyperFiDraft(fromServer) {
+                const d = fromServer || _readHyperFiDraft();
+                if (!d) return;
+                const form = document.getElementById('hyper-fi-form');
+                const s = HYPER_REF_STORES.find(function(x) { return x[0] === (d.fields || {}).branchCode; });
+                if (s) { document.getElementById('hyper-fi-station-search').value = d.search || _hyperRefStoreLabel(s); _applyHyperFiStore(s); }
+                Object.keys(d.fields || {}).forEach(function(n) {
+                    const el = form.elements[n];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList) Array.from(el).forEach(function(r) { r.checked = r.value === d.fields[n]; });
+                    else el.value = d.fields[n];
+                });
+                document.getElementById('hfi-broken-section').classList.toggle('hidden', (d.fields || {}).hasBroken !== 'Yes');
+                _hfiApplySurvey(d, '');
+                HFI.prevId = d.prevId || '';
+                if (d.recheck) { const rc = document.getElementById('hfi-recheck'); rc.value = d.recheck; rc.dataset.auto = ''; }
+                hfiRecalc();
+                document.getElementById('hyper-fi-draft-banner').classList.add('hidden');
+            }
+            function discardHyperFiDraft() { if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return; try { localStorage.removeItem(HYPER_FI_DRAFT_KEY); } catch (e) {} checkHyperFiDraft(); }
+            function resetHyperFiForm(ask) {
+                if (ask && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('hyperFi');
+                const form = document.getElementById('hyper-fi-form');
+                const rn = form.reporterName.value, rp = form.reporterPhone.value;
+                form.reset(); form.reporterName.value = rn; form.reporterPhone.value = rp;
+                document.querySelectorAll('#content-hyper-fi-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                _clearHyperFiCards();
+                document.getElementById('hfi-zones').innerHTML = '';
+                document.getElementById('hyper-fi-station-search').value = '';
+                document.getElementById('hfi-broken-section').classList.add('hidden');
+                const rc = document.getElementById('hfi-recheck'); rc.value = ''; rc.dataset.auto = '1';
+                HFI.prevId = '';
+                _clearHyperFiStore();
+            }
+
+            function _hfiFlash(el, msg) {
+                alert(msg);
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-2', 'ring-red-400'); setTimeout(function() { el.classList.remove('ring-2', 'ring-red-400'); }, 2000);
+            }
+            async function handleHyperFiSurveySubmit(e) {
+                e.preventDefault();
+                const form = e.target, C = HYPER_FI_CONFIG;
+                if (!form.reporterName.value.trim()) { alert('กรุณากรอกชื่อผู้ตรวจ (Surveyor)'); form.reporterName.focus(); return; }
+                if (!form.reporterPhone.value.trim()) { alert('กรุณากรอกเบอร์โทรศัพท์ (Phone)'); form.reporterPhone.focus(); return; }
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน'); return; }
+                const d = collectHyperFi();
+                const hasPhoto = function(k) { return (_accumulatedFiles[k] || []).filter(Boolean).length > 0; };
+                for (const el of document.querySelectorAll('#hfi-zones [data-card]')) {
+                    const c = _hfiCard(el);
+                    if (c.none) continue;
+                    if (!c.place.trim()) { _hfiFlash(el, c.cid + ': กรุณาระบุจุด / ชื่อพื้นที่'); return; }
+                    const z = _hfiZone(c.z), risks = [];
+                    for (const it of z.items) {
+                        const a = c.items[it.k];
+                        if (!a.r) { _hfiFlash(el, c.cid + ' (' + z.l + '): ยังไม่ได้ตอบข้อ “' + it.l + '”'); return; }
+                        if (a.r === 'risk') {
+                            if (!a.sev || !a.act || !a.st) { _hfiFlash(el, c.cid + ': ความเสี่ยง “' + it.l + '” — กรุณาเลือกระดับ / การดำเนินการ / สถานะ'); return; }
+                            if (a.st !== C.status[0] && !a.due) { _hfiFlash(el, c.cid + ': ความเสี่ยง “' + it.l + '” ยังไม่แก้ — กรุณาระบุกำหนดเสร็จ'); return; }
+                            risks.push(a);
+                        }
+                    }
+                    // evidence: a NEW risk needs a "before" photo (a re-check may rely on the earlier one); a fixed one needs "after"
+                    const newRisk = risks.some(function(a) { return !a.was; });
+                    if (newRisk && !hasPhoto('hfi_' + c.cid + '_b')) { _hfiFlash(el, c.cid + ': พบความเสี่ยง — กรุณาแนบรูปจุดเสี่ยง (ก่อนแก้ไข)'); return; }
+                    if (risks.some(function(a) { return a.st === C.status[0]; }) && !hasPhoto('hfi_' + c.cid + '_a')) { _hfiFlash(el, c.cid + ': มีความเสี่ยงที่แก้แล้ว — กรุณาแนบรูปหลังแก้ไข'); return; }
+                }
+                for (const p of C.prot) {
+                    const v = d.prot[p.k];
+                    if (p.t !== 'date' && (v === '' || v == null)) { _hfiFlash(document.getElementById('hfi-prot'), 'ระบบป้องกันอัคคีภัย: กรุณาระบุ “' + p.l + '”'); return; }
+                }
+                // section 5 defaults from the open high risks when the surveyor left it untouched
+                const S = C.severity, openHigh = _hfiRisks(d).filter(function(r) { return r.open && r.sev === S[0]; });
+                if (openHigh.length && (form.querySelector('input[name="hasBroken"]:checked') || {}).value !== 'Yes') {
+                    form.querySelector('input[name="hasBroken"][value="Yes"]').checked = true;
+                    document.getElementById('hfi-broken-section').classList.remove('hidden');
+                    if (!form.brokenDetail.value.trim()) form.brokenDetail.value = openHigh.map(function(r) { return r.cid + ' ' + (r.place || r.zone) + ': ' + r.item + ' → ' + (r.act || '-') + ' (' + (r.st || '-') + ')'; }).join('\n');
+                }
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุจุดเสี่ยงสูงที่ต้องแก้ทันที'); form.brokenDetail.focus(); return; }
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    const tasks = [], seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('HFI', form.branchCode.value, tasks, function() { return [1024, 1024, 0.62]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+                    const data = _hyperFiFields(form);
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('hyperFi');
+                    data.fireJson = JSON.stringify(d);
+                    const run = google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) { showSuccess(); sdsReset('hyperFi'); try { localStorage.removeItem(HYPER_FI_DRAFT_KEY); } catch (e2) {} checkHyperFiDraft(); resetHyperFiForm(false); }
+                            else alert('Error: ' + (res && res.error));
+                        })
+                        .withFailureHandler(function(err) { hideLoading(); alert('Server Error: ' + err.message); });
+                    if (window.HFI_VENDOR_TOKEN) run.processHyperFiSurveyVendor(window.HFI_VENDOR_TOKEN, data); else run.processHyperFiSurveyForm(data);
+                } catch (err) { hideLoading(); alert('Error processing form: ' + err.message); }
+            }
+            document.addEventListener('DOMContentLoaded', function() { try { checkHyperFiDraft(); } catch (e) {} });
+        </script>
