@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Renovate Unit Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <style>
+        /* Project tracker for FF Renovate cabinet units (QR register). Data: getFfrUnits (store-scoped, auto-syncs new surveys).
+           Bulk status update via updateFfrUnits (same rules as the scan page: forward only, Admin can move back / cancel). */
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; font-size: 14px; }
+        header { background: #881337; color: #fff; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        header h1 { font-size: 18px; margin: 0; flex: 1 1 auto; }
+        header a, header button { font: inherit; font-size: 13px; font-weight: 700; color: #881337; background: #fff; border: 0; border-radius: 6px; padding: 5px 10px; text-decoration: none; cursor: pointer; }
+        main { padding: 12px 16px 40px; max-width: 1400px; margin: 0 auto; }
+        .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-bottom: 12px; }
+        .kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 10px; cursor: pointer; }
+        .kpi.on { outline: 2px solid #881337; }
+        .kpi b { display: block; font-size: 22px; }
+        .kpi span { color: #64748b; font-size: 12px; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+        .filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .filters select, .filters input { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; max-width: 260px; }
+        .tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+        .tabs button { font: inherit; font-weight: 700; padding: 6px 14px; border-radius: 999px; border: 1px solid #881337; background: #fff; color: #881337; cursor: pointer; }
+        .tabs button.on { background: #881337; color: #fff; }
+        .wrap { overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; font-size: 13px; }
+        th, td { border-bottom: 1px solid #f1f5f9; padding: 6px 8px; text-align: left; white-space: nowrap; }
+        th { background: #f8fafc; position: sticky; top: 0; font-weight: 700; color: #475569; }
+        tr:hover td { background: #fff1f2; }
+        .bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; display: flex; min-width: 120px; }
+        .bar i { display: block; height: 100%; }
+        .s-Surveyed { background: #94a3b8; } .s-Ordered { background: #f59e0b; } .s-Delivered { background: #0ea5e9; } .s-Installed { background: #8b5cf6; } .s-Accepted { background: #10b981; } .s-Cancelled { background: #e2e8f0; }
+        .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 700; }
+        .pill.s-Cancelled { color: #64748b; }
+        .mono { font-family: monospace; }
+        a.lnk { color: #881337; font-weight: 700; }
+        .bulk { position: sticky; bottom: 0; background: #fff7ed; border: 2px solid #f59e0b; border-radius: 10px; padding: 10px 12px; display: none; flex-wrap: wrap; gap: 6px; align-items: center; box-shadow: 0 -4px 12px rgba(0,0,0,.08); }
+        .bulk.on { display: flex; }
+        .bulk select, .bulk input { font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 6px; }
+        .bulk button { font: inherit; font-weight: 700; padding: 6px 14px; border-radius: 6px; border: 0; background: #881337; color: #fff; cursor: pointer; }
+        .muted { color: #64748b; font-size: 12px; }
+        #msg { font-size: 13px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>📦 FF Renovate — ติดตามตู้ (QR)</h1>
+        <a id="qrLink" href="#" target="_blank" rel="noopener">🏷️ พิมพ์ QR</a>
+        <button onclick="exportXlsx()">⬇️ Excel</button>
+        <button onclick="load()">⟳ โหลดใหม่</button>
+    </header>
+    <main>
+        <div id="msg" class="muted">⏳ กำลังโหลด...</div>
+        <div class="kpis" id="kpis"></div>
+        <div class="card filters">
+            <select id="fTeam" onchange="render()"><option value="">ทุกทีม</option></select>
+            <select id="fStore" onchange="render()"><option value="">ทุกสาขา</option></select>
+            <select id="fRes" onchange="render()"><option value="">ทุกผลสำรวจ</option><option>Request New</option><option>Refurbish</option><option>Workable</option></select>
+            <select id="fCode" onchange="render()"><option value="">ทุกรหัสจัดซื้อ</option></select>
+            <input id="fQ" placeholder="ค้นหา Unit ID / PO / ผู้ขาย / ตู้" oninput="render()">
+            <label class="muted"><input type="checkbox" id="fCan" onchange="render()"> แสดงที่ยกเลิก</label>
+        </div>
+        <div class="tabs"><button id="tStore" class="on" onclick="tab('store')">ตามสาขา</button><button id="tUnit" onclick="tab('unit')">รายตู้</button></div>
+        <div class="card wrap" id="view"></div>
+        <div class="bulk" id="bulk">
+            <b id="bulkN">0 ตู้</b>
+            <select id="bStatus"><option value="">— เปลี่ยนสถานะเป็น —</option></select>
+            <input id="bPo" placeholder="เลข PO">
+            <input id="bVendor" placeholder="ผู้ขาย / ผู้รับเหมา">
+            <input id="bDate" type="date" title="วันที่ของขั้นนี้">
+            <input id="bNote" placeholder="หมายเหตุ" style="min-width:180px">
+            <button onclick="bulkSave(this)">บันทึกตู้ที่เลือก</button>
+            <a href="#" onclick="clearSel();return false" class="muted">ยกเลิกการเลือก</a>
+        </div>
+    </main>
+<script>
+const APP_URL = <?!= JSON.stringify(ScriptApp.getService().getUrl()) ?>;
+const FLOW = ['Surveyed', 'Ordered', 'Delivered', 'Installed', 'Accepted'];
+const TH = { Surveyed: 'สำรวจแล้ว', Ordered: 'สั่งซื้อ / PO', Delivered: 'ส่งของ', Installed: 'ติดตั้ง', Accepted: 'ตรวจรับแล้ว', Cancelled: 'ยกเลิก' };
+let UNITS = [], STORES = [], VIEW = 'store', FSTATUS = '', SEL = new Set();
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function user() { try { return JSON.parse(localStorage.getItem('app_user_data') || 'null') || {}; } catch (e) { return {}; } }
+function msg(t) { document.getElementById('msg').textContent = t; }
+document.getElementById('qrLink').href = APP_URL + '?page=ffr-qr';
+document.getElementById('bDate').value = new Date(Date.now() + 7 * 3600e3).toISOString().substring(0, 10);
+FLOW.concat(['Cancelled']).forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = TH[s]; document.getElementById('bStatus').appendChild(o); });
+
+function load() {
+    if (!user().email) { msg('กรุณาเข้าสู่ระบบในแอปหลักก่อน แล้วเปิดหน้านี้ใหม่'); return; }
+    msg('⏳ กำลังโหลด...');
+    google.script.run.withSuccessHandler(function(r) {
+        if (!r || !r.success) { msg('❌ ' + ((r && r.error) || 'โหลดไม่สำเร็จ')); return; }
+        UNITS = r.units || []; STORES = r.stores || [];
+        fillFilters(); render();
+        msg(STORES.length ? 'ตู้ทั้งหมด ' + UNITS.filter(u => u.Status !== 'Cancelled').length + ' ตู้ · ' + STORES.length + ' สาขาที่คุณดูได้ · QR สร้างอัตโนมัติจากผลสำรวจล่าสุด' : 'ไม่มีสาขาที่คุณมีสิทธิ์');
+    }).withFailureHandler(function(e) { msg('❌ ' + e.message); }).getFfrUnits(user().email, '', true);
+}
+function fillFilters() {
+    const set = (id, vals, label) => { const s = document.getElementById(id), keep = s.value; s.length = 1; vals.forEach(v => { const o = document.createElement('option'); o.value = v[0]; o.textContent = v[1]; s.appendChild(o); }); s.value = keep; };
+    set('fTeam', [...new Set(STORES.map(s => s.t))].sort().map(t => [t, 'ทีม ' + t]));
+    set('fStore', STORES.slice().sort((a, b) => (a.t + a.n).localeCompare(b.t + b.n)).map(s => [s.o, s.t + ' · ' + s.c + ' ' + s.n]));
+    set('fCode', [...new Set(UNITS.map(u => u['Equip Code']).filter(Boolean))].sort().map(c => [c, c]));
+}
+function filtered(ignoreStatus) {
+    const g = id => document.getElementById(id).value, q = g('fQ').trim().toLowerCase(), can = document.getElementById('fCan').checked;
+    return UNITS.filter(u => (!g('fTeam') || String(u.Team) === g('fTeam')) && (!g('fStore') || String(u['Branch Code']) === g('fStore')) &&
+        (!g('fRes') || u.Result === g('fRes')) && (!g('fCode') || u['Equip Code'] === g('fCode')) &&
+        (can || u.Status !== 'Cancelled' || FSTATUS === 'Cancelled') && (ignoreStatus || !FSTATUS || u.Status === FSTATUS) &&
+        (!q || [u['Unit ID'], u['PO No'], u.Vendor, u.Cabinet, u['Branch Name'], u['Gold Code']].join(' ').toLowerCase().indexOf(q) > -1));
+}
+function render() {
+    const base = filtered(true), cnt = {};
+    base.forEach(u => cnt[u.Status] = (cnt[u.Status] || 0) + 1);
+    const live = base.filter(u => u.Status !== 'Cancelled').length;
+    document.getElementById('kpis').innerHTML = '<div class="kpi ' + (!FSTATUS ? 'on' : '') + '" onclick="fs(\'\')"><b>' + live + '</b><span>ตู้ทั้งหมด</span></div>' +
+        FLOW.concat(['Cancelled']).map(s => '<div class="kpi ' + (FSTATUS === s ? 'on' : '') + '" onclick="fs(\'' + s + '\')"><b>' + (cnt[s] || 0) + '</b><span><i class="pill s-' + s + '">&nbsp;</i> ' + TH[s] + (s !== 'Cancelled' && live ? ' · ' + Math.round((cnt[s] || 0) * 100 / live) + '%' : '') + '</span></div>').join('');
+    const list = filtered(false);
+    document.getElementById('view').innerHTML = VIEW === 'store' ? storeTable(list) : unitTable(list);
+    updBulk();
+}
+function fs(s) { FSTATUS = s; render(); }
+function tab(v) { VIEW = v; document.getElementById('tStore').classList.toggle('on', v === 'store'); document.getElementById('tUnit').classList.toggle('on', v === 'unit'); render(); }
+function storeTable(list) {
+    const by = {};
+    list.forEach(u => { const k = u['Branch Code']; (by[k] = by[k] || []).push(u); });
+    const st = {}; STORES.forEach(s => st[s.o] = s);
+    const rows = Object.keys(by).sort((a, b) => ((st[a] || {}).t + (st[a] || {}).n).localeCompare((st[b] || {}).t + (st[b] || {}).n));
+    if (!rows.length) return '<p class="muted">ไม่มีตู้ตามตัวกรอง — QR จะสร้างเองเมื่อสาขาส่งแบบสำรวจ FF Renovate</p>';
+    const noUnits = STORES.filter(s => !UNITS.some(u => String(u['Branch Code']) === s.o)).length;
+    return '<table><thead><tr><th>ทีม</th><th>สาขา</th><th>ตู้</th>' + FLOW.map(s => '<th>' + TH[s] + '</th>').join('') + '<th>ความคืบหน้า</th><th>% ตรวจรับ</th><th></th></tr></thead><tbody>' +
+        rows.map(k => {
+            const us = by[k].filter(u => u.Status !== 'Cancelled'), s = st[k] || {}, c = {};
+            us.forEach(u => c[u.Status] = (c[u.Status] || 0) + 1);
+            const n = us.length || 1;
+            return '<tr><td>' + esc(s.t) + '</td><td><a href="#" class="lnk" onclick="goStore(\'' + esc(k) + '\');return false">' + esc((s.c || '') + ' ' + (s.n || k)) + '</a></td><td>' + us.length + '</td>' +
+                FLOW.map(f => '<td>' + (c[f] || '') + '</td>').join('') +
+                '<td><div class="bar">' + FLOW.map(f => c[f] ? '<i class="s-' + f + '" style="width:' + (c[f] * 100 / n) + '%" title="' + TH[f] + ' ' + c[f] + '"></i>' : '').join('') + '</div></td>' +
+                '<td><b>' + Math.round((c.Accepted || 0) * 100 / n) + '%</b></td>' +
+                '<td><a class="lnk" target="_blank" rel="noopener" href="' + APP_URL + '?page=ffr-qr&store=' + encodeURIComponent(k) + '">🏷️ QR</a></td></tr>';
+        }).join('') + '</tbody></table>' + (noUnits ? '<p class="muted">ยังไม่มีผลสำรวจ (ยังไม่มี QR): ' + noUnits + ' สาขา</p>' : '');
+}
+function goStore(k) { document.getElementById('fStore').value = k; tab('unit'); }
+function unitTable(list) {
+    if (!list.length) return '<p class="muted">ไม่มีตู้ตามตัวกรอง</p>';
+    const all = list.length && list.every(u => SEL.has(u['Unit ID']));
+    return '<table><thead><tr><th><input type="checkbox" ' + (all ? 'checked' : '') + ' onchange="selAll(this.checked)" title="เลือกทั้งหมดตามตัวกรอง"></th><th>Unit ID</th><th>สถานะ</th><th>สาขา</th><th>รหัส</th><th>ตู้</th><th>ระบบ</th><th>ผลสำรวจ</th><th>PO</th><th>ผู้ขาย</th><th>ส่งของ</th><th>ติดตั้ง</th><th>ตรวจรับ</th><th>โดย</th><th>อัปเดต</th></tr></thead><tbody>' +
+        list.map(u => '<tr><td><input type="checkbox" data-id="' + esc(u['Unit ID']) + '" ' + (SEL.has(u['Unit ID']) ? 'checked' : '') + ' onchange="sel(this)"></td>' +
+            '<td class="mono"><a class="lnk" target="_blank" rel="noopener" href="' + APP_URL + '?page=ffr-unit&id=' + encodeURIComponent(u['Unit ID']) + '">' + esc(u['Unit ID']) + '</a></td>' +
+            '<td><span class="pill s-' + esc(u.Status) + '">' + esc(TH[u.Status] || u.Status) + '</span></td><td>' + esc(u['Gold Code'] + ' ' + u['Branch Name']) + '</td><td class="mono">' + esc(u['Equip Code']) + '</td>' +
+            '<td>' + esc(u.Cabinet) + '</td><td>' + esc(u.System) + '</td><td>' + esc(u.Result) + '</td><td>' + esc(u['PO No']) + '</td><td>' + esc(u.Vendor) + '</td>' +
+            '<td>' + esc(u.Delivered) + '</td><td>' + esc(u.Installed) + '</td><td>' + esc(u.Accepted) + '</td><td>' + esc(u['Accepted By']) + '</td><td>' + esc(u.Updated) + '</td></tr>').join('') +
+        '</tbody></table>';
+}
+function sel(cb) { cb.checked ? SEL.add(cb.dataset.id) : SEL.delete(cb.dataset.id); updBulk(); }
+function selAll(on) { filtered(false).forEach(u => on ? SEL.add(u['Unit ID']) : SEL.delete(u['Unit ID'])); render(); }
+function clearSel() { SEL.clear(); render(); }
+function updBulk() { document.getElementById('bulk').classList.toggle('on', SEL.size > 0); document.getElementById('bulkN').textContent = SEL.size + ' ตู้'; }
+function bulkSave(btn) {
+    const g = id => document.getElementById(id).value.trim(), me = user();
+    const patch = { status: g('bStatus'), po: g('bPo'), vendor: g('bVendor'), date: g('bDate'), note: g('bNote') };
+    if (!patch.status && !patch.po && !patch.vendor && !patch.note) { alert('เลือกสถานะ หรือใส่ PO / ผู้ขาย / หมายเหตุ'); return; }
+    if (patch.status === 'Ordered' && (!patch.po || !patch.vendor) && !confirm('ไม่ได้ใส่ PO / ผู้ขาย — ตู้ที่ยังไม่มี PO จะถูกข้าม ดำเนินการต่อ?')) return;
+    if (!confirm('บันทึก ' + SEL.size + ' ตู้' + (patch.status ? ' → ' + TH[patch.status] : '') + '?')) return;
+    btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...';
+    google.script.run.withSuccessHandler(function(r) {
+        btn.disabled = false; btn.textContent = 'บันทึกตู้ที่เลือก';
+        if (!r || !r.success) { alert((r && r.error) || 'บันทึกไม่สำเร็จ'); return; }
+        const why = {}; (r.skipped || []).forEach(s => why[s.why] = (why[s.why] || 0) + 1);
+        alert('บันทึกแล้ว ' + r.updated + ' ตู้' + (r.skipped && r.skipped.length ? '\nข้าม ' + r.skipped.length + ' ตู้: ' + Object.keys(why).map(k => k + ' (' + why[k] + ')').join(', ') : ''));
+        const map = {}; (r.units || []).forEach(u => map[u['Unit ID']] = u);
+        UNITS = UNITS.map(u => map[u['Unit ID']] || u);
+        SEL.clear(); ['bStatus', 'bPo', 'bVendor', 'bNote'].forEach(id => document.getElementById(id).value = '');
+        render();
+    }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = 'บันทึกตู้ที่เลือก'; alert(e.message); })
+      .updateFfrUnits(me.email, me.name || '', Array.from(SEL), patch);
+}
+function exportXlsx() {
+    const list = filtered(false);
+    if (!list.length) { alert('ไม่มีข้อมูล'); return; }
+    const rows = list.map(u => ({ 'Unit ID': u['Unit ID'], 'Status': u.Status, 'Team': u.Team, 'Branch Code': u['Branch Code'], 'Gold Code': u['Gold Code'], 'Branch': u['Branch Name'],
+        'Equip Code': u['Equip Code'], 'Category': u.Category, 'Cabinet': u.Cabinet, 'System': u.System, 'Result': u.Result, 'Equipment ID': u['Equipment ID'], 'Asset No': u['Asset No'],
+        'PO No': u['PO No'], 'Vendor': u.Vendor, 'Delivered': u.Delivered, 'Installed': u.Installed, 'Accepted': u.Accepted, 'Accepted By': u['Accepted By'], 'Updated': u.Updated,
+        'QR Link': APP_URL + '?page=ffr-unit&id=' + encodeURIComponent(u['Unit ID']) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Units');
+    XLSX.writeFile(wb, 'FF_Renovate_Units_' + new Date().toISOString().substring(0, 10) + '.xlsx');
+}
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8"><title>FF Renovate Survey 3D</title>
+<style>
+  html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#0b1220;font-family:'Leelawadee UI','Segoe UI',Tahoma,sans-serif}
+  canvas{position:absolute;inset:0;width:1280px;height:720px}
+  #callouts{position:absolute;inset:0;pointer-events:none}
+  .co{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font-weight:700;font-size:20px;color:#fff;padding:7px 14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .co::after{content:'';position:absolute;left:50%;bottom:-9px;margin-left:-8px;border:8px solid transparent;border-bottom:0;border-top-color:inherit}
+  .co small{display:block;font-size:14px;font-weight:600;opacity:.92}
+  .co.bad{background:#b91c1c;border-color:#b91c1c}.co.good{background:#15803d;border-color:#15803d}.co.info{background:#1e293b;border-color:#1e293b}
+  .co.wk{background:#0369a1;border-color:#0369a1}.co.new{background:#be123c;border-color:#be123c}.co.none{background:#475569;border-color:#475569}
+  .co.lime{background:#4d7c0f;border-color:#4d7c0f}.co.amber{background:#b45309;border-color:#b45309}
+  .co.big{font-size:26px;padding:10px 18px}
+  #chap{position:absolute;left:24px;top:20px;padding:8px 18px;border-radius:12px;background:rgba(15,23,42,.85);color:#fff;font-size:22px;font-weight:700;border-left:6px solid #84cc16}
+  #brand{position:absolute;right:24px;top:22px;color:#fff;font-size:15px;font-weight:700;background:rgba(15,23,42,.7);padding:6px 12px;border-radius:999px}
+  #sub{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;bottom:24px;max-width:1160px;text-align:center;background:rgba(0,0,0,.78);color:#fff;font-size:24px;line-height:1.5;padding:9px 24px;border-radius:12px}
+  #fade{position:absolute;inset:0;background:#000;pointer-events:none}
+  #ov{position:absolute;inset:0;display:none}
+  .ovbg{position:absolute;inset:0;background:radial-gradient(1000px 620px at 50% 42%,rgba(54,83,20,.92),rgba(12,22,6,.97))}
+  .ovw{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;padding:0 50px 100px}
+  .ovw h1{font-size:48px;margin:0 0 10px}.ovw h2{font-size:28px;margin:0 0 8px;font-weight:600;opacity:.95}.ovw p{font-size:21px;margin:4px 0;opacity:.9}
+  .tiles{display:flex;gap:14px;margin-top:22px}
+  .tile{width:200px;border-radius:16px;padding:16px 10px;background:rgba(255,255,255,.09);border:3px solid;display:flex;flex-direction:column;gap:6px;align-items:center}
+  .tile .ic{font-size:44px;line-height:1.1}.tile b{font-size:22px}.tile span{font-size:15px;opacity:.92;line-height:1.45}
+  .flow{display:flex;gap:12px;align-items:center;margin-top:26px;font-size:21px;font-weight:700}
+  .flow .k{padding:14px 16px;border-radius:14px;color:#fff;width:200px;line-height:1.35}.flow .k i{display:block;font-style:normal;font-size:40px}
+  .flow .k span{display:block;font-size:15px;font-weight:600;opacity:.9}
+  #pip{position:absolute;right:20px;top:76px;width:600px;display:none;filter:drop-shadow(0 14px 30px rgba(0,0,0,.45))}
+  #pip .cap{background:#0f172a;color:#fff;font-size:17px;font-weight:700;padding:7px 14px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between}
+  #pip .cap span{color:#bef264;font-weight:600}
+  #pip .im{position:relative;width:600px;background:#fff;border:3px solid #0f172a;border-top:0;border-radius:0 0 12px 12px;overflow:hidden}
+  #pip .im img{position:absolute;left:0;top:0;width:600px}
+</style></head>
+<body>
+<canvas id="c" width="1280" height="720"></canvas>
+<div id="callouts"></div>
+<div id="chap"></div><div id="brand">🥩 FF Renovate Survey · MTN</div>
+<div id="pip"><div class="cap"><b id="pipT"></b><span>หน้าจอจริงในแอป</span></div><div class="im" id="pipBox"><img id="pipI"></div></div>
+<div id="ov"></div><div id="sub"></div>
+<div id="fade"></div>
+<script src="timeline.js"></script>
+<script type="module">
+import * as THREE from './three.module.js';
+const W = 1280, H = 720, $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ss = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const eio = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const back = x => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+const TL = window.TL, SEG = {}; TL.forEach((e, i) => { e.i = i; SEG[e.ph] = e; });
+let T = 0;
+const S0 = ph => SEG[ph].start;
+const F = (ph, fr) => (SEG[ph].audio - SEG[ph].start) + fr * SEG[ph].nd;
+const A = (ph, off, dur = 1) => ss((T - S0(ph) - off) / dur);
+const IN = ph => T >= S0(ph) && T < S0(ph) + SEG[ph].dur;
+const L = ph => T - S0(ph);
+
+// ── renderer ──
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(window.devicePixelRatio || 1); renderer.setSize(W, H, false);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1e2a3a); scene.fog = new THREE.Fog(0x1e2a3a, 50, 120);
+const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 300);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 1.25));
+const sun = new THREE.DirectionalLight(0xfff6e6, 1.5); sun.position.set(14, 30, 18); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 95 }); sun.shadow.bias = -0.0005; scene.add(sun);
+
+const MC = {};
+function mat(c, o) { const k = c + JSON.stringify(o || {}); return MC[k] || (MC[k] = new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .75, metalness: .05 }, o || {}))); }
+function grp(parent, x = 0, y = 0, z = 0, ry = 0) { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; parent.add(g); return g; }
+function box(g, w, h, d, c, x = 0, y = 0, z = 0, o) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), o && o.isMaterial ? o : mat(c, o)); m.position.set(x, y + h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function cyl(g, r, h, c, x = 0, y = 0, z = 0, o, seg = 24, r2) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r2 == null ? r : r2, r, h, seg), o && o.isMaterial ? o : mat(c, o)); m.position.set(x, y + h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function tex(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+const FONT = '"Leelawadee UI","Segoe UI",Tahoma,sans-serif';
+function planeTex(g, w, h, t, x, y, z, o = {}) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: t, roughness: .6, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: o.glow == null ? .35 : o.glow, side: THREE.DoubleSide, transparent: !!o.transparent, opacity: o.opacity == null ? 1 : o.opacity, depthWrite: o.depthWrite !== false }));
+  m.position.set(x, y, z); if (o.ry) m.rotation.y = o.ry; if (o.rx) m.rotation.x = o.rx; g.add(m); return m;
+}
+function sign(g, w, h, text, bg, x, y, z, ry = 0, fs = 58) {
+  return planeTex(g, w, h, tex(512, Math.round(512 * h / w), (c, cw, ch) => { c.fillStyle = bg; c.fillRect(0, 0, cw, ch); c.fillStyle = '#fff'; c.font = 'bold ' + fs + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, cw / 2, ch / 2 + 2, cw - 20); }), x, y, z, { ry });
+}
+function person(g, x, z, shirt, ry = 0) {
+  const p = grp(g, x, 0, z, ry);
+  cyl(p, .17, .8, 0x1f2937, -.09, 0, 0, null, 10); cyl(p, .17, .8, 0x1f2937, .09, 0, 0, null, 10);
+  const b = new THREE.Mesh(new THREE.CapsuleGeometry(.28, .55, 4, 10), mat(shirt)); b.position.y = 1.15; b.castShadow = true; p.add(b);
+  const h = new THREE.Mesh(new THREE.SphereGeometry(.22, 16, 12), mat(0xe0b48c)); h.position.y = 1.72; h.castShadow = true; p.add(h);
+  const ph = box(p, .1, .18, .02, 0x0f172a, .26, 1.18, .22); ph.rotation.x = -.6;
+  p.userData.thermo = box(p, .09, .22, .05, 0xfacc15, -.28, 1.2, .24);
+  return p;
+}
+
+// ───────────── outside ground + store shell ─────────────
+{ const g = new THREE.Mesh(new THREE.PlaneGeometry(110, 80), mat(0x5b6472)); g.rotation.x = -Math.PI / 2; g.position.y = -.12; g.receiveShadow = true; scene.add(g); }
+const STORE = grp(scene);
+box(STORE, 38, .1, 24, 0xd6d3d1, 0, -.1, 0);
+{ const t = tex(512, 512, (c) => { c.fillStyle = '#e7e5e4'; c.fillRect(0, 0, 512, 512); c.strokeStyle = '#d6d3d1'; c.lineWidth = 3; for (let i = 0; i <= 512; i += 64) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 512); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(512, i); c.stroke(); } });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(9, 6);
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(38, 24), new THREE.MeshStandardMaterial({ map: t, roughness: .9 })); fl.rotation.x = -Math.PI / 2; fl.position.y = .01; fl.receiveShadow = true; STORE.add(fl); }
+const WALL = 0xf1f5f9;
+box(STORE, 22.4, 4, .3, WALL, -7.8, 0, -12); box(STORE, 12.4, 4, .3, WALL, 12.8, 0, -12); box(STORE, 3.2, 1, .3, WALL, 5, 3, -12);   // back wall with loading door gap (x 3.4–6.6)
+box(STORE, .3, 4, 24, WALL, -19, 0, 0); box(STORE, .3, 4, 24, WALL, 19, 0, 0);
+box(STORE, 3.2, .5, .1, 0x64748b, 5, 2.5, -12.2);                                              // raised shutter
+box(STORE, 16, 1.0, .08, 0x93c5fd, -8, 0, 11.8, { transparent: true, opacity: .45 });
+planeTex(STORE, 10, 1.0, tex(1024, 102, (c, w, h) => { c.fillStyle = '#65a30d'; c.fillRect(0, 0, w, h); c.fillStyle = '#fff'; c.font = 'bold 66px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('FRESH FOOD · Big C สาขาตัวอย่าง', w / 2, h / 2); }), -7.8, 3.05, -11.83);
+
+// product textures
+const uprTex = tex(256, 256, (c, w, h) => { c.fillStyle = '#e0f2fe'; c.fillRect(0, 0, w, h); const cols = ['#f8fafc', '#fde68a', '#fca5a5', '#86efac', '#93c5fd', '#fdba74']; for (let r = 0; r < 5; r++) { c.fillStyle = '#94a3b8'; c.fillRect(0, r * 51 + 46, w, 5); for (let i = 0; i < 12; i++) { c.fillStyle = cols[(i + r * 2) % 6]; c.fillRect(6 + i * 20.5, r * 51 + 12, 15, 34); } } c.strokeStyle = '#475569'; c.lineWidth = 8; c.strokeRect(0, 0, w, h); c.beginPath(); c.moveTo(w / 2, 0); c.lineTo(w / 2, h); c.stroke(); });
+const frzTex = tex(256, 128, (c, w, h) => { c.fillStyle = '#dbeafe'; c.fillRect(0, 0, w, h); const cols = ['#f472b6', '#60a5fa', '#fbbf24', '#34d399', '#f87171']; for (let i = 0; i < 40; i++) { c.fillStyle = cols[i % 5]; c.fillRect(8 + (i % 10) * 24, 10 + Math.floor(i / 10) * 28, 20, 22); } c.strokeStyle = '#94a3b8'; c.lineWidth = 6; c.strokeRect(0, 0, w, h); });
+const meatTex = tex(256, 64, (c, w, h) => { c.fillStyle = '#fef2f2'; c.fillRect(0, 0, w, h); for (let i = 0; i < 16; i++) { c.fillStyle = i % 3 ? '#dc2626' : '#f87171'; c.fillRect(6 + i * 15.5, 14, 12, 36); } });
+const fruitTex = tex(256, 128, (c, w, h) => { c.fillStyle = '#ecfccb'; c.fillRect(0, 0, w, h); const cols = ['#f97316', '#84cc16', '#ef4444', '#facc15', '#a855f7']; for (let i = 0; i < 60; i++) { c.fillStyle = cols[i % 5]; c.beginPath(); c.arc(10 + (i % 15) * 16.5, 14 + Math.floor(i / 15) * 30, 9, 0, 7); c.fill(); } });
+
+// ── wall upright cabinets (Remote), 6 ──
+const UPR = [];
+for (let i = 0; i < 6; i++) {
+  const x = -14 + i * 2.5, g = grp(STORE, x, 0, -11.25);
+  box(g, 2.4, 2.2, .9, 0xf8fafc); const front = planeTex(g, 2.2, 1.85, uprTex, 0, 1.15, .46, { glow: .55 });
+  const tag = box(g, 1.4, .26, .06, 0x94a3b8, 0, 2.3, .4, mat(0x94a3b8));
+  UPR.push({ g, x, front, tag });
+}
+// rust on cabinet 4 (the one that turns out to be Request New)
+[[.85, .25], [-.9, .45], [.6, 2.0], [-.3, .15]].forEach(([dx, y]) => { const r = new THREE.Mesh(new THREE.CircleGeometry(.08, 10), mat(0xb45309, { roughness: 1 })); r.position.set(UPR[4].x + dx, y, -11.25 + .461); STORE.add(r); });
+// refrigerant pipes from the machine room along the back wall to each cabinet
+const PIPEM = new THREE.MeshStandardMaterial({ color: 0x111827, emissive: 0x06b6d4, emissiveIntensity: 0, roughness: .6 });
+{ const pts = [V(15.5, 1.6, -9.6), V(15.5, 3.7, -9.6), V(13, 3.7, -11.5), V(-15, 3.7, -11.5)]; STORE.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, 'catmullrom', .05), 80, .07, 8), PIPEM));
+  UPR.forEach(u => STORE.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(V(u.x, 3.7, -11.5), V(u.x, 2.2, -11.5)), 4, .05, 6), PIPEM))); }
+
+// ── island cabinets (Plug-in low frozen), 10 ──
+const ISL = [];
+for (let i = 0; i < 10; i++) {
+  const x = -12 + (i % 5) * 2.6, z = i < 5 ? -5 : -3.2, g = grp(STORE, x, 0, z);
+  box(g, 2.3, .8, 1.1, 0xf1f5f9); const top = planeTex(g, 2.2, 1.0, frzTex, 0, .82, 0, { rx: -Math.PI / 2, glow: .5 });
+  const lid = box(g, 2.3, .06, 1.1, 0xbae6fd, 0, .82, 0, { transparent: true, opacity: .35 });
+  ISL.push({ g, x, z, top, lid });
+}
+const OUTLETS = [-5, -3.2].map(z => box(STORE, .3, .12, .3, 0x475569, .1, 0, z));
+const DRAIN = (() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(.7, .7), mat(0x1f2937)); m.rotation.x = -Math.PI / 2; m.position.set(-13.9, .02, -1.9); STORE.add(m); return m; })();
+// import fruit island + service counter
+{ const g = grp(STORE, -8, 0, 3.5); box(g, 3, .9, 1.6, 0x365314); planeTex(g, 2.9, 1.5, fruitTex, 0, .92, 0, { rx: -Math.PI / 2, glow: .5 }); }
+const COUNTER = grp(STORE, 8, 0, -5.5);
+box(COUNTER, 6, .95, 1.1, 0x7f1d1d); planeTex(COUNTER, 5.8, .8, meatTex, 0, .98, 0, { rx: -Math.PI / 2, glow: .5 });
+box(COUNTER, 6, .5, .06, 0xbae6fd, 0, .95, .5, { transparent: true, opacity: .45 }); sign(COUNTER, 3, .45, 'Service Counter', '#991b1b', 0, 2.4, 0, 0, 52);
+// ── machine room ──
+box(STORE, .2, 3.2, 4.6, 0xe2e8f0, 12, 0, -9.7); box(STORE, .2, 3.2, .8, 0xe2e8f0, 12, 0, -5.4); box(STORE, 7, 3.2, .2, 0xe2e8f0, 15.5, 0, -5);
+sign(STORE, 2.8, .5, 'ห้องเครื่อง (Rack)', '#0f172a', 15.5, 2.5, -4.88);
+const RACK = grp(STORE, 16.3, 0, -9.2);
+box(RACK, 3.4, .35, 1.1, 0x334155); box(RACK, .08, 1.8, .08, 0x64748b, -1.66, 0, -.5); box(RACK, .08, 1.8, .08, 0x64748b, 1.66, 0, -.5); box(RACK, 3.4, .08, .08, 0x64748b, 0, 1.8, -.5);
+cyl(RACK, .28, 2.6, 0x9ca3af, 0, 1.25, -.35, null, 20).rotation.z = Math.PI / 2;
+const COMP = [0, 1, 2, 3].map(i => { const c = cyl(RACK, .26, .75, 0x14532d, -1.2 + i * .8, .35, .1, { metalness: .4, roughness: .45 }); const led = box(RACK, .1, .06, .02, 0x22c55e, -1.2 + i * .8, .7, .37, { emissive: 0x22c55e, emissiveIntensity: 1 }); return { c, led }; });
+const PANEL = box(STORE, .9, 1.3, .3, 0xcbd5e1, 18.6, .8, -7.6); PANEL.rotation.y = -Math.PI / 2;
+{ const o = new THREE.Mesh(new THREE.CircleGeometry(.45, 20), mat(0x1c1917, { roughness: .2, metalness: .3 })); o.rotation.x = -Math.PI / 2; o.position.set(16.3 + .4, .03, -8.6); o.scale.set(1.4, .8, 1); STORE.add(o); }
+const MDB = grp(STORE, 13.4, 0, -11.55); box(MDB, 1.8, 2.3, .5, 0x9ca3af); box(MDB, .02, 2.1, .02, 0x475569, 0, .1, .26);
+const MDBLED = box(MDB, .5, .14, .02, 0xf59e0b, 0, 1.9, .26, { emissive: 0xf59e0b, emissiveIntensity: .9 });
+// condenser + chillers outside the right wall
+const COND = grp(scene, 21.3, 0, -9.2); box(COND, 1.4, 1.3, 3.2, 0x94a3b8); const FANS = [-.8, .8].map(z => { const f = grp(COND, 0, 1.33, z); cyl(f, .55, .05, 0x1f2937); box(f, 1.0, .02, .14, 0x0f172a, 0, .06, 0); return f; });
+const CHIL = [-3.5, -.5, 2.5].map((z, i) => { const g = grp(scene, 22, 0, z); box(g, 1.6, 1.7, 2.6, 0x60a5fa); const f = grp(g, 0, 1.72, 0); cyl(f, .5, .05, 0x1e3a8a); box(f, .9, .02, .14, 0x0f172a, 0, .06, 0); return { g, f, run: i < 2 }; });
+// prep room (front-left)
+box(STORE, .2, 3, 4.8, 0xe2e8f0, -13, 0, 8.4); box(STORE, 6, 3, .2, 0xe2e8f0, -16, 0, 3);
+sign(STORE, 2.4, .45, 'ห้องเตรียม', '#0f766e', -16, 3.2, 3.12, 0, 56);
+box(STORE, 2.4, .9, .9, 0xd1d5db, -16.5, 0, 6.4, { metalness: .6, roughness: .3 });
+const SAW = grp(STORE, -17.6, 0, 8.6); box(SAW, .8, 1.5, .7, 0xe5e7eb); box(SAW, .05, .6, .05, 0xdc2626, 0, 1.5, 0);
+const SCALE = grp(STORE, -15.8, .9, 6.4); box(SCALE, .45, .12, .4, 0x334155); box(SCALE, .3, .3, .06, 0x0f172a, 0, .12, -.17);
+// loading area: truck + new cabinet crate + staging square
+const TRUCK = grp(scene, 5, 0, -18.5); box(TRUCK, 2.6, 2.8, 5.5, 0xf8fafc, 0, .4, 0); box(TRUCK, 2.6, 2.0, 1.8, 0x1d4ed8, 0, .4, 3.7);
+[-1.8, 1.6, 3.6].forEach(z => [-1.2, 1.2].forEach(x => { const w = cyl(TRUCK, .45, .3, 0x111827, x, 0, z); w.rotation.z = Math.PI / 2; w.position.y = .45; }));
+const CRATE = grp(scene, 5, -50, -15); box(CRATE, 2.2, .15, 1.1, 0x92400e); box(CRATE, 2.1, 2.0, 1.0, 0xfef3c7, 0, .15, 0); sign(CRATE, 1.6, .4, 'ตู้ใหม่', '#b45309', 0, 1.3, .52, 0, 60);
+const STAGE = (() => { const m = new THREE.Mesh(new THREE.PlaneGeometry(4, 3), new THREE.MeshBasicMaterial({ map: tex(256, 192, (c, w, h) => { c.strokeStyle = '#f59e0b'; c.lineWidth = 10; c.setLineDash([22, 14]); c.strokeRect(8, 8, w - 16, h - 16); }), transparent: true })); m.rotation.x = -Math.PI / 2; m.position.set(5, .03, -8.3); STORE.add(m); return m; })();
+const DOORW = new THREE.Mesh(new THREE.PlaneGeometry(3.2, .5), new THREE.MeshBasicMaterial({ map: tex(512, 80, (c, w, h) => { c.fillStyle = '#f59e0b'; c.fillRect(0, 34, w, 12); c.beginPath(); c.moveTo(0, 40); c.lineTo(30, 10); c.lineTo(30, 70); c.fill(); c.beginPath(); c.moveTo(w, 40); c.lineTo(w - 30, 10); c.lineTo(w - 30, 70); c.fill(); }), transparent: true, side: THREE.DoubleSide })); DOORW.position.set(5, 1.6, -12.25); scene.add(DOORW);
+
+// heat shimmer particles over the plug-in islands
+const HEAT = []; ISL.forEach((s, i) => { for (let k = 0; k < 5; k++) { const m = new THREE.Mesh(new THREE.SphereGeometry(.13, 8, 6), new THREE.MeshBasicMaterial({ color: 0xf97316, transparent: true, opacity: .45, depthWrite: false })); m.userData = { s, k, seed: (i * 7 + k * 13) % 10 / 10, dx: ((k * 37) % 9 - 4) * .22 }; scene.add(m); HEAT.push(m); } });
+// final layout drawing (floats over the store in 'layout')
+const LAYT = tex(1520, 960, (c, w, h) => {
+  c.fillStyle = 'rgba(255,255,255,.92)'; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(37,99,235,.22)'; c.lineWidth = 1; for (let i = 0; i < w; i += 40) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.stroke(); } for (let i = 0; i < h; i += 40) { c.beginPath(); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); }
+  const X = x => (x + 19) * 40, Z = z => (z + 12) * 40, R = (x0, z0, x1, z1, col, lab) => { c.strokeStyle = col; c.lineWidth = 6; c.strokeRect(X(x0), Z(z0), X(x1) - X(x0), Z(z1) - Z(z0)); if (lab) { c.fillStyle = col; c.font = 'bold 26px ' + FONT; c.fillText(lab, X(x0) + 8, Z(z0) + 30); } };
+  c.strokeStyle = '#1e3a8a'; c.lineWidth = 10; c.strokeRect(4, 4, w - 8, h - 8);
+  UPR.forEach(u => R(u.x - 1.2, -11.7, u.x + 1.2, -10.8, '#1d4ed8')); c.fillStyle = '#1d4ed8'; c.font = 'bold 26px ' + FONT; c.fillText('Remote · High chilled × 6', X(-15), Z(-10.2));
+  ISL.forEach(s => R(s.x - 1.15, s.z - .55, s.x + 1.15, s.z + .55, '#1d4ed8')); c.fillText('Plug-in islands × 10', X(-13), Z(-1.8));
+  R(5, -6.05, 13, -4.95, '#dc2626', 'Service Counter 8 ม.'); R(12, -12, 19, -5, '#334155', 'ห้องเครื่อง'); R(-19, 3, -13, 11, '#0f766e', 'ห้องเตรียม'); R(-9.5, 2.7, -6.5, 4.3, '#1d4ed8', 'Fruit');
+  c.fillStyle = '#1e3a8a'; c.font = 'bold 40px ' + FONT; c.fillText('FINAL LAYOUT · REV02', X(-18), Z(10.8));
+});
+const LAYP = planeTex(scene, 38, 24, LAYT, 0, -50, 0, { rx: -Math.PI / 2, glow: .6, transparent: true, opacity: .85, depthWrite: false });
+
+// plan sheet + cabinet cards
+const CARDS_DEF = [['ref', 'High Chilled glass door × 6', 'แผน: Refurbish 6'], ['new', 'Low frozen plug-in × 10', 'แผน: ซื้อใหม่ 10'], ['new', 'Open counter service × 1', 'แผน: ซื้อใหม่ 1'],
+  ['ref', 'Import fruit plug-in × 1', 'แผน: Refurbish 1'], ['new', 'Meat volume line × 2', 'แผน: ซื้อใหม่ 2'], ['ref', 'High frozen × 2', 'แผน: Refurbish 2']];
+function cardTex(d) {
+  return tex(560, 340, (c, w, h) => {
+    const col = d[0] === 'ref' ? '#15803d' : '#be123c';
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = '#334155'; c.fillRect(0, 0, w, 76);
+    c.fillStyle = '#fff'; c.font = 'bold 34px ' + FONT; c.textBaseline = 'middle'; c.fillText('🧊 ' + d[1], 20, 40, w - 36);
+    c.fillStyle = col; c.fillRect(20, 104, 300, 56); c.fillStyle = '#fff'; c.font = 'bold 30px ' + FONT; c.fillText(d[2], 34, 133, 280);
+    const cols = ['#15803d', '#0369a1', '#be123c', '#64748b'], lab = ['Refurb', 'Workable', 'New', 'ไม่พบ'];
+    lab.forEach((l, i) => { c.fillStyle = cols[i]; c.globalAlpha = .14; c.fillRect(20 + i * 132, 200, 120, 100); c.globalAlpha = 1; c.fillStyle = cols[i]; c.font = 'bold 26px ' + FONT; c.textAlign = 'center'; c.fillText(l, 80 + i * 132, 250); c.textAlign = 'left'; });
+    c.strokeStyle = '#cbd5e1'; c.lineWidth = 4; c.strokeRect(2, 2, w - 4, h - 4);
+  });
+}
+const CARDS = CARDS_DEF.map(d => planeTex(scene, 2.8, 1.7, cardTex(d), 0, -50, 0, { glow: .55 }));
+const SHEET = planeTex(scene, 2.2, 3, tex(440, 600, (c, w, h) => { c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.fillStyle = '#4d7c0f'; c.fillRect(0, 0, w, 70); c.fillStyle = '#fff'; c.font = 'bold 30px ' + FONT; c.fillText('แผนของสาขา', 18, 46);
+  for (let i = 0; i < 16; i++) { c.fillStyle = i % 2 ? '#f1f5f9' : '#fff'; c.fillRect(10, 86 + i * 31, w - 20, 29); c.fillStyle = '#334155'; c.font = '20px ' + FONT; c.fillText(['High chilled · Refurbish', 'Low frozen · ซื้อใหม่', 'Open counter · ซื้อใหม่', 'High frozen · Refurbish'][i % 4], 20, 107 + i * 31); } }), 0, -50, 0, { glow: .55 });
+const FLASH = new THREE.PointLight(0xffffff, 0, 9); scene.add(FLASH);
+
+const MTN = person(STORE, 0, 10.2, 0x4d7c0f, Math.PI);
+
+// ── MTN position over time ──
+const P_ENT = V(0, 0, 10.2), P1 = V(-8, 0, 5.6), P2 = V(-2, 0, -1.2), P3 = V(5, 0, -9.3), P_UPR = V(-6.3, 0, -9.0), P_ISL = V(-6.8, 0, -1.6), P_RACK = V(18.0, 0, -6.6), P_MDB = V(15.0, 0, -10.6), P_STG = V(7, 0, -7.6), P_PREP = V(-15.2, 0, 7.6);
+function mtnAt(t) {
+  const seg = TL.reduce((s, e) => t >= e.start ? e : s, TL[0]), lt = t - seg.start, ph = seg.ph, f = fr => F(ph, fr);
+  const walk = (a, b, t0, t1) => { const k = eio((lt - t0) / Math.max(t1 - t0, .01)); return a.clone().lerp(b, k); };
+  let p = P_ENT, ry = Math.PI, vis = true, thermo = false;
+  if (ph === 'amb') { thermo = true; p = lt < f(.3) ? walk(P_ENT, P1, .3, f(.12)) : lt < f(.58) ? walk(P1, P2, f(.3), f(.46)) : walk(P2, P3, f(.58), f(.76)); }
+  else if (ph === 'cards') p = walk(P3, P_UPR, .3, 3.5);
+  else if (ph === 'inspect' || ph === 'split') p = P_UPR;
+  else if (ph === 'newplan') p = walk(P_UPR, P_ISL, .2, 2.4);
+  else if (ph === 'rack') p = P_RACK;
+  else if (ph === 'site') vis = false;
+  else if (ph === 'cap') p = P_MDB;
+  else if (ph === 'install') p = P_STG;
+  else if (ph === 'submit') { p = P_PREP; ry = -Math.PI / 2; }
+  else if (['recap', 'outro', 'why', 'title'].includes(ph)) vis = ph !== 'recap' && ph !== 'outro';
+  return { p, ry, vis, thermo };
+}
+
+// ── camera poses per scene ──
+const OVR = [V(-22, 20, 28), V(-1, 0, -2)];
+const POSE = {
+  title: () => OVR, why: () => OVR,
+  store: lt => { const k = eio(lt / 13); return [V(lerp(-22, 24, k), lerp(19, 14, k), lerp(26, 18, k)), V(lerp(-4, 6, k), 1, lerp(-3, -5, k))]; },
+  open: () => [V(-2.5, 3.2, 13.6), V(.4, 1.2, 9.4)],
+  layout: lt => { const k = eio(lt / 10); return [V(lerp(-6, 0, k), lerp(26, 30, k), lerp(20, 16, k)), V(-1, 0, -2)]; },
+  amb: lt => { const m = mtnAt(S0('amb') + lt).p; return [m.clone().add(V(-4.6, 4.6, 5.6)), m.clone().add(V(0, 1, 0))]; },
+  cards: () => [V(-1, 7, 17), V(-1, 4.8, 4)],
+  inspect: () => [V(-11.4, 2.8, -5.4), V(-10.2, 1.2, -11.2)],
+  split: () => [V(-7.75, 4.6, -2.6), V(-7.75, 1.4, -11)],
+  newplan: () => [V(-6.8, 7.2, 4.2), V(-6.8, .5, -4.2)],
+  rack: lt => { const k = eio((lt - F('rack', .75)) / 1.6); return [V(lerp(14.2, 17.0, k), lerp(7.2, 8.0, k), lerp(-1.2, -3.0, k)), V(lerp(16.8, 21, k), lerp(.6, 1, k), lerp(-9.2, -9.2, k))]; },
+  site: () => [V(-1, 15, 15), V(-1, 0, -5)],
+  cap: lt => { const k = eio((lt - F('cap', .45)) / 1.6); return [V(lerp(29, 14.6, k), lerp(8, 7.0, k), lerp(5, -1.4, k)), V(lerp(21.5, 13.6, k), lerp(1, 1.2, k), lerp(-1, -11.4, k))]; },
+  install: () => [V(14, 11, -24), V(4.5, .5, -11)],
+  submit: lt => { const k = eio((lt - F('submit', .6)) / 2); return [V(lerp(-12.4, -10, k), lerp(4.2, 26, k), lerp(13.2, 24, k)), V(lerp(-17.6, 0, k), 1, lerp(7.6, 0, k))]; },
+  recap: () => OVR, outro: () => OVR
+};
+// ── callouts ──
+const CO = [];
+function co(html, cls, p, a, dx = 0, dy = 0) { if (a > .01) CO.push([html, cls, p, a, dx, dy]); }
+function project(p) { const v = (p.isVector3 ? p.clone() : V(p[0], p[1], p[2])).project(camera); return { x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H, front: v.z < 1 }; }
+// ── PIP: real app screenshots ──
+const PIPDEF = {
+  open: [['f02_store', 'ข้อ 1 · ผู้ตรวจ & สาขา', 0]],
+  layout: [['f03_context_u', 'ข้อ 2 · แผนของสาขา + Final Layout', .05]],
+  amb: [['f04_amb', 'ข้อ 3 · อุณหภูมิพื้นที่ขาย', .1]],
+  cards: [['f05_card_ref_u', 'การ์ดตู้แช่ (1 การ์ด = 1 รายการ)', .45]],
+  inspect: [['f05_card_ref_u', 'ข้อมูลตู้ + สภาพ 3 ด้าน + รูป', .05]],
+  newplan: [['f06_card_new_u', 'การ์ดแผนซื้อใหม่ + Write-off', .1]],
+  rack: [['f08_rack', 'ข้อ 5 · Rack / Multiset', .1]],
+  site: [['f09_site', '6.1 · คำถามหน้างาน 8 ข้อ', .05]],
+  cap: [['f11_cap', '6.2 · กำลังแอร์ & ไฟฟ้า', .05]],
+  install: [['f12_inst', '6.3 · ข้อจำกัดการติดตั้ง', .05]],
+  submit: [['f10_submit', 'ข้อ 7–8 · Save Draft / Submit', .05]]
+};
+const PIPH = {};
+function drawPip(seg, lt) {
+  const list = PIPDEF[seg.ph], el = $('pip');
+  if (!list) { el.style.display = 'none'; return 0; }
+  let idx = 0; list.forEach((x, i) => { if (lt >= F(seg.ph, x[2]) - .3 || i === 0) idx = i; });
+  const [n, cap, fr] = list[idx];
+  const start = idx === 0 ? Math.min(F(seg.ph, fr), 2.2) : F(seg.ph, fr), end = idx < list.length - 1 ? F(seg.ph, list[idx + 1][2]) : seg.dur - .4;
+  const a = ss((lt - start) / .5) * ss((end - lt) / .4);
+  el.style.display = a > .01 ? 'block' : 'none'; el.style.opacity = a; el.style.transform = `translateX(${((1 - a) * 40).toFixed(1)}px)`;
+  const ih = PIPH[n] || 400, boxH = Math.min(ih, 400);
+  $('pipT').textContent = cap; $('pipBox').style.height = boxH + 'px';
+  if ($('pipI').dataset.n !== n) { $('pipI').src = 'shots/pip/' + n + '.png'; $('pipI').dataset.n = n; }
+  const pan = ih > boxH ? (ih - boxH) * eio((lt - start - 1.2) / Math.max(end - start - 2.4, 1)) : 0;
+  $('pipI').style.transform = `translateY(${-pan.toFixed(1)}px)`;
+  return a;
+}
+const setGlow = (m, col, k) => { m.material = mat(col, { emissive: col, emissiveIntensity: k }); };
+const OUTC = ['ref', 'ref', 'wk', 'ref', 'new', 'ref'], OCOL = { ref: 0x16a34a, wk: 0x0284c7, new: 0xdc2626 };
+
+window.renderAt = function (t) {
+  T = t; CO.length = 0;
+  let seg = TL[0]; TL.forEach(e => { if (t >= e.start) seg = e; });
+  const ph = seg.ph, lt = t - seg.start;
+  let [p, q] = POSE[ph](lt);
+  if (seg.i > 0 && lt < 1.4) { const pr = TL[seg.i - 1], [p0, q0] = POSE[pr.ph](pr.dur); const k = eio(lt / 1.4); p = p0.clone().lerp(p, k); q = q0.clone().lerp(q, k); }
+  camera.position.copy(p); camera.lookAt(q);
+  const pipA = drawPip(seg, lt), off = 300 * pipA * (Math.min(PIPH[($('pipI').dataset.n) || ''] || 400, 400) > 300 ? 1 : 0);
+  if (off > .5) camera.setViewOffset(W, H, off, 0, W, H); else camera.clearViewOffset();
+  camera.updateMatrixWorld();
+
+  // MTN
+  { const m = mtnAt(t); MTN.position.copy(m.p); MTN.rotation.y = m.ry; MTN.visible = m.vis; MTN.userData.thermo.visible = m.thermo; }
+  // wall cabinet tags: decided in 'split', kept afterwards
+  const dec = t >= S0('split') ? (IN('split') ? A('split', F('split', .35), .6) : 1) : 0;
+  UPR.forEach((u, i) => { const o = OUTC[i]; if (dec > .5) setGlow(u.tag, OCOL[o], .8); else u.tag.material = mat(0x94a3b8); u.tag.scale.y = dec > .5 ? 1 + .25 * Math.max(0, 1 - Math.abs((L('split') - F('split', .35) - i * .15))) : 1; });
+  // islands: plan new → workable 1 (blue) / new 9 (red)
+  const ndec = t >= S0('newplan') ? (IN('newplan') ? A('newplan', F('newplan', .2), .6) : 1) : 0;
+  ISL.forEach((s, i) => { s.lid.material = ndec > .5 ? mat(i === 2 ? 0x38bdf8 : 0xf87171, { transparent: true, opacity: .55, emissive: i === 2 ? 0x0284c7 : 0xdc2626, emissiveIntensity: .5 }) : mat(0xbae6fd, { transparent: true, opacity: .35 }); });
+  // compressors: #3 broken (blinks red) once in the rack scene
+  COMP.forEach((c, i) => { const bad = i === 2 && t >= S0('rack'); const col = bad ? 0xef4444 : 0x22c55e; c.led.material = mat(col, { emissive: col, emissiveIntensity: bad ? (Math.sin(t * 7) > 0 ? 1.4 : .2) : 1 }); });
+  FANS.forEach((f, i) => { f.rotation.y = t * 9 + i; }); CHIL.forEach((c, i) => { c.f.rotation.y = c.run ? t * 7 + i : 0; });
+  MDBLED.material = mat(0xf59e0b, { emissive: 0xf59e0b, emissiveIntensity: IN('cap') ? .6 + .6 * Math.sin(t * 5) : .9 });
+  // pipes glow + heat shimmer in 'site'
+  PIPEM.emissiveIntensity = IN('site') ? .5 + .4 * Math.sin(t * 3) : 0;
+  const heatOn = IN('site') ? A('site', F('site', .55), .8) : 0;
+  HEAT.forEach(m => { const u = m.userData, ph2 = (t * .45 + u.seed) % 1; m.visible = heatOn > .01; m.position.set(u.s.x + u.dx, .9 + ph2 * 2.6, u.s.z + (u.k % 2 ? .2 : -.2)); m.scale.setScalar(.6 + ph2 * 1.4); m.material.opacity = .5 * heatOn * (1 - ph2); });
+  OUTLETS.forEach(o => setGlow(o, IN('site') && lt > F('site', .4) ? 0xfacc15 : 0x475569, IN('site') ? .8 : 0));
+  DRAIN.material = mat(IN('site') && lt > F('site', .48) ? 0x0ea5e9 : 0x1f2937, IN('site') ? { emissive: 0x0ea5e9, emissiveIntensity: lt > F('site', .48) ? .6 : 0 } : undefined);
+  // layout drawing
+  { const on = IN('layout'), a = on ? A('layout', F('layout', .1), 1.2) * (1 - A('layout', SEG.layout.dur - .8, .6)) : 0; LAYP.visible = a > .01; LAYP.position.set(0, lerp(10, 4.6, eio(a)), 0); LAYP.material.opacity = .85 * a; }
+  // plan sheet → cards
+  const CARD_POS = CARDS_DEF.map((d, i) => V(-4.2 + (i % 3) * 3.1, 6.4 - Math.floor(i / 3) * 2.0, 4));
+  const sheetA = IN('cards') ? ss(L('cards') / .6) * (1 - A('cards', F('cards', .25) + .6, .5)) : 0;
+  SHEET.position.set(-1, 4.8, 8); SHEET.scale.setScalar(Math.max(sheetA, .001)); SHEET.visible = sheetA > .01;
+  CARDS.forEach((m, i) => { const vis = IN('cards'); if (vis) { const k = eio((L('cards') - F('cards', .2) - i * .25) / 1.1); m.visible = k > 0; m.position.copy(V(-1, 4.8, 8).lerp(CARD_POS[i], k)); m.scale.setScalar(Math.max(lerp(.3, 1, k), .001)); } else m.visible = false; });
+  // flash: inspect nameplate + rack/condenser photos
+  { let fl = 0, at = null;
+    if (IN('inspect')) { fl = Math.max(0, 1 - Math.abs(L('inspect') - F('inspect', .85)) / .15); at = V(-10.4, 1.3, -10.2); }
+    if (IN('rack')) { const a1 = Math.max(0, 1 - Math.abs(L('rack') - F('rack', .7)) / .15), a2 = Math.max(0, 1 - Math.abs(L('rack') - (F('rack', .75) + 2.2)) / .15); fl = Math.max(a1, a2); at = a2 > a1 ? V(20, 1.6, -9.2) : V(16.3, 1.3, -8.2); }
+    FLASH.intensity = 35 * fl; if (at) FLASH.position.copy(at); }
+  // crate: truck → door → staging
+  { const on = IN('install'); if (on) { const k1 = eio((lt - F('install', .1)) / 2.4), k2 = eio((lt - F('install', .1) - 2.6) / 2.2); const pos = V(5, .4, -16).lerp(V(5, 0, -12.6), k1).lerp(V(5, 0, -8.3), k2); CRATE.position.copy(pos); } else CRATE.position.y = -50; STAGE.visible = on || IN('submit') ? true : false; DOORW.visible = on && lt > F('install', .2); }
+
+  // ── callouts ──
+  if (ph === 'store') {
+    co('ตู้ริมผนัง = Remote <small>ท่อน้ำยาจาก Rack</small>', 'wk', [-8, 3.0, -11.2], A('store', F('store', .1), .4));
+    co('ตู้เกาะกลางฟลอร์ = Plug-in', 'new', [-6.8, 1.5, -4.1], A('store', F('store', .35), .4));
+    co('Service Counter', 'info', [8, 2.0, -5.5], A('store', F('store', .55), .4));
+    co('ห้องเครื่อง · Rack / Multiset', 'lime', [16, 3.2, -8.5], A('store', F('store', .2), .4));
+    co('ห้องเตรียม', 'info', [-16, 3.0, 6], A('store', F('store', .85), .4));
+  }
+  if (ph === 'open') co('📱 แท็บ 🥩 FF Renovate', 'lime', [.6, 2.2, 10.3], A('open', F('open', .1), .4), -110, 0);
+  if (ph === 'layout') {
+    co('Layout ตรง ✓ <small>ตู้เกาะ 2 แถว</small>', 'good', [-7, 4.7, -4.1], A('layout', F('layout', .4), .4));
+    co('ไม่ตรง ✗ <small>Layout 8 ม. · หน้างาน 6 ม.</small>', 'bad', [12, 4.7, -5.5], A('layout', F('layout', .62), .4));
+    co('→ ระบุจุด + แนบรูปขีดแก้', 'amber', [12, 4.7, -2.5], A('layout', F('layout', .8), .4));
+  }
+  if (ph === 'amb') {
+    const pts = [[P1, '24.6 °C · 58 %', 'good', '① Produce', .12], [P2, '26.2 °C · 61 %', 'amber', '② Frozen', .46], [P3, '28.1 °C · 63 %', 'bad', '③ ใกล้ Loading', .76]];
+    pts.forEach(([pp, v, c, n, f]) => co(`🌡️ ${v}<small>${n}</small>`, c, [pp.x, 2.3, pp.z], A('amb', F('amb', f) + .2, .4)));
+    co('สูง 1.5 ม. · ห่างตู้ ≥ 1 ม.', 'info', [P1.x, .6, P1.z], A('amb', F('amb', .14), .4) * (1 - A('amb', F('amb', .32), .4)), 0, 0);
+  }
+  if (ph === 'cards') { co('แผนของสาขา', 'lime', [-1, 6.5, 8], ss(L('cards') / .6) * (1 - A('cards', F('cards', .25) + .5, .4))); co('1 รายการ → 1 การ์ด', 'lime big', [-1, 8.1, 4], A('cards', F('cards', .55), .4)); }
+  if (ph === 'inspect') {
+    co('ปี 2009 · Arneg · 5.5 °C <small>ซ่อม CMS 12 เดือน: 4 ครั้ง</small>', 'info', [-10.6, 2.9, -10.8], A('inspect', F('inspect', .1), .4));
+    co('① ตัวตู้ <small>บุบ / สนิม / สี</small>', 'amber', [-11.5, 1.6, -10.8], A('inspect', F('inspect', .4), .4));
+    co('② ระบบทำความเย็น', 'wk', [-10.2, .7, -10.8], A('inspect', F('inspect', .5), .4));
+    co('③ ประตู / กระจก / ไฟ', 'info', [-9.0, 2.0, -10.8], A('inspect', F('inspect', .6), .4));
+    co('📷 ภาพรวม · จุดเสียหาย · Nameplate', 'lime', [-10.6, .2, -9.6], A('inspect', F('inspect', .82), .4), 0, 60);
+  }
+  if (ph === 'split') {
+    const lab = { ref: ['🛠️ Refurbish', 'good'], wk: ['✅ Workable', 'wk'], new: ['🆕 New', 'new'] };
+    UPR.forEach((u, i) => co(lab[OUTC[i]][0], lab[OUTC[i]][1], [u.x, 2.7, -10.8], A('split', F('split', .35) + i * .15, .3)));
+    co('สนิมทะลุ → เลือกเหตุผล', 'new', [UPR[4].x, .5, -10.6], A('split', F('split', .62), .4), 0, 70);
+    co('4 + 1 + 1 = 6 ✓ ครบ', 'good big', [-7.75, 4.2, -10.8], A('split', F('split', .85), .4));
+  }
+  if (ph === 'newplan') {
+    co('แผน: ซื้อใหม่ 10', 'new', [-6.8, 2.0, -4.1], A('newplan', 0, .4) * (1 - A('newplan', F('newplan', .2), .4)));
+    co('ยังดี → Workable ✓', 'wk', [ISL[2].x, 1.2, ISL[2].z], A('newplan', F('newplan', .25), .4));
+    co('Request New 9 <small>ตู้เดิมรื้อออก</small>', 'new', [-12, 1.2, -3.2], A('newplan', F('newplan', .5), .4));
+    co('📦 Asset No. (FAS) + Full / Partial write-off', 'amber', [-6.8, .4, -2.2], A('newplan', F('newplan', .75), .4), 0, 90);
+  }
+  if (ph === 'rack') {
+    co('คอมเพรสเซอร์ 4 · ทำงาน 3', 'info', [16.3, 1.4, -9.1], A('rack', F('rack', .1), .4));
+    co('คราบน้ำมัน / รั่ว', 'bad', [16.9, .1, -8.4], A('rack', F('rack', .22), .4), 0, 60);
+    co('กำลังสำรอง ~4 HP · วาล์วว่าง 2 <small>รับตู้ Remote ใหม่ได้?</small>', 'wk', [15.4, 2.3, -9.7], A('rack', F('rack', .38), .4) * (1 - A('rack', F('rack', .74), .3)));
+    co('ข้อเสนอ MTN: Overhaul', 'amber big', [16.3, 3.3, -9.7], A('rack', F('rack', .55), .4) * (1 - A('rack', F('rack', .74), .3)));
+    co('📷 Condenser + Nameplate', 'lime', [21.3, 2.0, -9.2], A('rack', F('rack', .75) + 1.8, .4));
+  }
+  if (ph === 'site') {
+    co('ห้องเครื่อง / ที่วาง Rack?', 'lime', [15.5, 3.4, -8.5], A('site', F('site', .05), .4));
+    co('แนวเดินท่อ Remote?', 'wk', [-2, 3.9, -11.5], A('site', F('site', .15), .4));
+    co('ไฟสำรอง MDB?', 'amber', [13.4, 2.5, -11.5], A('site', F('site', .27), .4));
+    co('เต้ารับกลางฟลอร์?', 'info', [.1, .3, -4.1], A('site', F('site', .4), .4), 40, 0);
+    co('จุดระบายน้ำ?', 'info', [-13.9, .2, -1.9], A('site', F('site', .48), .4), -30, 40);
+    co('♨ Plug-in ปล่อยความร้อน <small>แอร์รับเพิ่มได้?</small>', 'bad', [-6.8, 3.5, -4.1], A('site', F('site', .62), .4));
+  }
+  if (ph === 'cap') {
+    co('Chiller 3 · เดินบ่าย 2 <small>→ มีสำรอง 1</small>', 'wk', [22, 2.6, -3.5], A('cap', F('cap', .1), .4) * (1 - A('cap', F('cap', .45), .3)));
+    co('โหลดแอร์ 72 %', 'info', [22, 2.6, 2.5], A('cap', F('cap', .25), .4) * (1 - A('cap', F('cap', .45), .3)));
+    co('Main 4000 A · พีค 3300 A', 'info', [13.4, 2.6, -11.5], A('cap', F('cap', .5) + 1.4, .4));
+    co('ไฟ MDB เหลือ 18 % ⚠', 'bad big', [13.4, 1.4, -11.4], A('cap', F('cap', .72), .4), 0, 0);
+    co('💡 แนะนำอัตโนมัติ <small>ทีมออกแบบตัดสินขั้นสุดท้าย</small>', 'lime', [13.4, .4, -11.4], A('cap', F('cap', .9), .4), 0, 80);
+  }
+  if (ph === 'install') {
+    co('Loading / ที่จอดรถส่งตู้', 'info', [5, 3.6, -17], A('install', F('install', .1), .4));
+    co('ประตู ≥ 1.2 × 2.2 ม.', 'amber', [5, 2.6, -12.2], A('install', F('install', .22), .4));
+    co('🌙 ทำงานกลางคืน?', 'wk', [1, 3.5, -12], A('install', F('install', .42), .4));
+    co('พื้นที่พักตู้', 'lime', [5, .2, -8.3], A('install', F('install', .58), .4), 0, 30);
+    co('ปิดโซนชั่วคราว? · อยู่ในห้าง?', 'info', [-2, 2.2, -5], A('install', F('install', .75), .4));
+  }
+  if (ph === 'submit') {
+    co('เลื่อยกระดูก · ใช้ได้ 1', 'good', [-17.6, 2.3, 8.6], A('submit', F('submit', .05), .4) * (1 - A('submit', F('submit', .58), .3)));
+    co('เครื่องชั่ง · ต้องซ่อม 1', 'amber', [-15.8, 1.5, 6.4], A('submit', F('submit', .15), .4) * (1 - A('submit', F('submit', .58), .3)));
+    co('☁️ Submit → รายงาน HO', 'lime big', [0, 6, 0], A('submit', F('submit', .75), .5));
+  }
+  $('callouts').innerHTML = CO.map(([h, cls, p, a, dx, dy]) => { const s = project(p); if (!s.front) return ''; return `<div class="co ${cls}" style="left:${(s.x + dx).toFixed(1)}px;top:${(s.y + dy).toFixed(1)}px;opacity:${a.toFixed(3)}">${h}</div>`; }).join('');
+
+  $('chap').style.display = seg.chapter ? 'block' : 'none'; $('chap').textContent = seg.chapter;
+  drawOverlay(seg, lt);
+  $('sub').textContent = seg.say; $('sub').style.opacity = ss(lt / .4) * ss((seg.dur - lt) / .3);
+  const total = TL[TL.length - 1].start + TL[TL.length - 1].dur;
+  $('fade').style.opacity = Math.max(1 - ss(t / .8), ss((t - (total - 1.2)) / 1.0));
+  renderer.render(scene, camera);
+};
+
+function drawOverlay(seg, lt) {
+  const ov = $('ov'), ph = seg.ph, a = ss(lt / .5) * ss((seg.dur - lt) / .5);
+  const show = n => ss((lt - n) / .4), tr = n => `opacity:${show(n).toFixed(3)};transform:translateY(${((1 - show(n)) * 24).toFixed(1)}px)`;
+  let h = '';
+  if (ph === 'title') h = `<h1>🥩 สำรวจก่อน Renovate Fresh Food</h1><h2>FF Renovate Survey · คู่มือ 3D สำหรับ M1 / MTN สาขา / Area MTN</h2><p>ตรวจตามสภาพจริง · ถ่ายรูปทุกการ์ด · ตู้ / Rack ที่รื้อออกต้องมี Asset No.</p><p style="font-size:16px;opacity:.7;margin-top:14px">ฝ่ายบริหารอาคาร · Big C</p>`;
+  else if (ph === 'why') {
+    const tl = [['🌡️', 'อุณหภูมิ', 'พื้นที่ขาย<br>≥ 3 จุด', '#16a34a', .05], ['🧊', 'ตู้แช่ทุกใบ', 'Refurbish / Workable<br>/ Request New', '#0369a1', .25], ['⚙️', 'Rack / Multiset', 'สภาพ + กำลังสำรอง<br>+ รูป', '#4d7c0f', .45], ['🔌', 'Remote / Plug-in', 'ไฟ ท่อ ห้องเครื่อง<br>ระบายน้ำ แอร์', '#b45309', .62], ['📐', 'Final Layout', 'ตรงกับหน้างาน<br>หรือไม่', '#be123c', .8]];
+    h = `<h2>MTN ต้องตรวจ 5 เรื่อง</h2><div class="tiles">` + tl.map(([ic, b, s, c, f]) => `<div class="tile" style="border-color:${c};${tr(F(ph, f))}"><div class="ic">${ic}</div><b>${b}</b><span>${s}</span></div>`).join('') + `</div>`;
+  } else if (ph === 'recap') {
+    const st = [['📍', '1 · เลือกสาขา', 'แผน + Final Layout → การ์ดอัตโนมัติ', '#4d7c0f', .1], ['🌡️', '2 · วัดอุณหภูมิ', '≥ 3 จุด + รูปเครื่องวัด', '#16a34a', .25], ['🧊', '3 · ตรวจตู้ + Rack', 'แยกจำนวนครบ · สภาพ · รูป', '#0369a1', .4], ['📨', '4 · หน้างาน → ส่ง', '6.1–6.3 · Save Draft · Submit', '#b45309', .55]];
+    h = `<h2>สรุป 4 ขั้นตอน</h2><div class="flow">` + st.map(([ic, b, s, c, f], i) => (i ? `<span style="opacity:.7;${tr(F(ph, f))}">→</span>` : '') + `<div class="k" style="background:${c};${tr(F(ph, f))}"><i>${ic}</i>${b}<span>${s}</span></div>`).join('') + `</div><p style="margin-top:26px;font-size:24px;${tr(F(ph, .8))}"><b>ลงพื้นที่ 18–21 พ.ย. 2026</b></p>`;
+  } else if (ph === 'outro') h = `<h1>📖 คู่มือฉบับเต็ม</h1><h2>แอป → แท็บ 🥩 FF Renovate → ปุ่ม "คู่มือ"</h2><p style="margin-top:14px">ฝ่ายบริหารอาคาร (Building Management) · Big C</p>`;
+  if (!h) { ov.style.display = 'none'; return; }
+  ov.style.display = 'block'; ov.style.opacity = a; ov.innerHTML = `<div class="ovbg"></div><div class="ovw">${h}</div>`;
+}
+{ const names = new Set(); Object.values(PIPDEF).flat().forEach(x => names.add(x[0]));
+  Promise.all([...names].map(n => new Promise(res => { const im = new Image(); im.onload = () => { PIPH[n] = im.naturalHeight * 600 / im.naturalWidth; res(); }; im.onerror = res; im.src = 'shots/pip/' + n + '.png'; }))).then(() => { window.READY = true; }); }
+</script>
+</body></html>

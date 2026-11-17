@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8"><title>Asset category 3D</title>
+<style>
+  html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#0b1220;font-family:'Leelawadee UI','Segoe UI',Tahoma,sans-serif}
+  canvas{position:absolute;inset:0}
+  #callouts{position:absolute;inset:0;pointer-events:none}
+  .co{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font-weight:700;font-size:20px;color:#fff;padding:7px 14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .co::after{content:'';position:absolute;left:50%;bottom:-9px;margin-left:-8px;border:8px solid transparent;border-bottom:0;border-top-color:inherit}
+  .co small{display:block;font-size:14px;font-weight:600;opacity:.9}
+  .co.bad{background:#b91c1c;border-color:#b91c1c}.co.good{background:#15803d;border-color:#15803d}.co.info{background:#1e293b;border-color:#1e293b}
+  .co.net{background:#c2410c;border-color:#c2410c}.co.lv-c{background:#2563eb;border-color:#2563eb}.co.lv-s{background:#0f766e;border-color:#0f766e}
+  .co.lv-t{background:#b45309;border-color:#b45309}.co.lv-m{background:#be185d;border-color:#be185d}
+  .co.big{font-size:26px;padding:10px 18px}
+  #chap{position:absolute;left:24px;top:20px;padding:8px 18px;border-radius:12px;background:rgba(15,23,42,.85);color:#fff;font-size:22px;font-weight:700;border-left:6px solid #64748b}
+  #code{position:absolute;right:22px;top:14px;display:flex;gap:4px;align-items:flex-end}
+  .cp{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .cp .lv{font-size:13px;font-weight:700;color:#fff;padding:1px 8px;border-radius:6px}
+  .cp .v{font-family:Consolas,monospace;font-size:27px;font-weight:700;padding:5px 11px;border-radius:8px;background:rgba(15,23,42,.88);color:#475569;border:2px solid #334155;min-width:62px;text-align:center}
+  .cp .nm{font-size:12.5px;color:#fff;text-shadow:0 1px 3px #000;max-width:150px;text-align:center;line-height:1.25;min-height:16px}
+  .sep{font-family:Consolas,monospace;font-size:27px;color:#cbd5e1;padding-bottom:26px;text-shadow:0 1px 3px #000}
+  #sub{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;bottom:24px;max-width:1160px;text-align:center;background:rgba(0,0,0,.78);color:#fff;font-size:25px;line-height:1.5;padding:9px 24px;border-radius:12px}
+  #fade{position:absolute;inset:0;background:#000;pointer-events:none}
+  #ov{position:absolute;inset:0;display:none}
+  .ovbg{position:absolute;inset:0;background:radial-gradient(1000px 620px at 50% 42%,rgba(15,30,70,.86),rgba(5,10,25,.95))}
+  .ovw{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;padding:0 50px 96px}
+  .ovw h1{font-size:52px;margin:0 0 10px}.ovw h2{font-size:28px;margin:0 0 8px;font-weight:600;opacity:.95}.ovw p{font-size:21px;margin:4px 0;opacity:.88}
+  .tiles{display:flex;gap:8px;margin-top:26px;align-items:stretch}
+  .tile{width:196px;border-radius:16px;padding:16px 12px;background:rgba(255,255,255,.08);border:3px solid;display:flex;flex-direction:column;gap:6px;align-items:center}
+  .tile .ic{font-size:46px;line-height:1.1}.tile .lv{font-size:23px;font-weight:700}.tile .en{font-size:15px;opacity:.8}
+  .tile .cd{font-family:Consolas,monospace;font-size:30px;font-weight:700;padding:2px 12px;border-radius:8px;color:#fff}
+  .tile .an{font-size:16px;opacity:.9;border-top:1px dashed rgba(255,255,255,.35);padding-top:6px;width:100%}
+  .arrow{align-self:center;font-size:34px;opacity:.7}
+  .eq{display:flex;gap:16px;align-items:center;margin-top:22px}
+  .eqb{background:#fff;color:#0f172a;border-radius:14px;padding:14px 20px;min-width:210px}
+  .eqb .l{font-size:16px;color:#475569;font-weight:600}.eqb .n{font-family:Consolas,monospace;font-size:30px;font-weight:700}
+  .eqo{font-size:42px;font-weight:700}
+  .zero{margin-top:22px;background:#15803d;border-radius:14px;padding:12px 28px;font-size:30px;font-weight:700}
+  .cards2{display:flex;gap:26px;margin-top:20px}
+  .c2{width:520px;background:#fff;color:#0f172a;border-radius:16px;overflow:hidden;text-align:left}
+  .c2 .hd{padding:10px 16px;color:#fff;font-size:22px;font-weight:700}
+  .c2 .bd{padding:12px 16px 14px;font-size:17px;line-height:1.5}
+  .c2 table{width:100%;border-collapse:collapse;font-size:15px;margin-top:8px}
+  .c2 td{border-bottom:1px solid #e5e7eb;padding:5px 6px}
+  .c2 td.k{font-family:Consolas,monospace;font-weight:700;color:#15803d;white-space:nowrap}
+  .c2 .dd{display:inline-block;border:2px solid #2563eb;border-radius:6px;padding:0 6px;font-family:Consolas,monospace;font-weight:700;color:#1d4ed8;white-space:nowrap}
+  .chain{display:flex;gap:10px;align-items:center;margin-top:22px;font-size:26px;font-weight:700}
+  .chain span.k{padding:8px 16px;border-radius:12px;color:#fff}
+  .fullcode{color:#0f172a;margin-top:24px;font-family:Consolas,monospace;font-size:40px;font-weight:700;background:#fff;border-radius:12px;padding:8px 20px}
+</style></head>
+<body>
+<canvas id="c" width="1280" height="720"></canvas>
+<div id="callouts"></div>
+<div id="chap"></div><div id="code"></div>
+<div id="ov"></div><div id="sub"></div>
+<div id="fade"></div>
+<script src="timeline.js"></script>
+<script type="module">
+import * as THREE from './three.module.js';
+const W = 1280, H = 720, $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ss = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const eio = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const back = x => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const LC = { st: '#475569', c: '#2563eb', s: '#0f766e', t: '#b45309', m: '#be185d' };
+
+// ── timeline helpers: everything is a pure function of global time T ──
+const TL = window.TL, SEG = {}; TL.forEach(e => SEG[e.ph] = e);
+let T = 0;
+const S0 = ph => SEG[ph].start, SE = ph => SEG[ph].start + SEG[ph].dur;
+const F = (ph, fr) => (SEG[ph].audio - SEG[ph].start) + fr * SEG[ph].nd;      // offset of a point in the narration
+const A = (ph, off, dur = 1) => ss((T - S0(ph) - off) / dur);
+const IN = ph => T >= S0(ph) && T < SE(ph);
+const L = ph => T - S0(ph);
+const INR = (a, b) => T >= S0(a) && T < SE(b);
+
+// ── renderer / world ──
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H, false); renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc9d7e6); scene.fog = new THREE.Fog(0xc9d7e6, 55, 130);
+const camera = new THREE.PerspectiveCamera(50, W / H, 0.05, 400);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 1.15));
+const sun = new THREE.DirectionalLight(0xffffff, 1.7); sun.position.set(14, 26, 16); sun.target.position.set(9, 0, -1);
+sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 22, bottom: -22, near: 1, far: 90 }); sun.shadow.bias = -0.0004;
+scene.add(sun); scene.add(sun.target);
+
+const MC = {};
+function mat(c, o) { const k = c + JSON.stringify(o || {}); return MC[k] || (MC[k] = new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .75, metalness: .05 }, o || {}))); }
+function grp(parent, x = 0, y = 0, z = 0, ry = 0) { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; parent.add(g); return g; }
+function box(g, w, h, d, c, x = 0, y = 0, z = 0, o) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), o && o.isMaterial ? o : mat(c, o)); m.position.set(x, y + h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function cyl(g, r, h, c, x = 0, y = 0, z = 0, o, seg = 20) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), o && o.isMaterial ? o : mat(c, o)); m.position.set(x, y + h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function tex(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+const FONT = '"Leelawadee UI","Segoe UI",Tahoma,sans-serif';
+// plane with text lines: lines = [[text, sizeFrac, color, bold], …]
+function plate(g, w, h, bg, lines, x, y, z, o = {}) {
+  const px = 512, ph = Math.round(px * h / w);
+  const t = tex(px, ph, (c, cw, ch) => {
+    c.fillStyle = bg; c.fillRect(0, 0, cw, ch);
+    if (o.border) { c.strokeStyle = o.border; c.lineWidth = o.bw || 14; c.strokeRect(0, 0, cw, ch); }
+    const tot = lines.reduce((s, l) => s + l[1], 0) * ch * 1.15; let yy = ch / 2 - tot / 2;
+    lines.forEach(([s, f, col, b]) => { const fs = f * ch; c.font = (b === false ? '' : 'bold ') + Math.round(fs) + 'px ' + (o.mono && b !== false ? 'Consolas,monospace' : FONT); c.fillStyle = col; c.textAlign = 'center'; c.textBaseline = 'middle'; yy += fs * 1.15 / 2; c.fillText(s, cw / 2, yy, cw * .94); yy += fs * 1.15 / 2; });
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: t, roughness: .6, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: o.glow == null ? .25 : o.glow }));
+  m.position.set(x, y, z); if (o.ry) m.rotation.y = o.ry; g.add(m); return m;
+}
+function qrTex(code, col) {
+  return tex(200, 250, (c) => {
+    c.fillStyle = '#fff'; c.fillRect(0, 0, 200, 250); c.strokeStyle = col; c.lineWidth = 12; c.strokeRect(6, 6, 188, 238);
+    c.fillStyle = '#111'; const n = 13, s = 10, ox = 35, oy = 26;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { const fin = (a, b) => a < 4 && b < 4; if (fin(i, j) || fin(n - 1 - i, j) || fin(i, n - 1 - j)) continue; if (hash(i * 31 + j * 7 + code.length) > .5) c.fillRect(ox + i * s, oy + j * s, s, s); }
+    [[0, 0], [n - 4, 0], [0, n - 4]].forEach(([i, j]) => { c.fillRect(ox + i * s, oy + j * s, 4 * s, 4 * s); c.fillStyle = '#fff'; c.fillRect(ox + i * s + s * .7, oy + j * s + s * .7, 2.6 * s, 2.6 * s); c.fillStyle = '#111'; c.fillRect(ox + i * s + s * 1.2, oy + j * s + s * 1.2, 1.6 * s, 1.6 * s); });
+    c.fillStyle = col; c.font = 'bold 36px Consolas,monospace'; c.textAlign = 'center'; c.fillText(code, 100, 228);
+  });
+}
+function tube(g, pts, r, m) { const cu = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)), false, 'catmullrom', .1); const t = new THREE.Mesh(new THREE.TubeGeometry(cu, 80, r, 8, false), m); t.castShadow = true; g.add(t); return t; }
+
+// ───────────── STORE (Mini Big C, cut-away) ─────────────
+const STORE = grp(scene);
+{ const gnd = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), mat(0xaeb8c2, { roughness: 1 })); gnd.rotation.x = -Math.PI / 2; gnd.receiveShadow = true; scene.add(gnd);
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(14, 10), mat(0xf3efe6, { roughness: .85 })); fl.rotation.x = -Math.PI / 2; fl.position.y = .012; fl.receiveShadow = true; STORE.add(fl); }
+const backWallMat = new THREE.MeshStandardMaterial({ color: 0xe8e2d6, roughness: .9, transparent: true, opacity: 1 });
+box(STORE, 14.3, 3.2, .15, 0, 0, 0, -5.07, backWallMat);
+box(STORE, .15, 3.2, 10, 0xe8e2d6, -7.07, 0, 0);
+box(STORE, .15, .5, 10, 0xe8e2d6, 7.07, 0, 0);
+box(STORE, 14.3, .5, .15, 0xe8e2d6, 0, 0, 5.07);
+// pylon sign
+cyl(STORE, .12, 4.2, 0x64748b, 8.8, 0, 4.4); box(STORE, 2.8, 1.1, .22, 0x16a34a, 8.8, 4.0, 4.4);
+plate(STORE, 2.6, .9, '#16a34a', [['Mini Big C', .5, '#fff']], 8.8, 4.55, 4.52, { glow: .5 });
+plate(STORE, 2.6, .9, '#16a34a', [['Mini Big C', .5, '#fff']], 8.8, 4.55, 4.28, { glow: .5, ry: Math.PI });
+// chiller cabinet (upright glass 3-door)
+function buildChiller(g, x, z, s = 1) {
+  const o = grp(g, x, 0, z); o.scale.setScalar(s);
+  box(o, 1.9, 2.1, .8, 0xf8fafc);
+  const gl = new THREE.Mesh(new THREE.PlaneGeometry(1.76, 1.6), new THREE.MeshStandardMaterial({ color: 0xcfe9ff, emissive: 0x9fd4ff, emissiveIntensity: .55, roughness: .2 }));
+  gl.position.set(0, 1.12, .405); o.add(gl);
+  [-.3, .3].forEach(px => box(o, .04, 1.6, .02, 0xcbd5e1, px * 1.95, .32, .41));
+  for (let r = 0; r < 4; r++) for (let k = 0; k < 9; k++) box(o, .15, .22, .02, [0xef4444, 0x22c55e, 0xf59e0b, 0x3b82f6, 0xa855f7][(r * 3 + k) % 5], -.78 + k * .195, .4 + r * .38, .385);
+  box(o, 1.9, .3, .8, 0x1e3a8a, 0, 2.1, 0);
+  return o;
+}
+function buildMDB(g, x, z, ry = 0, s = 1) {
+  const o = grp(g, x, 0, z, ry); o.scale.setScalar(s);
+  box(o, 1.2, 2.1, .6, 0x9aa5b4, 0, 0, 0, { metalness: .3, roughness: .5 });
+  box(o, .02, 1.9, .01, 0x475569, 0, .1, .305);
+  plate(o, .5, .28, '#facc15', [['⚡ MDB', .55, '#111']], -.3, 1.6, .31, { glow: .2 });
+  return o;
+}
+function buildPump(g, x, z, s = 1) {
+  const o = grp(g, x, 0, z); o.scale.setScalar(s);
+  cyl(o, .55, 1.5, 0x60a5fa, 0, 0, 0); box(o, .5, .35, .6, 0x1d4ed8, .95, 0, 0);
+  const m = cyl(o, .16, .4, 0x1e40af, .95, .35, 0); m.rotation.z = Math.PI / 2; m.position.y = .55;
+  return o;
+}
+const CH = [-4.6, -2.6, -.6].map(x => buildChiller(STORE, x, -4.5));
+const MDB = buildMDB(STORE, -6.65, -3, Math.PI / 2);
+const PUMP = buildPump(STORE, 8.6, -3.4);
+// gondolas
+[[-2.5, -1.2], [-2.5, 1.6]].forEach(([x, z]) => { box(STORE, 6.4, 1.5, .9, 0xd1d5db, x, 0, z); for (let r = 0; r < 3; r++) for (let k = 0; k < 22; k++) [-1, 1].forEach(sd => box(STORE, .26, .3, .06, [0xef4444, 0xfbbf24, 0x10b981, 0x3b82f6, 0xf472b6][(r + k) % 5], x - 3 + k * .285, .15 + r * .45, z + sd * .47)); });
+box(STORE, 1.8, .95, .7, 0x334155, 4.6, 0, 3.4); box(STORE, .5, .3, .4, 0x0f172a, 4.2, .95, 3.4);
+// lights + cable
+const LIGHTS = [];
+[[-4.2, -2.6], [-1.2, -2.6], [1.8, -2.6], [-4.2, .2], [-1.2, .2], [1.8, .2]].forEach(([x, z]) => { const m = box(STORE, 1.3, .07, .26, 0xffffff, x, 3.0, z, { emissive: 0xffffff, emissiveIntensity: .9 }); LIGHTS.push(m); });
+const cableMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xff7a00, emissiveIntensity: 0, roughness: .5 });
+tube(STORE, [[-6.4, 2.1, -3], [-6.4, 3.12, -3], [-5.2, 3.12, -2.7], [2.6, 3.12, -2.7], [2.6, 3.12, .1], [-4.8, 3.12, .1]], .045, cableMat);
+// split-type air conditioners: indoor on back wall, outdoor behind the store, copper pipe over the wall
+const AX = [-5.5, -3, -.5, 2, 4.5], CAP = [36, 36, 24, 24, 18];
+const pipeMat = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: .6, roughness: .35, emissive: 0xff6a00, emissiveIntensity: 0 });
+const ACIN = [], CDU = [];
+AX.forEach((x, i) => {
+  const ind = grp(STORE, x, 2.62, -4.86); box(ind, 1.0, .3, .22, 0xffffff); box(ind, .86, .03, .02, 0x94a3b8, 0, .05, .115); ACIN.push(ind);
+  const cd = grp(STORE, x, 0, -6.05); box(cd, 1.1, .08, .55, 0x9ca3af); box(cd, .95, .72, .38, 0xe5e7eb, 0, .08, 0, { roughness: .5 });
+  const fan = cyl(cd, .25, .02, 0x334155, -.16, 0, 0); fan.rotation.x = Math.PI / 2; fan.position.set(-.16, .44, -.2);
+  const fg = new THREE.Mesh(new THREE.TorusGeometry(.26, .02, 6, 24), mat(0x64748b)); fg.position.set(-.16, .44, -.205); cd.add(fg);
+  CDU.push(cd);
+  tube(STORE, [[x + .38, 2.74, -4.76], [x + .38, 3.36, -4.82], [x + .38, 3.36, -5.3], [x + .38, 1.0, -5.38], [x + .3, .5, -5.85]], .04, pipeMat);
+});
+const hlMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0, depthWrite: false });
+const HL = new THREE.Mesh(new THREE.BoxGeometry(1.25, .55, .45), hlMat); HL.position.set(AX[0], 2.77, -4.86); scene.add(HL);
+const qrMat = new THREE.MeshStandardMaterial({ map: qrTex('M0001', LC.m), roughness: .5, emissive: 0xffffff, emissiveMap: qrTex('M0001', LC.m), emissiveIntensity: .35 });
+const QR = new THREE.Mesh(new THREE.PlaneGeometry(.26, .325), qrMat); QR.position.set(AX[0] + .24, .48, -6.245); QR.rotation.y = Math.PI; scene.add(QR);
+// cost pile + coins + share bars
+const coinMat = mat(0xf5b301, { metalness: .8, roughness: .3, emissive: 0x6b4a00, emissiveIntensity: .4 });
+const PILE = grp(scene, -.2, 3.75, -4.4);
+for (let i = 0; i < 9; i++) { const c = cyl(PILE, .13, .04, 0, (i % 3 - 1) * .28, Math.floor(i / 3) * .045, 0, coinMat); }
+const COINS = []; { let o = 0; CAP.forEach((cp, u) => { for (let j = 0; j < cp / 6; j++) COINS.push({ u, o: o++, m: cyl(scene, .09, .03, 0, 0, 0, 0, coinMat) }); }); }
+const BARS = AX.map((x, i) => { const b = box(scene, .32, 1, .32, 0, x + .25, 0, -6.05, mat(0xdb2777, { emissive: 0xdb2777, emissiveIntensity: .3 })); b.geometry.translate(0, 0, 0); return b; });
+
+// ───────────── CABINET: 18 drawers = 18 Categories ─────────────
+const CX = 20, CAB = grp(scene, CX, 0, 0);
+box(CAB, 6 * 1.7 + .3, 3.4, 2.4, 0x1e293b, 0, 0, -.03, { roughness: .6 });
+plate(CAB, 6.6, .55, '#0f172a', [['ตู้ 18 หมวดหลัก (Category) · คงที่ ไม่เปลี่ยน', .5, '#fff']], 0, 3.78, 1.0, { glow: .6 });
+const CATS = [['C01', 'Refrigeration', 'ทำความเย็น'], ['C02', 'Electrical', 'ไฟฟ้า'], ['C03', 'HVAC', 'ปรับอากาศ'], ['C04', 'Sanitary', 'สุขาภิบาล'], ['C05', 'Fresh Food Equip.', 'อุปกรณ์ของสด'], ['C06', 'Civil & Architecture', 'โยธา / สถาปัตย์'],
+  ['C07', 'Ice Maker', 'เครื่องทำน้ำแข็ง'], ['C08', 'Fire Fighting', 'ดับเพลิง'], ['C09', 'Vertical Transport', 'ลิฟต์ / บันไดเลื่อน'], ['C10', 'CCTV & Sound', 'กล้อง / เสียง'], ['C11', 'DC Equipment', 'อุปกรณ์ DC'], ['C12', 'LP Equipment', 'อุปกรณ์ LP'],
+  ['C13', 'Small Equipment', 'อุปกรณ์ขนาดเล็ก'], ['C14', 'Facility Mgmt', 'บริหารอาคาร'], ['C15', 'Coffee Equip.', 'อุปกรณ์กาแฟ'], ['C16', 'LPG System', 'ระบบแก๊ส LPG'], ['C17', 'Shelves & Fixtures', 'ชั้นวาง / ฟิกซ์เจอร์'], ['C18', 'POS_DGT', 'POS']];
+const DR = CATS.map(([cd, en, th], i) => {
+  const row = Math.floor(i / 6), col = i % 6, x = (col - 2.5) * 1.7, y = .2 + (2 - row) * 1.0;
+  const g = grp(CAB, x, y, 0);
+  const fm = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, emissive: 0x2563eb, emissiveIntensity: 0, roughness: .5 });
+  box(g, 1.6, .9, .06, 0, 0, 0, 1.21, fm);
+  plate(g, 1.46, .7, '#f8fafc', [[cd, .34, LC.c], [en, .17, '#0f172a'], [th, .16, '#475569', false]], 0, .47, 1.245, { glow: .3 });
+  box(g, .5, .05, .05, 0x94a3b8, 0, .07, 1.27);
+  box(g, 1.5, .04, 2.2, 0x64748b, 0, .02, .05); box(g, .03, .32, 2.2, 0x64748b, -.75, .02, .05); box(g, .03, .32, 2.2, 0x64748b, .75, .02, .05); box(g, 1.5, .32, .03, 0x64748b, 0, .02, -1.05);
+  return { g, fm, x: CX + x, y, i };
+});
+// folders (Subcategory) inside a drawer
+function folder(dr, code, name, i, z, tabX, color = '#ccfbf1') {
+  const f = grp(dr.g, 0, .06, z);
+  const bm = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), emissive: 0x14b8a6, emissiveIntensity: 0, roughness: .7 });
+  box(f, 1.3, .78, .02, 0, 0, 0, 0, bm);
+  box(f, .42, .2, .022, 0, tabX, .78, 0, bm);
+  plate(f, .38, .16, color, [[code, .7, LC.s]], tabX, .88, .013, { glow: .3 });
+  plate(f, 1.2, .3, color, [[code, .42, LC.s], [name, .3, '#0f172a']], 0, .58, .013, { glow: .3 });
+  return { f, bm, z };
+}
+const C03F = [['S001', 'Air Conditioning'], ['S002', 'Ventilation Fan'], ['S003', 'Chiller System'], ['S004', 'HVAC Water Treatment'], ['S005', 'Other HVAC Equipment']]
+  .map(([c, n], i) => folder(DR[2], c, n, i, .8 - i * .34, -.42 + i * .21));
+const C06N = ['งานทาสีภายใน', 'งานทาสีภายนอก', 'งานผ้าใบ', 'งานรางน้ำฝน', 'งานกระเบื้อง', 'งานฝ้าเพดาน', 'งานฟิล์มกระจก', 'งานประตู', 'งานหลังคา', 'งานกันชนสแตนเลส', 'งานหมอนกั้นล้อ'];
+const C06F = C06N.map((n, i) => folder(DR[5], 'S0' + String(i + 1).padStart(2, '0'), n, i, .9 - i * .165, -.42 + (i % 5) * .21));
+const NEWF = folder(DR[5], 'S012', 'โครงสร้างอาคาร (ใหม่)', 11, -.95, .42, '#bbf7d0'); NEWF.bm.emissive.set(0x22c55e);
+// type cards (in folder S001) and machine tags
+const S1 = C03F[0];
+const CARDS = [['T001', 'AHU'], ['T002', 'FCU'], ['T003', 'Split Type'], ['T004', 'Package (PAC)']].map(([c, n], i) => {
+  const g = grp(S1.f, -.72 + i * .48, 1.32, .02);
+  const m = plate(g, .44, .4, '#fef3c7', [[c, .3, LC.t], [n, .19, '#0f172a']], 0, 0, 0, { glow: .25, border: LC.t, bw: 10 });
+  return { g, m };
+});
+const TAGS = [0, 1, 2, 3, 4].map(i => { const g = grp(S1.f, -.52 + i * .26, .2, .03); const tx = qrTex('M000' + (i + 1), LC.m); const m = new THREE.Mesh(new THREE.PlaneGeometry(.22, .275), new THREE.MeshStandardMaterial({ map: tx, emissive: 0xffffff, emissiveMap: tx, emissiveIntensity: .35 })); g.add(m); return g; });
+// flying copies
+const GHOST = grp(scene); box(GHOST, 1.0, .3, .22, 0xffffff, 0, -.15, 0, { emissive: 0x3b82f6, emissiveIntensity: .25 });
+const MINI = [buildChiller(scene, 0, 0, .32), buildMDB(scene, 0, 0, 0, .36), buildPump(scene, 0, 0, .34)];
+const MINI_TO = [0, 1, 3];
+
+// ───────────── camera keys (offsets may use narration fractions) ─────────────
+const CAM = {
+  title: [[.01, [24, 15, 30], [8, 0, -1], .01], [20, [15, 12, 25], [7, 0, -1], 20]],
+  store: [[4, [11, 8.5, 11], [0, 1, -1.5], 4], [8.5, [-3, 7.5, 12.5], [0, 1, -1.5], 4.5], [13, [-11.5, 7, 6], [0, 1, -1.5], 4.5]],
+  problem: [[1.8, [-.5, 4.6, 2.2], [-4.2, 2.4, -4.2], 1.8]],
+  rule: [[10, [6, 10, 16], [3, 1, -2], 10]],
+  cabinet: [[1.4, [8, 9, 12], [14, 1.5, 0], 1.4], [3, [20, 4.4, 12.2], [20, 1.8, 0], 1.6]],
+  ac_pick: [[1.0, [6, 8, 6], [-3, 1.5, -3], 1.0], [2.4, [-3.3, 2.75, -1.0], [-5.5, 2.75, -4.8], 1.4]],
+  ac_cat: [[1.8, [9, 13, 22], [8, 1.5, -1], 1.8], [5.0, [19.15, 7.4, 6.6], [19.15, 2.6, 2.4], 2.4]],
+  ac_sub: [[1.6, [19.15, 5.8, 7.0], [19.15, 4.3, 3.4], 1.6]],
+  ac_type: [[1.4, [19.15, 6.2, 7.3], [19.15, 4.9, 3.5], 1.4]],
+  ac_mach: [[1.2, [19.15, 6.0, 7.1], [19.15, 4.6, 3.6], 1.2]],
+  qr: [[1.3, [6, 9, -16], [-2, .5, -6], 1.3], [2.8, [-4.3, 1.25, -8.0], [-5.5, .55, -6.1], 1.5]],
+  more: [[1.6, [19.5, 4.8, 11], [18.6, 2.2, 0], 1.6]],
+  add: [[1.5, [22.6, 6.4, 8.2], [23.6, 2.7, 1.6], 1.5]],
+  roles: [[1.2, [8, 12, 8], [0, 1, -3], 1.2], [2.8, [.5, 10.5, 3.2], [0, 1.2, -5.6], 1.6]],
+  alloc: [[1.5, [1.0, 10.2, 2.6], [0, 1.4, -5.8], 1.5]],
+  check: [[10, [10, 15, 24], [8, 0, -1], 10]],
+  mini_big: [[10, [16, 12, 22], [9, 0, -1], 10]],
+  outro: [[12, [24, 16, 30], [8, 0, -1], 12]]
+};
+const KEYS = []; TL.forEach(e => (CAM[e.ph] || []).forEach(([off, p, at, mv]) => KEYS.push({ t: e.start + off, mv, p: new THREE.Vector3(...p), at: new THREE.Vector3(...at) })));
+function camAt(t) {
+  const p = KEYS[0].p.clone(), at = KEYS[0].at.clone();
+  KEYS.forEach(k => { const e = eio((t - (k.t - k.mv)) / k.mv); if (e > 0) { p.lerp(k.p, e); at.lerp(k.at, e); } });
+  camera.position.copy(p); camera.lookAt(at); camera.updateMatrixWorld(true);
+}
+function project(v3) { const v = new THREE.Vector3(...v3).project(camera); return { x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H, front: v.z < 1 }; }
+const bez = (a, c, b, k) => a.clone().multiplyScalar((1 - k) * (1 - k)).add(c.clone().multiplyScalar(2 * k * (1 - k))).add(b.clone().multiplyScalar(k * k));
+
+// ───────────── frame ─────────────
+window.renderAt = function (t) {
+  T = t;
+  const seg = TL.find(e => t >= e.start && t < e.start + e.dur) || TL[TL.length - 1], ph = seg.ph, lt = t - seg.start;
+  camAt(t);
+  const CO = [];   // [html, cls, pos3, alpha, dx, dy]
+  const co = (h, cls, p, a, dx = 0, dy = 0) => { if (a > .01) CO.push([h, cls, p, a, dx, dy]); };
+
+  // store: x-ray back wall + glowing networks for roles / alloc
+  const xr = A('roles', F('roles', .3), 1) * (1 - A('check', 0, 1));
+  backWallMat.opacity = 1 - .82 * xr; backWallMat.depthWrite = xr < .05;
+  const glow = A('roles', F('roles', .5), .8) * (1 - A('check', 0, 1));
+  pipeMat.emissiveIntensity = glow * (.55 + .4 * Math.sin(t * 5)); cableMat.emissiveIntensity = glow * (.55 + .4 * Math.sin(t * 5 + 1.3));
+  hlMat.opacity = (IN('ac_pick') ? A('ac_pick', 2.0, .5) : IN('problem') ? A('problem', F('problem', .45), .5) : 0) * (.3 + .2 * Math.sin(t * 6));
+
+  // ghost AC flies from the store into drawer C03
+  { const k = IN('ac_cat') ? eio((L('ac_cat') - .4) / 2.8) : 0, out = IN('ac_cat') ? A('ac_cat', 3.0, .5) : 1;
+    GHOST.visible = IN('ac_cat') && out < .99;
+    GHOST.position.copy(bez(new THREE.Vector3(AX[0], 2.77, -4.6), new THREE.Vector3(7, 11, -1), new THREE.Vector3(DR[2].x, DR[2].y + .5, 1.6), k));
+    GHOST.scale.setScalar(lerp(1, 2.6, Math.sin(Math.PI * k)) * lerp(1, .6, k) * (1 - out) + .001); }
+
+  // drawers
+  const ripple = i => IN('cabinet') ? ss((L('cabinet') - F('cabinet', .08) - i * .12) / .3) * (1 - ss((L('cabinet') - F('cabinet', .08) - i * .12 - .6) / .4)) : 0;
+  const open = [0, 0, A('ac_cat', F('ac_cat', .55), 1.2) * (1 - A('more', 0, 1)), 0, 0, A('add', F('add', .15), 1.2) * (1 - A('roles', 0, 1))];
+  const flash = [];
+  MINI_TO.forEach((d, j) => { const off = F('more', [.3, .58, .84][j]); flash[d] = IN('more') ? A('more', off, .2) * (1 - A('more', off + 1.2, .5)) : 0; });
+  DR.forEach((d, i) => {
+    const o = open[i] || 0; d.g.position.z = 2.0 * o;
+    let e = ripple(i) * .8 + (flash[i] || 0) * .9;
+    if (i === 2) e += A('ac_cat', 3.0, .4) * (1 - A('more', 0, .6)) * .7;
+    if (i === 5) e += (IN('add') ? A('add', .3, .4) : 0) * .7;
+    d.fm.emissiveIntensity = e;
+  });
+  // folder S001 rises; cards; tags
+  const kf = A('ac_sub', F('ac_sub', .6), 1.3) * (1 - A('more', 0, .8));
+  S1.f.position.set(0, .06 + 1.45 * kf, S1.z + 1.05 * kf); S1.f.scale.setScalar(1 + .32 * kf); S1.f.rotation.x = -.5 * kf;
+  S1.bm.emissiveIntensity = .35 * kf;
+  const ks = A('ac_type', F('ac_type', .6), .6) * (1 - A('more', 0, .6));
+  CARDS.forEach((c, i) => {
+    const kc = A('ac_type', F('ac_type', .2) + i * .35, .6) * (1 - A('more', 0, .6));
+    const sel = i === 2; const s = back(kc) * (sel ? 1 + .35 * ks : 1 - .18 * ks);
+    c.g.scale.setScalar(Math.max(s, .001)); c.g.visible = kc > .01; c.g.position.y = 1.32 + (sel ? .06 * ks : -.06 * ks); c.g.position.z = .02 + (sel ? .06 * ks : 0);
+    c.m.material.emissiveIntensity = sel ? .25 + .45 * ks : .25 - .12 * ks;
+  });
+  TAGS.forEach((g, i) => { const k = A('ac_mach', F('ac_mach', .38) + i * .45, .5) * (1 - A('more', 0, .6)); g.scale.setScalar(Math.max(back(k), .001)); g.visible = k > .01; });
+  QR.scale.setScalar(Math.max(back(A('qr', F('qr', .3), .6)), .001)); QR.visible = t >= S0('qr') + F('qr', .3);
+  // C06: new folder S012 drops in at the back
+  { const kn = A('add', F('add', .55), 1.1) * (1 - A('roles', 0, 1)); NEWF.f.position.y = .7 + 2.0 * (1 - eio(kn)); NEWF.f.visible = kn > .01;
+    NEWF.bm.emissiveIntensity = kn >= 1 ? .35 + .25 * Math.sin(t * 5) : .3; }
+  // minis fly into C01 / C02 / C04
+  MINI.forEach((m, j) => {
+    const off = F('more', [.3, .58, .84][j]) - 1.6, d = DR[MINI_TO[j]];
+    const k = eio((L('more') - off) / 1.6), gone = A('more', off + 1.45, .3);
+    m.visible = IN('more') && gone < .99 && L('more') > .3;
+    const s0 = new THREE.Vector3(13.2, 3.0 - j * 1.05, 3.4), e = new THREE.Vector3(d.x, d.y + .2, 1.6);
+    m.position.copy(bez(s0, new THREE.Vector3((s0.x + e.x) / 2, 5.4, 3.4), e, k)); m.scale.setScalar(([.5, .55, .5][j]) * (1 - gone) + .001);
+    m.rotation.y = .5 * Math.sin(t * .8 + j);
+  });
+  // cost allocation coins and share bars
+  { const on = INR('alloc', 'alloc'); PILE.visible = on; PILE.scale.setScalar(Math.max(A('alloc', F('alloc', .05), .5), .001));
+    const arrived = [0, 0, 0, 0, 0];
+    COINS.forEach(c => {
+      const st = F('alloc', .15) + c.o * .2, k = on ? (L('alloc') - st) / 1.1 : (t >= SE('alloc') ? 1 : 0);
+      c.m.visible = on && k > 0 && k < 1;
+      if (k >= 1) arrived[c.u]++;
+      const a = new THREE.Vector3(-.2, 3.95, -4.4), b = new THREE.Vector3(AX[c.u] + .25, .9, -6.05);
+      c.m.position.copy(bez(a, new THREE.Vector3((a.x + b.x) / 2, 5.4, -5.4), b, eio(clamp(k)))); c.m.rotation.x = t * 3 + c.o;
+    });
+    BARS.forEach((b, i) => { const n = CAP[i] / 6, h = (arrived[i] / n) * CAP[i] / 36 * 1.3; b.scale.y = Math.max(h, .001); b.position.y = .8 + h / 2; b.visible = xr > .05 && h > .01 && t < S0('check'); });
+  }
+
+  // ── callouts per segment ──
+  if (ph === 'store') {
+    const p = lt;
+    co('ตู้แช่', 'info', [-2.6, 2.6, -4.3], ss((p - 2) / .5)); co('ไฟ', 'info', [-1.2, 3.2, .2], ss((p - 3) / .5)); co('แอร์', 'info', [2, 3.05, -4.8], ss((p - 4) / .5));
+    co('ตู้ไฟฟ้า MDB', 'info', [-6.6, 2.4, -3], ss((p - 5) / .5)); co('ท่อ / สายไฟ', 'net', [-5.1, 3.4, -5.0], ss((p - 6) / .5)); co('ตัวอาคาร', 'info', [6.9, 1.2, 0], ss((p - 7) / .5));
+  }
+  if (ph === 'problem') {
+    co('BOQ: งานระบบไฟฟ้า + แอร์ <small>เหมารวม 1 งาน ฿ ????</small>', 'bad big', [AX[0], 2.95, -4.86], A('problem', F('problem', .05), .5), 0, -195);
+    const p0 = [AX[0], 2.95, -4.86], a = n => A('problem', F('problem', .45 + n * .09), .4);
+    co('บัญชี: "เครื่องปรับอากาศ 1 ชุด"', 'info', p0, a(0), -210, -40); co('ปฏิบัติการ: "แอร์หน้าร้าน"', 'info', p0, a(1), 210, -40); co('BMMS: "Split Type"', 'info', p0, a(2), -10, -110);
+    co('เครื่องเดียวกันหรือไม่? ❓', 'bad', p0, a(3.3), 0, 120);
+  }
+  if (ph === 'cabinet') {
+    co('C01 Refrigeration', 'lv-c', [DR[0].x, DR[0].y + .95, 1.3], A('cabinet', F('cabinet', .32), .4));
+    co('C18 POS', 'lv-c', [DR[17].x, DR[17].y + .95, 1.3], A('cabinet', F('cabinet', .5), .4), 0, 0);
+    co('🔒 18 หมวดหลัก ตายตัว ไม่เปลี่ยน', 'info big', [CX, 3.6, 1.2], A('cabinet', F('cabinet', .72), .5), 0, 0);
+  }
+  if (ph === 'ac_pick') co('แอร์แยกส่วน 36,000 BTU <small>1 ใน 5 เครื่องของสาขา</small>', 'lv-m', [AX[0], 3.0, -4.86], A('ac_pick', 2.0, .5));
+  if (ph === 'ac_cat') co('C03 · HVAC', 'lv-c big', [DR[2].x, DR[2].y + 1.0, 1.3 + 2 * open[2]], A('ac_cat', 3.2, .4));
+  if (ph === 'ac_sub') co('S001 · Air Conditioning', 'lv-s big', [DR[2].x, DR[2].y + 2.75, 3.3], kf * A('ac_sub', F('ac_sub', .6) + .9, .4));
+  if (ph === 'ac_type') co('T003 · Split Type Air Conditioner', 'lv-t big', [DR[2].x + .15, DR[2].y + 3.75, 3.5], ks);
+  if (ph === 'ac_mach') co('5 เครื่อง → M0001 … M0005 <small>+ ยี่ห้อ รุ่น Serial รูป</small>', 'lv-m big', [DR[2].x - .9, DR[2].y + 2.1, 3.8], A('ac_mach', F('ac_mach', .45) + 1.8, .4), -260, 0);
+  if (ph === 'qr') {
+    const a = A('qr', F('qr', .3) + .3, .4), q = [AX[0] + .24, .72, -6.25];
+    co('<span style="color:#cbd5e1">SKS30</span>_<span style="color:#93c5fd">C03</span>_<span style="color:#5eead4">S001</span>_<span style="color:#fcd34d">T003</span>_<span style="color:#f9a8d4">M0001</span>', 'info big', q, a, 0, -40);
+    co('Oracle FA <small>ฝ่ายบัญชี</small>', 'lv-c', q, A('qr', F('qr', .6), .4), -260, 60); co('BMMS <small>แจ้งซ่อม · PM</small>', 'good', q, A('qr', F('qr', .8), .4), 260, 60);
+  }
+  if (ph === 'more') MINI_TO.forEach((d, j) => { const off = F('more', [.3, .58, .84][j]); co(['C01 · S001 · T010 <small>Chill Upright Glass 3 Door</small>', 'C02 · S002 · T001 <small>MDB</small>', 'C04 · S001 · T001 <small>Submersible Pump</small>'][j], 'lv-c', [DR[d].x, DR[d].y + .95, 1.3], A('more', off, .3) * (1 - A('more', off + 2.4, .4))); });
+  if (ph === 'add') {
+    co('🔒 ลิ้นชัก (Category) ไม่แก้', 'info', [DR[5].x - 2.2, DR[5].y + 1.1, 1.3], A('add', F('add', .3), .4));
+    co('+ S012 โครงสร้างอาคาร <small>ต่อท้าย เลขถัดไป · S001–S011 ไม่ขยับ</small>', 'good big', [DR[5].x, DR[5].y + 1.3, 2.0 * open[5] - .95], A('add', F('add', .55) + 1.0, .4), 230, -10);
+  }
+  if (ph === 'roles') {
+    co('เครื่อง = ทรัพย์สิน 1 ตัว + QR', 'good', [AX[3], 1.0, -6.05], A('roles', F('roles', .35), .4));
+    co('ท่อทองแดง = เครือข่าย (Network)', 'net', [AX[2] + .38, 3.4, -5.1], A('roles', F('roles', .6), .4));
+    co('สายไฟ = เครือข่าย (Network)', 'net', [-1, 3.15, -2.7], A('roles', F('roles', .72), .4));
+  }
+  if (ph === 'alloc') {
+    co('ค่าท่อ + สายไฟ + ค่าดำเนินการ', 'net', [-.2, 4.2, -4.4], A('alloc', F('alloc', .05), .4));
+    const tot = CAP.reduce((a, b) => a + b, 0);
+    CAP.forEach((c, i) => co(c + 'k BTU<small>' + (c / tot * 100).toFixed(1) + '%</small>', 'lv-m', [AX[i] + .25, .9 + c / 36 * 1.3 + .1, -6.05], A('alloc', F('alloc', .7) + i * .15, .4)));
+  }
+  $('callouts').innerHTML = CO.map(([h, cls, p, a, dx, dy]) => { const s = project(p); if (!s.front) return ''; return `<div class="co ${cls}" style="left:${(s.x + dx).toFixed(1)}px;top:${(s.y + dy).toFixed(1)}px;opacity:${a.toFixed(3)}">${h}</div>`; }).join('');
+
+  // ── HUD: chapter, code builder, overlays, subtitle, fade ──
+  const chapCol = { ac_cat: LC.c, ac_sub: LC.s, ac_type: LC.t, ac_mach: LC.m, qr: LC.m, roles: '#c2410c', alloc: '#c2410c', check: '#15803d', add: '#15803d' }[ph] || '#64748b';
+  $('chap').style.display = seg.chapter ? 'block' : 'none'; $('chap').textContent = seg.chapter; $('chap').style.borderLeftColor = chapCol;
+  drawCode(ph, lt); drawOverlay(seg, lt);
+  $('sub').textContent = seg.say; $('sub').style.opacity = ss(lt / .4) * ss((seg.dur - lt) / .3);
+  const total = TL[TL.length - 1].start + TL[TL.length - 1].dur;
+  $('fade').style.opacity = Math.max(1 - ss(t / .8), ss((t - (total - 1.2)) / 1.0));
+  renderer.render(scene, camera);
+};
+
+function drawCode(ph, lt) {
+  let parts = null, on = {};
+  const P = (st, c, s, ty, m) => [['st', 'สาขา', ...st], ['c', 'หมวดหลัก', ...c], ['s', 'หมวดย่อย', ...s], ['t', 'ประเภท', ...ty], ['m', 'เครื่อง', ...m]];
+  if (INR('ac_cat', 'qr')) {
+    parts = P(['SKS30', 'สุขสวัสดิ์ 30'], ['C03', 'HVAC'], ['S001', 'Air Conditioning'], ['T003', 'Split Type'], ['M0001', 'เครื่องที่ 1 จาก 5']);
+    on = { c: T >= S0('ac_cat') + 3.0, s: T >= S0('ac_sub') + F('ac_sub', .6) + .6, t: T >= S0('ac_type') + F('ac_type', .6), m: T >= S0('ac_mach') + F('ac_mach', .38), st: T >= S0('qr') + F('qr', .3) };
+  } else if (ph === 'more') {
+    const j = [.3, .58, .84].reduce((a, f, i) => lt >= F('more', f) ? i : a, -1);
+    const D = [[['C01', 'Refrigeration'], ['S001', 'Positive Sale Floor'], ['T010', 'Chill Upright 3 Door'], ['M0001', '']],
+      [['C02', 'Electrical'], ['S002', 'Low Voltage System'], ['T001', 'MDB'], ['M0001', '']],
+      [['C04', 'Sanitary'], ['S001', 'Wastewater System'], ['T001', 'Submersible Pump'], ['M0001', '']]];
+    if (j >= 0) { parts = P(['SKS30', ''], ...D[j]); on = { c: 1, s: 1, t: 1, m: 1, st: 1 }; } else { parts = P(['SKS30', ''], ['C??', ''], ['S???', ''], ['T???', ''], ['M????', '']); }
+  } else if (ph === 'add') {
+    parts = P(['', ''], ['C06', 'Civil & Architecture'], ['S012', 'โครงสร้างอาคาร (ใหม่)'], ['T001', 'Building structure'], ['M0001', '']);
+    on = { c: 1, s: lt >= F('add', .55) + 1.0, t: lt >= F('add', .55) + 1.0 };
+  }
+  const el = $('code');
+  if (!parts) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = parts.filter(p => p[2] !== '').map((p, i) => {
+    const o = on[p[0]]; const col = LC[p[0]];
+    return (i ? '<div class="sep">_</div>' : '') + `<div class="cp"><div class="lv" style="background:${col}">${p[1]}</div><div class="v" style="${o ? `color:#fff;background:${col};border-color:#fff` : ''}">${o ? p[2] : '····'}</div><div class="nm">${o ? p[3] : ''}</div></div>`;
+  }).join('');
+}
+
+function drawOverlay(seg, lt) {
+  const ov = $('ov'), ph = seg.ph;
+  const a = ss(lt / .5) * ss((seg.dur - lt) / .5);
+  const show = n => ss((lt - n) / .4), tr = n => `opacity:${show(n).toFixed(3)};transform:translateY(${((1 - show(n)) * 24).toFixed(1)}px)`;
+  let h = '';
+  if (ph === 'title') h = `<h1>เราจัดหมวดหมู่ทรัพย์สินอย่างไร?</h1><h2>Big C Asset Blueprint · อธิบายทีละขั้น</h2><p>อ้างอิงโครงสร้าง BMMS Machine Database (EGD) · ใช้ได้ทั้ง Mini Big C และ Big Format</p>`;
+  else if (ph === 'rule') {
+    const tl = [['c', '🗄️', 'หมวดหลัก', 'Category', 'C03', 'ลิ้นชัก · เหมือน "จังหวัด"', .45], ['s', '📁', 'หมวดย่อย', 'Subcategory', 'S001', 'แฟ้ม · เหมือน "อำเภอ"', .58], ['t', '🗂️', 'ประเภท', 'Type', 'T003', 'การ์ด · เหมือน "ถนน"', .72], ['m', '🏷️', 'ตัวเครื่อง', 'Machine', 'M0001', 'QR · เหมือน "บ้านเลขที่"', .86]];
+    h = `<h2>กฎเดียว 4 ระดับ · เหมือนที่อยู่บ้าน</h2><div class="tiles">` + tl.map(([k, ic, lv, en, cd, an, f], i) => (i ? `<div class="arrow" style="${tr(F(ph, f) - .1)}">→</div>` : '') + `<div class="tile" style="border-color:${LC[k]};${tr(F(ph, f))}"><div class="ic">${ic}</div><div class="lv">${lv}</div><div class="en">${en}</div><div class="cd" style="background:${LC[k]}">${cd}</div><div class="an">${an}</div></div>`).join('') + `</div>`;
+  } else if (ph === 'check') {
+    h = `<h2>ตรวจยอด: ทรัพย์สินรวม = BOQ + PO</h2><p>ตัวอย่างจริง · Mini Big C สุขสวัสดิ์ 30 · 48 ทรัพย์สิน</p><div class="eq">
+      <div class="eqb" style="${tr(F(ph, .2))}"><div class="l">ทรัพย์สินรวม (ทุก QR)</div><div class="n">4,284,790.52</div></div><div class="eqo" style="${tr(F(ph, .3))}">=</div>
+      <div class="eqb" style="${tr(F(ph, .4))}"><div class="l">BOQ ผู้รับเหมา</div><div class="n">3,025,903.65</div></div><div class="eqo" style="${tr(F(ph, .5))}">+</div>
+      <div class="eqb" style="${tr(F(ph, .6))}"><div class="l">PO ของที่บิ๊กซีจัดหา</div><div class="n">1,258,886.87</div></div></div>
+      <div class="zero" style="${tr(F(ph, .82))}">ส่วนต่าง 0.00 ✓</div>`;
+  } else if (ph === 'mini_big') {
+    h = `<h2>ใช้กฎเดียวกัน ต่างกันที่ "ใครใส่รหัส"</h2><div class="cards2">
+      <div class="c2" style="${tr(F(ph, 0))}"><div class="hd" style="background:#0b7a5e">Mini Big C · แบบฟอร์มตายตัว</div><div class="bd">รหัสใส่ไว้แล้วทุกบรรทัด ผู้รับเหมากรอกแค่จำนวนและราคา
+        <table><tr><td class="k">C03_S001_T003</td><td>แอร์แยกส่วน 36,000 BTU</td><td>2 ชุด</td></tr><tr><td class="k">C01_S001_T010</td><td>ตู้แช่ 3 ประตู</td><td>3 ตู้</td></tr><tr><td class="k">C02_S002_T001</td><td>ตู้ MDB</td><td>1 ตู้</td></tr></table></div></div>
+      <div class="c2" style="${tr(F(ph, .5))}"><div class="hd" style="background:#1d4ed8">Big Format · เลือกรหัสทุกบรรทัด</div><div class="bd">BOQ แยกตามอาคาร / โซน ผู้รับเหมาเลือกรหัส และระบุว่าท่อ-สายไฟจ่ายให้เครื่องใด
+        <table><tr><td>Chiller · อาคาร A (ตัวอย่าง)</td><td><span class="dd">C03_S003_T001 ▾</span></td></tr><tr><td>ท่อน้ำเย็น · โซน Sale</td><td><span class="dd">Network → Chiller ▾</span></td></tr><tr><td>บันไดเลื่อน · ชั้น 1–2</td><td><span class="dd">C09_S001_T002 ▾</span></td></tr></table></div></div></div>`;
+  } else if (ph === 'outro') {
+    h = `<h2>จำง่ายๆ</h2><div class="chain">` + [['c', '🗄️ ลิ้นชัก'], ['s', '📁 แฟ้ม'], ['t', '🗂️ การ์ด'], ['m', '🏷️ เครื่อง']].map(([k, n], i) => (i ? '<span style="opacity:.7">→</span>' : '') + `<span class="k" style="background:${LC[k]};${tr(F(ph, .05) + i * .35)}">${n}</span>`).join('') +
+      `</div><div class="fullcode" style="${tr(F(ph, .45))}"><span style="color:#475569">SKS30</span>_<span style="color:${LC.c}">C03</span>_<span style="color:${LC.s}">S001</span>_<span style="color:${LC.t}">T003</span>_<span style="color:${LC.m}">M0001</span></div>
+      <p style="margin-top:18px;${tr(F(ph, .6))}">รหัสเดียว: BOQ → Oracle FA → BMMS QR</p>`;
+  }
+  if (!h) { ov.style.display = 'none'; return; }
+  ov.style.display = 'block'; ov.style.opacity = a; ov.innerHTML = `<div class="ovbg"></div><div class="ovw">${h}</div>`;
+}
+window.READY = true;
+</script>
+</body></html>

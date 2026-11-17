@@ -4,7 +4,6 @@
 <head>
     <base target="_top">
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
     <!-- QR Code Library -->
@@ -50,6 +49,7 @@
             background-color: #f0fdf4;
         }
     </style>
+    <?!= includeTailwindCss_() ?>
 </head>
 
 <body class="py-10 px-4 sm:px-6 lg:px-8">
@@ -416,7 +416,7 @@
             'tab-performance',
             'tab-talent'
         ];
-        const GENERAL_USER_TABS = ['tab-register', 'tab-aircon-survey', 'tab-ref-survey', 'tab-hyper-ref-survey', 'tab-hyper-ac-survey', 'tab-hyper-eq-survey', 'tab-hyper-fo-survey', 'tab-hyper-li-survey', 'tab-hyper-to-survey', 'tab-hyper-pk-survey', 'tab-hyper-fa-survey', 'tab-hyper-hb-survey', 'tab-hyper-fi-survey', 'tab-np-survey', 'tab-edmi-survey', 'tab-layout-survey', 'tab-cctv-survey'];
+        const GENERAL_USER_TABS = ['tab-register', 'tab-aircon-survey', 'tab-ref-survey', 'tab-hyper-ref-survey', 'tab-hyper-ac-survey', 'tab-hyper-eq-survey', 'tab-hyper-fo-survey', 'tab-hyper-li-survey', 'tab-hyper-to-survey', 'tab-hyper-pk-survey', 'tab-hyper-fa-survey', 'tab-hyper-hb-survey', 'tab-hyper-fi-survey', 'tab-np-survey', 'tab-edmi-survey', 'tab-layout-survey', 'tab-cctv-survey', 'tab-cctv-sys-survey', 'tab-ffr-survey'];
         // Admin-configurable override of which GENERAL_USER_TABS a non-admin user sees
         // (e.g. showing only EDMI Solar Meter on a collection day). {tabId: true/false};
         // a tab missing from this map defaults to visible. Populated async in initApp()
@@ -682,7 +682,7 @@
             // tab-visibility toggle list).
             const activeTab = document.querySelector('.tab-btn.active');
             if ((!activeTab || activeTab.classList.contains('hidden')) && typeof openTab === 'function') {
-                const BASE_FALLBACK_ORDER = ['tab-aircon-survey', 'tab-ref-survey', 'tab-hyper-ref-survey', 'tab-hyper-ac-survey', 'tab-hyper-eq-survey', 'tab-hyper-fo-survey', 'tab-hyper-li-survey', 'tab-hyper-to-survey', 'tab-hyper-pk-survey', 'tab-hyper-fa-survey', 'tab-hyper-hb-survey', 'tab-hyper-fi-survey', 'tab-np-survey', 'tab-edmi-survey', 'tab-layout-survey', 'tab-cctv-survey', 'tab-register'];
+                const BASE_FALLBACK_ORDER = ['tab-aircon-survey', 'tab-ref-survey', 'tab-hyper-ref-survey', 'tab-hyper-ac-survey', 'tab-hyper-eq-survey', 'tab-hyper-fo-survey', 'tab-hyper-li-survey', 'tab-hyper-to-survey', 'tab-hyper-pk-survey', 'tab-hyper-fa-survey', 'tab-hyper-hb-survey', 'tab-hyper-fi-survey', 'tab-np-survey', 'tab-edmi-survey', 'tab-layout-survey', 'tab-cctv-survey', 'tab-cctv-sys-survey', 'tab-ffr-survey', 'tab-register'];
                 const preferTab = deptRule ? deptRule.tab : _generalDefaultTab;
                 const FALLBACK_ORDER = [preferTab].concat(BASE_FALLBACK_ORDER.filter(id => id !== preferTab));
                 const candidateIds = showAdminExtras ? FALLBACK_ORDER.concat(ADMIN_ONLY_TABS) : FALLBACK_ORDER;
@@ -827,12 +827,7 @@
             sel.classList.toggle('bg-gray-100', !!cfg.lock);
             toggleRegOtherField('reg-department-select', 'reg-department-other');
         }
-        document.addEventListener('DOMContentLoaded', function() {
-            google.script.run
-                .withSuccessHandler(function(res) { if (res && res.success) _applyRegDeptConfig(res.data); })
-                .withFailureHandler(function(e) { console.error('Failed to load registration department config:', e); })
-                .getRegDeptConfig();
-        });
+        // getRegDeptConfig is now fetched in initApp()'s batched bootstrap (AppBootstrap.gs).
 
         function toggleRegOtherField(selectId, otherInputId) {
             const select = document.getElementById(selectId);
@@ -1207,6 +1202,14 @@
                 <button onclick="openTab('cctv-survey')" id="tab-cctv-survey"
                     class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
                     📹 กล้องวงจรปิด (CCTV)
+                </button>
+                <button onclick="openTab('cctv-sys-survey')" id="tab-cctv-sys-survey"
+                    class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                    🎥 ตรวจระบบ CCTV (MTN)
+                </button>
+                <button onclick="openTab('ffr-survey')" id="tab-ffr-survey"
+                    class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
+                    🥩 FF Renovate
                 </button>
                 <button onclick="openTab('np-survey')" id="tab-np-survey"
                     class="tab-btn flex-1 py-3 px-4 text-sm font-semibold text-gray-500 hover:text-gray-700 border-b-2 border-transparent transition-colors whitespace-nowrap">
@@ -3022,6 +3025,8 @@
         <?!= include('HyperLightingSurveyTab') ?>
         <?!= include('HyperToiletSurveyTab') ?>
         <?!= include('CctvSurveyTab') ?>
+        <?!= include('CctvSystemSurveyTab') ?>
+        <?!= include('FfRenovateSurveyTab') ?>
         <?!= include('HyperParkingSurveyTab') ?>
         <?!= include('HyperFixedAssetSurveyTab') ?>
         <?!= include('HyperHandBlowerSurveyTab') ?>
@@ -3912,12 +3917,10 @@
             btnEl.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
         }
         function _prefetchEnumOptions() {
-            ENUM_GROUP_KEYS.forEach(function (k) {
-                google.script.run
-                    .withSuccessHandler(function (res) { if (res && res.success) _enumCache[k] = res.options; })
-                    .withFailureHandler(function (e) { console.error('enum fetch failed', k, e); })
-                    .getEnumFieldOptions(k);
-            });
+            google.script.run   // one execution for all groups (AppBootstrap.gs)
+                .withSuccessHandler(function (map) { Object.keys(map || {}).forEach(function (k) { var r = map[k]; if (r && r.success) _enumCache[k] = r.options; }); })
+                .withFailureHandler(function (e) { console.error('enum fetch failed', e); })
+                .getEnumFieldOptionsMap(ENUM_GROUP_KEYS);
         }
 
         // Client-side Levenshtein distance — mirrors _levenshtein_ in Survey.gs,
@@ -3982,143 +3985,14 @@
                 // Fetch employees for dropdowns
                 // google.script.run.withSuccessHandler(populateSelects).withFailureHandler(function (e) { console.error(e); }).getEmployeeListV2();
 
-                // Fetch Store DB Data (Stations & BUs)
-                google.script.run.withSuccessHandler(populateStoreData).withFailureHandler(function (e) { console.error(e); }).getStoreDBDataForFrontend();
-
-                // Fetch Layout Survey target-store list + ASIS/To-Be reference doc links
-                // (restricts the Layout Survey tab's branch search to just the confirmed
-                // target-project stores — see layoutTargetCodesSet / _layoutMatchPool()).
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        if (!res || !res.success) { console.error("Failed to load layout target docs:", res && res.error); return; }
-                        layoutTargetDocsMap = {};
-                        layoutTargetCodesSet = new Set();
-                        (res.data || []).forEach(function (r) {
-                            layoutTargetDocsMap[r.code] = { asisUrl: r.asisUrl, tobeUrl: r.tobeUrl };
-                            layoutTargetCodesSet.add(r.code);
-                        });
-                    })
-                    .withFailureHandler(function (e) { console.error("Failed to load layout target docs:", e); })
-                    .getLayoutTargetDocs();
-
-                // Trading Hours Survey target-store allowlist (Phase 1/2) — restricts
-                // the branch search to just the confirmed conversion-project stores
-                // (see hoursTargetStoresMap / _hoursMatchPool()). Deliberately fired
-                // after a short delay, not immediately back-to-back with the
-                // getLayoutTargetDocs() call above — two google.script.run calls fired
-                // back-to-back on first page load can silently drop the second call's
-                // callback (known Apps Script sandboxed-iframe quirk, see
-                // feedback_gas_temp_diag_testing / this file's report-page loadData()
-                // comments) — confirmed live: without this delay hoursTargetCodesSet
-                // never populated, so the search silently failed open to every store.
-                setTimeout(function () {
-                    google.script.run
-                        .withSuccessHandler(function (res) {
-                            if (!res || !res.success) { console.error("Failed to load trading hours target stores:", res && res.error); return; }
-                            hoursTargetStoresMap = {};
-                            hoursTargetCodesSet = new Set();
-                            (res.data || []).forEach(function (r) {
-                                hoursTargetStoresMap[r.code] = { phase: r.phase, targetDate: r.targetDate };
-                                hoursTargetCodesSet.add(r.code);
-                            });
-                        })
-                        .withFailureHandler(function (e) { console.error("Failed to load trading hours target stores:", e); })
-                        .getTradingHoursTargetStores();
-                }, 600);
-
-                // Fetch Vendors
-                google.script.run.withSuccessHandler(populateVendorList).withFailureHandler(function (e) { console.error(e); }).getVendorList();
-
-                // Fetch Brand/Type/Product enum options (defaults ∪ real submitted data)
-                _prefetchEnumOptions();
-
-                // Fetch the active Upload Schedule round (e.g. "2026-Q1") and stamp it
-                // onto the Aircon/Ref survey forms' hidden surveyRound input, so each
-                // submission records which quarterly round it belongs to.
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        var round = (res && res.round) || '';
-                        var acField  = document.getElementById('aircon_surveyRound');
-                        var refField = document.getElementById('ref_surveyRound');
-                        if (acField)  acField.value  = round;
-                        if (refField) refField.value = round;
-                    })
-                    .withFailureHandler(function (e) { console.error("Failed to load active schedule round:", e); })
-                    .getActiveScheduleRound();
-
-                // Fetch admin-configured general-tab visibility (e.g. "EDMI only this Friday")
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        if (res && res.success) {
-                            _generalTabVisibility = res.data || {};
-                            _generalDefaultTab = res.defaultTab || 'tab-aircon-survey';
-                            _renderViewByRole();
-                        }
-                    })
-                    .withFailureHandler(function (e) { console.error("Failed to load tab visibility:", e); })
-                    .getGeneralTabVisibility();
-
-                // Fetch admin-configured landing tab per department (e.g. SGM → Fixed Asset Hyper)
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        if (res && res.success) {
-                            _deptLanding = res.data || {};
-                            _renderViewByRole();
-                        }
-                    })
-                    .withFailureHandler(function (e) { console.error("Failed to load department landing tabs:", e); })
-                    .getDeptLandingTabs();
-
-                // Fetch admin-configured team-restricted tab access (e.g. Trading Hours
-                // Survey defaulting to SMF-only) — same source of truth as _renderViewByRole().
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        if (res && res.success) {
-                            _teamTabAccess = Object.assign({}, TEAM_TAB_DEFAULTS, res.data || {});
-                            _renderViewByRole();
-                        }
-                    })
-                    .withFailureHandler(function (e) { console.error("Failed to load team tab access:", e); })
-                    .getTeamTabAccess();
-
-                // Fetch admin-configured Brand quick-pick chip counts (index.html's
-                // _brandChipsHtml) — falls back to BRAND_CHIP_DEFAULT_COUNT per group
-                // until this lands, so there's no flash of a differently-sized chip row.
-                google.script.run
-                    .withSuccessHandler(function (res) { if (res && res.success) _brandChipCounts = res.data || {}; })
-                    .withFailureHandler(function (e) { console.error("Failed to load brand chip config:", e); })
-                    .getBrandChipConfig();
-
-                // Fetch admin-configured explicit brand chip picks (overrides the
-                // auto top-N count above for any group where an admin chose one).
-                google.script.run
-                    .withSuccessHandler(function (res) { if (res && res.success) _brandChipSelections = res.data || {}; })
-                    .withFailureHandler(function (e) { console.error("Failed to load brand chip selection:", e); })
-                    .getBrandChipSelection();
-
-                // Fetch admin-configured per-survey-type equipment photo requirement
-                // toggle — defaults false (see _equipmentPhotoRequired above) until this lands.
-                google.script.run
-                    .withSuccessHandler(function (res) { if (res && res.success) _equipmentPhotoRequired = Object.assign({ aircon: false, ref: false, np: false, hyperRef: false, hyperAc: false, hyperEq: false, hyperFo: false, hyperTo: false, hyperPk: false, hyperFa: false, hyperHb: false, hyperFi: false, hyperSc: false, edmi: false, layout: false, hours: false }, res.data || {}); })
-                    .withFailureHandler(function (e) { console.error("Failed to load equipment photo requirement config:", e); })
-                    .getEquipmentPhotoRequired();
-
-                // Fetch Survey Configuration (with delay to ensure DOM is ready)
-                setTimeout(function () {
-                    google.script.run.withSuccessHandler(loadSurveyConfig).withFailureHandler(function (e) {
-                        console.error("Failed to load survey config:", e);
-                    }).getSurveyConfig();
-
-                    // Fetch Survey Objectives
-                    google.script.run.withSuccessHandler(loadSurveyObjectives).withFailureHandler(function (e) {
-                        console.error("Failed to load survey objectives:", e);
-                    }).getSurveyObjectives();
-                }, 500);
-
-                // Check Admin Status (Pass current user email if logged in)
+                // ── Page-load data: 2 batched server calls instead of ~25 (see AppBootstrap.gs) ──
+                // Every google.script.run call is a separate Apps Script execution that re-parses
+                // the whole project and is throttled per user, so ~25 parallel calls queued up and
+                // made the first load slow (and back-to-back calls could drop callbacks). The
+                // handlers below are the exact success handlers the individual calls used; if a
+                // batch fails, or one part of it errors, just that function is re-fetched alone.
                 let email = "";
                 if (CURRENT_USER) {
-                    // Start of session check
                     email = CURRENT_USER.email;
                 } else {
                     const user = localStorage.getItem(AUTH_USER);
@@ -4130,8 +4004,8 @@
                     }
                 }
 
-                if (email) {
-                    google.script.run.withSuccessHandler(function (res) {
+                const BOOT_HANDLERS = {
+                    checkAdminStatus: function (res) {
                         // Persist refreshed flags so role changes take effect without re-login
                         if (res && CURRENT_USER) {
                             CURRENT_USER.isAdmin = res.isAdmin || false;
@@ -4143,8 +4017,122 @@
                             updateUserUI(CURRENT_USER);
                         }
                         handleAdminStatus(res);
-                    }).checkAdminStatus(email);
+                    },
+                    getRegDeptConfig: function (res) { if (res && res.success) _applyRegDeptConfig(res.data); },
+                    // Admin-configured general-tab visibility (e.g. "EDMI only this Friday")
+                    getGeneralTabVisibility: function (res) {
+                        if (res && res.success) {
+                            _generalTabVisibility = res.data || {};
+                            _generalDefaultTab = res.defaultTab || 'tab-aircon-survey';
+                            _renderViewByRole();
+                        }
+                    },
+                    // Admin-configured landing tab per department (e.g. SGM → Fixed Asset Hyper)
+                    getDeptLandingTabs: function (res) {
+                        if (res && res.success) {
+                            _deptLanding = res.data || {};
+                            _renderViewByRole();
+                        }
+                    },
+                    // Team-restricted tab access (e.g. Trading Hours Survey defaulting to SMF-only)
+                    getTeamTabAccess: function (res) {
+                        if (res && res.success) {
+                            _teamTabAccess = Object.assign({}, TEAM_TAB_DEFAULTS, res.data || {});
+                            _renderViewByRole();
+                        }
+                    },
+                    // Brand quick-pick chip counts / explicit picks (_brandChipsHtml)
+                    getBrandChipConfig: function (res) { if (res && res.success) _brandChipCounts = res.data || {}; },
+                    getBrandChipSelection: function (res) { if (res && res.success) _brandChipSelections = res.data || {}; },
+                    // Per-survey-type equipment photo requirement toggle (defaults false until this lands)
+                    getEquipmentPhotoRequired: function (res) { if (res && res.success) _equipmentPhotoRequired = Object.assign({ aircon: false, ref: false, np: false, hyperRef: false, hyperAc: false, hyperEq: false, hyperFo: false, hyperTo: false, hyperPk: false, hyperFa: false, hyperHb: false, hyperFi: false, hyperSc: false, edmi: false, layout: false, hours: false }, res.data || {}); },
+                    // Active Upload Schedule round (e.g. "2026-Q1") stamped onto Aircon/Ref forms' hidden surveyRound
+                    getActiveScheduleRound: function (res) {
+                        var round = (res && res.round) || '';
+                        var acField  = document.getElementById('aircon_surveyRound');
+                        var refField = document.getElementById('ref_surveyRound');
+                        if (acField)  acField.value  = round;
+                        if (refField) refField.value = round;
+                    },
+                    // Store DB Data (Stations & BUs)
+                    getStoreDBDataForFrontend: populateStoreData,
+                    // Layout Survey target-store list + ASIS/To-Be doc links (see _layoutMatchPool())
+                    getLayoutTargetDocs: function (res) {
+                        if (!res || !res.success) { console.error("Failed to load layout target docs:", res && res.error); return; }
+                        layoutTargetDocsMap = {};
+                        layoutTargetCodesSet = new Set();
+                        (res.data || []).forEach(function (r) {
+                            layoutTargetDocsMap[r.code] = { asisUrl: r.asisUrl, tobeUrl: r.tobeUrl };
+                            layoutTargetCodesSet.add(r.code);
+                        });
+                    },
+                    // Trading Hours Survey target-store allowlist (see _hoursMatchPool())
+                    getTradingHoursTargetStores: function (res) {
+                        if (!res || !res.success) { console.error("Failed to load trading hours target stores:", res && res.error); return; }
+                        hoursTargetStoresMap = {};
+                        hoursTargetCodesSet = new Set();
+                        (res.data || []).forEach(function (r) {
+                            hoursTargetStoresMap[r.code] = { phase: r.phase, targetDate: r.targetDate };
+                            hoursTargetCodesSet.add(r.code);
+                        });
+                    },
+                    getVendorList: populateVendorList,
+                    getSurveyConfig: loadSurveyConfig,
+                    getSurveyObjectives: loadSurveyObjectives,
+                    // Brand/Type/Product enum options (defaults ∪ real submitted data), all groups at once
+                    getEnumFieldOptionsMap: function (map) {
+                        Object.keys(map || {}).forEach(function (k) {
+                            const r = map[k];
+                            if (r && r.success) _enumCache[k] = r.options;
+                        });
+                    }
+                };
+
+                // Re-fetch one function on its own (batch failed / that part errored). Staggered so
+                // several fallbacks don't hit the back-to-back dropped-callback quirk.
+                function bootFallback(name, delay) {
+                    setTimeout(function () {
+                        const runner = google.script.run
+                            .withSuccessHandler(BOOT_HANDLERS[name])
+                            .withFailureHandler(function (e) { console.error('Failed to load ' + name + ':', e); });
+                        if (name === 'checkAdminStatus') runner.checkAdminStatus(email);
+                        else if (name === 'getEnumFieldOptionsMap') runner.getEnumFieldOptionsMap(ENUM_GROUP_KEYS);
+                        else runner[name]();
+                    }, delay);
                 }
+                function bootDispatch(res, names, label) {
+                    if (res && res.__ms != null) console.log('[boot] ' + label + ' server ' + res.__ms + 'ms');
+                    let fb = 0;
+                    names.forEach(function (name) {
+                        const v = res ? res[name] : undefined;
+                        if (!res || (v && v.__error)) {
+                            if (v && v.__error) console.error('[boot] ' + name + ' failed in batch:', v.__error);
+                            bootFallback(name, 400 * fb++);
+                            return;
+                        }
+                        try { BOOT_HANDLERS[name](v); } catch (e) { console.error('[boot] handler ' + name + ':', e); }
+                    });
+                }
+
+                const BOOT_CONFIG_NAMES = (email ? ['checkAdminStatus'] : []).concat([
+                    'getRegDeptConfig', 'getGeneralTabVisibility', 'getDeptLandingTabs', 'getTeamTabAccess',
+                    'getBrandChipConfig', 'getBrandChipSelection', 'getEquipmentPhotoRequired', 'getActiveScheduleRound']);
+                const BOOT_DATA_NAMES = ['getStoreDBDataForFrontend', 'getLayoutTargetDocs', 'getTradingHoursTargetStores',
+                    'getVendorList', 'getSurveyConfig', 'getSurveyObjectives', 'getEnumFieldOptionsMap'];
+
+                // Phase 1: tab/role config (small, decides what renders)
+                google.script.run
+                    .withSuccessHandler(function (res) { bootDispatch(res, BOOT_CONFIG_NAMES, 'config'); })
+                    .withFailureHandler(function (e) { console.error('[boot] config batch failed:', e); bootDispatch(null, BOOT_CONFIG_NAMES, 'config'); })
+                    .getAppBootstrapConfig(email);
+
+                // Phase 2: dropdown/search lookup data — short delay, not back-to-back with phase 1
+                setTimeout(function () {
+                    google.script.run
+                        .withSuccessHandler(function (res) { bootDispatch(res, BOOT_DATA_NAMES, 'data'); })
+                        .withFailureHandler(function (e) { console.error('[boot] data batch failed:', e); bootDispatch(null, BOOT_DATA_NAMES, 'data'); })
+                        .getAppBootstrapData(ENUM_GROUP_KEYS);
+                }, 300);
 
                 // Ensure overlay is handled if we are already logged in (double check)
                 // Ensure overlay is handled if we are already logged in (double check)
@@ -5287,6 +5275,8 @@
             if (tabName === 'hyper-hb-survey' && typeof checkHyperHbDraft === 'function') checkHyperHbDraft();
             if (tabName === 'hyper-sc-survey' && typeof checkHyperScDraft === 'function') checkHyperScDraft();
             if (tabName === 'cctv-survey' && typeof checkCctvDraft === 'function') checkCctvDraft();
+            if (tabName === 'cctv-sys-survey' && typeof checkCsysDraft === 'function') checkCsysDraft();
+            if (tabName === 'ffr-survey' && typeof checkFfrDraft === 'function') checkFfrDraft();
 
             if (tabName === 'work-orders') {
                 // Pending orders removed
@@ -7552,7 +7542,9 @@
             'tab-np-survey': '🍦 New Product',
             'tab-edmi-survey': '☀️ EDMI Solar Meter',
             'tab-layout-survey': '📐 Layout Survey',
-            'tab-cctv-survey': '📹 กล้องวงจรปิด (CCTV Survey)'
+            'tab-cctv-survey': '📹 กล้องวงจรปิด (CCTV Survey)',
+            'tab-cctv-sys-survey': '🎥 ตรวจระบบ CCTV & อุปกรณ์ LP (CCTV System Survey)',
+            'tab-ffr-survey': '🥩 สำรวจก่อน Renovate Fresh Food (FF Renovate Survey)'
         };
 
         // Role select gets a colored left border so SMF/MMS-restricted tabs are
@@ -9042,7 +9034,7 @@
             SDS[type] = a;
         }
         const SDS_TAB_TYPES = { 'aircon-survey': 'aircon', 'np-survey': 'np', 'hyper-ref-survey': 'hyperRef',
-            'hyper-ac-survey': 'hyperAc', 'hyper-eq-survey': 'hyperEq', 'hyper-fo-survey': 'hyperFo', 'hyper-li-survey': 'hyperLi', 'hyper-to-survey': 'hyperTo', 'hyper-pk-survey': 'hyperPk', 'hyper-fa-survey': 'hyperFa', 'hyper-hb-survey': 'hyperHb', 'hyper-fi-survey': 'hyperFi', 'hyper-sc-survey': 'hyperSc', 'cctv-survey': 'cctv' };
+            'hyper-ac-survey': 'hyperAc', 'hyper-eq-survey': 'hyperEq', 'hyper-fo-survey': 'hyperFo', 'hyper-li-survey': 'hyperLi', 'hyper-to-survey': 'hyperTo', 'hyper-pk-survey': 'hyperPk', 'hyper-fa-survey': 'hyperFa', 'hyper-hb-survey': 'hyperHb', 'hyper-fi-survey': 'hyperFi', 'hyper-sc-survey': 'hyperSc', 'cctv-survey': 'cctv', 'cctv-sys-survey': 'cctvSys', 'ffr-survey': 'ffr' };
 
         function _sdsForm(a) { return document.querySelector(a.form); }
         function _sdsRoot(a) { return document.querySelector(a.root); }
@@ -9181,10 +9173,27 @@
                     failed = up.failed;
                 }
                 if (loadingText) loadingText.textContent = 'กำลังบันทึกข้อมูลขึ้นระบบ...';
-                const res = await new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(bad).saveSurveyDraft({
+                // Many surveyors at once (FF Renovate field week): a save that meets the busy write lock, the per-account
+                // concurrency limit or a dropped connection is retried automatically (a draft save is safe to repeat).
+                const payload = {
                     type: type, draftId: a.st.draftId, branchCode: code, branchName: _sdsField(a, 'branchName'),
                     reporterEmail: email, reporterPhone: phone, draft: a.buildDraft(), photos: sdsUploadedLinks(type)
-                }));
+                };
+                const callSave = () => new Promise((ok, bad) => google.script.run.withSuccessHandler(ok).withFailureHandler(bad).saveSurveyDraft(payload));
+                const transient = (m) => /busy|ระบบกำลังบันทึก|lock|too many|simultaneous|timed? ?out|timeout|network|NetworkError|Failed to fetch|Service invoked|try again/i.test(String(m || ''));
+                let res = null;
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        res = await callSave();
+                        if (res && (res.success || !transient(res.error))) break;
+                    } catch (err) {
+                        if (attempt === 2 || !transient(err && err.message ? err.message : err)) throw err;
+                    }
+                    if (attempt < 2) {
+                        if (loadingText) loadingText.textContent = 'ระบบมีผู้ใช้งานพร้อมกันมาก — กำลังลองบันทึกอีกครั้ง (' + (attempt + 2) + '/3)...';
+                        await new Promise(r => setTimeout(r, 2500 * (attempt + 1) + Math.random() * 2500));   // jitter: spread retries
+                    }
+                }
                 hideLoading();
                 if (loadingText) loadingText.textContent = 'Processing...';
                 if (!res || !res.success) {
@@ -9391,6 +9400,18 @@
             sizeFor: function(cat) { return cat === 'cctv_layout' ? [1600, 1600, 0.72] : [1024, 1024, 0.65]; },
             buildDraft: function() { return _buildCctvDraft(); },
             restoreDraft: function(d) { restoreCctvDraft(d); }
+        });
+        sdsRegister('cctvSys', {
+            form: '#csys-form', root: '#content-cctv-sys-survey', idPrefix: 'CSYS',
+            sizeFor: function() { return [1024, 1024, 0.65]; },
+            buildDraft: function() { return _buildCsysDraft(); },
+            restoreDraft: function(d) { restoreCsysDraft(d); }
+        });
+        sdsRegister('ffr', {
+            form: '#ffr-form', root: '#content-ffr-survey', idPrefix: 'FFR',
+            sizeFor: function(cat) { return cat === 'ffr_paper' ? [2000, 2000, 0.78] : cat === 'ffr_layout' ? [1600, 1600, 0.72] : [1024, 1024, 0.65]; },
+            buildDraft: function() { return _buildFfrDraft(); },
+            restoreDraft: function(d) { restoreFfrDraft(d); }
         });
         // ─── END SERVER DRAFTS ─────────────────────────────────────────────────────
 

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Renovate Survey Report</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #be123c; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .tab-on { background: #be123c; color: #fff; }
+        th { white-space: nowrap; }
+        .kpi { background: #fff; border: 1px solid #e2e8f0; border-radius: .75rem; padding: .75rem 1rem; }
+        #printHdr { display: none; }
+        /* ── Print: 🖨️ พิมพ์รายงาน = KPIs + the open tab (A4 landscape) · 🖨️ in the record window = that store only ── */
+        @media print {
+            @page { size: A4 landscape; margin: 8mm 8mm 10mm 8mm; @bottom-right { content: counter(page) " / " counter(pages); font-size: 8pt; color: #64748b; } }
+            body { background: #fff !important; font-size: 9pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            nav, .noprint, #arcTogglePill, #arcToggleBanner { display: none !important; }
+            #printHdr { display: block; border-bottom: 2px solid #be123c; padding-bottom: 4px; margin-bottom: 6px; }
+            main { max-width: none !important; padding: 0 !important; }
+            main > * + * { margin-top: 6px !important; }
+            .overflow-x-auto { overflow: visible !important; }
+            section { border: 0 !important; }
+            table { font-size: 7.5pt; } th, td { padding: 3px 4px !important; }
+            thead { display: table-header-group; } tr { break-inside: avoid; }
+            .kpi { padding: 4px 8px; break-inside: avoid; } .kpi .text-2xl { font-size: 13pt; }
+            #kpis { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; gap: 6px !important; }
+            #view-racks { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } #view-racks > * { break-inside: avoid; }
+            body.print-modal main, body.print-modal #printHdr { display: none !important; }
+            body.print-modal #modal { position: static !important; display: block !important; background: none !important; padding: 0 !important; overflow: visible !important; }
+            body.print-modal #modal > div { max-width: none !important; margin: 0 !important; border-radius: 0 !important; }
+            body.print-modal #modal .space-y-4 > * { break-inside: avoid; }
+        }
+    </style>
+    <?!= includeTailwindCss_() ?>
+</head>
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 flex flex-wrap justify-between gap-2 py-3">
+            <div class="flex items-center gap-4">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" target="_top" class="text-slate-500 p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-rose-700 rounded-full"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">🥩 รายงานสำรวจก่อน Renovate Fresh Food</h1>
+                    <p class="text-xs text-slate-500 font-medium">FF Renovation 2027 · MTN ตรวจหน้างาน → Refurbish / Workable / Request New → Final BOQ</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="loader" id="mainLoader"></div>
+                <a href="<?= MANUALS_URL ?>?page=ffr-manual" target="_blank" class="px-3 py-1.5 text-sm font-medium text-rose-800 bg-white border border-rose-200 rounded-lg hover:bg-rose-50">📖 คู่มือ</a>
+                <button id="fullManualBtn" onclick="openFullManual(this)" class="hidden px-3 py-1.5 text-sm font-medium text-white bg-rose-800 border border-rose-800 rounded-lg hover:bg-rose-900">🔒 คู่มือฉบับเต็ม</button>
+                <a id="layoutFolderBtn" href="#" target="_blank" class="px-3 py-1.5 text-sm font-medium text-rose-800 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100">📐 โฟลเดอร์ Layout</a>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=ffr-checklist" target="_blank" rel="noopener" class="px-3 py-1.5 text-sm font-medium text-rose-800 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100">🖨️ ฟอร์มกระดาษ A4</a>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=ffr-qr" target="_blank" rel="noopener" class="px-3 py-1.5 text-sm font-medium text-rose-800 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100" title="พิมพ์ป้าย QR ตู้ (1 ดวง = 1 ตู้) สำหรับจัดซื้อ / ตรวจรับ">🏷️ QR ตู้</a>
+                <a href="<?= ScriptApp.getService().getUrl() ?>?page=ffr-units" target="_blank" rel="noopener" class="px-3 py-1.5 text-sm font-medium text-rose-800 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100" title="ติดตามตู้: สั่งซื้อ / ส่งของ / ติดตั้ง / ตรวจรับ">📦 ติดตามตู้</a>
+                <button id="syncUnitsBtn" onclick="syncUnits(this)" class="hidden px-3 py-1.5 text-sm font-medium text-rose-800 bg-white border border-rose-200 rounded-lg hover:bg-rose-50" title="สร้าง / อัปเดตรหัสตู้ + QR จากผลสำรวจล่าสุดของทุกสาขา">⟳ สร้าง/อัปเดต QR</button>
+                <button id="refreshLayoutBtn" onclick="refreshLayouts(this)" class="hidden px-3 py-1.5 text-sm font-medium text-rose-800 bg-white border border-rose-200 rounded-lg hover:bg-rose-50">⟳ สแกน Layout</button>
+                <button onclick="printReport()" class="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50" title="พิมพ์ / บันทึก PDF (A4 แนวนอน) — KPI + แท็บที่เปิดอยู่ตามตัวกรอง">🖨️ พิมพ์รายงาน</button>
+                <button onclick="downloadToExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
+                <button onclick="loadAll()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 space-y-5">
+        <div id="printHdr"></div>
+        <div id="scopeBanner" class="hidden rounded-lg border px-4 py-2 text-sm"></div>
+        <div id="kpis" class="grid grid-cols-2 md:grid-cols-6 gap-3"></div>
+        <div class="noprint flex flex-wrap items-center gap-2">
+            <div class="flex rounded-lg border border-rose-200 overflow-hidden text-sm font-semibold">
+                <button data-tab="stores" onclick="setTab('stores')" class="px-4 py-1.5 tab-on">สาขา</button>
+                <button data-tab="items" onclick="setTab('items')" class="px-4 py-1.5 text-rose-800">ตู้แช่ (รวมทุกสาขา)</button>
+                <button data-tab="racks" onclick="setTab('racks')" class="px-4 py-1.5 text-rose-800">Rack (รูปสำหรับตัดสินใจ)</button>
+            </div>
+            <select id="fTeam" onchange="renderAll()" class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-white"><option value="">ทุกทีม</option></select>
+            <select id="fState" onchange="renderAll()" class="border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-white">
+                <option value="">ทุกสถานะ</option><option value="done">ตรวจแล้ว</option><option value="todo">ยังไม่ตรวจ</option><option value="nolayout">ยังไม่มี Layout</option><option value="full">Full Renovate</option><option value="pmflag">มีข้อสังเกตจาก PM</option><option value="instrisk">มีข้อจำกัดการติดตั้ง</option>
+            </select>
+            <input id="fText" oninput="renderAll()" placeholder="ค้นหาสาขา / ตู้" class="border border-slate-200 rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[160px]">
+        </div>
+        <section id="view-stores" class="bg-white border border-slate-200 rounded-xl overflow-x-auto"></section>
+        <section id="view-items" class="hidden bg-white border border-slate-200 rounded-xl overflow-x-auto"></section>
+        <section id="view-racks" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4"></section>
+    </main>
+
+    <div id="modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto p-4" onclick="if(event.target===this)closeModal()">
+        <div class="bg-white rounded-xl w-full max-w-4xl my-6">
+            <div class="flex items-center justify-between px-5 py-3 border-b"><h2 id="modalTitle" class="font-bold text-slate-900"></h2>
+                <div class="flex gap-2 noprint"><button onclick="printRecord()" class="text-xs text-slate-700 border border-slate-300 rounded px-2 py-1" title="พิมพ์ / บันทึก PDF ของสาขานี้">🖨️ พิมพ์</button><button id="deleteBtn" onclick="deleteRecord()" class="hidden text-xs text-red-600 border border-red-200 rounded px-2 py-1">ลบรายการ</button><button onclick="closeModal()" class="text-slate-500 text-xl px-2">×</button></div></div>
+            <div id="modalBody" class="p-5 space-y-4 text-sm"></div>
+        </div>
+    </div>
+
+    <script>
+        let CF = null, SHOW_PRICE = false, SCOPE_TXT = '', rows = [], items = [], racks = [], tab = 'stores', isAdmin = false, canEdit = false, _userEmail = '', currentId = null;
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fmt(n) { return Math.round(num(n)).toLocaleString(); }
+        function money(n) { const v = num(n); return (v > 0 ? '+' : '') + fmt(v); }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? '-' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }); }
+        function ambCls(f) { return f === 'Over' ? 'bg-red-100 text-red-700' : f === 'Watch' ? 'bg-amber-100 text-amber-800' : f === 'OK' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'; }
+        const GRADE = { '1': 'ดี', '2': 'พอใช้', '3': 'แย่' };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            loadAll();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) {
+                if (!f) return;
+                isAdmin = !!(f.isAdmin || f.isScheduleAdmin); canEdit = isAdmin || !!f.smfEditAllowed || !!f.opsEditAllowed;
+                document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+                document.getElementById('refreshLayoutBtn').classList.toggle('hidden', !canEdit);
+                document.getElementById('syncUnitsBtn').classList.toggle('hidden', !canEdit);
+                document.getElementById('fullManualBtn').classList.toggle('hidden', !f.isAdmin);   // Super Admin only (server re-checks)
+            }).getUserFlags(_userEmail);
+        });
+        // Full manual (budget / BOQ / report) — server returns a signed 12 h link only for Super Admin.
+        function openFullManual(btn) {
+            const w = window.open('', '_blank');   // open now so the popup isn't blocked after the async call
+            btn.disabled = true;
+            google.script.run.withSuccessHandler(function(res) {
+                btn.disabled = false;
+                if (res && res.success) { if (w) w.location.href = res.url; else window.open(res.url, '_blank'); }
+                else { if (w) w.close(); alert((res && res.error) || 'เปิดไม่สำเร็จ'); }
+            }).withFailureHandler(function(err) { btn.disabled = false; if (w) w.close(); alert(err.message); }).getFfrFullManualLink(_userEmail);
+        }
+        let _gen = 0;
+        function loadAll() {
+            const g = ++_gen; let pending = 2;
+            const done = function() { if (--pending === 0 && g === _gen) document.getElementById('mainLoader').classList.add('hidden'); };
+            document.getElementById('mainLoader').classList.remove('hidden');
+            const call = function(fn, onOk, tries) {
+                google.script.run.withSuccessHandler(function(res) {
+                    if (g !== _gen) return;
+                    if (!res && tries < 3) { setTimeout(function() { call(fn, onOk, tries + 1); }, 1500); return; }
+                    if (!res || !res.success) { alert('โหลดข้อมูลไม่สำเร็จ (' + fn + '): ' + (res && res.error)); done(); return; }
+                    onOk(res); done();
+                }).withFailureHandler(function(err) { if (g === _gen) { alert('Error (' + fn + '): ' + err.message); done(); } })[fn](window.ARCHIVE_ON, _userEmail);
+            };
+            call('getFfRenovateOverview', function(res) {
+                CF = res.ffConfig; rows = res.rows || []; SHOW_PRICE = !!res.showPrice;   // prices: Super Admin only (server decides + strips)
+                // store scope: admins / schedule admin / SMF = all stores; anyone else = only stores where they are AMM MTN (server-filtered)
+                const sb = document.getElementById('scopeBanner');
+                SCOPE_TXT = res.scopeAll ? '' : (res.scopeN ? 'แสดงเฉพาะสาขาที่คุณรับผิดชอบ (AMM MTN) — ' + res.scopeN + ' สาขา'
+                    : (_userEmail ? 'ไม่พบสาขาในโครงการที่คุณเป็น AMM MTN (' + _userEmail + ') — ถ้าไม่ถูกต้อง แจ้ง Admin ให้ตรวจ ID AMM ในฐานข้อมูลสาขา' : 'กรุณาเข้าสู่ระบบในแอปหลักก่อน เพื่อดูรายงานสาขาที่คุณรับผิดชอบ'));
+                sb.textContent = SCOPE_TXT;
+                sb.className = SCOPE_TXT ? 'rounded-lg border px-4 py-2 text-sm ' + (res.scopeN ? 'bg-sky-50 border-sky-200 text-sky-900' : 'bg-amber-50 border-amber-200 text-amber-900') : 'hidden';
+                document.getElementById('layoutFolderBtn').href = res.layoutFolder;
+                const teams = Array.from(new Set(rows.map(function(r) { return r.team; }).filter(Boolean))).sort();
+                const sel = document.getElementById('fTeam'), cur = sel.value;
+                sel.innerHTML = '<option value="">ทุกทีม</option>' + teams.map(function(t) { return '<option' + (t === cur ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('');
+                renderAll();
+            }, 0);
+            call('getFfRenovateItemRows', function(res) { items = res.items || []; racks = res.racks || []; renderAll(); }, 0);
+        }
+        function setTab(t) {
+            tab = t;
+            document.querySelectorAll('[data-tab]').forEach(function(b) { b.classList.toggle('tab-on', b.dataset.tab === t); b.classList.toggle('text-rose-800', b.dataset.tab !== t); });
+            ['stores', 'items', 'racks'].forEach(function(k) { document.getElementById('view-' + k).classList.toggle('hidden', k !== t); });
+        }
+        function _match(r) {
+            const team = document.getElementById('fTeam').value, st = document.getElementById('fState').value, q = document.getElementById('fText').value.toLowerCase().trim();
+            if (team && r.team !== team) return false;
+            if (st === 'done' && !r.sv) return false;
+            if (st === 'todo' && r.sv) return false;
+            if (st === 'nolayout' && r.layouts) return false;
+            if (st === 'full' && !r.full) return false;
+            if (st === 'instrisk' && !(r.sv && r.sv['Install Risks'])) return false;
+            if (st === 'pmflag' && !(r.pm && r.pm.flags && r.pm.flags.length)) return false;
+            if (q && (r.code + ' ' + r.gold + ' ' + r.name).toLowerCase().indexOf(q) === -1) return false;
+            return true;
+        }
+        function renderAll() { if (!CF) return; renderKpis(); renderStores(); renderItems(); renderRacks(); }
+        function renderKpis() {
+            const sv = rows.filter(function(r) { return r.sv; });
+            const s = function(k) { return sv.reduce(function(a, r) { return a + num(r.sv[k]); }, 0); };
+            const boqRef = rows.reduce(function(a, r) { return a + r.boq.refQ; }, 0), boqNew = rows.reduce(function(a, r) { return a + r.boq.newQ; }, 0),
+                  boqTot = SHOW_PRICE ? rows.reduce(function(a, r) { return a + num(r.boq.total); }, 0) : 0;
+            const k = function(l, v, sub, c) { return '<div class="kpi"><div class="text-xs text-slate-500">' + l + '</div><div class="text-2xl font-bold ' + (c || 'text-slate-900') + '">' + v + '</div><div class="text-[11px] text-slate-500">' + (sub || '') + '</div></div>'; };
+            document.getElementById('kpis').innerHTML =
+                k('ตรวจแล้ว', sv.length + ' / ' + rows.length, 'สาขา · มี Layout ' + rows.filter(function(r) { return r.layouts; }).length, 'text-rose-700') +
+                (SHOW_PRICE ? k('BOQ รวม', (boqTot / 1e6).toFixed(1) + ' MB', 'Refurbish ' + boqRef + ' ตู้') : k('แผน BOQ', fmt(boqRef) + ' / ' + fmt(boqNew), 'ตู้ Refurbish / ซื้อใหม่')) +
+                k('Refurbish ยืนยัน', fmt(s('BOQ Refurbish Confirmed')) + ' / ' + fmt(s('BOQ Refurbish Qty')), 'จากแผนของสาขาที่ตรวจแล้ว', 'text-emerald-700') +
+                k('Workable / New', fmt(s('Qty Workable')) + ' / ' + fmt(s('Qty Request New')), 'ตู้', 'text-sky-700') +
+                (SHOW_PRICE ? k('งบเทียบ BOQ', money(s('Cost Delta vs BOQ (THB)')), '฿ (+ ต้องเพิ่ม / − ประหยัด)', s('Cost Delta vs BOQ (THB)') > 0 ? 'text-red-700' : 'text-emerald-700')
+                            : k('ไม่พบ / Rack เสนอเปลี่ยน', fmt(s('Qty Not Found')) + ' / ' + fmt(s('Rack Replace')), 'ตู้ / ชุด', 'text-slate-700')) +
+                k('ร้อนเกิน / Rack เปลี่ยน', sv.filter(function(r) { return r.sv['Ambient Flag'] === 'Over'; }).length + ' / ' + fmt(s('Rack Replace')), 'สาขา > ' + CF.ambMax + '°C / Rack', 'text-amber-700');
+        }
+        // BOQ revision the survey was checked against; amber when older than the BOQ now loaded (re-check changed lines)
+        function _boqRevTag(rev) {
+            const cur = CF && CF.boqRev ? CF.boqRev : '', r = String(rev || '').trim();
+            if (!r) return '<div class="text-[10px] font-normal text-slate-400" title="ส่งก่อนมีการบันทึก BOQ Rev">BOQ R0</div>';
+            const old = cur && r !== cur;
+            return '<div class="text-[10px] ' + (old ? 'font-semibold text-amber-700' : 'font-normal text-slate-400') + '" title="' + (old ? 'ตรวจกับ BOQ ' + esc(r) + ' — ตอนนี้ใช้ ' + esc(cur) + ' ควรตรวจรายการที่เปลี่ยน' : 'ตรวจกับ BOQ ' + esc(r)) + '">BOQ ' + esc(r.split(' · ')[0]) + (old ? ' ⚠' : '') + '</div>';
+        }
+        // PM contract baseline (FfRenovatePm.gs): refrigerant + rack age · lease left (red < 5 yrs) · flags (hover for the list)
+        function _pmCell(pm) {
+            if (!pm) return '<td class="p-2 text-[10px] text-slate-400">ไม่มีใน PM</td>';
+            const fl = pm.flags || [];
+            return '<td class="p-2 text-[11px] whitespace-nowrap">' + esc(pm.refg || '-') + (pm.rackYr ? ' · Rack ' + pm.rackAge + ' ปี' : '') +
+                (pm.remain > 0 ? '<div class="' + (pm.remain < 5 ? 'text-red-600 font-semibold' : 'text-slate-500') + '">เช่าเหลือ ' + pm.remain + ' ปี</div>' : '<div class="text-slate-400">' + esc(pm.own || '') + '</div>') +
+                (fl.length ? '<div class="text-amber-700 font-semibold" title="' + esc(fl.map(function(f) { return '• ' + f.m; }).join('\n')) + '">⚠ ' + fl.length + ' ข้อสังเกต</div>' : '') + '</td>';
+        }
+        function renderStores() {
+            const list = rows.filter(_match).sort(function(a, b) { return (a.sv ? 1 : 0) - (b.sv ? 1 : 0) || a.team.localeCompare(b.team) || a.name.localeCompare(b.name); });
+            let h = '<table class="min-w-full text-xs"><thead class="bg-slate-50 text-slate-500"><tr><th class="text-left p-2">สาขา</th><th class="p-2">ทีม / Model</th><th class="p-2">Layout</th><th class="p-2">BOQ Ref / New</th>' + (SHOW_PRICE ? '<th class="p-2">BOQ ฿</th>' : '') + '<th class="p-2 text-left">ข้อมูล PM / สัญญา</th>' +
+                '<th class="p-2">ตรวจ</th><th class="p-2">Ambient max</th><th class="p-2">Refurbish / Workable / New / ไม่พบ</th>' + (SHOW_PRICE ? '<th class="p-2">งบเทียบ BOQ</th>' : '') + '<th class="p-2">Rack ใช้ต่อ/OH/เปลี่ยน</th><th class="text-left p-2">ระบบที่แนะนำ</th><th class="text-left p-2">แอร์ / ไฟ / ติดตั้ง</th></tr></thead><tbody>';
+            list.forEach(function(r) {
+                const v = r.sv;
+                h += '<tr class="border-t border-slate-100 hover:bg-rose-50/40 ' + (v ? 'cursor-pointer' : '') + '"' + (v ? ' data-open="' + esc(v.ID) + '"' : '') + '>' +
+                    '<td class="p-2"><b>' + esc(r.gold) + '</b> ' + esc(r.name) + (r.full ? ' <span class="px-1.5 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold">Full Renovate</span>' : '') + '<div class="text-[10px] text-slate-400">' + esc(r.code) + (r.amm ? ' · ' + esc(r.amm) : '') + '</div></td>' +
+                    '<td class="p-2 text-center">' + esc(r.team || '-') + ' / ' + esc(r.model || '-') + '</td>' +
+                    '<td class="p-2 text-center">' + (r.layouts ? '📄 ' + r.layouts : '<span class="text-amber-600">—</span>') + '</td>' +
+                    '<td class="p-2 text-center">' + r.boq.refQ + ' / ' + r.boq.newQ + (r.rack ? ' <span class="text-indigo-700" title="BOQ มี Multiset ใหม่">⚙️</span>' : '') + '</td>' +
+                    (SHOW_PRICE ? '<td class="p-2 text-right">' + fmt(r.boq.total) + '</td>' : '') + _pmCell(r.pm) +
+                    (v ? '<td class="p-2 text-center text-emerald-700 font-semibold">✓ ' + fdate(v.Timestamp) + _boqRevTag(v['BOQ Rev']) + '</td>' +
+                        '<td class="p-2 text-center"><span class="px-1.5 py-0.5 rounded ' + ambCls(v['Ambient Flag']) + '">' + esc(v['Ambient Max (C)']) + ' °C</span></td>' +
+                        '<td class="p-2 text-center"><span class="text-emerald-700 font-semibold">' + num(v['Qty Refurbish OK']) + '</span> / <span class="text-sky-700">' + num(v['Qty Workable']) + '</span> / <span class="text-red-700 font-semibold">' + num(v['Qty Request New']) + '</span> / ' + num(v['Qty Not Found']) + '</td>' +
+                        (SHOW_PRICE ? '<td class="p-2 text-right ' + (num(v['Cost Delta vs BOQ (THB)']) > 0 ? 'text-red-700' : 'text-emerald-700') + '">' + money(v['Cost Delta vs BOQ (THB)']) + '</td>' : '') +
+                        '<td class="p-2 text-center">' + num(v['Rack Keep']) + ' / ' + num(v['Rack Overhaul']) + ' / <b class="text-red-700">' + num(v['Rack Replace']) + '</b></td>' +
+                        '<td class="p-2">' + esc(v['System Recommend'] || '-') + (v['High Frozen System'] ? '<div class="text-[10px] text-indigo-700">High Frozen เดิม: ' + esc(v['High Frozen System']) + '</div>' : '') + (v['Site Risks'] ? '<div class="text-[10px] text-red-600" title="' + esc(v['Site Risks']) + '">⚠ ' + esc(String(v['Site Risks']).split(' | ').length) + ' ข้อเสี่ยง</div>' : '') + '</td>' +
+                        '<td class="p-2">' + esc(v['AC Type'] || '-') + (v['AC TR'] !== '' && v['AC TR'] != null ? ' ' + esc(v['AC TR']) + ' TR' : '') + (v['AC Load (%)'] !== '' && v['AC Load (%)'] != null ? ' · ' + esc(v['AC Load (%)']) + '%' : '') +
+                            (v['MDB Headroom (%)'] !== '' && v['MDB Headroom (%)'] != null ? '<div class="text-[10px] ' + (num(v['MDB Headroom (%)']) < 20 ? 'text-red-600' : 'text-slate-500') + '">MDB เหลือ ' + esc(v['MDB Headroom (%)']) + '%</div>' : '') +
+                            (v['Cooling Hint'] ? '<div class="text-[10px] text-indigo-700">' + 'Plug-in ' + esc(String(v['Cooling Hint']).replace(/\s*\(.*\)$/, '')) + '</div>' : '') +
+                            (v['Install Risks'] ? '<div class="text-[10px] text-red-600" title="' + esc(v['Install Risks']) + '">⚠ ติดตั้ง ' + esc(String(v['Install Risks']).split(' | ').length) + ' ข้อ</div>' : '') + '</td>'
+                      : '<td class="p-2 text-center text-slate-400" colspan="' + (SHOW_PRICE ? 7 : 6) + '">ยังไม่ตรวจ</td>') + '</tr>';
+            });
+            document.getElementById('view-stores').innerHTML = h + '</tbody></table>';
+        }
+        function renderItems() {
+            const q = document.getElementById('fText').value.toLowerCase().trim();
+            const list = items.filter(function(it) { const r = rows.find(function(x) { return x.code === it.code; }); return (!r || _matchNoText(r)) && (!q || (it.gold + ' ' + it.name + ' ' + it.cat).toLowerCase().indexOf(q) > -1); });
+            const agg = {};
+            list.forEach(function(it) {
+                // group by purchasing code: the same purchase item surveyed under an older BOQ name adds up with the new one
+                const k = it.ec || (it.cat + '|' + it.name + '|' + it.sys);
+                const a = agg[k] || (agg[k] = { ec: it.ec || '', cat: it.cat, name: it.name, names: new Set(), sys: it.sys, q: 0, ref: 0, work: 0, nw: 0, none: 0, planRef: 0, planNew: 0, stores: new Set(), cost: 0 });
+                a.names.add(it.name);
+                a.q += it.q; a.ref += it.qRef; a.work += it.qWork; a.nw += it.qNew; a.none += it.qNone; a.stores.add(it.gold);
+                if (it.plan === 'ref') a.planRef += it.q; if (it.plan === 'new') a.planNew += it.q;
+                if (SHOW_PRICE) a.cost += it.qRef * num(it.pr) + it.qNew * num(it.pn);
+            });
+            const ks = Object.keys(agg).sort();
+            let h = '<div class="p-3 text-xs text-slate-500">รวมจากแบบสำรวจล่าสุดของแต่ละสาขา (' + new Set(list.map(function(i) { return i.gold; })).size + ' สาขา) — ใช้เป็น Final list "Refurbish / Workable / Request new"</div>' +
+                '<table class="min-w-full text-xs"><thead class="bg-slate-50 text-slate-500"><tr><th class="text-left p-2">รหัส</th><th class="text-left p-2">หมวด</th><th class="text-left p-2">ตู้</th><th class="p-2">ระบบ</th><th class="p-2">สาขา</th><th class="p-2">แผน BOQ Ref / New</th><th class="p-2">ตรวจ</th><th class="p-2 text-emerald-700">Refurbish</th><th class="p-2 text-sky-700">Workable</th><th class="p-2 text-red-700">Request New</th><th class="p-2">ไม่พบ</th>' + (SHOW_PRICE ? '<th class="p-2">งบตามผลตรวจ ฿</th>' : '') + '</tr></thead><tbody>';
+            ks.forEach(function(k) {
+                const a = agg[k];
+                const other = Array.from(a.names).filter(function(n) { return n !== a.name; });
+                h += '<tr class="border-t border-slate-100"><td class="p-2 font-mono whitespace-nowrap">' + esc(a.ec || '-') + '</td><td class="p-2">' + esc(a.cat) + '</td><td class="p-2">' + esc(a.name) + (other.length ? '<div class="text-[10px] text-slate-400">รวมชื่อเดิม: ' + esc(other.join(' · ')) + '</div>' : '') + '</td><td class="p-2 text-center">' + (a.sys === 'remote' ? 'Remote' : 'Plug-in') + '</td><td class="p-2 text-center">' + a.stores.size + '</td>' +
+                    '<td class="p-2 text-center">' + a.planRef + ' / ' + a.planNew + '</td><td class="p-2 text-center">' + a.q + '</td><td class="p-2 text-center font-semibold text-emerald-700">' + a.ref + '</td><td class="p-2 text-center text-sky-700">' + a.work + '</td>' +
+                    '<td class="p-2 text-center font-semibold text-red-700">' + a.nw + '</td><td class="p-2 text-center">' + a.none + '</td>' + (SHOW_PRICE ? '<td class="p-2 text-right">' + fmt(a.cost) + '</td>' : '') + '</tr>';
+            });
+            if (!ks.length) h += '<tr><td colspan="' + (SHOW_PRICE ? 12 : 11) + '" class="p-6 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>';
+            document.getElementById('view-items').innerHTML = h + '</tbody></table>';
+        }
+        function _matchNoText(r) {
+            const team = document.getElementById('fTeam').value, st = document.getElementById('fState').value;
+            if (team && r.team !== team) return false;
+            if (st === 'nolayout' && r.layouts) return false;
+            return true;
+        }
+        function renderRacks() {
+            const q = document.getElementById('fText').value.toLowerCase().trim();
+            const list = racks.filter(function(rk) { const r = rows.find(function(x) { return x.code === rk.code; }); return (!r || _matchNoText(r)) && (!q || (rk.gold + ' ' + rk.name + ' ' + rk.type + ' ' + rk.brand).toLowerCase().indexOf(q) > -1); })
+                .sort(function(a, b) { return CF.rackRec.indexOf(b.rec) - CF.rackRec.indexOf(a.rec); });
+            const recCls = function(r) { return r === CF.rackRec[2] ? 'bg-red-600' : r === CF.rackRec[1] ? 'bg-amber-500' : 'bg-emerald-600'; };
+            document.getElementById('view-racks').innerHTML = list.length ? list.map(function(rk) {
+                const age = rk.yr ? (new Date().getFullYear() - rk.yr) + ' ปี' : '-';
+                return '<div class="bg-white border border-slate-200 rounded-xl overflow-hidden"><div class="px-4 py-2 flex items-center justify-between border-b"><div><b>' + esc(rk.gold) + ' ' + esc(rk.name) + '</b> · ' + esc(rk.rid) + ' ' + esc(rk.type) + '</div>' +
+                    '<span class="text-white text-xs px-2 py-0.5 rounded ' + recCls(rk.rec) + '">' + esc(rk.rec || '-') + '</span></div>' +
+                    '<div class="p-3 text-xs grid grid-cols-2 gap-x-3 gap-y-1"><span>ยี่ห้อ/รุ่น: <b>' + esc((rk.brand || '-') + ' ' + (rk.model || '')) + '</b></span><span>อายุ: <b>' + age + '</b> · น้ำยา <b>' + esc(rk.refg || '-') + '</b></span>' +
+                    '<span>คอมเพรสเซอร์: <b>' + rk.compOk + ' / ' + rk.comp + '</b> ทำงาน</span><span>สภาพ: ' + esc(GRADE[rk.cond] || '-') + ' · Condenser ' + esc(GRADE[rk.cdu] || '-') + '</span>' +
+                    '<span>รั่ว: ' + esc(rk.leak || '-') + ' · คอนโทรล ' + esc(rk.ctrl || '-') + '</span><span>ซ่อม 12 ด.: ' + rk.rep + ' ครั้ง · ' + fmt(rk.repCost) + ' ฿</span>' +
+                    (rk.feeds ? '<span class="col-span-2">จ่ายให้: ' + esc(rk.feeds) + '</span>' : '') + (rk.nt ? '<span class="col-span-2 text-slate-600">📝 ' + esc(rk.nt) + '</span>' : '') + '</div>' +
+                    '<div class="flex gap-1 p-2 pt-0 overflow-x-auto">' + (rk.photos || []).map(function(u) { return '<a href="' + esc(u.replace('thumbnail?sz=w1000&', 'thumbnail?sz=w2000&')) + '" target="_blank"><img src="' + esc(u) + '" class="h-28 rounded border object-cover" loading="lazy"></a>'; }).join('') + '</div></div>';
+            }).join('') : '<div class="md:col-span-2 bg-white border rounded-xl p-6 text-center text-slate-400">ยังไม่มีข้อมูล Rack</div>';
+        }
+        document.addEventListener('click', function(e) { const tr = e.target.closest('[data-open]'); if (tr) openRecord(tr.dataset.open); });
+
+        // ─── Record detail ─────────────────────────────────────────────────
+        function openRecord(id) {
+            currentId = id;
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = 'กำลังโหลด...';
+            document.getElementById('modalBody').innerHTML = '<div class="loader"></div>';
+            google.script.run.withSuccessHandler(function(res) {
+                if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(res && res.error) + '</p>'; return; }
+                renderRecord(res);
+            }).withFailureHandler(function(err) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(err.message) + '</p>'; }).getFfRenovateSurveyRecordById(id, _userEmail);
+        }
+        function _photos(att, k) { return (att[k] || []).map(function(u) { return '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" class="h-24 rounded border object-cover" loading="lazy"></a>'; }).join(''); }
+        function renderRecord(res) {
+            const d = res.data, att = d.Attachments_JSON || {};
+            document.getElementById('modalTitle').textContent = (d['Gold Code'] || d['Branch Code']) + ' ' + d['Branch Name'] + ' · ' + d.ID;
+            let h = '<div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">' +
+                '<div><span class="text-slate-500">ผู้ตรวจ</span><br><b>' + esc(d['Reporter Name']) + '</b> · ' + esc(d['Reporter Role']) + '</div>' +
+                '<div><span class="text-slate-500">วันที่ตรวจ</span><br><b>' + esc(d['Survey Date'] || fdate(d.Timestamp)) + '</b></div>' +
+                '<div><span class="text-slate-500">Final Layout</span><br><b>' + esc(d['Layout Status'] || '-') + '</b>' + (d['Layout Note'] ? '<br>' + esc(d['Layout Note']) : '') + '</div>' +
+                '<div><span class="text-slate-500">ระบบที่แนะนำ</span><br><b>' + esc(d['System Recommend'] || '-') + '</b>' + (d['Pipe Length (m)'] !== '' ? ' · ท่อ ' + esc(d['Pipe Length (m)']) + ' ม.' : '') + '</div></div>';
+            if ((res.layouts || []).length) h += '<div class="text-xs">📐 ' + res.layouts.map(function(l) { return (l.kind ? '<b>' + esc(l.kind) + ':</b> ' : '') + (l.fid ? '<button type="button" data-ffr-layout data-gold="' + esc(d['Gold Code']) + '" data-fid="' + esc(l.fid) + '" data-name="' + esc(l.name) + '" class="underline text-rose-700">' + esc(l.name) + '</button>' : '<a class="underline text-rose-700" target="_blank" rel="noopener" href="' + esc(l.url) + '">' + esc(l.name) + '</a>'); }).join(' · ') + '</div>';
+            h += '<div class="text-xs"><a class="inline-block px-2 py-1 rounded border border-rose-300 text-rose-800 font-semibold" target="_blank" rel="noopener" href="<?= ScriptApp.getService().getUrl() ?>?page=ffr-qr&store=' + encodeURIComponent(d['Branch Code']) + '">🏷️ พิมพ์ QR ตู้ของสาขานี้</a> <span class="text-slate-500">1 ดวง = 1 ตู้ (Refurbish / Workable / Request New) — ใช้ต่อในจัดซื้อและตรวจรับงาน</span></div>';
+            if (res.pm) {
+                const pm = res.pm, n = function(v) { return v === undefined || v === '' || v === null ? '-' : v; };
+                h += '<div class="border border-sky-200 bg-sky-50 rounded-lg p-2 text-xs"><b class="text-sky-900">📋 ข้อมูลสัญญา PM ตู้แช่' + (res.pmAsOf ? ' (' + esc(res.pmAsOf) + ')' : '') + '</b>' +
+                    '<div>' + esc(n(pm.own)) + (pm.remain > 0 ? ' · เช่าเหลือ ' + pm.remain + ' ปี' : '') + ' · เปิด ' + esc(n(pm.open)) + ' · สัญญา PM ' + esc(n(pm.startMA)) + ' → ' + esc(n(pm.endMA)) + '</div>' +
+                    '<div>Rack: ' + esc(n(pm.refg)) + ' · คอม + ' + n(pm.posC) + ' / − ' + n(pm.negC) + ' · CDU + ' + n(pm.cduP) + ' / − ' + n(pm.cduN) + (pm.rackYr ? ' · ติดตั้ง ' + pm.rackYr : '') + (pm.rackChill || pm.rackFrz ? ' · ' + esc([pm.rackChill, pm.rackFrz].filter(Boolean).join(' / ')) : '') + '</div>' +
+                    '<div>ห้องเย็น Chill ' + n(pm.chillRoom) + ' / Frozen ' + n(pm.frzRoom) + ' · Remote: แช่เย็น ' + n(pm.remChill) + ' แช่แข็ง ' + n(pm.remFrz) + ' · Plug-in: แช่เย็น ' + n(pm.plugChill) + ' Drum ' + n(pm.drum) + ' High Frozen ' + n(pm.plugFrz) + ' Low Frozen ' + n(pm.lowFrz) + ' Stainless ' + n(pm.stain) + '</div>' +
+                    ((res.pmFlags || []).length ? '<ul class="mt-1 list-disc pl-5 text-amber-800">' + res.pmFlags.map(function(f) { return '<li>' + esc(f.m) + '</li>'; }).join('') + '</ul>' : '') + '</div>';
+            }
+            h += '<div class="text-xs"><b>✍️ ฟอร์มกระดาษที่ SGM ลงนาม:</b> ' + (att.ffr_paper && att.ffr_paper.length ? '</div><div class="flex gap-1 flex-wrap">' + _photos(att, 'ffr_paper') + '</div>' : '<span class="text-amber-700">ไม่มี (ส่งก่อนมีข้อบังคับนี้)</span></div>');
+            if (att.ffr_layout) h += '<div class="flex gap-1 flex-wrap">' + _photos(att, 'ffr_layout') + '</div>';
+            h += '<div><h3 class="font-bold mb-1">อุณหภูมิพื้นที่ขาย — สูงสุด <span class="px-1.5 rounded ' + ambCls(d['Ambient Flag']) + '">' + esc(d['Ambient Max (C)']) + ' °C</span> · เฉลี่ย ' + esc(d['Ambient Avg (C)']) + ' °C</h3><div class="flex flex-wrap gap-1 text-xs">' +
+                (d.Ambient_JSON || []).map(function(p) { return '<span class="px-2 py-0.5 rounded border">' + esc(p.z) + ' <b>' + p.t + '°C</b>' + (p.rh !== '' ? ' ' + p.rh + '%' : '') + (p.tm ? ' ' + esc(p.tm) : '') + '</span>'; }).join('') + '</div><div class="flex gap-1 mt-1">' + _photos(att, 'ffr_amb') + '</div></div>';
+            h += '<div><h3 class="font-bold mb-1">ตู้แช่ (' + (d.Items_JSON || []).length + ' การ์ด)</h3><div class="space-y-2">' + (d.Items_JSON || []).map(function(it) {
+                return '<div class="border rounded-lg p-2 text-xs"><div class="flex flex-wrap justify-between gap-2"><b>' + esc(it.iid + ' · ' + (it.ec ? it.ec + ' · ' : '') + it.cat + ' · ' + it.name) + '</b><span>' + (it.plan === 'ref' ? 'แผน Refurbish' : it.plan === 'new' ? 'แผนซื้อใหม่' : 'นอก BOQ') + ' · ' + (it.sys === 'remote' ? 'Remote' : 'Plug-in') + '</span></div>' +
+                    '<div>ตรวจ ' + it.q + ' → <span class="text-emerald-700 font-semibold">Refurbish ' + it.qRef + '</span> · <span class="text-sky-700">Workable ' + it.qWork + '</span> · <span class="text-red-700 font-semibold">New ' + it.qNew + '</span> · ไม่พบ ' + it.qNone +
+                    ' | ตัวตู้ ' + esc(GRADE[it.body] || '-') + ' · ทำความเย็น ' + esc(GRADE[it.cool] || '-') + ' · ประตู ' + esc(GRADE[it.door] || '-') + (it.yr ? ' · ปี ' + it.yr : '') + (it.tm !== '' ? ' · ' + it.tm + '°C' : '') + (it.rep ? ' · ซ่อม ' + it.rep + ' ครั้ง' : '') + '</div>' +
+                    (it.eq ? '<div class="text-indigo-800">🏷️ Equipment ID: <span class="font-mono">' + esc(it.eq) + '</span></div>' : '') +
+                    (it.qNew ? '<div class="text-amber-800">🧾 รื้อออก ' + it.qNew + ' ใบ · ' + esc(it.wo || '-') + ' · Asset No. ' + esc(it.asset || 'ไม่ระบุ') + '</div>' : '') + (it.why || it.nt ? '<div class="text-slate-600">' + esc([it.why, it.nt].filter(Boolean).join(' · ')) + '</div>' : '') + '<div class="flex gap-1 mt-1 overflow-x-auto">' + _photos(att, it.pk) + '</div></div>';
+            }).join('') + '</div></div>';
+            h += '<div><h3 class="font-bold mb-1">Rack / Multiset</h3><div class="space-y-2">' + (d.Racks_JSON || []).map(function(rk) {
+                return '<div class="border rounded-lg p-2 text-xs"><b>' + esc(rk.rid + ' · ' + rk.type) + '</b> — ' + esc((rk.brand || '') + ' ' + (rk.model || '')) + (rk.yr ? ' · ปี ' + rk.yr : '') + ' · ' + esc(rk.refg || '') + ' · คอมฯ ' + rk.compOk + '/' + rk.comp + ' · <b>' + esc(rk.rec) + '</b>' +
+                    (rk.fit || rk.spareHp !== '' || rk.spareCirc !== '' ? '<div class="text-indigo-800">กำลังสำรอง: ' + esc(rk.spare || '-') + (rk.spareHp !== '' && rk.spareHp != null ? ' · ' + rk.spareHp + ' HP/kW' : '') + (rk.spareCirc !== '' && rk.spareCirc != null ? ' · วงจรว่าง ' + rk.spareCirc : '') + ' · รองรับตู้ Remote ใหม่: <b>' + esc(rk.fit || '-') + '</b></div>' : '') +
+                    (rk.asset || rk.wo ? '<div class="text-amber-800">🧾 Asset No. ' + esc(rk.asset || '-') + ' · ' + esc(rk.wo || '-') + '</div>' : '') + (rk.nt ? '<div class="text-slate-600">' + esc(rk.nt) + '</div>' : '') + '<div class="flex gap-1 mt-1 overflow-x-auto">' + _photos(att, rk.pk) + _photos(att, 'ffr_cd_' + rk.rid) + '</div></div>';
+            }).join('') + '</div></div>';
+            const site = d.Site_JSON || {};
+            h += '<div><h3 class="font-bold mb-1">ความพร้อม Remote / Plug-in</h3><div class="grid md:grid-cols-2 gap-x-4 text-xs">' + (res.ffConfig.site || []).map(function(c) {
+                const v = site[c.k] || '-', bad = c.bad.indexOf(v) > -1;
+                return '<div class="flex justify-between border-b border-slate-100 py-1"><span>' + esc(c.l) + '</span><b class="' + (bad ? 'text-red-700' : '') + '">' + esc(v) + '</b></div>';
+            }).join('') + '</div></div>';
+            const cap = d.Cap_JSON || {}, capCf = res.ffConfig.cap || [];
+            h += '<div><h3 class="font-bold mb-1">กำลังแอร์ &amp; ไฟฟ้า</h3><div class="grid grid-cols-2 md:grid-cols-5 gap-x-4 text-xs">' + capCf.map(function(c) {
+                return '<div class="border-b border-slate-100 py-1"><span class="text-slate-500">' + esc(c.l.replace(' *', '')) + '</span><br><b>' + esc(cap[c.k] !== undefined ? cap[c.k] : '-') + '</b></div>';
+            }).join('') + '</div>' + (d['MDB Headroom (%)'] !== '' && d['MDB Headroom (%)'] != null ? '<div class="text-xs mt-1">ไฟ MDB เหลือ <b>' + esc(d['MDB Headroom (%)']) + '%</b></div>' : '') +
+                (d['Cooling Hint'] ? '<div class="text-xs mt-1 text-indigo-800">💡 แนวทางระบายความร้อนตู้ Plug-in (เบื้องต้น): <b>' + esc(d['Cooling Hint']) + '</b></div>' : '') + '</div>';
+            const ins = d.Install_JSON || {};
+            h += '<div><h3 class="font-bold mb-1">ข้อจำกัดการติดตั้ง</h3><div class="grid md:grid-cols-2 gap-x-4 text-xs">' + (res.ffConfig.install || []).map(function(c) {
+                const v = ins[c.k] || '-', bad = c.bad.indexOf(v) > -1;
+                return '<div class="flex justify-between border-b border-slate-100 py-1"><span>' + esc(c.l) + '</span><b class="' + (bad ? 'text-red-700' : '') + '">' + esc(v) + '</b></div>';
+            }).join('') + '</div>' + (ins.note ? '<p class="text-xs text-slate-600 mt-1">📝 ' + esc(ins.note) + '</p>' : '') + '</div>';
+            const eq = d.Equip_JSON || {}, eqk = Object.keys(eq);
+            if (eqk.length) h += '<div><h3 class="font-bold mb-1">อุปกรณ์ห้องเตรียม</h3><div class="text-xs flex flex-wrap gap-1">' + eqk.map(function(k) { const e = (res.ffConfig.equip || []).find(function(x) { return x.k === k; }); return '<span class="px-2 py-0.5 rounded border">' + esc(e ? e.l : k) + ': ใช้ได้ ' + (eq[k].ok || 0) + ' · ซ่อม ' + (eq[k].fix || 0) + ' · ขอใหม่ ' + (eq[k].nw || 0) + '</span>'; }).join('') + '</div></div>';
+            if (d['Has Broken'] === 'Yes') h += '<p class="text-red-700 text-xs">🚨 ' + esc(d['Broken Detail']) + '</p>';
+            if (d.Comments) h += '<p class="text-xs bg-slate-50 rounded p-2">💬 ' + esc(d.Comments) + '</p>';
+            document.getElementById('modalBody').innerHTML = h;
+        }
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); currentId = null; }
+        function deleteRecord() {
+            if (!currentId || !confirm('ลบรายการ ' + currentId + '?')) return;
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadAll(); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); }).deleteFfRenovateSurveyRecord(currentId, _userEmail);
+        }
+        // Unit register (FfRenovateUnits.gs): one QR per cabinet unit — built on submit; this backfills / refreshes all stores
+        function syncUnits(btn) {
+            btn.disabled = true; btn.textContent = '⏳ กำลังสร้าง QR...';
+            google.script.run.withSuccessHandler(function(r) {
+                btn.disabled = false; btn.textContent = '⟳ สร้าง/อัปเดต QR';
+                if (!r || !r.success) { alert((r && r.error) || 'ไม่สำเร็จ'); return; }
+                alert('รหัสตู้ / QR: ' + r.stores + ' สาขา · สร้างใหม่ ' + r.created + ' · อัปเดต ' + r.updated + ' · ยกเลิก ' + r.cancelled);
+            }).withFailureHandler(function(e) { btn.disabled = false; btn.textContent = '⟳ สร้าง/อัปเดต QR'; alert(e.message); }).syncFfrUnitsFromSurveys(_userEmail);
+        }
+        function refreshLayouts(btn) {
+            btn.disabled = true; btn.textContent = '⏳ กำลังสแกน...';
+            google.script.run.withSuccessHandler(function(res) {
+                btn.disabled = false; btn.textContent = '⟳ สแกน Layout';
+                if (res && res.success) { alert('พบไฟล์ Layout ' + res.files + ' ไฟล์ · ' + res.stores + ' สาขา\n\nตั้งชื่อไฟล์ขึ้นต้นด้วยรหัสสาขา เช่น 11112_Suratthani.pdf หรือ 112_Suratthani.pdf แล้ววางในโฟลเดอร์ Fresh Food Survey'); loadAll(); }
+                else alert('ไม่สำเร็จ: ' + (res && res.error));
+            }).withFailureHandler(function(err) { btn.disabled = false; btn.textContent = '⟳ สแกน Layout'; alert(err.message); }).refreshFfrLayouts(_userEmail);
+        }
+        // ── Print ──
+        // Whole report: header (date, tab, filters) + KPIs + the open tab, A4 landscape. Uses the on-screen filters.
+        function printReport() {
+            const TAB = { stores: 'สาขา', items: 'ตู้แช่ (รวมทุกสาขา)', racks: 'Rack' };
+            const fT = document.getElementById('fTeam'), fS = document.getElementById('fState'), q = document.getElementById('fText').value.trim();
+            const flt = [fT.value ? 'ทีม ' + fT.value : 'ทุกทีม', fS.options[fS.selectedIndex].text].concat(q ? ['ค้นหา "' + q + '"'] : []);
+            document.getElementById('printHdr').innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-end">' +
+                '<div><b style="font-size:13pt;color:#881337">รายงานสำรวจก่อน Renovate Fresh Food — FF Renovation 2027</b><br><span style="font-size:8.5pt;color:#475569">มุมมอง: ' + esc(TAB[tab] || tab) + ' · ' + esc(flt.join(' · ')) + (window.ARCHIVE_ON ? ' · รวมข้อมูล Archive' : '') + (SCOPE_TXT ? ' · ' + esc(SCOPE_TXT) : '') + '</span></div>' +
+                '<div style="font-size:8pt;color:#475569;text-align:right">พิมพ์ ' + new Date().toLocaleString('th-TH') + (SHOW_PRICE ? '<br><b style="color:#be123c">มีข้อมูลงบประมาณ — Super Admin เท่านั้น</b>' : '') + '</div></div>';
+            document.body.classList.remove('print-modal');
+            window.print();
+        }
+        // Only the open record window (one store).
+        function printRecord() {
+            document.body.classList.add('print-modal');
+            const off = function() { document.body.classList.remove('print-modal'); window.removeEventListener('afterprint', off); };
+            window.addEventListener('afterprint', off);
+            window.print();
+            setTimeout(off, 1500);   // some browsers skip afterprint in iframes
+        }
+        // Price / budget columns (any key with "THB") only for Super Admin — the server doesn't send them otherwise anyway.
+        function _np(o) { if (!SHOW_PRICE) Object.keys(o).forEach(function(k) { if (/THB/.test(k)) delete o[k]; }); return o; }
+        function downloadToExcel(btn) {
+            if (btn) { btn.disabled = true; }
+            google.script.run.withSuccessHandler(function(r) { if (btn) btn.disabled = false; _writeExcel((r && r.success && r.units) || []); })
+                .withFailureHandler(function() { if (btn) btn.disabled = false; _writeExcel([]); }).getFfrUnits(_userEmail, '', true);
+        }
+        function _writeExcel(units) {
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.map(function(r) { return _np((function() {
+                const v = r.sv || {};
+                return { 'Oracle': r.code, 'Gold': r.gold, 'Store': r.name, 'Team': r.team, 'Model': r.model, 'AMM': r.amm, 'Layouts': r.layouts, 'BOQ Refurbish Qty': r.boq.refQ, 'BOQ New Qty': r.boq.newQ, 'BOQ Total THB': r.boq.total,
+                         'Surveyed': r.sv ? 'Yes' : 'No', 'Survey ID': v.ID || '', 'BOQ Rev': v['BOQ Rev'] || (r.sv ? 'R0' : ''), 'Survey Date': v['Survey Date'] || '', 'Inspector': v['Reporter Name'] || '', 'Layout Status': v['Layout Status'] || '', 'Ambient Max C': v['Ambient Max (C)'] || '', 'Ambient Flag': v['Ambient Flag'] || '',
+                         'Refurbish OK': v['Qty Refurbish OK'] || 0, 'Workable': v['Qty Workable'] || 0, 'Request New': v['Qty Request New'] || 0, 'Not Found': v['Qty Not Found'] || 0, 'Cost Delta vs BOQ THB': v['Cost Delta vs BOQ (THB)'] || 0, 'Scrap cabinets': v['Scrap Cabinets'] || 0, 'Partial WO cards': v['Partial WO Cards'] || 0, 'Asset No missing': v['Asset No Missing'] || 0,
+                         'Rack Keep': v['Rack Keep'] || 0, 'Rack Overhaul': v['Rack Overhaul'] || 0, 'Rack Replace': v['Rack Replace'] || 0, 'System Recommend': v['System Recommend'] || '', 'High Frozen System': v['High Frozen System'] || '', 'Site Risks': v['Site Risks'] || '',
+                         'Full Renovate': r.full ? 'Yes' : 'No', 'AC Type': v['AC Type'] || '', 'AC TR': v['AC TR'] || '', 'AC Load %': v['AC Load (%)'] || '', 'Chiller Spare': v['Chiller Spare'] || '',
+                         'Transformer kVA': v['Transformer kVA'] || '', 'MDB Headroom %': v['MDB Headroom (%)'] || '', 'Cooling Hint': v['Cooling Hint'] || '', 'Install Risks': v['Install Risks'] || '',
+                         'PM Ownership': r.pm ? r.pm.own : '', 'PM Lease Left (yrs)': r.pm ? r.pm.remain : '', 'PM Contract End': r.pm ? r.pm.endMA : '',
+                         'PM Refrigerant': r.pm ? r.pm.refg : '', 'PM Rack Install Year': r.pm ? r.pm.rackYr : '', 'PM Rack Age': r.pm ? r.pm.rackAge : '',
+                         'PM High Frozen': r.pm ? r.pm.hfz : '', 'PM Flags': r.pm ? (r.pm.flags || []).map(function(f) { return f.m; }).join(' | ') : '' };
+            })()); })), 'Stores');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(items.map(function(it) { return _np((function() {
+                return { 'Gold': it.gold, 'Store': it.sn || '', 'Team': it.team, 'Card': it.iid, 'Equip Code': it.ec || '', 'Category': it.cat, 'Cabinet': it.name, 'System': it.sys, 'Position': it.pos, 'BOQ Plan': it.plan, 'Qty': it.q,
+                         'Refurbish': it.qRef, 'Workable': it.qWork, 'Request New': it.qNew, 'Not Found': it.qNone, 'Body': GRADE[it.body] || '', 'Cooling': GRADE[it.cool] || '', 'Door': GRADE[it.door] || '', 'Year': it.yr, 'Temp C': it.tm,
+                         'CMS repairs 12m': it.rep, 'Repair cost': it.repCost, 'Reason new': it.why, 'Scrap (remove) qty': it.qNew, 'Equipment IDs': it.eq || '', 'Asset No (FAS)': it.asset, 'Write-off type': it.wo, 'Note': it.nt, 'Refurbish THB/unit': it.pr, 'New THB/unit': it.pn, 'Photos': it.photos };
+            })()); })), 'Cabinets');
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(racks.map(function(rk) {
+                return { 'Gold': rk.gold, 'Store': rk.name, 'Rack': rk.rid, 'Type': rk.type, 'Brand': rk.brand, 'Model': rk.model, 'Year': rk.yr, 'Refrigerant': rk.refg, 'Compressors': rk.comp, 'Working': rk.compOk,
+                         'Condition': GRADE[rk.cond] || '', 'Condenser': GRADE[rk.cdu] || '', 'Leak': rk.leak, 'Control': rk.ctrl, 'Spare capacity': rk.spare, 'Repairs 12m': rk.rep, 'Repair cost': rk.repCost, 'Recommendation': rk.rec, 'Spare HP/kW': rk.spareHp, 'Spare circuits': rk.spareCirc, 'Fits new Remote': rk.fit, 'Asset No (FAS)': rk.asset, 'Write-off type': rk.wo, 'Feeds': rk.feeds, 'Note': rk.nt, 'Photo 1': (rk.photos || [])[0] || '' };
+            })), 'Racks');
+            if (units.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(units), 'Units (QR)');
+            XLSX.writeFile(wb, 'FF_Renovate_Survey_' + new Date().toISOString().substring(0, 10) + '.xlsx');
+        }
+    </script>
+    <?!= include('FfrLayoutViewer') ?>
+</body>
+</html>

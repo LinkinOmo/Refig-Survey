@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Air Conditioner Survey Report</title>
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -144,6 +143,7 @@
         }
         #printArea { display: none; }
     </style>
+    <?!= includeTailwindCss_() ?>
 </head>
 
 <body class="text-slate-800 antialiased">
@@ -832,12 +832,10 @@
             applyAdminUI();
 
             // Fetch Brand/Type enum options (defaults ∪ real submitted data) for the edit modal.
-            ['aircon_brand', 'aircon_type'].forEach(function(k) {
-                google.script.run
-                    .withSuccessHandler(function(res) { if (res && res.success) _enumCache[k] = res.options; })
-                    .withFailureHandler(function(e) { console.error('enum fetch failed', k, e); })
-                    .getEnumFieldOptions(k);
-            });
+            google.script.run   // one execution for all groups (AppBootstrap.gs)
+                .withSuccessHandler(function(map) { Object.keys(map || {}).forEach(function(k) { var r = map[k]; if (r && r.success) _enumCache[k] = r.options; }); })
+                .withFailureHandler(function(e) { console.error('enum fetch failed', e); })
+                .getEnumFieldOptionsMap(['aircon_brand', 'aircon_type']);
 
             // Load combined Aircon + Ref monthly aggregation chart — independent of main data
             google.script.run

@@ -406,7 +406,7 @@ function hyperSurveySubmit_(def, form) {
 // One photo per call — the submission form uploads each photo here first, then submits only the links.
 function hyperUploadSurveyPhoto(idPrefix, uploadId, branchCode, category, fileData) {
     try {
-        var defs = [HYPER_REF_DEF, HYPER_AC_DEF, HYPER_EQ_DEF, HYPER_LI_DEF, HYPER_TO_DEF, HYPER_FO_DEF, HYPER_PK_DEF, HYPER_FA_DEF, HYPER_HB_DEF, HYPER_FI_DEF, STORE_CLOSE_DEF, CCTV_DEF];
+        var defs = [HYPER_REF_DEF, HYPER_AC_DEF, HYPER_EQ_DEF, HYPER_LI_DEF, HYPER_TO_DEF, HYPER_FO_DEF, HYPER_PK_DEF, HYPER_FA_DEF, HYPER_HB_DEF, HYPER_FI_DEF, STORE_CLOSE_DEF, CCTV_DEF, CCTV_SYS_DEF, FF_RENOVATE_DEF];
         var def = null;
         for (var i = 0; i < defs.length; i++) if (defs[i].idPrefix === idPrefix) def = defs[i];
         // Aircon / NP draft saves reuse this one-photo-per-call uploader (see SurveyDraftStore.gs)

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hyper Fire Prevention Survey Report</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -16,7 +15,40 @@
         .detail-label { font-size: .75rem; font-weight: 600; color: #64748b; min-width: 120px; }
         .detail-value { font-size: .85rem; color: #1e293b; }
         .tabbtn.active { background: #dc2626; color: #fff; }
+        .sum-table th, .sum-table td { border: 1px solid #e2e8f0; padding: 3px 6px; }
+        /* ── A4 print: printDetail() fills #printArea with a formal per-store report; everything else is hidden ── */
+        #printArea { display: none; }
+        @media print {
+            @page { size: A4 portrait; margin: 10mm 10mm 12mm 10mm; @bottom-right { content: counter(page) " / " counter(pages); font-size: 8pt; color: #64748b; } }
+            html, body { background: #fff !important; }
+            body > *:not(#printArea) { display: none !important; }
+            #printArea { display: block !important; }
+        }
+        #printArea { font-family: 'Prompt', Tahoma, sans-serif; color: #0f172a; font-size: 9pt; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        #printArea h2 { font-size: 10.5pt; font-weight: 700; margin: 9px 0 4px; padding: 2px 6px; background: #fee2e2; border-left: 4px solid #dc2626; break-after: avoid; }
+        #printArea .pt { width: 100%; border-collapse: collapse; }
+        #printArea .pt th, #printArea .pt td { border: 1px solid #cbd5e1; padding: 2px 4px; font-size: 8pt; vertical-align: top; text-align: left; }
+        #printArea .pt th { background: #f1f5f9; font-weight: 600; }
+        #printArea .pt thead { display: table-header-group; }
+        #printArea .pt tr { break-inside: avoid; }
+        #printArea .c { text-align: center !important; } #printArea .r { text-align: right !important; }
+        #printArea .kpi { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+        #printArea .kpi div { border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 5px; }
+        #printArea .kpi b { display: block; font-size: 12pt; }
+        #printArea .kpi span { font-size: 7.5pt; color: #64748b; }
+        #printArea .card { border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 6px; break-inside: avoid; }
+        #printArea .card.risk { border-color: #fca5a5; }
+        #printArea .card-h { display: flex; justify-content: space-between; gap: 6px; padding: 3px 6px; background: #334155; color: #fff; font-size: 8.5pt; }
+        #printArea .card.risk .card-h { background: #b91c1c; }
+        #printArea .photos { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px 6px 5px; }
+        #printArea .photos figure { margin: 0; text-align: center; font-size: 7pt; color: #475569; }
+        #printArea .photos img { width: 34mm; height: 34mm; object-fit: cover; border: 1px solid #cbd5e1; display: block; }
+        #printArea .sig { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 22px; break-inside: avoid; }
+        #printArea .sig div { text-align: center; font-size: 8pt; }
+        #printArea .sig .line { border-bottom: 1px dotted #64748b; height: 34px; margin-bottom: 3px; }
+        #printArea .foot { position: fixed; bottom: 0; left: 0; font-size: 7pt; color: #94a3b8; }
     </style>
+    <?!= includeTailwindCss_() ?>
 </head>
 <body class="text-slate-800 antialiased">
     <?!= include('ArchiveToggle') ?>
@@ -36,6 +68,8 @@
                 <span id="recordCount" class="text-sm text-slate-500 hidden"></span>
                 <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-fi-checklist" target="_blank" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">🖨️ แบบฟอร์มกระดาษ</a>
                 <a href="<?= MANUALS_URL ?>?page=fi-manual" target="_blank" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">📖 คู่มือ</a>
+                <a href="https://drive.google.com/file/d/1KhPprjCJwCixMyfchtFxNbW_fLH5EW1B/view" target="_blank" title="วิดีโอ 3D สถานการณ์จริง (ไม่มีเสียงพากย์ · ซับไทย)" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">🎬 วิดีโอสอน</a>
+                <a href="https://drive.google.com/file/d/1V_L6lQ0ofzcZ9WxkkA_kbFCC40XOuDDp/view" target="_blank" title="วิดีโอ 3D แนวทาง v5: ใครตรวจอะไร เมื่อไร · M1 เจ้าของกระบวนการ · Thermoscan บังคับ (ไม่มีเสียงพากย์ · ซับไทย)" class="whitespace-nowrap px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">🎬 แนวทาง v5</a>
                 <button onclick="downloadToExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
                 <button onclick="window.location.reload()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
             </div>
@@ -100,12 +134,13 @@
 
     <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
         <div class="bg-white w-full md:max-w-5xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
-            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดการตรวจความเสี่ยงอัคคีภัย</h3><button onclick="closeModal()" class="text-slate-400 text-xl">✕</button></div>
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดการตรวจความเสี่ยงอัคคีภัย</h3><div class="flex items-center gap-3"><button onclick="printDetail()" class="px-3 py-1 text-xs font-bold text-red-700 border border-red-300 rounded-lg hover:bg-red-50" title="พิมพ์รายงานสาขานี้ / บันทึก PDF (A4)">🖨️ พิมพ์ A4 / PDF</button><button onclick="closeModal()" class="text-slate-400 text-xl">✕</button></div></div>
             <div class="p-5 overflow-y-auto" id="modalBody"></div>
             <div class="px-5 py-3 border-t flex justify-between gap-2">
                 <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ</button>
                 <div class="flex gap-2 ml-auto">
                     <label class="flex items-center gap-1.5 text-xs text-slate-600 mr-2"><input type="checkbox" id="showAll" onchange="currentRecord && renderModal(currentRecord)"> แสดงทุกข้อ (รวมที่ปกติ)</label>
+                    <button onclick="printDetail()" class="px-4 py-2 text-sm font-bold text-red-700 border border-red-300 rounded-lg">🖨️ พิมพ์ A4</button>
                     <button onclick="closeModal()" class="px-4 py-2 text-sm border border-slate-300 rounded-lg">ปิด</button>
                     <button id="saveBtn" onclick="saveRecord()" class="hidden px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700">บันทึกหมายเหตุ</button>
                 </div>
@@ -249,11 +284,31 @@
                     (r['Submitted Via'] === 'Vendor Portal' ? ' <span class="text-xs px-1.5 rounded bg-sky-100 text-sky-800">🏢 ผู้รับเหมา: ' + esc(r['Vendor Company']) + '</span>' : '') + ' · ' + fdate(r['Timestamp']) + (r['Re-check Of'] ? ' · 🔁 ตรวจซ้ำจาก ' + esc(r['Re-check Of']) : '') + '</span></div>' +
                 '<div class="detail-row"><span class="detail-label">ผลประเมิน</span><span class="detail-value">' + badge(r['Fire Rating']) + ' · ตรวจ ' + num(r['Areas']) + ' พื้นที่ / ' + num(r['Items Checked']) + ' ข้อ · พบ ' + num(r['Risks Found']) + ' (สูง ' + num(r['High Risks']) + ') · แก้แล้ว ' + num(r['Fixed']) +
                 ' · <b class="text-red-600">ค้าง ' + num(r['Open Risks']) + ' (สูง ' + num(r['Open High']) + ')</b> · ตีเทปแดง-ดำ ' + num(r['Tape Zones']) + ' จุด · นัดตรวจซ้ำ ' + esc(dstr(r['Next Re-check']) || '-') + '</span></div>';
+            // Per-zone summary · full risk register (incl. fixed) · this branch's survey history
+            const zs = zoneSummary(r), rr = allRisks(r), hist = branchHistory(r);
+            h += '<div class="mt-3 border border-slate-200 rounded-lg p-3 overflow-x-auto"><b class="text-sm">📊 สรุปรายพื้นที่</b><table class="sum-table w-full text-xs mt-1"><thead class="bg-slate-50"><tr><th class="text-left">พื้นที่</th><th>จุด</th><th>ข้อที่ตรวจ</th><th>✅ ปกติ</th><th>— N/A</th><th>⚠️ เสี่ยง</th><th>สูง</th><th>แก้แล้ว</th><th>ค้าง</th></tr></thead><tbody>' +
+                zs.map(function(s) {
+                    if (s.none && !s.spots) return '<tr class="text-slate-400"><td>' + esc(s.z.icon + ' ' + s.z.l) + '</td><td colspan="8" class="text-center">ไม่มีพื้นที่นี้ในสาขา</td></tr>';
+                    return '<tr' + (s.open ? ' class="bg-red-50"' : '') + '><td>' + esc(s.z.icon + ' ' + s.z.l) + '</td><td class="text-center">' + s.spots + '</td><td class="text-center">' + s.checked + '</td><td class="text-center text-green-700">' + s.ok + '</td><td class="text-center text-slate-400">' + s.na +
+                        '</td><td class="text-center font-bold ' + (s.risk ? 'text-red-600' : '') + '">' + s.risk + '</td><td class="text-center ' + (s.high ? 'text-red-600 font-bold' : '') + '">' + s.high + '</td><td class="text-center text-green-700">' + s.fixed + '</td><td class="text-center font-bold ' + (s.open ? 'text-red-600' : '') + '">' + s.open + '</td></tr>';
+                }).join('') + '</tbody></table></div>';
+            if (rr.length) h += '<div class="mt-3 border border-red-200 rounded-lg p-3 overflow-x-auto"><b class="text-sm">⚠️ ทะเบียนความเสี่ยงทั้งหมดของสาขา (' + rr.length + ' รายการ · ค้าง ' + rr.filter(function(o) { return o.open; }).length + ')</b><table class="sum-table w-full text-xs mt-1"><thead class="bg-red-50"><tr><th>#</th><th class="text-left">จุด</th><th class="text-left">ความเสี่ยง</th><th>ระดับ</th><th class="text-left">ดำเนินการ</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="text-left">หมายเหตุ</th></tr></thead><tbody>' +
+                rr.map(function(o, i) {
+                    const late = o.open && o.a.due && o.a.due < TODAY;
+                    return '<tr' + (o.open ? '' : ' class="text-slate-500"') + '><td class="text-center">' + (i + 1) + '</td><td><b>' + esc(o.c.cid) + '</b> ' + esc(o.c.place || o.z.l) + '<div class="text-[10px] text-slate-400">' + esc(o.z.l) + (o.c.floor ? ' · ชั้น ' + esc(o.c.floor) : '') + '</div></td><td>' + esc(o.it.l) + '</td>' +
+                        '<td class="text-center"><span class="px-1.5 rounded-full font-bold ' + sevCls(o.sev) + '">' + esc(o.sev) + '</span></td><td>' + esc(o.a.act || '-') + '</td>' +
+                        '<td class="text-center font-semibold ' + (o.open ? 'text-red-600' : 'text-green-700') + '">' + esc(o.a.st || '-') + (o.a.was ? '<div class="text-[10px] text-indigo-600 font-normal">ครั้งก่อน: ' + esc(o.a.was) + '</div>' : '') + '</td>' +
+                        '<td class="text-center ' + (late ? 'text-red-600 font-bold' : '') + '">' + esc(o.a.due || '-') + (late ? ' ⏰' : '') + '</td><td class="text-slate-500">' + esc(o.a.nt || '') + '</td></tr>';
+                }).join('') + '</tbody></table></div>';
+            if (hist.length > 1) h += '<div class="mt-3 border border-indigo-200 rounded-lg p-3 overflow-x-auto"><b class="text-sm">🔁 ประวัติการตรวจของสาขานี้ (' + hist.length + ' ครั้ง)</b><table class="sum-table w-full text-xs mt-1"><thead class="bg-indigo-50"><tr><th class="text-left">วันที่</th><th>ระดับ</th><th>พบ (สูง)</th><th>แก้แล้ว</th><th>ค้าง (สูง)</th><th class="text-left">ผู้ตรวจ</th></tr></thead><tbody>' +
+                hist.map(function(x) {
+                    return '<tr' + (String(x['ID']) === String(r['ID']) ? ' class="bg-indigo-50 font-semibold"' : '') + '><td>' + fdate(x['Timestamp']) + '</td><td class="text-center">' + badge(x['Fire Rating']) + '</td><td class="text-center">' + num(x['Risks Found']) + ' (' + num(x['High Risks']) + ')</td><td class="text-center text-green-700">' + num(x['Fixed']) + '</td><td class="text-center text-red-600">' + num(x['Open Risks']) + ' (' + num(x['Open High']) + ')</td><td>' + esc(x['Reporter Name']) + '</td></tr>';
+                }).join('') + '</tbody></table></div>';
             // Store-wide protection
             const pr = d.prot || {};
             h += '<div class="mt-3 border border-slate-200 rounded-lg p-3"><b class="text-sm">🧯 ระบบป้องกันอัคคีภัย</b><div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 mt-1">' + (FC.prot || []).map(function(p) {
                 const v = pr[p.k], bad = p.badIfPositive ? num(v) > 0 : p.bad && v !== '' && v != null && p.bad.indexOf((p.o || []).indexOf(v)) > -1;
-                return '<div class="text-xs py-0.5"><span class="text-slate-500">' + esc(p.l) + ':</span> <b class="' + (bad ? 'text-red-600' : '') + '">' + esc(v === '' || v == null ? '-' : v) + '</b></div>';
+                return '<div class="text-xs py-0.5"><span class="text-slate-500">' + esc(p.l) + ':</span> <b class="' + (bad ? 'text-red-600' : '') + '">' + (bad ? '⚠️ ' : '') + esc(v === '' || v == null ? '-' : v) + '</b></div>';
             }).join('') + '</div></div>';
             (d.cards || []).forEach(function(c) {
                 const z = zoneOf(c.z);
@@ -263,7 +318,7 @@
                 if (!rows.length && !all) return;
                 const pb = att['hfi_' + c.cid + '_b'] || [], pa = att['hfi_' + c.cid + '_a'] || [];
                 h += '<div class="border ' + (nRisk ? 'border-red-300' : 'border-slate-200') + ' rounded-lg p-3 mt-3"><div class="flex flex-wrap justify-between gap-2"><b class="text-sm">' + esc(z.icon + ' ' + r['Branch Code'] + '-' + c.cid + ' · ' + (c.place || '-')) + '</b>' +
-                    '<span class="text-xs text-slate-500">' + esc(z.l) + (c.floor ? ' · ชั้น ' + esc(c.floor) : '') + (c.tape ? ' · 🟥⬛ ตีเทปแล้ว' : '') + '</span></div>' +
+                    '<span class="text-xs text-slate-500">' + esc(z.l) + (c.floor ? ' · ชั้น ' + esc(c.floor) : '') + (c.tape ? ' · 🟥⬛ ตีเทปแล้ว' : '') + ' · ' + cardCounts(c, z) + '</span></div>' +
                     '<table class="w-full text-xs mt-2">' + rows.map(function(o) {
                         const a = o.a, risk = a.r === 'risk';
                         return '<tr class="border-t border-slate-100"><td class="py-1 pr-2">' + (risk ? '⚠️' : a.r === 'ok' ? '✅' : '—') + ' ' + esc(o.it.l) + '</td>' +
@@ -284,6 +339,118 @@
             document.getElementById('modalBody').innerHTML = h;
             document.getElementById('saveBtn').classList.toggle('hidden', !canEdit());
         }
+        // ── Detail helpers (shared by the modal and the A4 print) ──
+        function sevShort(s) { return String(s || '-').split(' ')[0]; }
+        function sevCls(s) { return s === 'สูง' ? 'bg-red-600 text-white' : s === 'กลาง' ? 'bg-orange-100 text-orange-800' : 'bg-yellow-100 text-yellow-800'; }
+        function cardCounts(c, z) {
+            let ok = 0, risk = 0, na = 0;
+            z.items.forEach(function(it) { const a = (c.items || {})[it.k] || {}; if (a.r === 'ok') ok++; else if (a.r === 'risk') risk++; else if (a.r === 'na') na++; });
+            return '✅ ' + ok + ' · ⚠️ ' + risk + (na ? ' · N/A ' + na : '');
+        }
+        // Every risk in the survey (fixed ones too): open first, then high → low, then due date.
+        function allRisks(r) {
+            const d = r['Fire_JSON'] || {}, ST = FC.status, S = FC.severity, out = [];
+            (d.cards || []).forEach(function(c) {
+                if (c.none) return;
+                const z = zoneOf(c.z);
+                z.items.forEach(function(it) { const a = (c.items || {})[it.k]; if (a && a.r === 'risk') out.push({ c: c, z: z, it: it, a: a, sev: sevShort(a.sev), open: a.st !== ST[0] }); });
+            });
+            return out.sort(function(x, y) { return (y.open - x.open) || (S.indexOf(x.a.sev) - S.indexOf(y.a.sev)) || String(x.a.due || '9').localeCompare(String(y.a.due || '9')); });
+        }
+        function zoneSummary(r) {
+            const d = r['Fire_JSON'] || {}, ST = FC.status, S = FC.severity;
+            return (FC.zones || []).map(function(z) {
+                const s = { z: z, spots: 0, none: false, checked: 0, ok: 0, na: 0, risk: 0, high: 0, fixed: 0, open: 0 };
+                (d.cards || []).filter(function(c) { return c.z === z.k; }).forEach(function(c) {
+                    if (c.none) { s.none = true; return; }
+                    s.spots++;
+                    z.items.forEach(function(it) {
+                        const a = (c.items || {})[it.k] || {};
+                        if (a.r) s.checked++;
+                        if (a.r === 'ok') s.ok++; else if (a.r === 'na') s.na++;
+                        else if (a.r === 'risk') { s.risk++; if (a.sev === S[0]) s.high++; if (a.st === ST[0]) s.fixed++; else s.open++; }
+                    });
+                });
+                return s;
+            }).filter(function(s) { return s.spots || s.none; });
+        }
+        function branchHistory(r) { return allData.filter(function(x) { return String(x['Branch Code']) === String(r['Branch Code']); }); }
+        function protBad(p, v) { return p.badIfPositive ? num(v) > 0 : !!(p.bad && v !== '' && v != null && p.bad.indexOf((p.o || []).indexOf(v)) > -1); }
+
+        // ── A4 portrait print / PDF of the open record. Honours the "แสดงทุกข้อ" tick for the area detail. ──
+        function printDetail() {
+            const r = currentRecord;
+            if (!r || !FC) { alert('กรุณารอโหลดข้อมูลให้เสร็จก่อน'); return; }
+            const d = r['Fire_JSON'] || {}, att = r['Attachments_JSON'] || {}, all = document.getElementById('showAll').checked, ST = FC.status;
+            const col = (FC.colors || []).find(function(x) { return x.k === r['Fire Rating']; }) || { k: r['Fire Rating'] || '-', l: '', hex: '#64748b' };
+            const rr = allRisks(r), zs = zoneSummary(r), hist = branchHistory(r), pr = d.prot || {};
+            const fig = function(list, cap) { return (list || []).map(function(u, i) { return '<figure><img src="' + esc(u) + '"><figcaption>' + esc(cap) + ' ' + (i + 1) + '</figcaption></figure>'; }).join(''); };
+            const kpi = function(v, l, red) { return '<div><b' + (red ? ' style="color:#dc2626"' : '') + '>' + v + '</b><span>' + l + '</span></div>'; };
+            let h = '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;border-bottom:2px solid #dc2626;padding-bottom:6px">' +
+                '<div><div style="font-size:8pt;color:#64748b">Big C Supercenter · Building Management · Maintenance</div>' +
+                '<div style="font-size:14pt;font-weight:700">🧯 รายงานตรวจความเสี่ยงอัคคีภัย (Hyper)</div>' +
+                '<div style="font-size:11pt;font-weight:600">' + esc(r['Branch Code']) + ' — ' + esc(r['Branch Name']) + '</div></div>' +
+                '<div style="text-align:center;min-width:34mm;padding:4px 8px;border-radius:6px;color:#fff;background:' + esc(col.hex) + '"><div style="font-size:16pt;font-weight:700">' + esc(col.k) + '</div><div style="font-size:8pt">' + esc(col.l) + '</div></div></div>';
+            h += '<table class="pt" style="margin-top:6px"><tr><th style="width:18%">ผู้ตรวจ</th><td>' + esc(r['Reporter Name']) + (r['Submitted Via'] === 'Vendor Portal' ? ' (ผู้รับเหมา: ' + esc(r['Vendor Company']) + ')' : '') + '</td><th style="width:18%">วันที่ตรวจ</th><td>' + fdate(r['Timestamp']) + '</td></tr>' +
+                '<tr><th>Survey ID</th><td>' + esc(r['ID']) + (r['Re-check Of'] ? '<br><span style="color:#4f46e5">🔁 ตรวจซ้ำจาก ' + esc(r['Re-check Of']) + '</span>' : '') + '</td><th>นัดตรวจซ้ำ</th><td>' + esc(dstr(r['Next Re-check']) || '-') + (recheckOverdue(r) ? ' <b style="color:#dc2626">(เลยนัด)</b>' : '') + '</td></tr>' +
+                (r['Review Status'] ? '<tr><th>สถานะตรวจรับ</th><td colspan="3">' + esc(r['Review Status']) + (r['Reviewed By'] ? ' · ' + esc(r['Reviewed By']) : '') + (r['Review Note'] ? ' · ' + esc(r['Review Note']) : '') + '</td></tr>' : '') + '</table>';
+            h += '<h2>1. สรุปผล</h2><div class="kpi">' + kpi(num(r['Areas']), 'พื้นที่ / จุดที่ตรวจ') + kpi(num(r['Items Checked']), 'ข้อที่ตรวจ') + kpi(num(r['Risks Found']) + ' <small>(สูง ' + num(r['High Risks']) + ')</small>', 'ความเสี่ยงที่พบ', num(r['High Risks'])) +
+                kpi(num(r['Fixed']), 'แก้ไขแล้ว') + kpi(num(r['Temporary Fix']), 'ลดความเสี่ยงชั่วคราว') +
+                kpi(num(r['Open Risks']) + ' <small>(สูง ' + num(r['Open High']) + ')</small>', 'ความเสี่ยงค้าง', num(r['Open Risks'])) + kpi(num(r['Need HO Budget']), 'ต้องของบ HO') + kpi(num(r['Tenant Actions']), 'แจ้งร้านค้าเช่า') +
+                kpi(num(r['Tape Zones']), 'ตีเทปแดง-ดำ (จุด)') + kpi(num(r['Ceiling Wiring Risks']), 'สายไฟเหนือฝ้าเสี่ยง', num(r['Ceiling Wiring Risks'])) + '</div>';
+            if (r['Has Broken'] === 'Yes' || r['Broken Detail']) h += '<div style="margin-top:5px;padding:4px 6px;border:1px solid #fca5a5;background:#fef2f2;border-radius:4px"><b style="color:#b91c1c">⚠️ จุดเสี่ยงสูงที่ต้องแก้ทันที:</b><div style="white-space:pre-line">' + esc(r['Broken Detail'] || '-') + '</div></div>';
+            h += '<h2>2. สรุปรายพื้นที่</h2><table class="pt"><thead><tr><th>พื้นที่</th><th class="c">จุด</th><th class="c">ข้อที่ตรวจ</th><th class="c">ปกติ</th><th class="c">N/A</th><th class="c">เสี่ยง</th><th class="c">สูง</th><th class="c">แก้แล้ว</th><th class="c">ค้าง</th></tr></thead><tbody>' +
+                zs.map(function(s) {
+                    if (s.none && !s.spots) return '<tr style="color:#94a3b8"><td>' + esc(s.z.icon + ' ' + s.z.l) + '</td><td colspan="8" class="c">ไม่มีพื้นที่นี้ในสาขา</td></tr>';
+                    return '<tr' + (s.open ? ' style="background:#fef2f2"' : '') + '><td>' + esc(s.z.icon + ' ' + s.z.l) + '</td><td class="c">' + s.spots + '</td><td class="c">' + s.checked + '</td><td class="c">' + s.ok + '</td><td class="c">' + s.na + '</td><td class="c"><b>' + s.risk + '</b></td><td class="c"' + (s.high ? ' style="color:#dc2626;font-weight:700"' : '') + '>' + s.high + '</td><td class="c">' + s.fixed + '</td><td class="c"' + (s.open ? ' style="color:#dc2626;font-weight:700"' : '') + '>' + s.open + '</td></tr>';
+                }).join('') + '</tbody></table>';
+            h += '<h2>3. ระบบป้องกันอัคคีภัยของสาขา</h2><table class="pt"><thead><tr><th style="width:55%">รายการ</th><th>ผล</th></tr></thead><tbody>' + (FC.prot || []).map(function(p) {
+                const v = pr[p.k], bad = protBad(p, v);
+                return '<tr' + (bad ? ' style="background:#fef2f2"' : '') + '><td>' + esc(p.l) + '</td><td' + (bad ? ' style="color:#dc2626;font-weight:700"' : '') + '>' + (bad ? '⚠️ ' : '') + esc(v === '' || v == null ? '-' : v) + '</td></tr>';
+            }).join('') + '</tbody></table>';
+            h += '<h2>4. ทะเบียนความเสี่ยงและการแก้ไข (' + rr.length + ' รายการ · ค้าง ' + rr.filter(function(o) { return o.open; }).length + ')</h2>' + (rr.length ?
+                '<table class="pt"><thead><tr><th class="c">#</th><th>จุด</th><th>ความเสี่ยง</th><th class="c">ระดับ</th><th>การดำเนินการ</th><th class="c">สถานะ</th><th class="c">กำหนดเสร็จ</th><th>หมายเหตุ</th></tr></thead><tbody>' +
+                rr.map(function(o, i) {
+                    const late = o.open && o.a.due && o.a.due < TODAY;
+                    return '<tr><td class="c">' + (i + 1) + '</td><td><b>' + esc(r['Branch Code'] + '-' + o.c.cid) + '</b><br>' + esc(o.c.place || '-') + (o.c.floor ? ' · ชั้น ' + esc(o.c.floor) : '') + '</td><td>' + esc(o.it.l) + '</td>' +
+                        '<td class="c" style="' + (o.sev === 'สูง' ? 'color:#dc2626;font-weight:700' : o.sev === 'กลาง' ? 'color:#ea580c;font-weight:600' : '') + '">' + esc(o.sev) + '</td><td>' + esc(o.a.act || '-') + '</td>' +
+                        '<td class="c" style="font-weight:600;color:' + (o.open ? '#dc2626' : '#15803d') + '">' + esc(o.a.st || '-') + (o.a.was ? '<br><span style="font-weight:400;color:#4f46e5;font-size:7pt">ครั้งก่อน: ' + esc(o.a.was) + '</span>' : '') + '</td>' +
+                        '<td class="c"' + (late ? ' style="color:#dc2626;font-weight:700"' : '') + '>' + esc(o.a.due || '-') + (late ? '<br>เลยกำหนด' : '') + '</td><td>' + esc(o.a.nt || '') + '</td></tr>';
+                }).join('') + '</tbody></table>' : '<p style="color:#15803d">✅ ไม่พบความเสี่ยง</p>');
+            h += '<h2>5. รายละเอียดรายจุด' + (all ? ' (ทุกข้อ)' : ' (เฉพาะจุดที่พบความเสี่ยง)') + '</h2>';
+            let nCards = 0;
+            (d.cards || []).forEach(function(c) {
+                const z = zoneOf(c.z);
+                if (c.none) return;
+                const rows = z.items.map(function(it) { return { it: it, a: (c.items || {})[it.k] || {} }; }).filter(function(o) { return all || o.a.r === 'risk'; });
+                const pb = att['hfi_' + c.cid + '_b'] || [], pa = att['hfi_' + c.cid + '_a'] || [], hasRisk = rows.some(function(o) { return o.a.r === 'risk'; });
+                if (!rows.length) return;
+                nCards++;
+                h += '<div class="card' + (hasRisk ? ' risk' : '') + '"><div class="card-h"><b>' + esc(z.icon + ' ' + r['Branch Code'] + '-' + c.cid + ' · ' + (c.place || '-')) + '</b><span>' + esc(z.l) + (c.floor ? ' · ชั้น ' + esc(c.floor) : '') + (c.tape ? ' · ตีเทปแดง-ดำแล้ว' : '') + ' · ' + cardCounts(c, z) + '</span></div>' +
+                    '<table class="pt" style="border:0"><tbody>' + rows.map(function(o) {
+                        const a = o.a, risk = a.r === 'risk';
+                        return '<tr><td style="width:4%" class="c">' + (risk ? '⚠️' : a.r === 'ok' ? '✅' : '—') + '</td><td>' + esc(o.it.l) + (risk && a.nt ? '<div style="color:#64748b;font-size:7.5pt">' + esc(a.nt) + '</div>' : '') + '</td>' +
+                            '<td style="width:38%">' + (risk ? '<b style="color:' + (sevShort(a.sev) === 'สูง' ? '#dc2626' : '#ea580c') + '">' + esc(sevShort(a.sev)) + '</b> · ' + esc(a.act || '-') + ' · <b style="color:' + (a.st === ST[0] ? '#15803d' : '#dc2626') + '">' + esc(a.st || '-') + '</b>' + (a.due ? ' · ' + esc(a.due) : '') : (a.r === 'ok' ? 'ปกติ' : 'ไม่เกี่ยวข้อง')) + '</td></tr>';
+                    }).join('') + '</tbody></table>' +
+                    (c.nt ? '<div style="padding:2px 6px;font-size:8pt">หมายเหตุ: ' + esc(c.nt) + '</div>' : '') +
+                    ((c.prevB || []).length || pb.length || pa.length ? '<div class="photos">' + fig(c.prevB, 'ครั้งก่อน') + fig(pb, 'ก่อนแก้') + fig(pa, 'หลังแก้') + '</div>' : '') + '</div>';
+            });
+            if (!nCards) h += '<p style="color:#64748b">— ไม่มีจุดที่พบความเสี่ยง (ติ๊ก “แสดงทุกข้อ” ก่อนพิมพ์ เพื่อพิมพ์ทุกข้อ) —</p>';
+            if (hist.length > 1) h += '<h2>6. ประวัติการตรวจของสาขา</h2><table class="pt"><thead><tr><th>วันที่</th><th class="c">ระดับ</th><th class="c">พบ (สูง)</th><th class="c">แก้แล้ว</th><th class="c">ค้าง (สูง)</th><th>ผู้ตรวจ</th></tr></thead><tbody>' +
+                hist.map(function(x) { return '<tr' + (String(x['ID']) === String(r['ID']) ? ' style="font-weight:700;background:#eef2ff"' : '') + '><td>' + fdate(x['Timestamp']) + '</td><td class="c">' + esc(x['Fire Rating'] || '-') + '</td><td class="c">' + num(x['Risks Found']) + ' (' + num(x['High Risks']) + ')</td><td class="c">' + num(x['Fixed']) + '</td><td class="c">' + num(x['Open Risks']) + ' (' + num(x['Open High']) + ')</td><td>' + esc(x['Reporter Name']) + '</td></tr>'; }).join('') + '</tbody></table>';
+            if (r['Comments']) h += '<h2>สรุป / ข้อเสนอภาพรวมสาขา</h2><div style="white-space:pre-line;border:1px solid #cbd5e1;border-radius:4px;padding:4px 6px">' + esc(r['Comments']) + '</div>';
+            h += '<div class="sig">' + ['ผู้ตรวจ', 'ผู้จัดการสาขา (SGM)', 'MTN ผู้ตรวจรับ'].map(function(t) { return '<div><div class="line"></div>(' + t + ')<br>วันที่ ......../......../........</div>'; }).join('') + '</div>';
+            h += '<div class="foot">Hyper Fire Prevention · ' + esc(r['Branch Code']) + ' · ' + esc(r['ID']) + ' · พิมพ์เมื่อ ' + fdate(Date.now()) + '</div>';
+            const area = document.getElementById('printArea');
+            area.innerHTML = h;
+            // Wait for the photos (max 6 s) so they are not blank on paper / PDF
+            const imgs = Array.prototype.slice.call(area.querySelectorAll('img'));
+            Promise.race([
+                Promise.all(imgs.map(function(im) { return im.complete ? 1 : new Promise(function(ok) { im.onload = im.onerror = ok; }); })),
+                new Promise(function(ok) { setTimeout(ok, 6000); })
+            ]).then(function() { window.print(); });
+        }
+
         function saveRecord() {
             const form = { id: currentId, clientEmail: _userEmail, hasBroken: document.getElementById('editHasBroken').checked ? 'Yes' : 'No',
                            brokenDetail: document.getElementById('editBrokenDetail').value, comments: document.getElementById('editComments').value };
@@ -310,6 +477,7 @@
             XLSX.writeFile(wb, 'hyper_fire_prevention_' + TODAY + '.xlsx');
         }
     </script>
+    <div id="printArea"></div>
     <script>var HYPER_REVIEW_KIND = 'Fi';</script>
     <?!= include('HyperReviewBar') ?>
 </body>

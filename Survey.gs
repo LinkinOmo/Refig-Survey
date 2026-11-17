@@ -132,7 +132,9 @@ function _computeEnumCanonicalCasing_(group, headers, data) {
     return { canonicalCasing: canonicalCasing, colIdxs: colIdxs, frequency: frequency };
 }
 
-function getEnumFieldOptions(groupKey) {
+// sheetDataMemo (optional, server-side only): {sheetName: values[][]} shared across calls in one
+// execution so getEnumFieldOptionsMap() reads each source sheet once on a cold cache (10 groups → 3 sheets).
+function getEnumFieldOptions(groupKey, sheetDataMemo) {
     try {
         var group = ENUM_FIELD_GROUPS[groupKey];
         if (!group) return { success: false, error: 'Unknown enum group: ' + groupKey };
@@ -142,8 +144,12 @@ function getEnumFieldOptions(groupKey) {
         var cached = cache.get(cacheKey);
         if (cached) return { success: true, options: JSON.parse(cached) };
 
-        var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(group.sheet);
-        var data = (sheet && sheet.getLastRow() > 1) ? sheet.getDataRange().getValues() : [[]];
+        var data = sheetDataMemo && sheetDataMemo[group.sheet];
+        if (!data) {
+            var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(group.sheet);
+            data = (sheet && sheet.getLastRow() > 1) ? sheet.getDataRange().getValues() : [[]];
+            if (sheetDataMemo) sheetDataMemo[group.sheet] = data;
+        }
         var headers = data[0] || [];
         var computed = _computeEnumCanonicalCasing_(group, headers, data);
         // Most-submitted value first; ties (including unused defaults, all at 0) fall

@@ -32,6 +32,17 @@
         .opt { white-space: nowrap; margin-right: 3mm; display: inline-block; }
         .sign td { height: 13mm; vertical-align: bottom; text-align: center; font-size: 9pt; }
         .rc td { font-size: 8.5pt; }
+        .pts td { height: 6.6mm; font-size: 8.5pt; }
+        .pts td.pl { width: 11mm; text-align: center; font-weight: 700; background: #fef2f2; }
+        .pts .cid { display: block; font-size: 6.5pt; font-weight: 400; color: #555; }
+        .pts .pre { font-weight: 600; }
+        .zone .grid { margin-top: 1mm; }
+        .zone .grid th.c { width: 12mm; font-size: 8pt; }
+        #ptPanel { display: none; background: #fff; color: #111; padding: 10px 16px; border-bottom: 3px solid #7f1d1d; font-size: 13px; }
+        #ptPanel.on { display: block; }
+        #ptPanel .row { display: inline-flex; align-items: center; gap: 6px; margin: 3px 14px 3px 0; }
+        #ptPanel input { width: 52px; padding: 2px 4px; border: 1px solid #999; border-radius: 4px; }
+        #ptPanel button { font: inherit; padding: 3px 10px; border-radius: 6px; border: 1px solid #7f1d1d; background: #fff; color: #7f1d1d; font-weight: 700; cursor: pointer; margin-right: 6px; }
         .toolbar { position: sticky; top: 0; background: #7f1d1d; color: #fff; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; z-index: 5; font-size: 14px; }
         .toolbar button, .toolbar input { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; }
         .toolbar button { background: #fff; color: #7f1d1d; font-weight: 700; cursor: pointer; }
@@ -43,9 +54,11 @@
         <b>🖨️ แบบฟอร์มกระดาษ — สำรวจความเสี่ยงอัคคีภัย</b>
         <span>สาขา:</span><input id="storeInput" placeholder="รหัสสาขา (เว้นว่าง = ฟอร์มเปล่า)" style="min-width:220px">
         <button onclick="loadStore()">📥 ใส่ความเสี่ยงค้างจากครั้งก่อน</button>
+        <button onclick="document.getElementById('ptPanel').classList.toggle('on')">⚙️ จำนวนจุดต่อพื้นที่</button>
         <button onclick="window.print()">พิมพ์ / Save PDF</button>
         <span id="msg">A4 แนวตั้ง · เปิด Background graphics ตอนพิมพ์</span>
     </div>
+    <div id="ptPanel" class="noprint"></div>
     <div id="pages"></div>
 
 <script>
@@ -57,7 +70,25 @@ let STORE = { code: '', name: '', last: null };
 
 const SEV_CODE = ['ส', 'ก', 'ต'];
 const ST_CODE = ['A', 'B', 'C'];
-const POINTS = z => z.multi ? 3 : 1;
+// Points (= cards in the app) per zone. Multi zones default 3, user-adjustable; a loaded store never gets fewer
+// points than its last survey had, and those points come pre-filled with the app's place name / floor / card ID.
+const MAX_COLS = 6;
+let PTS = {};
+try { PTS = JSON.parse(localStorage.getItem('hfiPaperPts') || '{}') || {}; } catch (e) { PTS = {}; }
+function prevCards(z) { return STORE.last ? (STORE.last.fire.cards || []).filter(c => c.z === z.k && !c.none) : []; }
+// a loaded store keeps all its previous points + 1 spare row for a newly found spot
+const POINTS = z => z.multi ? Math.max(+PTS[z.k] || 3, prevCards(z).length ? prevCards(z).length + 1 : 0, 1) : 1;
+const ptLabel = (zi, i, n) => n > 1 ? (zi + 1) + String.fromCharCode(65 + i) : String(zi + 1);
+function savePts() { try { localStorage.setItem('hfiPaperPts', JSON.stringify(PTS)); } catch (e) {} }
+function ptPanel() {
+    const rows = FI.zones.map((z, i) => z.multi ? '<span class="row">' + z.icon + ' ' + (i + 1) + '. ' + esc(z.l.split(' (')[0].split(' / ')[0]) +
+        ' <input type="number" min="1" max="20" value="' + (+PTS[z.k] || 3) + '" data-z="' + z.k + '" onchange="setPts(this)"> จุด</span>' : '').join('');
+    document.getElementById('ptPanel').innerHTML = '<b>จำนวนจุดต่อพื้นที่ (1 จุด = 1 การ์ดในแอป)</b> &nbsp; ตั้งทุกพื้นที่: ' +
+        [3, 5, 8].map(n => '<button onclick="setAllPts(' + n + ')">' + n + ' จุด</button>').join('') +
+        '<span class="muted">พื้นที่ที่มีจุดเดียว (MDB, ลานรับสินค้า, หลังคา, ภายนอก) = 1 การ์ด · โหลดสาขาแล้วจะไม่น้อยกว่าจำนวนจุดครั้งก่อน</span><br>' + rows;
+}
+function setPts(el) { PTS[el.dataset.z] = Math.max(1, Math.min(20, +el.value || 1)); savePts(); render(); }
+function setAllPts(n) { FI.zones.forEach(z => { if (z.multi) PTS[z.k] = n; }); savePts(); ptPanel(); render(); }
 
 function header(page, total, sub) {
     return '<div class="hdr"><div><h1>🧯 แบบสำรวจความเสี่ยงอัคคีภัย สาขา Big Format</h1>' +
@@ -79,22 +110,35 @@ function howTo() {
     const sts = FI.status.map((s, i) => '<span class="opt"><b>' + ST_CODE[i] + '</b> = ' + esc(s) + '</span>').join(' ');
     const colors = FI.colors.slice().reverse().map(c => '<span class="opt"><span class="pill" style="background:' + c.hex + '">' + c.k + '</span> ' + esc(c.l) + ' (ตรวจซ้ำ ≤ ' + c.recheck + ' วัน)</span>').join(' ');
     return '<h2>วิธีกรอก — ค้นหา → ลด → ตรวจซ้ำ</h2><div class="legend">' +
-        '1) เดินตรวจทีละพื้นที่ เขียนชื่อจุดจริงในแถว “จุด” แล้วกรอกทุกข้อ: <b>✓</b> ปกติ · <b>✗</b> พบความเสี่ยง · <b>–</b> ไม่มี / ไม่เกี่ยว · ไม่มีพื้นที่นี้ในสาขา ให้ขีดคร่อมทั้งตาราง<br>' +
+        '1) เดินตรวจทีละพื้นที่ — เขียน <b>ชื่อจุด / ตำแหน่ง</b> ในตาราง “จุดที่ตรวจ” (<b>1 จุด = 1 การ์ดในแอป</b> เช่น <b>2A</b> = ตู้ DB-LP2 หลังแคชเชียร์ 5) แล้วกรอกทุกข้อใต้คอลัมน์ของจุดนั้น: <b>✓</b> ปกติ · <b>✗</b> พบความเสี่ยง · <b>–</b> ไม่มี / ไม่เกี่ยว · จุดที่ไม่ใช้ให้ขีดทิ้ง · ไม่มีพื้นที่นี้ในสาขา ให้ติ๊ก “ไม่มีพื้นที่นี้”<br>' +
         '2) ข้อที่มี <span class="crit">●</span> = จุดวิกฤต พบความเสี่ยงถือเป็นระดับ <b>สูง</b> · ทุกข้อที่ ✗ ให้ลงรายละเอียดใน <b>ทะเบียนความเสี่ยง</b> (หน้าท้าย) และถ่ายรูป <b>ก่อน</b> / <b>หลัง</b> แก้ไข<br>' +
         '3) แก้ได้ทันทีให้แก้เลย (ย้ายของ · ตีเทปแดง-ดำ ≥ 1 ม. · ปิดฝาตู้) · กรอกเสร็จแล้วบันทึกเข้าแอปภายในวันเดียวกัน — ระบบคำนวณระดับสีให้อัตโนมัติ<br>' +
         '<b>ระดับ:</b> ส = สูง · ก = กลาง · ต = ต่ำ &nbsp; <b>สถานะ:</b> ' + sts + '<br><b>การแก้ไข:</b> ' + acts + '<br><b>ระดับสีสาขา:</b> ' + colors + '</div>';
 }
 
 function zoneTable(z, zi) {
-    const n = POINTS(z);
-    const cols = Array.from({ length: n }, (_, i) => '<th class="c">' + (n > 1 ? 'จุด ' + (i + 1) : 'ผล') + '</th>').join('');
-    const pt = '<tr class="pt"><td class="n"></td><td>ชื่อจุด / ชั้น →' + (z.tape ? ' &nbsp; ' + box + 'ตีเทปแดง-ดำแล้ว (ใส่ ✓ ใต้จุด)' : '') + '</td>' +
-        Array.from({ length: n }, () => '<td></td>').join('') + '</tr>';
-    const rows = z.items.map((it, j) => '<tr><td class="n">' + (zi + 1) + '.' + (j + 1) + '</td><td>' + (it.crit ? '<span class="crit">●</span> ' : '') + esc(it.l) + '</td>' +
-        Array.from({ length: n }, () => '<td class="c"></td>').join('') + '</tr>').join('');
-    return '<div class="zone"><h2>' + z.icon + ' ' + (zi + 1) + '. ' + esc(z.l) + (z.multi ? ' <span class="muted">(หลายจุด — เกิน 3 จุดใช้แผ่นเพิ่ม)</span>' : '') +
+    const n = POINTS(z), prev = prevCards(z), dots = mm => '<span class="fill" style="min-width:' + mm + 'mm"></span>';
+    // 1) the points checked in this zone — same fields as a card in the app (place is required there)
+    const pts = Array.from({ length: n }, (_, i) => {
+        const c = prev[i];
+        return '<tr><td class="pl">' + ptLabel(zi, i, n) + (c && c.cid ? '<span class="cid">' + esc(c.cid) + '</span>' : '') + '</td>' +
+            '<td>ชื่อจุด / ตำแหน่ง: ' + (c && c.place ? '<span class="pre">' + esc(c.place) + '</span>' : dots(70)) + '</td>' +
+            '<td style="width:24mm">ชั้น: ' + (c && c.floor ? '<span class="pre">' + esc(c.floor) + '</span>' : dots(12)) + '</td>' +
+            (z.tape ? '<td style="width:33mm">' + box + 'ตีเทปแดง-ดำแล้ว</td>' : '') + '</tr>';
+    }).join('');
+    // 2) checklist grid, one column per point (wraps to another grid above MAX_COLS points)
+    let grids = '';
+    const per = Math.ceil(n / Math.ceil(n / MAX_COLS));   // split evenly, e.g. 7 → 4 + 3
+    for (let s0 = 0; s0 < n; s0 += per) {
+        const m = Math.min(per, n - s0);
+        const cols = Array.from({ length: m }, (_, i) => '<th class="c">' + (n > 1 ? 'จุด ' : 'ผล ') + ptLabel(zi, s0 + i, n) + '</th>').join('');
+        const rows = z.items.map((it, j) => '<tr><td class="n">' + (zi + 1) + '.' + (j + 1) + '</td><td>' + (it.crit ? '<span class="crit">●</span> ' : '') + esc(it.l) + '</td>' +
+            Array.from({ length: m }, () => '<td class="c"></td>').join('') + '</tr>').join('');
+        grids += '<table class="grid"><thead><tr><th style="width:9mm">ข้อ</th><th>รายการตรวจ</th>' + cols + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+    return '<div class="zone"><h2>' + z.icon + ' ' + (zi + 1) + '. ' + esc(z.l) + (z.multi ? ' <span class="muted">(หลายจุด · ' + n + ' จุด — 1 จุด = 1 การ์ด, ในแอปกด ＋ เพิ่มจุด)</span>' : '') +
         ' <span style="float:right;font-weight:400">' + box + 'ไม่มีพื้นที่นี้</span></h2>' +
-        '<table><thead><tr><th style="width:9mm">ข้อ</th><th>รายการตรวจ</th>' + cols + '</tr></thead><tbody>' + pt + rows + '</tbody></table></div>';
+        '<table class="pts"><tbody>' + pts + '</tbody></table>' + grids + '</div>';
 }
 
 function protTable() {
@@ -112,7 +156,7 @@ function protTable() {
 function riskLog(rowsN) {
     const blank = Array.from({ length: rowsN }, (_, i) => '<tr><td style="text-align:center">' + (i + 1) + '</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="text-align:center">' + box + box + '</td></tr>').join('');
     return '<h2>⚠️ ทะเบียนความเสี่ยง — ทุกข้อที่ ✗</h2><table class="log"><thead><tr>' +
-        '<th style="width:7mm">#</th><th style="width:12mm">ข้อ</th><th style="width:28mm">จุด / ชั้น</th><th>รายละเอียดที่พบ</th><th style="width:11mm">ระดับ<br>ส/ก/ต</th>' +
+        '<th style="width:7mm">#</th><th style="width:12mm">ข้อ</th><th style="width:28mm">จุด (เช่น 2A)<br>/ ชั้น</th><th>รายละเอียดที่พบ</th><th style="width:11mm">ระดับ<br>ส/ก/ต</th>' +
         '<th style="width:13mm">การแก้ไข<br>(1–8)</th><th style="width:11mm">สถานะ<br>A/B/C</th><th style="width:20mm">กำหนดเสร็จ /<br>ผู้รับผิดชอบ</th><th style="width:15mm">รูป<br>ก่อน·หลัง</th>' +
         '</tr></thead><tbody>' + blank + '</tbody></table>';
 }
@@ -135,7 +179,7 @@ function recheckBlock() {
         const zz = zl[c.z]; if (!zz) return;
         zz.z.items.forEach((it, j) => {
             const a = (c.items || {})[it.k];
-            if (a && a.r === 'risk' && a.st !== FI.status[0]) rows.push({ no: (zz.i + 1) + '.' + (j + 1), place: (c.place || zz.z.l) + (c.floor ? ' (' + c.floor + ')' : ''), item: it.l, a });
+            if (a && a.r === 'risk' && a.st !== FI.status[0]) rows.push({ no: (zz.i + 1) + '.' + (j + 1), place: (c.cid ? c.cid + ' · ' : '') + (c.place || zz.z.l) + (c.floor ? ' (' + c.floor + ')' : ''), item: it.l, a });
         });
     });
     const col = FI.colors.find(c => c.k === L.rating);
@@ -153,7 +197,7 @@ function render() {
     // Pack zones into pages by item count so each page stays within A4.
     const pages = [[]]; let load = 0;
     FI.zones.forEach((z, i) => {
-        const w = z.items.length + 3;
+        const n = POINTS(z), w = (z.items.length + 1.3) * Math.ceil(n / MAX_COLS) + n * 0.9 + 2;
         if (load + w > (pages.length === 1 ? 26 : 44) && pages[pages.length - 1].length) { pages.push([]); load = 0; }
         pages[pages.length - 1].push(zoneTable(z, i)); load += w;
     });
@@ -180,6 +224,7 @@ function loadStore() {
 
 document.getElementById('storeInput').value = PRESET;
 document.getElementById('storeInput').addEventListener('keydown', e => { if (e.key === 'Enter') loadStore(); });
+ptPanel();
 render();
 if (PRESET) loadStore();
 </script>

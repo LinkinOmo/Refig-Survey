@@ -1,0 +1,393 @@
+﻿<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8"><title>BOQ App vision 3D</title>
+<style>
+  html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#0b1220;font-family:'Leelawadee UI','Segoe UI',Tahoma,sans-serif}
+  canvas{position:absolute;inset:0;width:1280px;height:720px}
+  #callouts{position:absolute;inset:0;pointer-events:none}
+  .co{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font-weight:700;font-size:20px;color:#fff;padding:7px 14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .co::after{content:'';position:absolute;left:50%;bottom:-9px;margin-left:-8px;border:8px solid transparent;border-bottom:0;border-top-color:inherit}
+  .co small{display:block;font-size:14px;font-weight:600;opacity:.92}
+  .co.bad{background:#b91c1c;border-color:#b91c1c}.co.good{background:#15803d;border-color:#15803d}.co.info{background:#1e293b;border-color:#1e293b}
+  .co.up{background:#1d4ed8;border-color:#1d4ed8}.co.fad{background:#b45309;border-color:#b45309}.co.mtn{background:#0f766e;border-color:#0f766e}
+  .co.gad{background:#6d28d9;border-color:#6d28d9}.co.loop{background:#0369a1;border-color:#0369a1}
+  .co.big{font-size:26px;padding:10px 18px}
+  #chap{position:absolute;left:24px;top:20px;padding:8px 18px;border-radius:12px;background:rgba(15,23,42,.85);color:#fff;font-size:22px;font-weight:700;border-left:6px solid #64748b}
+  #brand{position:absolute;right:24px;top:22px;color:#fff;font-size:15px;font-weight:700;background:rgba(15,23,42,.7);padding:6px 12px;border-radius:999px}
+  #sub{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;bottom:24px;max-width:1160px;text-align:center;background:rgba(0,0,0,.78);color:#fff;font-size:25px;line-height:1.5;padding:9px 24px;border-radius:12px}
+  #fade{position:absolute;inset:0;background:#000;pointer-events:none}
+  #ov{position:absolute;inset:0;display:none}
+  .ovbg{position:absolute;inset:0;background:radial-gradient(1000px 620px at 50% 42%,rgba(12,40,80,.84),rgba(4,12,28,.94))}
+  .ovw{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;padding:0 50px 96px}
+  .ovw h1{font-size:50px;margin:0 0 10px}.ovw h2{font-size:28px;margin:0 0 8px;font-weight:600;opacity:.95}.ovw p{font-size:21px;margin:4px 0;opacity:.88}
+  .tiles{display:flex;gap:16px;margin-top:24px}
+  .tile{width:250px;border-radius:16px;padding:18px 14px;background:rgba(255,255,255,.09);border:3px solid;display:flex;flex-direction:column;gap:8px;align-items:center}
+  .tile .ic{font-size:48px;line-height:1.1}.tile b{font-size:23px}.tile span{font-size:16px;opacity:.9;line-height:1.45}
+  .road{display:flex;gap:0;margin-top:26px;align-items:stretch}
+  .ph{width:250px;padding:14px 14px 16px;background:rgba(255,255,255,.09);border-top:6px solid;text-align:left;position:relative}
+  .ph .n{font-size:14px;font-weight:700;opacity:.8}.ph b{display:block;font-size:21px;margin:4px 0 6px}.ph span{font-size:15.5px;opacity:.9;line-height:1.5}
+  .ph + .ph{margin-left:10px}
+  .flow{display:flex;gap:10px;align-items:center;margin-top:22px;font-size:22px;font-weight:700}
+  .flow .k{padding:8px 16px;border-radius:12px;color:#fff}
+  #pip{position:absolute;right:22px;top:78px;width:730px;display:none;filter:drop-shadow(0 14px 30px rgba(0,0,0,.45))}
+  #pip .cap{background:#0f172a;color:#fff;font-size:17px;font-weight:700;padding:7px 14px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between}
+  #pip .cap span{color:#93c5fd;font-weight:600}
+  #pip .im{position:relative;width:730px;height:456px;background:#fff;border:3px solid #0f172a;border-top:0;border-radius:0 0 12px 12px;overflow:hidden}
+  #pip .im img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:top}
+  .gal{display:grid;grid-template-columns:repeat(4,262px);gap:14px;margin-top:18px}
+  .gi{background:#fff;border-radius:10px;overflow:hidden;color:#0f172a;text-align:left}
+  .gi img{display:block;width:262px;height:164px;object-fit:cover;object-position:top}
+  .gi div{font-size:14px;font-weight:700;padding:6px 9px}
+</style></head>
+<body>
+<canvas id="c" width="1280" height="720"></canvas>
+<div id="callouts"></div>
+<div id="chap"></div><div id="brand">MTN Suite · BOQ App</div>
+<div id="pip"></div><div id="ov"></div><div id="sub"></div>
+<div id="fade"></div>
+<script src="timeline.js"></script>
+<script type="module">
+import * as THREE from './three.module.js';
+const W = 1280, H = 720, $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ss = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const eio = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const back = x => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const COL = { up: '#1d4ed8', mid: '#0891b2', fad: '#b45309', mtn: '#0f766e', gad: '#6d28d9', loop: '#0369a1' };
+
+const TL = window.TL, SEG = {}; TL.forEach(e => SEG[e.ph] = e);
+let T = 0;
+const S0 = ph => SEG[ph].start, SE = ph => SEG[ph].start + SEG[ph].dur;
+const F = (ph, fr) => (SEG[ph].audio - SEG[ph].start) + fr * SEG[ph].nd;
+const A = (ph, off, dur = 1) => ss((T - S0(ph) - off) / dur);
+const IN = ph => T >= S0(ph) && T < SE(ph);
+const L = ph => T - S0(ph);
+const AFTER = ph => T >= S0(ph);
+
+// ── renderer ──
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(window.devicePixelRatio || 1); renderer.setSize(W, H, false);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xbcd6ee); scene.fog = new THREE.Fog(0xbcd6ee, 70, 170);
+const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 500);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x5b7a4a, 1.1));
+const sun = new THREE.DirectionalLight(0xfff6e6, 1.8); sun.position.set(20, 45, 30); sun.target.position.set(0, 0, 10);
+sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 150 }); sun.shadow.bias = -0.0005;
+scene.add(sun); scene.add(sun.target);
+
+const MC = {};
+function mat(c, o) { const k = c + JSON.stringify(o || {}); return MC[k] || (MC[k] = new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .75, metalness: .05 }, o || {}))); }
+function grp(parent, x = 0, y = 0, z = 0, ry = 0) { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; parent.add(g); return g; }
+function box(g, w, h, d, c, x = 0, y = 0, z = 0, o) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), o && o.isMaterial ? o : mat(c, o)); m.position.set(x, y + h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function cyl(g, r, h, c, x = 0, y = 0, z = 0, o, seg = 24, r2) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r2 == null ? r : r2, r, h, seg), o && o.isMaterial ? o : mat(c, o)); m.position.set(x, y + h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function tex(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+const FONT = '"Leelawadee UI","Segoe UI",Tahoma,sans-serif';
+function plate(g, w, h, bg, lines, x, y, z, o = {}) {
+  const px = 512, ph = Math.round(px * h / w);
+  const t = tex(px, ph, (c, cw, ch) => {
+    c.fillStyle = bg; c.fillRect(0, 0, cw, ch);
+    const tot = lines.reduce((s, l) => s + l[1], 0) * ch * 1.15; let yy = ch / 2 - tot / 2;
+    lines.forEach(([s, f, col, b]) => { const fs = f * ch; c.font = (b === false ? '' : 'bold ') + Math.round(fs) + 'px ' + FONT; c.fillStyle = col; c.textAlign = 'center'; c.textBaseline = 'middle'; yy += fs * 1.15 / 2; c.fillText(s, cw / 2, yy, cw * .94); yy += fs * 1.15 / 2; });
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: t, roughness: .6, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: o.glow == null ? .3 : o.glow, side: o.two ? THREE.DoubleSide : THREE.FrontSide }));
+  m.position.set(x, y, z); if (o.ry) m.rotation.y = o.ry; g.add(m); return m;
+}
+// app-screen mock: header + rows [[left, right, chipColor]]
+function screenTex(title, color, rows, foot) {
+  return tex(640, 400, (c) => {
+    c.fillStyle = '#f8fafc'; c.fillRect(0, 0, 640, 400);
+    c.fillStyle = color; c.fillRect(0, 0, 640, 64);
+    c.fillStyle = '#fff'; c.font = 'bold 22px ' + FONT; c.textBaseline = 'middle'; c.fillText('MTN Suite', 20, 22);
+    c.font = 'bold 30px ' + FONT; c.fillText(title, 20, 48, 600);
+    rows.forEach(([l, r, chip], i) => {
+      const y = 86 + i * 50; c.fillStyle = i % 2 ? '#eef2f7' : '#ffffff'; c.fillRect(14, y, 612, 44);
+      c.fillStyle = '#0f172a'; c.font = '600 22px ' + FONT; c.fillText(l, 26, y + 22, 400);
+      if (r) { c.font = 'bold 20px ' + FONT; const w = c.measureText(r).width + 24; c.fillStyle = chip || '#e2e8f0'; c.fillRect(612 - w, y + 7, w, 30); c.fillStyle = chip ? '#fff' : '#0f172a'; c.fillText(r, 624 - w, y + 22); }
+    });
+    if (foot) { c.fillStyle = color; c.fillRect(14, 346, 612, 42); c.fillStyle = '#fff'; c.font = 'bold 22px ' + FONT; c.textAlign = 'center'; c.fillText(foot, 320, 367); }
+  });
+}
+function person(g, x, z, shirt, ry = 0, helmet) {
+  const p = grp(g, x, 0, z, ry);
+  cyl(p, .17, .8, 0x1f2937, -.09, 0, 0, null, 10); cyl(p, .17, .8, 0x1f2937, .09, 0, 0, null, 10);
+  const b = new THREE.Mesh(new THREE.CapsuleGeometry(.28, .55, 4, 10), mat(shirt)); b.position.y = 1.15; b.castShadow = true; p.add(b);
+  const h = new THREE.Mesh(new THREE.SphereGeometry(.22, 16, 12), mat(0xe0b48c)); h.position.y = 1.72; h.castShadow = true; p.add(h);
+  if (helmet) { const hm = new THREE.Mesh(new THREE.SphereGeometry(.24, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(helmet)); hm.position.y = 1.76; p.add(hm); }
+  return p;
+}
+
+// ───────────── terrain: valley with a hill (upstream) ─────────────
+const HC = new THREE.Vector2(-34, 0), HR = 19, HH = 7.5;
+const ground = (x, z) => { const r = Math.hypot(x - HC.x, z - HC.y); return r < HR ? HH * Math.pow(1 - (r * r) / (HR * HR), 2) : 0; };
+{ const g = new THREE.PlaneGeometry(200, 170, 200, 170); g.rotateX(-Math.PI / 2); g.translate(0, 0, 25);
+  const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, ground(p.getX(i), p.getZ(i)));
+  g.computeVertexNormals(); const m = new THREE.Mesh(g, mat(0x8cc46e, { roughness: .95 })); m.receiveShadow = true; scene.add(m); }
+
+// river: main stream + two downstream branches
+const P3 = pts => pts.map(([x, z]) => new THREE.Vector3(x, ground(x, z), z));
+const MAIN = new THREE.CatmullRomCurve3(P3([[-34, 0], [-29, 3], [-21, 5], [-13, 3.5], [-5, -.5], [3, -2], [10, -1]]));
+const BRA = new THREE.CatmullRomCurve3(P3([[10, -1], [16, -5], [22, -10], [27.5, -13]]));
+const BRB = new THREE.CatmullRomCurve3(P3([[10, -1], [16, 3], [22, 8], [27.5, 11]]));
+const waterTex = tex(64, 256, (c, w, h) => { const g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, '#2b6cb0'); g.addColorStop(.5, '#3b8fe0'); g.addColorStop(1, '#2b6cb0'); c.fillStyle = g; c.fillRect(0, 0, w, h); c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2; for (let i = 0; i < 14; i++) { const x = 6 + hash(i) * 52, y = hash(i + 9) * h; c.beginPath(); c.moveTo(x, y); c.lineTo(x + 2, y + 18 + hash(i + 3) * 20); c.stroke(); } });
+waterTex.wrapS = waterTex.wrapT = THREE.RepeatWrapping;
+const waterMat = new THREE.MeshStandardMaterial({ map: waterTex, roughness: .25, metalness: .1, emissive: 0x1e5aa8, emissiveIntensity: .25, side: THREE.DoubleSide });
+function ribbon(curve, w, n) {
+  const pos = [], uv = [], idx = [], len = curve.getLength();
+  for (let i = 0; i <= n; i++) { const u = i / n, p = curve.getPointAt(u), t = curve.getTangentAt(u), s = new THREE.Vector3(-t.z, 0, t.x).normalize();
+    [-1, 1].forEach(k => { const q = p.clone().addScaledVector(s, k * w / 2); pos.push(q.x, ground(q.x, q.z) + .1, q.z); uv.push((k + 1) / 2, u * len / 4); }); }
+  for (let i = 0; i < n; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, waterMat); m.receiveShadow = true; scene.add(m); m.userData.n = n; return m;
+}
+const RMAIN = ribbon(MAIN, 2.6, 220), RA = ribbon(BRA, 2.2, 90), RB = ribbon(BRB, 2.2, 90);
+const lakeMat = new THREE.MeshStandardMaterial({ color: 0x2f7fd0, roughness: .2, metalness: .1, emissive: 0x1e5aa8, emissiveIntensity: .25 });
+const LAKE_A = new THREE.Mesh(new THREE.CircleGeometry(5.2, 40), lakeMat); LAKE_A.rotation.x = -Math.PI / 2; LAKE_A.position.set(31, .1, -14.5); scene.add(LAKE_A);
+const LAKE_B = new THREE.Mesh(new THREE.CircleGeometry(5.2, 40), lakeMat); LAKE_B.rotation.x = -Math.PI / 2; LAKE_B.position.set(31, .1, 12.5); scene.add(LAKE_B);
+const spring = cyl(scene, 1.4, .5, 0x94a3b8, -34, ground(-34, 0) - .2, 0);
+// trees
+{ const samples = [MAIN, BRA, BRB].flatMap(c => c.getSpacedPoints(80));
+  for (let i = 0; i < 140; i++) {
+    const x = -70 + hash(i) * 140, z = -40 + hash(i + 50) * 75;
+    if (samples.some(p => Math.hypot(p.x - x, p.z - z) < 3.4)) continue;
+    if (Math.hypot(x - 31, z + 14.5) < 7 || Math.hypot(x - 31, z - 12.5) < 7) continue;
+    if ([[-35, -6], [-21, -2], [-7, -8], [5, 6], [38, -21], [38, 19], [6, -17]].some(([a, b]) => Math.hypot(x - a, z - b) < 5)) continue;
+    const y = ground(x, z), s = .7 + hash(i + 7) * .7;
+    cyl(scene, .12 * s, .9 * s, 0x7c5a3a, x, y, z, null, 6);
+    const c = new THREE.Mesh(new THREE.ConeGeometry(.75 * s, 1.9 * s, 8), mat([0x2f7d3a, 0x3a8f45, 0x276b31][i % 3])); c.position.set(x, y + .9 * s + .9 * s, z); c.castShadow = true; scene.add(c);
+  } }
+
+// ───────────── stations ─────────────
+const ST = {};
+function station(id, x, z, color, label, scr, faceTo, build) {
+  const y = ground(x, z), g = grp(scene, x, y, z);
+  cyl(g, 2.6, 3.2, 0xe5e7eb, 0, -2.9, 0);
+  const ringMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(color), emissive: new THREE.Color(color), emissiveIntensity: .2 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, .09, 8, 48), ringMat); ring.rotation.x = Math.PI / 2; ring.position.y = .32; g.add(ring);
+  if (build) build(g);
+  const sc = grp(g, 0, 3.6, 0); sc.lookAt(faceTo[0], y + 3.6, faceTo[1]);
+  box(sc, 3.9, 2.5, .12, 0x0f172a, 0, -1.25, -.07);
+  const sm = new THREE.MeshStandardMaterial({ map: scr, emissive: 0xffffff, emissiveMap: scr, emissiveIntensity: .55, roughness: .5 });
+  const s = new THREE.Mesh(new THREE.PlaneGeometry(3.7, 2.3), sm); s.position.z = .0; sc.add(s);
+  cyl(g, .08, 2.4, 0x334155, 0, .3, 0);
+  plate(sc, 3.9, .55, color, [[label, .55, '#fff']], 0, -1.62, .02, { glow: .55 });
+  ST[id] = { g, ring: ringMat, x, y, z, sc, sm };
+  return g;
+}
+station('s1', -35, -6, COL.up, 'ตั้งโครงการ · PPT / BM', screenTex('ตั้งโครงการใหม่', COL.up, [['สาขา', '(รหัสสาขา)'], ['Format', 'Mini Big C'], ['ประเภทโครงการ', 'Renovate'], ['แบบฟอร์ม BOQ', 'มาตรฐาน + รหัส', '#16a34a']], 'สร้างโครงการ'), [-24, 14],
+  g => { box(g, 2.4, 1.6, 1.8, 0xf1f5f9, 1.1, .3, -1); box(g, 2.6, .25, 2.0, 0x1d4ed8, 1.1, 1.9, -1); person(g, -1.2, .6, 0x1d4ed8); });
+station('s2', -21, -2, COL.up, 'BOQ App · ผู้รับเหมา', screenTex('กรอก BOQ', COL.up, [['C03_S001_T003 แอร์แยกส่วน', '✓', '#16a34a'], ['C01_S001_T010 ตู้แช่ 3 ประตู', '✓', '#16a34a'], ['C02_S002_T001 ตู้ MDB', '✓', '#16a34a'], ['เทียบราคาอ้างอิง', 'ในเกณฑ์', '#0891b2']], 'รหัสครบ 100% · ส่ง BOQ'), [-19, 8],
+  g => { box(g, 1.6, .75, .9, 0x92400e, .9, .3, .2); box(g, .9, .04, .6, 0x111827, .9, 1.05, .2); const lp = box(g, .9, .55, .03, 0x111827, .9, 1.07, -.08); lp.rotation.x = -.2; person(g, -.2, .9, 0xf59e0b, .4, 0xfacc15); });
+station('s3', -7, -8, COL.mid, 'GCP · เปรียบเทียบ + PO', screenTex('เปรียบเทียบราคา', COL.mid, [['ผู้รับเหมา A', 'ต่ำสุด', '#16a34a'], ['ผู้รับเหมา B', '+4%'], ['บรรทัดนอกแบบฟอร์ม', '0'], ['อนุมัติตาม DOA', '✓', '#16a34a']], 'อนุมัติ → PR / PO'), [-4, 5],
+  g => { box(g, 2.4, 1.5, 1.8, 0xf1f5f9, -1.1, .3, -1); box(g, 2.6, .25, 2.0, 0x0891b2, -1.1, 1.8, -1); person(g, 1.2, .5, 0x0891b2); });
+station('s4', 5, 6, COL.mid, 'ส่งมอบ · สแกน QR', screenTex('ทะเบียนเครื่อง', COL.mid, [['M0001 แอร์ 36,000 BTU', 'QR ✓', '#16a34a'], ['ยี่ห้อ / รุ่น', 'กรอกแล้ว'], ['Serial', 'กรอกแล้ว'], ['รูปถ่าย', '✓', '#16a34a']], 'ยืนยันส่งมอบ'), [7, 15],
+  g => { box(g, 2.6, 1.7, 2.0, 0xfafaf9, -1.0, .3, -1.1); box(g, 2.8, .3, 2.2, 0x16a34a, -1.0, 2.0, -1.1);
+         const cdu = grp(g, 1.0, .3, -.4); box(cdu, .9, .7, .4, 0xe5e7eb); const fn = cyl(cdu, .22, .02, 0x334155); fn.rotation.x = Math.PI / 2; fn.position.set(-.15, .37, .21);
+         ST.qr = plate(cdu, .22, .28, '#ffffff', [['▦', .7, '#111']], .27, .4, .205, { glow: .6 }); ST.tech = person(g, 1.6, 1.0, 0x0f766e, -2.6, 0xf97316); });
+station('fad', 38, -21, COL.fad, 'FAD · Oracle FA', screenTex('Oracle FA · ทรัพย์สินรายเครื่อง', COL.fad, [['SKS30_C03_S001_T003_M0001', 'ทุน + ปันส่วน'], ['SKS30_C01_S001_T010_M0001', 'ทุน + ปันส่วน'], ['ทรัพย์สินรวม', '= BOQ + PO'], ['ส่วนต่าง', '0.00', '#16a34a']], 'ตั้งทรัพย์สินอัตโนมัติ'), [28, -6],
+  g => { box(g, 3.4, .3, 2.4, 0xe7e5e4, 0, .3, -1); [-1.3, -.45, .45, 1.3].forEach(px => cyl(g, .16, 1.6, 0xf5f5f4, px, .6, -.2, null, 12)); box(g, 3.6, .3, 2.6, 0xd6d3d1, 0, 2.2, -1); box(g, 3.4, 1.6, .2, 0xf5f5f4, 0, .6, -2.1); });
+station('mtn', 38, 19, COL.mtn, 'MTN App · ซ่อมบำรุง', screenTex('MTN App · M0001', COL.mtn, [['แจ้งซ่อม (Work order)', '2 งาน'], ['PM ครั้งถัดไป', 'เดือนหน้า'], ['แบบสำรวจล่าสุด', 'คะแนน 4/5', '#16a34a'], ['ประวัติซ่อม + ค่าใช้จ่าย', 'ครบ']], 'สแกน QR → ข้อมูลเครื่อง'), [28, 30],
+  g => { box(g, 3.0, 1.8, 2.2, 0xf0fdf4, 0, .3, -1.1); box(g, 3.2, .3, 2.4, 0x0f766e, 0, 2.1, -1.1); person(g, 1.7, .6, 0x0f766e, -.5, 0xf97316); });
+// GAD watchtower
+const GAD = grp(scene, 6, 0, -17);
+cyl(GAD, .5, 7, 0x6b7280, 0, 0, 0, null, 12, .35); box(GAD, 2.2, 1.4, 2.2, 0x6d28d9, 0, 7, 0); cyl(GAD, 1.6, .3, 0x4c1d95, 0, 8.4, 0, null, 4);
+plate(GAD, 2.1, .5, '#6d28d9', [['GAD Audit', .6, '#fff']], 0, 7.7, 1.12, { glow: .6 });
+const beamMat = new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+const BEAM = new THREE.Mesh(new THREE.ConeGeometry(4, 16, 32, 1, true), beamMat); BEAM.geometry.translate(0, -8, 0);
+const BEAMG = grp(GAD, 0, 7.6, 0); BEAMG.add(BEAM);
+
+// data packets (code chips) riding the river
+const PK = [];
+const CODES = [['C03_S001_T003', '#1d4ed8'], ['C01_S001_T010', '#0f766e'], ['C02_S002_T001', '#b45309'], ['C04_S002_T001', '#be185d'], ['C06_S012_T001', '#0891b2'], ['C09_S001_T002', '#6d28d9'], ['C03_S003_T001', '#1d4ed8'], ['C08_S002_T001', '#b91c1c']];
+CODES.forEach(([cd, col], i) => {
+  const g = grp(scene); box(g, 1.7, .6, .6, 0, 0, -.3, 0, mat(col, { emissive: new THREE.Color(col), emissiveIntensity: .35 }));
+  plate(g, 1.6, .5, col, [[cd, .5, '#fff']], 0, 0, .31, { glow: .7 }); plate(g, 1.6, .5, col, [[cd, .5, '#fff']], 0, 0, -.31, { glow: .7, ry: Math.PI });
+  PK.push({ g, i, br: i % 2 ? BRB : BRA });
+});
+// today: data islands
+const ISL = grp(scene, 0, 0, 74);
+{ const sea = new THREE.Mesh(new THREE.CircleGeometry(24, 48), lakeMat); sea.rotation.x = -Math.PI / 2; sea.position.y = .06; ISL.add(sea); }
+const ISP = [[-12, -2], [0, 6], [12, -2]], ISN = [['ผู้รับเหมา / PPT', 'Excel · PDF'], ['FAD', 'Oracle (คีย์ใหม่)'], ['MTN', 'แบบสำรวจ / แจ้งซ่อม (คีย์ใหม่)']];
+const PAPERS = [];
+ISP.forEach(([x, z], i) => {
+  cyl(ISL, 5.2, .6, 0xe7d8a8, x, -.2, z, null, 32); cyl(ISL, 4.4, .25, 0x7fb86a, x, .4, z, null, 32);
+  box(ISL, 2.4, 1.6, 1.8, 0xf8fafc, x, .6, z - 1.2); box(ISL, 2.6, .25, 2.0, [0x1d4ed8, 0xb45309, 0x0f766e][i], x, 2.2, z - 1.2);
+  plate(ISL, 4.4, 1.0, ['#1d4ed8', '#b45309', '#0f766e'][i], [[ISN[i][0], .42, '#fff'], [ISN[i][1], .26, '#fff', false]], x, 3.4, z - .2, { glow: .5 });
+  for (let k = 0; k < 6; k++) box(ISL, .7, .06, .5, 0xffffff, x + 1.6, .65 + k * .07, z + .8, null).rotation.y = hash(i * 9 + k) * .4;
+  person(ISL, x - 1.6, z + .9, [0xf59e0b, 0xb45309, 0x0f766e][i], .3);
+});
+// broken bridges
+[[-6, 2, .55], [6, 2, -.55]].forEach(([x, z, ry]) => { const b = grp(ISL, x, .45, z, ry); box(b, 2.2, .12, 1.0, 0x8b5a2b, -1.6, 0, 0); box(b, 2.2, .12, 1.0, 0x8b5a2b, 1.6, 0, 0); });
+for (let i = 0; i < 2; i++) { const p = new THREE.Mesh(new THREE.PlaneGeometry(.9, 1.2), mat(0xffffff, { side: THREE.DoubleSide, emissive: 0xffffff, emissiveIntensity: .3 })); scene.add(p); PAPERS.push(p); }
+const LUMP = box(ISL, 2.2, 1.6, 1.6, 0x6b7280, 2.4, .6, 7, { emissive: 0x111827, emissiveIntensity: .2 });
+// water cycle: clouds + rain
+const CLOUDS = [0, 1].map(i => { const g = grp(scene); for (let k = 0; k < 6; k++) { const s = new THREE.Mesh(new THREE.SphereGeometry(1.1 + hash(k + i * 7) * .7, 16, 12), mat(0xffffff, { roughness: 1, emissive: 0xffffff, emissiveIntensity: .25 })); s.position.set((k - 2.5) * 1.1, hash(k + 3) * .6, hash(k + 5) * .8); g.add(s); } return g; });
+const RAIN = []; for (let i = 0; i < 70; i++) { const d = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .7, 4), mat(0x93c5fd, { emissive: 0x60a5fa, emissiveIntensity: .5 })); scene.add(d); RAIN.push({ d, x: -40 + hash(i) * 16, z: -9 + hash(i + 33) * 14, o: hash(i + 66) }); }
+
+// ───────────── camera ─────────────
+const CAM = {
+  title: [[.01, [8, 44, 66], [2, 0, 2], .01], [14, [-4, 40, 60], [0, 0, 2], 14]],
+  today: [[2.4, [0, 15, 99], [0, .5, 74], 2.4]],
+  today2: [[1.6, [6, 9, 91], [3, 1.2, 77], 1.6]],
+  vision: [[2.6, [-8, 34, 50], [-2, 0, -1], 2.6], [11, [2, 30, 46], [0, 0, -1], 8]],
+  source: [[2.2, [-25, 14, 13], [-28, 4.5, -3], 2.2]],
+  boq: [[1.8, [-17, 7.8, 7.2], [-20.6, 5.0, -1.6], 1.8]],
+  gcp: [[2, [-2, 7, 7], [-7, 2.2, -8], 2]],
+  handover: [[2, [9.5, 4.6, 15], [5, 2.0, 5], 2]],
+  fad: [[1.6, [14, 12, 6], [20, 1, -6], 1.6], [5, [31.5, 6.5, -8.5], [38, 3, -20.5], 3]],
+  mtn: [[1.6, [14, 12, 16], [22, 1, 8], 1.6], [5, [31.5, 6.5, 29.5], [38, 3, 18.5], 3]],
+  loop: [[2, [2, 32, 50], [-2, 3, -2], 2]],
+  gad: [[2, [18, 18, 14], [4, 3, -8], 2]],
+  benefits: [[12, [10, 38, 58], [2, 0, 0], 12]],
+  roadmap: [[12, [-8, 40, 60], [0, 0, 0], 12]],
+  outro: [[12, [8, 46, 68], [2, 0, 2], 12]]
+};
+const KEYS = []; TL.forEach(e => (CAM[e.ph] || []).forEach(([off, p, at, mv]) => KEYS.push({ t: e.start + off, mv, p: new THREE.Vector3(...p), at: new THREE.Vector3(...at) })));
+function camAt(t, pk = 0) { const p = KEYS[0].p.clone(), at = KEYS[0].at.clone(); KEYS.forEach(k => { const e = eio((t - (k.t - k.mv)) / k.mv); if (e > 0) { p.lerp(k.p, e); at.lerp(k.at, e); } });
+  if (pk > 0) { const dir = at.clone().sub(p), right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize(); at.addScaledVector(right, dir.length() * .3 * pk); }
+  camera.position.copy(p); camera.lookAt(at); camera.updateMatrixWorld(true); }
+function project(v) { const q = (v.isVector3 ? v.clone() : new THREE.Vector3(...v)).project(camera); return { x: (q.x + 1) / 2 * W, y: (1 - q.y) / 2 * H, front: q.z < 1 }; }
+const bez = (a, c, b, k) => a.clone().multiplyScalar((1 - k) * (1 - k)).add(c.clone().multiplyScalar(2 * k * (1 - k))).add(b.clone().multiplyScalar(k * k));
+
+// ───────────── mockup screenshots (shots/*.png from render_mockups.js) ─────────────
+const PIP_IN = 2.6;
+const PIP = { source: [['S1-Setup', '01 ตั้งโครงการ (BM / PPT)']], boq: [['S2-BOQ-Small', '02 กรอก BOQ · Mini Big C (ผู้รับเหมา)'], ['S3-BOQ-Big', '03 กรอก BOQ · Big Format (ผู้รับเหมา)']],
+  gcp: [['S4-Bid', '04 เปรียบเทียบราคาและอนุมัติ (GCP)']], handover: [['S5-Handover', '05 ส่งมอบ + ทะเบียนเครื่อง']],
+  fad: [['S6-Accounting', '06 ฝ่ายบัญชีตรวจและตั้งทรัพย์สิน (FAD)']], mtn: [['S7-Live', '07 ใช้งานใน Oracle + MTN App']] };
+const GAL = [['Main', '00 ภาพรวม 6 ขั้น'], ['S1-Setup', '01 ตั้งโครงการ'], ['S2-BOQ-Small', '02 กรอก BOQ · Mini'], ['S3-BOQ-Big', '03 กรอก BOQ · Big'],
+  ['S4-Bid', '04 เปรียบเทียบ + อนุมัติ'], ['S5-Handover', '05 ส่งมอบ + QR'], ['S6-Accounting', '06 ตั้งทรัพย์สิน (FAD)'], ['S7-Live', '07 ใช้งาน (MTN App)']];
+const SHOT = { s1: 'S1-Setup', s2: 'S2-BOQ-Small', s3: 'S4-Bid', s4: 'S5-Handover', fad: 'S6-Accounting', mtn: 'S7-Live' };
+// Update HTML in place: if only style="" values changed, patch styles instead of rebuilding (rebuilding <img> every frame made the screens blink).
+function setHTML(el, html) {
+  const key = html.replace(/ style="[^"]*"/g, '');
+  if (el._k === key) {
+    const tmp = document.createElement('template'); tmp.innerHTML = html;
+    const a = tmp.content.querySelectorAll('*'), b = el.querySelectorAll('*');
+    if (a.length === b.length) { for (let i = 0; i < a.length; i++) { const v = a[i].getAttribute('style'); if (b[i].getAttribute('style') !== v) { if (v == null) b[i].removeAttribute('style'); else b[i].setAttribute('style', v); } } return; }
+  }
+  el._k = key; el.innerHTML = html;
+}
+function drawPip(seg, lt, pk) {
+  const el = $('pip'), L2 = PIP[seg.ph];
+  if (!L2 || pk < .01) { el.style.display = 'none'; return; }
+  const n = L2.length, span = (seg.dur - PIP_IN) / n, idx = Math.min(n - 1, Math.floor((lt - PIP_IN) / span));
+  const xf = n > 1 && idx > 0 ? ss((lt - PIP_IN - idx * span) / .6) : 1;
+  el.style.display = 'block'; el.style.opacity = pk; el.style.transform = `translateX(${((1 - pk) * 80).toFixed(1)}px)`;
+  setHTML(el, `<div class="cap">${L2[idx][1]}<span>หน้าจอตัวอย่าง · Mockup</span></div><div class="im">` +
+    (idx > 0 ? `<img src="shots/pip/${L2[idx - 1][0]}.png" style="opacity:${(1 - xf).toFixed(3)}">` : '') + `<img src="shots/pip/${L2[idx][0]}.png" style="opacity:${xf.toFixed(3)}"></div>`);
+}
+
+// ───────────── frame ─────────────
+window.renderAt = function (t) {
+  T = t;
+  const seg = TL.find(e => t >= e.start && t < e.start + e.dur) || TL[TL.length - 1], ph = seg.ph, lt = t - seg.start;
+  const pk = PIP[ph] ? ss((lt - PIP_IN) / .6) * ss((seg.dur - lt - .2) / .5) : 0;
+  camAt(t, pk);
+  const CO = []; const co = (h, cls, p, a, dx = 0, dy = 0) => { if (a > .01) CO.push([h, cls, p, a, dx, dy]); };
+
+  // river fills from the spring during 'vision' (before that the valley is dry)
+  const fillMain = AFTER('vision') ? eio((L('vision') - F('vision', .1)) / 3.2) : (IN('title') ? 1 : 0);
+  const fillBr = AFTER('vision') ? eio((L('vision') - F('vision', .1) - 3.0) / 1.6) : (IN('title') ? 1 : 0);
+  RMAIN.geometry.setDrawRange(0, Math.floor(fillMain * RMAIN.userData.n) * 6);
+  RA.geometry.setDrawRange(0, Math.floor(fillBr * RA.userData.n) * 6); RB.geometry.setDrawRange(0, Math.floor(fillBr * RB.userData.n) * 6);
+  const lk = AFTER('vision') ? A('vision', F('vision', .1) + 4.4, 1) : (IN('title') ? 1 : 0);
+  LAKE_A.scale.setScalar(Math.max(lk, .001)); LAKE_B.scale.setScalar(Math.max(lk, .001));
+  waterTex.offset.y = -t * .35;
+  // stations glow when it is their turn
+  const turn = { source: 's1', boq: 's2', gcp: 's3', handover: 's4', fad: 'fad', mtn: 'mtn' }[ph];
+  Object.entries(ST).forEach(([k, s]) => { if (s.ring) s.ring.emissiveIntensity = k === turn ? .6 + .5 * Math.sin(t * 5) : .2; });
+  // packets flow once the river exists
+  const flow = AFTER('vision') && !AFTER('benefits') ? A('vision', F('vision', .1) + 3.5, 1) : 0;
+  PK.forEach(p => {
+    const s = (t * .045 + p.i / PK.length) % 1;
+    let pos; if (s < .62) pos = MAIN.getPointAt(s / .62); else pos = p.br.getPointAt((s - .62) / .38);
+    p.g.position.set(pos.x, pos.y + .75 + .12 * Math.sin(t * 3 + p.i), pos.z);
+    const tg = (s < .62 ? MAIN.getTangentAt(s / .62) : p.br.getTangentAt((s - .62) / .38)); p.g.rotation.y = Math.atan2(-tg.z, tg.x);
+    const edge = ss(s / .04) * ss((1 - s) / .05); p.g.scale.setScalar(Math.max(flow * edge, .001)); p.g.visible = flow * edge > .01;
+  });
+  // handover: QR blink + technician turns
+  if (ST.qr) ST.qr.material.emissiveIntensity = IN('handover') ? .6 + .5 * A('handover', F('handover', .25), .3) * (.5 + .5 * Math.sin(t * 8)) : .6;
+  // today: papers re-keyed island to island
+  PAPERS.forEach((p, i) => {
+    const off = F('today', .35) + i * 2.2, k = IN('today') ? eio((L('today') - off) / 1.6) : 0;
+    p.visible = IN('today') && k > 0 && k < 1;
+    const a = new THREE.Vector3(ISP[i][0] + 1.6, 1.2, 74 + ISP[i][1] + .8), b = new THREE.Vector3(ISP[i + 1][0] + 1.6, 1.2, 74 + ISP[i + 1][1] + .8);
+    p.position.copy(bez(a, new THREE.Vector3((a.x + b.x) / 2, 6, (a.z + b.z) / 2), b, k)); p.rotation.set(-.3, t * 2, 0);
+  });
+  LUMP.scale.setScalar(IN('today2') ? Math.max(back(A('today2', F('today2', .1), .6)), .001) : .001); LUMP.visible = IN('today2');
+  // water cycle
+  const cyc = IN('loop');
+  CLOUDS.forEach((c, i) => {
+    const lake = i ? LAKE_B.position : LAKE_A.position;
+    const up = A('loop', F('loop', .05), 1.6), go = A('loop', F('loop', .05) + 1.8, 3.4), gone = A('loop', SEG.loop.dur - 1.2, 1);
+    const p0 = new THREE.Vector3(lake.x, .5 + 9 * up, lake.z), p1 = new THREE.Vector3(-30 + i * 4, 15, -2 + i * 3);
+    c.position.copy(p0.clone().lerp(p1, eio(go))); c.scale.setScalar(Math.max(up * (1 - gone), .001)); c.visible = cyc && up > .01;
+  });
+  const rain = cyc ? A('loop', F('loop', .05) + 5.0, .6) * (1 - A('loop', SEG.loop.dur - 1.2, 1)) : 0;
+  RAIN.forEach(r => { const f = (t * .9 + r.o) % 1; r.d.position.set(r.x, lerp(14, ground(r.x, r.z) + .3, f), r.z); r.d.visible = rain > .05; r.d.scale.y = Math.max(rain, .001); });
+  // GAD beam
+  beamMat.opacity = IN('gad') ? .4 * A('gad', .8, .8) : 0; BEAMG.rotation.set(.95, t * 1.1, 0);
+
+  // ── callouts ──
+  const STP = id => [ST[id].x, ST[id].y + 6.2, ST[id].z];
+  if (ph === 'today') {
+    co('คีย์ใหม่ ⌨', 'bad', [-6, 2.6, 76], A('today', F('today', .35) + 1.3, .3)); co('คีย์ใหม่ ⌨', 'bad', [6, 2.6, 76], A('today', F('today', .35) + 3.5, .3));
+    co('สะพานขาด ✕', 'bad', [-6, .6, 76], A('today', F('today', .75), .3), 0, 70); co('สะพานขาด ✕', 'bad', [6, .6, 76], A('today', F('today', .8), .3), 0, 70);
+  }
+  if (ph === 'today2') {
+    co('ทรัพย์สินเป็นยอดก้อน <small>ไม่รู้มูลค่ารายเครื่อง</small>', 'bad big', [2.4, 2.4, 81], A('today2', F('today2', .15), .4));
+    co('งานซ่อมไม่ผูกกับทรัพย์สิน ❓', 'bad', [12, 3.0, 72], A('today2', F('today2', .65), .4));
+  }
+  if (ph === 'vision') { co('ต้นน้ำ <small>BOQ App</small>', 'up big', [-34, 9.5, 0], A('vision', F('vision', .2), .4)); co('ปลายน้ำ 1 <small>FAD / Oracle FA</small>', 'fad', [31, 1.5, -14.5], A('vision', F('vision', .1) + 4.6, .4)); co('ปลายน้ำ 2 <small>MTN App</small>', 'mtn', [31, 1.5, 12.5], A('vision', F('vision', .1) + 4.9, .4)); }
+  if (ph === 'source') co('แบบฟอร์ม BOQ มาตรฐาน <small>รหัสหมวดหมู่ใส่ไว้แล้ว</small>', 'up', STP('s1'), A('source', F('source', .5), .4));
+  if (ph === 'boq') { co('รหัสครบ 100% ✓', 'good', STP('s2'), A('boq', F('boq', .35), .4), -150, 0); co('เทียบราคาอ้างอิง <small>จากโครงการก่อน</small>', 'up', STP('s2'), A('boq', F('boq', .7), .4), 170, 0); }
+  if (ph === 'gcp') co('PR / PO ใช้รหัสเดียวกัน', 'info', STP('s3'), A('gcp', F('gcp', .6), .4));
+  if (ph === 'handover') co('สแกน QR → ทะเบียนเครื่อง', 'mtn', [ST.s4.x + 1, ST.s4.y + 1.6, ST.s4.z - .4], A('handover', F('handover', .3), .4), 0, -10);
+  if (ph === 'fad') { co('ปันส่วนอัตโนมัติ <small>ท่อ สายไฟ ค่าดำเนินการ → เครื่อง</small>', 'fad', STP('fad'), A('fad', F('fad', .35), .4), -200, 0); co('ทรัพย์สิน = BOQ + PO ✓', 'good', STP('fad'), A('fad', F('fad', .75), .4), 190, 0); }
+  if (ph === 'mtn') { co('แจ้งซ่อม · PM · แบบสำรวจ', 'mtn', STP('mtn'), A('mtn', F('mtn', .4), .4), -180, 0); co('QR ดวงเดียว', 'good', STP('mtn'), A('mtn', F('mtn', .75), .4), 170, 0); }
+  if (ph === 'loop') {
+    CLOUDS.forEach((c, i) => co(['ค่าซ่อมจริง · อายุเครื่อง', 'คะแนนสภาพ · ประวัติ PM'][i], 'loop', [c.position.x, c.position.y + 2.2, c.position.z], (i ? 1 : 1) * A('loop', F('loop', .05) + 1.2, .4) * (1 - A('loop', F('loop', .05) + 5.2, .4)), i ? 150 : -150, 0));
+    co('ปรับแบบฟอร์ม · สเปก · ราคาอ้างอิง', 'up big', [-30, 10, -2], A('loop', F('loop', .05) + 5.4, .4));
+  }
+  if (ph === 'gad') co('ประวัติในระบบทุกขั้น <small>BOQ ที่อนุมัติ → PO → ทะเบียนเครื่อง → Oracle</small>', 'gad big', [6, 10, -17], A('gad', F('gad', .3), .4));
+  setHTML($('callouts'), CO.map(([h, cls, p, a, dx, dy]) => { const s = project(p); if (!s.front) return ''; return `<div class="co ${cls}" style="left:${(s.x + dx).toFixed(1)}px;top:${(s.y + dy).toFixed(1)}px;opacity:${a.toFixed(3)}">${h}</div>`; }).join(''));
+
+  const chapCol = { today: '#b91c1c', today2: '#b91c1c', source: COL.up, boq: COL.up, gcp: COL.mid, handover: COL.mid, fad: COL.fad, mtn: COL.mtn, loop: COL.loop, gad: COL.gad }[ph] || '#64748b';
+  $('chap').style.display = seg.chapter ? 'block' : 'none'; $('chap').textContent = seg.chapter; $('chap').style.borderLeftColor = chapCol;
+  drawOverlay(seg, lt); drawPip(seg, lt, pk);
+  $('sub').textContent = seg.say; $('sub').style.opacity = ss(lt / .4) * ss((seg.dur - lt) / .3);
+  const total = TL[TL.length - 1].start + TL[TL.length - 1].dur;
+  $('fade').style.opacity = Math.max(1 - ss(t / .8), ss((t - (total - 1.2)) / 1.0));
+  renderer.render(scene, camera);
+};
+
+function drawOverlay(seg, lt) {
+  const ov = $('ov'), ph = seg.ph, a = ss(lt / .5) * ss((seg.dur - lt) / .5);
+  const show = n => ss((lt - n) / .4), tr = n => `opacity:${show(n).toFixed(3)};transform:translateY(${((1 - show(n)) * 24).toFixed(1)}px)`;
+  let h = '';
+  if (ph === 'title') h = `<h1>BOQ App · MTN Suite</h1><h2>วิสัยทัศน์: ข้อมูลไหลจากต้นน้ำถึงปลายน้ำ</h2><p>BOQ (ต้นน้ำ) → GCP → ส่งมอบ → FAD / Oracle FA และ MTN App (ปลายน้ำ)</p><p style="font-size:16px;opacity:.7;margin-top:14px">ฝ่ายบริหารอาคาร · ร่างวิสัยทัศน์เพื่อหารือ</p>`;
+  else if (ph === 'benefits') {
+    const tl = [['⌨️', 'คีย์ครั้งเดียว', 'ผู้รับเหมากรอกครั้งเดียว ทุกฝ่ายใช้ข้อมูลชุดเดียวกัน', COL.up, .1], ['🏷️', 'ทรัพย์สินรายเครื่อง', 'มูลค่าต่อเครื่องรวมค่าท่อและค่าดำเนินการ', COL.fad, .3], ['🔧', 'ซ่อมผูกทรัพย์สิน', 'ประวัติซ่อมและค่าใช้จ่ายอยู่กับ QR ของเครื่อง', COL.mtn, .5], ['🔍', 'ตรวจสอบได้', 'GAD เห็นประวัติทุกขั้นในระบบ', COL.gad, .7]];
+    h = `<h2>ประโยชน์</h2><div class="tiles">` + tl.map(([ic, b, s, c, f]) => `<div class="tile" style="border-color:${c};${tr(F(ph, f))}"><div class="ic">${ic}</div><b>${b}</b><span>${s}</span></div>`).join('') + `</div>`;
+  } else if (ph === 'roadmap') {
+    const st = [['ระยะ 1', 'BOQ Template Mini Big C', 'แบบฟอร์มมีรหัสทุกบรรทัด + ดัชนีหมวด (Class Index)', COL.up, .05], ['ระยะ 2', 'เทียบราคา + ส่งมอบ QR', 'GCP อนุมัติในแอป · ช่างสแกน QR ทะเบียนเครื่อง', COL.mid, .3], ['ระยะ 3', 'เชื่อม FAD + MTN App', 'ปันส่วนและส่ง Oracle FA · เครื่องขึ้น MTN App', COL.fad, .55], ['ระยะ 4', 'ข้อมูลไหลกลับ', 'ค่าซ่อม อายุ คะแนนสภาพ → ปรับสเปกและราคา', COL.loop, .8]];
+    h = `<h2>ลำดับการพัฒนาที่เสนอ</h2><p style="font-size:16px;opacity:.75">ยังไม่กำหนดเวลา · ร่างเพื่อหารือกับ GCP, FAD, EGD และ GAD</p><div class="road">` + st.map(([n, b, s, c, f]) => `<div class="ph" style="border-top-color:${c};${tr(F(ph, f))}"><div class="n">${n}</div><b>${b}</b><span>${s}</span></div>`).join('') + `</div>`;
+  } else if (ph === 'gallery') {
+    h = `<h2>ตัวอย่างหน้าจอ BOQ App · 8 หน้า</h2><p style="font-size:16px;opacity:.75">Mockup จากตัวเลข BOQ จริง (สุขสวัสดิ์ 30, Food Place อุดมสุข) · ร่างเพื่อหารือ</p><div class="gal">` +
+      GAL.map(([f, c], i) => `<div class="gi" style="${tr(.6 + i * .45)}"><img src="shots/thumb/${f}.png"><div>${c}</div></div>`).join('') + `</div>`;
+  } else if (ph === 'outro') {
+    h = `<h1>หนึ่งรหัส หนึ่งสายน้ำ</h1><div class="flow">` + [['BOQ App', COL.up], ['GCP', COL.mid], ['ส่งมอบ QR', COL.mid], ['FAD · Oracle', COL.fad], ['MTN App', COL.mtn]].map(([n, c], i) => (i ? '<span style="opacity:.7">→</span>' : '') + `<span class="k" style="background:${c};${tr(.6 + i * .3)}">${n}</span>`).join('') + `</div><p style="margin-top:18px;${tr(2.4)}">MTN Suite · ฝ่ายบริหารอาคาร</p>`;
+  }
+  if (!h) { ov.style.display = 'none'; return; }
+  ov.style.display = 'block'; ov.style.opacity = a; setHTML(ov, `<div class="ovbg"></div><div class="ovw">${h}</div>`);
+}
+{ const loader = new THREE.TextureLoader();
+  const jobs = Object.entries(SHOT).map(([id, n]) => new Promise(res => loader.load('shots/' + n + '.png', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; ST[id].sm.map = t; ST[id].sm.emissiveMap = t; ST[id].sm.needsUpdate = true; res(); }, undefined, () => res())));
+  GAL.forEach(([n]) => jobs.push(new Promise(res => { const im = new Image(); im.onload = im.onerror = res; im.src = 'shots/thumb/' + n + '.png'; })));
+  Object.values(PIP).flat().forEach(([n]) => jobs.push(new Promise(res => { const im = new Image(); im.onload = im.onerror = res; im.src = 'shots/pip/' + n + '.png'; })));
+  Promise.all(jobs).then(() => { window.READY = true; }); }
+</script>
+</body></html>

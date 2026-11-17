@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCTV System Survey Report</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        .glass-panel { background: rgba(255,255,255,.95); border: 1px solid rgba(226,232,240,.8); box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
+        .loader { border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #0f766e; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .detail-row { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .detail-label { font-size: .75rem; font-weight: 600; color: #64748b; min-width: 130px; }
+        .detail-value { font-size: .85rem; color: #1e293b; }
+        .tab-on { background: #0f766e; color: #fff; }
+        th { white-space: nowrap; }
+    </style>
+    <?!= includeTailwindCss_() ?>
+</head>
+<body class="text-slate-800 antialiased">
+    <?!= include('ArchiveToggle') ?>
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap justify-between gap-2 py-3">
+            <div class="flex items-center gap-4">
+                <a href="<?= ScriptApp.getService().getUrl() ?>" target="_top" class="text-slate-500 p-2 rounded-lg hover:bg-slate-50" title="กลับหน้าหลัก">🏠</a>
+                <div class="h-8 w-1 bg-teal-700 rounded-full"></div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">🎥 รายงานตรวจสอบระบบกล้องวงจรปิด (CCTV System)</h1>
+                    <p class="text-xs text-slate-500 font-medium">LP เสีย / รอซ่อม → MTN ตรวจหน้างาน (ซ่อมได้ / ต้องซื้อใหม่) → CMS ใหม่ · เทียบ CMS Dashboard</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <div class="loader" id="mainLoader"></div>
+                <a href="<?= MANUALS_URL ?>?page=csys-manual" target="_blank" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50">📖 คู่มือ</a>
+                <? if (CSYS_VIDEO_ID) { ?><a href="https://drive.google.com/file/d/<?= CSYS_VIDEO_ID ?>/view" target="_blank" class="px-3 py-1.5 text-sm font-medium text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-50">🎬 วิดีโอ</a><? } ?>
+                <button onclick="openLpModal()" class="px-3 py-1.5 text-sm font-medium text-teal-800 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100">📋 LP Register</button>
+                <button onclick="downloadToExcel(this)" class="px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100">⬇ Export Excel</button>
+                <button onclick="loadAll()" class="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50">↻ Refresh</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div id="srcNote" class="text-xs text-slate-500"></div>
+        <div class="grid grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="glass-panel p-4 rounded-xl border-l-4 border-red-500"><p class="text-xs font-semibold text-slate-500 mb-1">LP แจ้งเสีย / รอซ่อม</p><h3 class="text-3xl font-bold text-red-600" id="stLp">0</h3><p class="text-[11px] text-slate-400" id="stLpSub"></p></div>
+            <div class="glass-panel p-4 rounded-xl border-l-4 border-teal-600"><p class="text-xs font-semibold text-slate-500 mb-1">สาขาที่ MTN ตรวจแล้ว</p><h3 class="text-3xl font-bold text-teal-700" id="stSurv">0</h3><p class="text-[11px] text-slate-400" id="stSurvSub"></p></div>
+            <div class="glass-panel p-4 rounded-xl border-l-4 border-slate-500"><p class="text-xs font-semibold text-slate-500 mb-1">ผลตรวจ (ชิ้น)</p><h3 class="text-3xl font-bold" id="stQ">0</h3><p class="text-[11px] text-slate-500" id="stQSub"></p></div>
+            <div class="glass-panel p-4 rounded-xl border-l-4 border-blue-600"><p class="text-xs font-semibold text-slate-500 mb-1">OPEX ซ่อม (ประมาณการ)</p><h3 class="text-2xl font-bold text-blue-700"><span id="stOpex">0</span> <span class="text-sm">฿</span></h3><p class="text-[11px] text-slate-400" id="stOpexSub"></p></div>
+            <div class="glass-panel p-4 rounded-xl border-l-4 border-rose-600"><p class="text-xs font-semibold text-slate-500 mb-1">CAPEX เปลี่ยนใหม่</p><h3 class="text-2xl font-bold text-rose-700"><span id="stCapex">0</span> <span class="text-sm">฿</span></h3><p class="text-[11px] text-slate-400" id="stCapexSub"></p></div>
+            <div class="glass-panel p-4 rounded-xl border-l-4 border-amber-500"><p class="text-xs font-semibold text-slate-500 mb-1">CMS ใหม่ที่เปิดแล้ว</p><h3 class="text-3xl font-bold text-amber-700" id="stCms">0</h3><p class="text-[11px] text-slate-400" id="stCmsSub"></p></div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+            <button id="tab-x" onclick="showView('x')" class="tab-on px-4 py-2 rounded-lg text-sm font-semibold border border-teal-700">🔀 LP × สำรวจ × CMS</button>
+            <button id="tab-items" onclick="showView('items')" class="px-4 py-2 rounded-lg text-sm font-semibold border border-teal-700 text-teal-800 bg-white">🔧 รายการซ่อม / เปลี่ยน</button>
+            <button id="tab-recs" onclick="showView('recs')" class="px-4 py-2 rounded-lg text-sm font-semibold border border-teal-700 text-teal-800 bg-white">📝 แบบสำรวจ</button>
+        </div>
+
+        <!-- Cross-reference -->
+        <div id="view-x" class="space-y-3">
+            <div class="glass-panel p-3 rounded-xl grid grid-cols-1 md:grid-cols-5 gap-2">
+                <input type="text" id="xSearch" placeholder="ค้นหา รหัส / ชื่อสาขา..." class="md:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="renderX()">
+                <select id="xBu" onchange="renderX()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"><option value="">ทุก BU</option></select>
+                <select id="xFlag" onchange="renderX()" class="md:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="">ทุกสาขา</option>
+                    <option value="lpNotSurv">LP แจ้งเสีย แต่ MTN ยังไม่ตรวจ</option>
+                    <option value="wait">มีรายการรอ MTN สรุป (ตาม LP)</option>
+                    <option value="surv">ตรวจแล้ว</option>
+                    <option value="cmsMissing">ตรวจแล้ว ต้องซ่อม/เปลี่ยน แต่ยังไม่มีเลข CMS ใหม่</option>
+                    <option value="citedCancel">CMS ที่ LP อ้าง ถูกยกเลิก</option>
+                    <option value="cmsCancel">มีงาน CMS CCTV/EAS ถูกยกเลิก (180 วัน)</option>
+                    <option value="noLpCms">มีงาน CMS ค้าง แต่ไม่อยู่ในรายการ LP</option>
+                </select>
+            </div>
+            <div class="glass-panel rounded-xl overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-xs">
+                        <tr>
+                            <th class="px-3 py-2 text-left">สาขา (รหัส LP/CMS)</th>
+                            <th class="px-3 py-2 text-left">LP เสีย / รอซ่อม</th>
+                            <th class="px-3 py-2 text-right">รอ MTN</th>
+                            <th class="px-3 py-2 text-left">CMS ที่ LP อ้าง<br><span class="font-normal">ค้าง / ปิด / ยกเลิก / ไม่พบ</span></th>
+                            <th class="px-3 py-2 text-left">CMS CCTV/EAS 180 วัน<br><span class="font-normal">ค้าง / ยกเลิก</span></th>
+                            <th class="px-3 py-2 text-left">ผลตรวจ MTN<br><span class="font-normal">ได้ / ซ่อม / ใหม่ / ไม่พบ</span></th>
+                            <th class="px-3 py-2 text-right">OPEX ฿</th>
+                            <th class="px-3 py-2 text-right">CAPEX ฿</th>
+                            <th class="px-3 py-2 text-left">CMS ใหม่</th>
+                        </tr>
+                    </thead>
+                    <tbody id="xBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+            <p class="text-[11px] text-slate-400">"รอ MTN" = รายการที่ LP ระบุว่ารอ MTN สรุป / ยืนยัน · CMS ที่ LP อ้าง = เลขในคอลัมน์ "สถานะ CMS" ของไฟล์ LP ที่ค้นเจอใน CMS Dashboard · CMS ที่ถูกยกเลิก (รวมยกเลิกอัตโนมัติ 7 วัน) ไม่ได้แปลว่าซ่อมแล้ว</p>
+        </div>
+
+        <!-- Item-level -->
+        <div id="view-items" class="hidden space-y-3">
+            <div class="glass-panel p-3 rounded-xl grid grid-cols-1 md:grid-cols-6 gap-2">
+                <input type="text" id="iSearch" placeholder="ค้นหา สาขา / ตำแหน่ง / อาการ..." class="md:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="renderItems()">
+                <select id="iType" onchange="renderItems()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"><option value="">ทุกอุปกรณ์</option></select>
+                <select id="iRes" onchange="renderItems()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="action">ต้องซ่อม / เปลี่ยน</option><option value="fix">มีซ่อมได้ (OPEX)</option><option value="new">มีเปลี่ยนใหม่ (CAPEX)</option><option value="over">OPEX เกิน 5,000 ฿</option><option value="nocms">ยังไม่มีเลข CMS ใหม่</option><option value="">ทั้งหมด</option>
+                </select>
+                <select id="iFmt" onchange="renderItems()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"><option value="">ทุก Format</option></select>
+                <span id="iCount" class="text-sm text-slate-500 self-center"></span>
+            </div>
+            <div class="glass-panel rounded-xl overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-xs">
+                        <tr><th class="px-3 py-2 text-left">สาขา</th><th class="px-3 py-2 text-left">อุปกรณ์ / ตำแหน่ง</th><th class="px-3 py-2 text-right">จำนวน</th><th class="px-3 py-2 text-left">ได้ / ซ่อม / ใหม่ / ไม่พบ</th>
+                            <th class="px-3 py-2 text-left">วิธีซ่อม</th><th class="px-3 py-2 text-right">OPEX ฿</th><th class="px-3 py-2 text-right">CAPEX ฿</th><th class="px-3 py-2 text-left">CMS ใหม่</th><th class="px-3 py-2 text-left">LP</th></tr>
+                    </thead>
+                    <tbody id="iBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Records -->
+        <div id="view-recs" class="hidden space-y-3">
+            <div class="glass-panel p-3 rounded-xl flex flex-wrap gap-3 items-center">
+                <input type="text" id="rSearch" placeholder="ค้นหา รหัส / ชื่อสาขา / ผู้ตรวจ..." class="flex-1 min-w-[200px] border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="renderRecs()">
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="latestOnly" checked onchange="renderRecs()"> ล่าสุด/สาขา</label>
+            </div>
+            <div class="glass-panel rounded-xl overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500 text-xs">
+                        <tr><th class="px-3 py-2 text-left">สาขา</th><th class="px-3 py-2 text-left">วัตถุประสงค์</th><th class="px-3 py-2 text-right">กล้อง ทั้งหมด/ได้/เสีย</th><th class="px-3 py-2 text-right">เก็บภาพ (วัน)</th><th class="px-3 py-2 text-right">เกณฑ์ NG</th>
+                            <th class="px-3 py-2 text-left">ผลตรวจ ได้/ซ่อม/ใหม่/ไม่พบ</th><th class="px-3 py-2 text-right">OPEX ฿</th><th class="px-3 py-2 text-right">CAPEX ฿</th><th class="px-3 py-2 text-left">ผู้ตรวจ / วันที่</th></tr>
+                    </thead>
+                    <tbody id="rBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Record modal -->
+    <div id="detailModal" class="hidden fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40">
+        <div class="bg-white w-full md:max-w-5xl md:rounded-2xl rounded-t-2xl max-h-[94dvh] flex flex-col shadow-2xl">
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">รายละเอียดผลตรวจระบบ CCTV</h3><button onclick="closeModal()" class="text-slate-400 text-xl">✕</button></div>
+            <div class="p-5 overflow-y-auto" id="modalBody"></div>
+            <div class="px-5 py-3 border-t flex flex-wrap justify-between gap-2">
+                <button id="deleteBtn" onclick="deleteRecord()" class="hidden text-red-600 text-sm font-semibold hover:underline">ลบรายการ</button>
+                <div class="flex flex-wrap gap-2 ml-auto">
+                    <button onclick="closeModal()" class="px-4 py-2 text-sm border border-slate-300 rounded-lg">ปิด</button>
+                    <button id="saveBtn" onclick="saveRecord()" class="hidden px-4 py-2 text-sm font-semibold text-teal-800 bg-white border border-teal-700 rounded-lg hover:bg-teal-50">บันทึกหมายเหตุ</button>
+                    <button id="cmsBtn" onclick="saveCms()" class="hidden px-4 py-2 text-sm font-bold text-white bg-teal-700 rounded-lg hover:bg-teal-800">✔ บันทึกเลข CMS</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LP register modal -->
+    <div id="lpModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl">
+            <div class="px-5 py-3 border-b flex justify-between items-center"><h3 class="font-bold">📋 LP Register (ไฟล์อุปกรณ์ LP)</h3><button onclick="document.getElementById('lpModal').classList.add('hidden')" class="text-slate-400 text-xl">✕</button></div>
+            <div class="p-5 space-y-3 text-sm" id="lpBody">กำลังโหลด...</div>
+        </div>
+    </div>
+
+    <script>
+        let CS = null, OV = null, recs = [], items = [], currentRecord = null, currentId = null, cmsLookup = {};
+        let isAdmin = false, canEditAll = false, _userEmail = '';
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+        function fmt(n) { return Math.round(num(n)).toLocaleString(); }
+        function fdate(ts) { const d = new Date(ts); return isNaN(d) ? '-' : d.toLocaleString('en-GB', { year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }); }
+        function typeLabel(k) { const t = CS && CS.types.find(function(x) { return x.k === k; }); return t ? t.l : (k || '-'); }
+        function split(a, b, c, d) { return '<span class="text-emerald-700">' + num(a) + '</span> / <span class="text-blue-700 font-semibold">' + num(b) + '</span> / <span class="text-red-700 font-semibold">' + num(c) + '</span> / <span class="text-slate-500">' + num(d) + '</span>'; }
+        function cmsBadge(no, st) {
+            if (!no) return '';
+            const c = /ยกเลิก/.test(st) ? 'bg-red-100 text-red-700' : /ปิดงาน/.test(st) ? 'bg-emerald-100 text-emerald-700' : st && !/ยังไม่เข้า/.test(st) ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500';
+            return '<span class="inline-block text-[11px] px-1.5 rounded font-mono ' + c + '">' + esc(no) + (st ? ' · ' + esc(st) : '') + '</span>';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); if (u && localStorage.getItem('app_auth_token')) _userEmail = u.email || ''; } catch (e) {}
+            loadAll();
+            if (_userEmail) google.script.run.withSuccessHandler(function(f) {
+                if (!f) return;
+                isAdmin = !!(f.isAdmin || f.isScheduleAdmin); canEditAll = isAdmin || !!f.smfEditAllowed || !!f.opsEditAllowed;
+                document.getElementById('deleteBtn').classList.toggle('hidden', !isAdmin);
+            }).getUserFlags(_userEmail);
+        });
+
+        // Three independent loads; each renders its own view when it lands.
+        let _gen = 0;
+        function loadAll() {
+            const g = ++_gen; let pending = 3;
+            const done = function() { if (--pending === 0 && g === _gen) document.getElementById('mainLoader').classList.add('hidden'); };
+            document.getElementById('mainLoader').classList.remove('hidden');
+            const call = function(fn, onOk, tries) {
+                google.script.run.withSuccessHandler(function(res) {
+                    if (g !== _gen) return;
+                    if (!res && tries < 3) { setTimeout(function() { call(fn, onOk, tries + 1); }, 1500); return; }
+                    if (!res || !res.success) { alert('โหลดข้อมูลไม่สำเร็จ (' + fn + '): ' + (res && res.error)); done(); return; }
+                    onOk(res); done();
+                }).withFailureHandler(function(err) { if (g === _gen) { alert('Error (' + fn + '): ' + err.message); done(); } })[fn](window.ARCHIVE_ON);
+            };
+            call('getCctvSysOverview', function(res) { OV = res; fillFilters(); renderX(); renderStats(); }, 0);
+            call('getCctvSysSurveyList', function(res) { CS = res.csConfig; recs = res.data || []; fillFilters(); renderRecs(); }, 0);
+            call('getCctvSysItemRows', function(res) { CS = CS || res.csConfig; items = res.rows || []; fillFilters(); renderItems(); renderStats(); }, 0);
+        }
+        function fillFilters() {
+            if (OV) {
+                const bus = Array.from(new Set(OV.rows.map(function(r) { return r.bu; }).filter(Boolean))).sort(), sel = document.getElementById('xBu'), cur = sel.value;
+                sel.innerHTML = '<option value="">ทุก BU</option>' + bus.map(function(b) { return '<option' + (b === cur ? ' selected' : '') + '>' + esc(b) + '</option>'; }).join('');
+                document.getElementById('srcNote').innerHTML = '📋 LP Register: ' + esc(OV.lpFile || '') + ' ณ <b>' + esc(OV.lpAsOf) + '</b>' + (OV.lpSource === 'upload' ? ' (อัปโหลด)' : ' (built-in)') +
+                    ' · 🛠️ CMS Dashboard: ' + fmt(OV.cmsRows) + ' งาน CCTV/EAS ณ ' + esc(OV.cmsAsOf) + (OV.cmsError ? ' <span class="text-red-600">⚠️ ' + esc(OV.cmsError) + '</span>' : '');
+            }
+            if (CS) {
+                const t = document.getElementById('iType'), cur = t.value;
+                t.innerHTML = '<option value="">ทุกอุปกรณ์</option>' + CS.types.map(function(x) { return '<option value="' + x.k + '"' + (x.k === cur ? ' selected' : '') + '>' + esc(x.l) + '</option>'; }).join('');
+            }
+            const fs = Array.from(new Set(items.map(function(r) { return String(r.fmt || ''); }).filter(Boolean))).sort(), f = document.getElementById('iFmt'), fc = f.value;
+            f.innerHTML = '<option value="">ทุก Format</option>' + fs.map(function(x) { return '<option' + (x === fc ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
+        }
+        function showView(v) {
+            ['x', 'items', 'recs'].forEach(function(k) {
+                document.getElementById('view-' + k).classList.toggle('hidden', k !== v);
+                const b = document.getElementById('tab-' + k);
+                b.classList.toggle('tab-on', k === v); b.classList.toggle('bg-white', k !== v); b.classList.toggle('text-teal-800', k !== v);
+            });
+        }
+        function renderStats() {
+            if (OV) {
+                const lpRows = OV.rows.filter(function(r) { return r.lpBroken > 0; });
+                const surv = OV.rows.filter(function(r) { return r.survey; });
+                document.getElementById('stLp').textContent = fmt(lpRows.reduce(function(a, r) { return a + r.lpBroken; }, 0));
+                document.getElementById('stLpSub').textContent = lpRows.length + ' สาขา · รอ MTN ' + fmt(lpRows.reduce(function(a, r) { return a + r.lpWait; }, 0)) + ' ชิ้น';
+                document.getElementById('stSurv').textContent = surv.length;
+                document.getElementById('stSurvSub').textContent = 'จากสาขาที่ LP แจ้ง ' + lpRows.filter(function(r) { return r.survey; }).length + ' / ' + lpRows.length;
+            }
+            const s = function(k) { return items.reduce(function(a, r) { return a + num(r[k]); }, 0); };
+            document.getElementById('stQ').textContent = fmt(s('q'));
+            document.getElementById('stQSub').innerHTML = 'ได้ ' + fmt(s('qOk')) + ' · <b class="text-blue-700">ซ่อม ' + fmt(s('qFix')) + '</b> · <b class="text-red-700">ใหม่ ' + fmt(s('qNew')) + '</b> · ไม่พบ ' + fmt(s('qNone'));
+            document.getElementById('stOpex').textContent = fmt(s('repair'));
+            document.getElementById('stOpexSub').textContent = 'เกิน ' + fmt(CS ? CS.opexLimit : 5000) + ' ฿: ' + items.filter(function(r) { return r.repair > (CS ? CS.opexLimit : 5000); }).length + ' รายการ';
+            document.getElementById('stCapex').textContent = fmt(s('capex'));
+            document.getElementById('stCapexSub').textContent = 'ใช้ของจากสาขาปิด ' + fmt(items.reduce(function(a, r) { return a + (r.reuse ? r.qNew : 0); }, 0)) + ' ชิ้น';
+            const need = items.filter(function(r) { return r.needCms; });
+            document.getElementById('stCms').textContent = need.filter(function(r) { return r.newCms; }).length + ' / ' + need.length;
+            document.getElementById('stCmsSub').textContent = 'รายการที่ต้องเปิด CMS';
+        }
+
+        function xMatch(r, flag) {
+            const sv = r.survey;
+            switch (flag) {
+                case 'lpNotSurv': return r.lpBroken > 0 && !sv;
+                case 'wait': return r.lpWait > 0;
+                case 'surv': return !!sv;
+                case 'cmsMissing': return sv && num(sv.cmsNeed) > num(sv.cmsIn);
+                case 'citedCancel': return r.citedCancelled > 0;
+                case 'cmsCancel': return r.cmsCancelled > 0;
+                case 'noLpCms': return !r.lpBroken && r.cmsOpen > 0;
+                default: return true;
+            }
+        }
+        function filteredX() {
+            if (!OV) return [];
+            const q = document.getElementById('xSearch').value.toLowerCase().trim(), bu = document.getElementById('xBu').value, flag = document.getElementById('xFlag').value;
+            return OV.rows.filter(function(r) {
+                if (bu && r.bu !== bu) return false;
+                if (!xMatch(r, flag)) return false;
+                return !q || [r.gold, r.name, r.survey && r.survey.code].join(' ').toLowerCase().indexOf(q) > -1;
+            }).sort(function(a, b) { return b.lpBroken - a.lpBroken || b.cmsOpen - a.cmsOpen; });
+        }
+        function renderX() {
+            const rows = filteredX();
+            document.getElementById('xBody').innerHTML = rows.slice(0, 600).map(function(r) {
+                const sv = r.survey;
+                const lpTypes = Object.keys(r.lpType).map(function(k) { return '<span class="text-[10px] px-1 rounded bg-red-50 text-red-700 mr-0.5">' + esc(typeLabel(k).split(' (')[0]) + ' ' + r.lpType[k] + '</span>'; }).join('');
+                return '<tr class="hover:bg-teal-50' + (sv ? ' cursor-pointer" data-id="' + esc(sv.id) + '"' : '"') + '>' +
+                    '<td class="px-3 py-2"><b>' + esc(r.gold) + '</b> <span class="text-[10px] px-1.5 rounded bg-slate-100 text-slate-600">' + esc(r.bu || '') + '</span><div class="text-xs text-slate-500">' + esc(r.name) + '</div></td>' +
+                    '<td class="px-3 py-2">' + (r.lpBroken ? '<b class="text-red-600">' + r.lpBroken + '</b> <div>' + lpTypes + '</div>' : '<span class="text-slate-300">-</span>') + '</td>' +
+                    '<td class="px-3 py-2 text-right">' + (r.lpWait ? '<b class="text-amber-700">' + r.lpWait + '</b>' : '-') + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + (r.lpCited ? r.citedOpen + ' / ' + r.citedClosed + ' / <b class="' + (r.citedCancelled ? 'text-red-600' : '') + '">' + r.citedCancelled + '</b> / ' + r.citedMissing : '<span class="text-slate-300">-</span>') + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + (r.cmsOpen + r.cmsCancelled ? '<b class="text-amber-700">' + r.cmsOpen + '</b> / <b class="' + (r.cmsCancelled ? 'text-red-600' : '') + '">' + r.cmsCancelled + '</b>' + (r.cmsLast ? '<div class="text-slate-400">ล่าสุด ' + esc(r.cmsLast) + '</div>' : '') : '<span class="text-slate-300">-</span>') + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + (sv ? split(sv.ok, sv.fix, sv.neu, sv.none) + '<div class="text-slate-400">' + fdate(sv.at) + ' · ' + esc(sv.by || '') + '</div>' : '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">ยังไม่ตรวจ</span>') + '</td>' +
+                    '<td class="px-3 py-2 text-right font-mono">' + (sv ? fmt(sv.opex) : '-') + '</td>' +
+                    '<td class="px-3 py-2 text-right font-mono">' + (sv ? fmt(sv.capex) : '-') + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + (sv && num(sv.cmsNeed) ? '<b class="' + (num(sv.cmsIn) < num(sv.cmsNeed) ? 'text-red-600' : 'text-emerald-700') + '">' + num(sv.cmsIn) + ' / ' + num(sv.cmsNeed) + '</b>' : '-') + '</td></tr>';
+            }).join('') || '<tr><td colspan="9" class="text-center py-10 text-slate-400">ไม่พบข้อมูล</td></tr>';
+            if (rows.length > 600) document.getElementById('xBody').insertAdjacentHTML('beforeend', '<tr><td colspan="9" class="text-center py-2 text-xs text-slate-400">แสดง 600 จาก ' + rows.length + ' สาขา — ใช้ตัวกรอง หรือ Export Excel</td></tr>');
+        }
+        document.getElementById('xBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        function filteredItems() {
+            const q = document.getElementById('iSearch').value.toLowerCase().trim(), t = document.getElementById('iType').value, res = document.getElementById('iRes').value, f = document.getElementById('iFmt').value;
+            const lim = CS ? CS.opexLimit : 5000;
+            return items.filter(function(r) {
+                if (t && r.type !== t) return false;
+                if (f && String(r.fmt) !== f) return false;
+                if (res === 'action' && !(r.qFix + r.qNew)) return false;
+                if (res === 'fix' && !r.qFix) return false;
+                if (res === 'new' && !r.qNew) return false;
+                if (res === 'over' && !(r.repair > lim)) return false;
+                if (res === 'nocms' && !(r.needCms && !r.newCms)) return false;
+                return !q || [r.code, r.gold, r.name, r.loc, r.sym, r.fix].join(' ').toLowerCase().indexOf(q) > -1;
+            });
+        }
+        function renderItems() {
+            const rows = filteredItems(), lim = CS ? CS.opexLimit : 5000;
+            document.getElementById('iCount').textContent = rows.length + ' รายการ · ' + fmt(rows.reduce(function(a, r) { return a + r.q; }, 0)) + ' ชิ้น';
+            document.getElementById('iBody').innerHTML = rows.map(function(r) {
+                return '<tr class="hover:bg-teal-50 cursor-pointer" data-id="' + esc(r.id) + '">' +
+                    '<td class="px-3 py-2"><b>' + esc(r.code) + '</b><div class="text-xs text-slate-500">' + esc(r.name) + '</div></td>' +
+                    '<td class="px-3 py-2"><b class="text-xs">' + esc(r.iid) + '</b> ' + esc(typeLabel(r.type)) + '<div class="text-xs text-slate-500">' + esc([r.loc, r.sym].filter(Boolean).join(' · ')) + '</div></td>' +
+                    '<td class="px-3 py-2 text-right font-bold">' + r.q + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + split(r.qOk, r.qFix, r.qNew, r.qNone) + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + esc(r.fix || '-') + '</td>' +
+                    '<td class="px-3 py-2 text-right font-mono ' + (r.repair > lim ? 'text-red-600 font-bold' : '') + '">' + (r.repair ? fmt(r.repair) : '-') + '</td>' +
+                    '<td class="px-3 py-2 text-right font-mono">' + (r.reuse && r.qNew ? '<span class="text-emerald-700 text-xs">ของสาขาปิด</span>' : r.capex ? fmt(r.capex) : '-') + '</td>' +
+                    '<td class="px-3 py-2">' + (r.newCms ? cmsBadge(r.newCms, r.newCmsStatus) : r.needCms ? '<span class="text-xs text-red-600">ยังไม่เปิด</span>' : '-') + '</td>' +
+                    '<td class="px-3 py-2 text-[11px] text-slate-500">' + (r.fromLp ? esc(r.lpSt || 'LP') : 'เพิ่มเอง') + '</td></tr>';
+            }).join('') || '<tr><td colspan="9" class="text-center py-10 text-slate-400">ไม่พบข้อมูล</td></tr>';
+        }
+        document.getElementById('iBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        function renderRecs() {
+            const q = document.getElementById('rSearch').value.toLowerCase().trim();
+            let base = recs;
+            if (document.getElementById('latestOnly').checked) { const seen = new Set(); base = recs.filter(function(r) { const k = String(r['Branch Code']); if (seen.has(k)) return false; seen.add(k); return true; }); }
+            const rows = base.filter(function(r) { return !q || [r['Branch Code'], r['Gold Code'], r['Branch Name'], r['Reporter Name']].join(' ').toLowerCase().indexOf(q) > -1; });
+            document.getElementById('rBody').innerHTML = rows.map(function(r) {
+                const closing = CS && r['Survey Purpose'] === CS.purposes[1];
+                return '<tr class="hover:bg-teal-50 cursor-pointer" data-id="' + esc(r['ID']) + '">' +
+                    '<td class="px-3 py-2"><b>' + esc(r['Branch Code']) + '</b> <span class="text-[10px] px-1.5 rounded bg-slate-100 text-slate-600">' + esc(r['Store Format'] || '') + '</span>' + (r['Has Broken'] === 'Yes' ? ' <span class="text-xs text-red-600">⚠️ เร่งด่วน</span>' : '') + '<div class="text-xs text-slate-500">' + esc(r['Branch Name']) + '</div></td>' +
+                    '<td class="px-3 py-2 text-xs">' + (closing ? '<span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">สาขาปิด · เก็บกลับ ' + num(r['Harvest Working Qty']) + '</span>' : 'ตรวจซ่อม') + '</td>' +
+                    '<td class="px-3 py-2 text-right text-xs">' + (closing ? '-' : esc(r['Base CAM Total']) + ' / ' + esc(r['Base CAM Working']) + ' / <b class="text-red-600">' + esc(r['Base CAM Broken']) + '</b>') + '</td>' +
+                    '<td class="px-3 py-2 text-right ' + (r['Recording Days'] !== '' && CS && num(r['Recording Days']) < CS.recDaysMin ? 'text-red-600 font-bold' : '') + '">' + esc(r['Recording Days'] === '' ? '-' : r['Recording Days']) + '</td>' +
+                    '<td class="px-3 py-2 text-right ' + (num(r['Checks NG']) ? 'text-red-600 font-bold' : '') + '">' + (closing ? '-' : num(r['Checks NG'])) + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + split(r['Qty OK Now'], r['Qty Repairable'], r['Qty Replace'], r['Qty Not Found']) + '</td>' +
+                    '<td class="px-3 py-2 text-right font-mono">' + fmt(r['Repair OPEX (THB)']) + '</td>' +
+                    '<td class="px-3 py-2 text-right font-mono">' + fmt(r['Replace CAPEX (THB)']) + '</td>' +
+                    '<td class="px-3 py-2 text-xs">' + esc(r['Reporter Name']) + ' <span class="text-slate-400">(' + esc(r['Reporter Role'] || '') + ')</span><div class="text-slate-400">' + fdate(r['Timestamp']) + '</div></td></tr>';
+            }).join('') || '<tr><td colspan="9" class="text-center py-10 text-slate-400">ยังไม่มีแบบสำรวจ</td></tr>';
+        }
+        document.getElementById('rBody').addEventListener('click', function(e) { const tr = e.target.closest('[data-id]'); if (tr) openModal(tr.dataset.id); });
+
+        // ─── Record modal ──────────────────────────────────────────────────
+        function openModal(id) {
+            currentId = id; currentRecord = null;
+            document.getElementById('modalBody').innerHTML = '<p class="text-center text-slate-400 py-10">กำลังโหลด...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            ['cmsBtn', 'saveBtn'].forEach(function(b) { document.getElementById(b).classList.add('hidden'); });
+            google.script.run.withSuccessHandler(function(res) {
+                if (id !== currentId) return;
+                if (!res || !res.success) { document.getElementById('modalBody').innerHTML = '<p class="text-red-600">' + esc(res && res.error) + '</p>'; return; }
+                currentRecord = res.data; CS = res.csConfig || CS; cmsLookup = res.cmsLookup || {};
+                renderModal(res.data);
+            }).getCctvSysSurveyRecordById(id);
+        }
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); currentId = null; }
+        function canEdit() { return canEditAll || (currentRecord && _userEmail && String(currentRecord['Reporter Email']).toLowerCase() === _userEmail.toLowerCase()); }
+        function photos(list) { return (list || []).map(function(u) { return '<a href="' + esc(u) + '" target="_blank"><img src="' + esc(u) + '" class="w-24 h-24 object-cover rounded border"></a>'; }).join(''); }
+        function cmsOf(no) { const c = cmsLookup[no]; return cmsBadge(no, c ? c.status : 'ไม่พบใน CMS Dashboard'); }
+        function renderModal(r) {
+            const its = r['Items_JSON'] || [], att = r['Attachments_JSON'] || {}, chk = r['Checks_JSON'] || {}, hv = r['Harvest_JSON'] || {}, ed = canEdit();
+            const closing = r['Survey Purpose'] === CS.purposes[1], lim = CS.opexLimit;
+            const row = function(l, v) { return '<div class="detail-row"><span class="detail-label">' + l + '</span><span class="detail-value">' + v + '</span></div>'; };
+            let h = row('สาขา', esc(r['Branch Code']) + ' - ' + esc(r['Branch Name']) + ' <span class="text-xs text-slate-500">(' + esc(r['Store Format'] || '-') + ' · รหัส LP/CMS ' + esc(r['Gold Code'] || '-') + ')</span>') +
+                row('ผู้ตรวจ / วันที่', esc(r['Reporter Name']) + ' · ' + esc(r['Reporter Role'] || '') + (r['Vendor Company'] ? ' (' + esc(r['Vendor Company']) + ')' : '') + ' · ' + esc(r['Reporter Phone'] || '') + ' · ' + fdate(r['Timestamp'])) +
+                row('วัตถุประสงค์', esc(r['Survey Purpose'] || '-'));
+            if (!closing) {
+                const base = CS.types.filter(function(t) { return t.base; }).map(function(t) {
+                    const p = 'Base ' + t.k.toUpperCase() + ' ';
+                    if (r[p + 'Total'] === '' || r[p + 'Total'] == null) return '';
+                    return '<span class="inline-block mr-3">' + esc(t.l.split(' (')[0]) + ' <b>' + esc(r[p + 'Total']) + '</b> (ได้ ' + esc(r[p + 'Working']) + ' · เสีย <b class="text-red-600">' + esc(r[p + 'Broken']) + '</b>)</span>';
+                }).join('');
+                h += row('นับจริงหน้างาน', base || '-') +
+                    row('ระบบ', 'Analog ' + esc(r['Cam Analog'] === '' ? '-' : r['Cam Analog']) + ' · IP ' + esc(r['Cam IP'] === '' ? '-' : r['Cam IP']) + ' · เก็บภาพ <b class="' + (num(r['Recording Days']) < CS.recDaysMin ? 'text-red-600' : '') + '">' + esc(r['Recording Days']) + '</b> วัน · ศูนย์ควบคุม: ' + esc(r['Online Command Center'] || '-')) +
+                    row('เกณฑ์ตรวจเช็ก', CS.checks.map(function(c) { const v = chk[c.k] || '-'; return '<span class="inline-block mr-2 mb-1 text-xs px-2 py-0.5 rounded-full ' + (v === 'NG' ? 'bg-red-100 text-red-700 font-semibold' : v === 'OK' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500') + '">' + esc(c.l) + ': ' + (v === 'NA' ? 'ไม่มี' : v) + '</span>'; }).join(''));
+            } else {
+                h += row('เก็บกู้อุปกรณ์', Object.keys(hv).map(function(k) { return '<span class="inline-block mr-3">' + esc(typeLabel(k).split(' (')[0]) + ': ใช้ได้ <b>' + hv[k].ok + '</b> · เสีย ' + hv[k].bad + ' · ตกรุ่น ' + hv[k].old + '</span>'; }).join('') || '-') +
+                    row('ปลายทาง / วันถอด', esc(r['Harvest Destination'] || '-') + ' · ' + esc(r['Removal Date'] || '-'));
+            }
+            h += row('สรุปผล', split(r['Qty OK Now'], r['Qty Repairable'], r['Qty Replace'], r['Qty Not Found']) + ' (ได้ / ซ่อม / ใหม่ / ไม่พบ) · OPEX <b>' + fmt(r['Repair OPEX (THB)']) + ' ฿</b> · CAPEX <b>' + fmt(r['Replace CAPEX (THB)']) + ' ฿</b>');
+            its.forEach(function(it) {
+                const rc = it.qFix ? it.cEq + it.cLab + it.cClimb + it.cTest : 0, nc = it.qNew && !it.reuse ? it.unitNew * it.qNew : 0, need = it.qFix + it.qNew > 0;
+                h += '<div class="border rounded-lg p-3 mt-3 ' + (need ? 'border-teal-300' : 'border-slate-200') + '" data-it="' + esc(it.iid) + '">' +
+                    '<div class="flex flex-wrap justify-between gap-2"><b>' + esc(it.iid + ' · ' + typeLabel(it.type)) + ' × ' + it.q + '</b><span class="text-xs">' + split(it.qOk, it.qFix, it.qNew, it.qNone) + '</span></div>' +
+                    '<div class="grid md:grid-cols-2 gap-x-4 text-xs mt-1 text-slate-700">' +
+                        (it.loc ? '<p><b>ตำแหน่ง:</b> ' + esc(it.loc) + '</p>' : '') + (it.sym ? '<p><b>อาการ:</b> ' + esc(it.sym) + '</p>' : '') +
+                        (it.cause ? '<p><b>สาเหตุ:</b> ' + esc(it.cause) + '</p>' : '') + (it.brand || it.model ? '<p><b>ยี่ห้อ/รุ่น:</b> ' + esc([it.brand, it.model].filter(Boolean).join(' ')) + '</p>' : '') +
+                        (it.qFix ? '<p class="md:col-span-2"><b class="text-blue-700">ซ่อม:</b> ' + esc(it.fix || '-') + ' — อุปกรณ์ ' + fmt(it.cEq) + ' · แรง ' + fmt(it.cLab) + ' · ปีนป่าย ' + fmt(it.cClimb) + ' · ทดสอบ ' + fmt(it.cTest) + ' = <b class="' + (rc > lim ? 'text-red-600' : '') + '">' + fmt(rc) + ' ฿</b>' + (rc > lim ? ' ⚠️ เกิน ' + fmt(lim) : '') + '</p>' : '') +
+                        (it.qNew ? '<p class="md:col-span-2"><b class="text-red-700">เปลี่ยนใหม่:</b> ' + (it.reuse ? 'ใช้ของจากสาขาปิด / คลัง' : fmt(it.unitNew) + ' × ' + it.qNew + ' = <b>' + fmt(nc) + ' ฿</b>') + '</p>' : '') +
+                        (it.lp ? '<p class="md:col-span-2 text-slate-500"><b>LP:</b> ' + esc([it.lp.q + ' ชิ้น', it.lp.st, it.lp.flt, it.lp.sym].filter(Boolean).join(' · ')) + ' ' + (it.lp.cms || []).map(cmsOf).join(' ') + '</p>' : '<p class="md:col-span-2 text-slate-400">เพิ่มเองที่หน้างาน (ไม่อยู่ในรายการ LP)</p>') +
+                        (it.nt ? '<p class="md:col-span-2 text-slate-500">หมายเหตุ: ' + esc(it.nt) + '</p>' : '') +
+                    '</div><div class="flex flex-wrap gap-2 mt-2">' + photos(att[it.pk]) + '</div>';
+                if (need) h += '<div class="mt-2 pt-2 border-t border-dashed flex flex-wrap items-center gap-2 text-xs"><b>CMS ใหม่:</b>' +
+                    (ed ? '<input data-cms value="' + esc(it.newCms || '') + '" maxlength="9" inputmode="numeric" class="w-32 border border-slate-300 rounded p-1 font-mono text-sm" placeholder="9 หลัก">' : '') +
+                    (it.newCms ? cmsOf(it.newCms) : (ed ? '' : '<span class="text-red-600">ยังไม่เปิด</span>')) + '</div>';
+                h += '</div>';
+            });
+            if (!its.length) h += '<p class="mt-3 text-sm text-emerald-700">✔ ไม่มีอุปกรณ์เสีย (ผู้ตรวจยืนยันว่าระบบใช้งานได้ปกติ)</p>';
+            const dis = ed ? '' : ' disabled';
+            h += '<div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg"><label class="flex items-center gap-2 text-xs font-bold text-red-700"><input type="checkbox" id="editHasBroken"' + (r['Has Broken'] === 'Yes' ? ' checked' : '') + dis + '> ⚠️ ปัญหาเร่งด่วน (ระบบล่ม / ไม่มีภาพบันทึก)</label>' +
+                '<textarea id="editBrokenDetail" rows="2" class="mt-2 w-full border border-red-300 rounded px-2 py-1 text-sm"' + dis + '>' + esc(r['Broken Detail'] || '') + '</textarea></div>' +
+                '<div class="mt-3"><label class="text-xs font-semibold text-slate-500">สรุป / ข้อเสนอแนะ</label><textarea id="editComments" rows="3" class="w-full border border-slate-300 rounded px-2 py-1 text-sm"' + dis + '>' + esc(r['Comments'] || '') + '</textarea></div>' +
+                '<p class="text-[11px] text-slate-400 mt-2">แก้ไขผลตรวจ / จำนวน: ส่งแบบสำรวจใหม่ (รายงานใช้รายการล่าสุดของสาขา)</p>';
+            document.getElementById('modalBody').innerHTML = h;
+            document.getElementById('saveBtn').classList.toggle('hidden', !ed);
+            document.getElementById('cmsBtn').classList.toggle('hidden', !ed || !its.some(function(it) { return it.qFix + it.qNew > 0; }));
+        }
+        function saveCms() {
+            const ups = [];
+            let bad = '';
+            document.querySelectorAll('#modalBody [data-it]').forEach(function(c) {
+                const i = c.querySelector('[data-cms]'); if (!i) return;
+                const v = i.value.trim();
+                if (v && !/^2\d{8}$/.test(v)) bad = c.dataset.it;
+                ups.push({ iid: c.dataset.it, newCms: v });
+            });
+            if (bad) { alert(bad + ': เลข CMS ต้องเป็นตัวเลข 9 หลัก (เช่น 261150545)'); return; }
+            const btn = document.getElementById('cmsBtn'); btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+            google.script.run.withSuccessHandler(function(res) {
+                btn.disabled = false; btn.textContent = '✔ บันทึกเลข CMS';
+                if (res && res.success) { closeModal(); loadAll(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error));
+            }).withFailureHandler(function(err) { btn.disabled = false; btn.textContent = '✔ บันทึกเลข CMS'; alert('Server Error: ' + err.message); })
+              .updateCctvSysItemCms(currentId, ups, _userEmail);
+        }
+        function saveRecord() {
+            const form = { id: currentId, clientEmail: _userEmail, hasBroken: document.getElementById('editHasBroken').checked ? 'Yes' : 'No',
+                           brokenDetail: document.getElementById('editBrokenDetail').value, comments: document.getElementById('editComments').value };
+            if (form.hasBroken === 'Yes' && !form.brokenDetail.trim()) { alert('กรุณาระบุปัญหาเร่งด่วน'); return; }
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadAll(); } else alert('บันทึกไม่สำเร็จ: ' + (res && res.error)); })
+                .withFailureHandler(function(err) { alert('Server Error: ' + err.message); }).updateCctvSysSurveyRecord(form);
+        }
+        function deleteRecord() {
+            if (!currentId || !confirm('ยืนยันการลบรายการนี้?')) return;
+            google.script.run.withSuccessHandler(function(res) { if (res && res.success) { closeModal(); loadAll(); } else alert('ลบไม่สำเร็จ: ' + (res && res.error)); }).deleteCctvSysSurveyRecord(currentId, _userEmail);
+        }
+
+        // ─── LP register (view / admin re-upload) ─────────────────────────────
+        // Same parsing rules as "Pyhon ANL/build_cctv_lp_register.py" — keep in sync.
+        const LP_CATS = ['mon', 'ups', 'hdd', 'eas', 'tag', 'cam'];
+        function csysParseLpWorkbook(wb) {
+            const ws = wb.Sheets['data_รายละเอียด'];
+            if (!ws) throw new Error('ไม่พบชีต "data_รายละเอียด" ในไฟล์');
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+            const clean = function(v) { let s = String(v == null ? '' : v).replace(/[\r\n\t​]+/g, ' ').trim(); return s === '-' ? '' : s; };
+            const hdr = rows[0].map(clean);
+            const col = function(n) { const i = hdr.findIndex(function(h) { return h.indexOf(n) === 0; }); if (i < 0) throw new Error('ไม่พบคอลัมน์ ' + n); return i; };
+            const C = { cat: col('หมวดหมู่อุปกรณ์'), bu: col('Business Unit'), code: col('รหัสสาขา'), name: col('ชื่อสาขา'), desc: col('รายละเอียดอุปกรณ์'), st: col('สถานะอุปกรณ์'),
+                        grp: col('กลุ่มสถานะ'), qty: col('จำนวน'), sym: col('อาการเสีย'), cms: col('สถานะ CMS'), flt: col('กรองข้อมูล'), lp: col('On Process LP LCI') };
+            const strings = [], sidx = {};
+            const S = function(v) { v = clean(v); if (!(v in sidx)) { sidx[v] = strings.length; strings.push(v); } return sidx[v]; };
+            const stores = {}, broken = [];
+            rows.slice(1).forEach(function(r) {
+                const m = String(r[C.cat]).match(/หมวด\s*(\d)/), ci = m ? parseInt(m[1], 10) - 1 : -1, code = clean(r[C.code]);
+                if (ci < 0 || ci >= LP_CATS.length || !/^\d{4,6}$/.test(code) || /test/i.test(clean(r[C.st]))) return;
+                const qty = typeof r[C.qty] === 'number' && r[C.qty] > 0 ? Math.round(r[C.qty]) : 1;
+                const isBroken = clean(r[C.grp]) === 'เสีย / รอซ่อม';
+                const st = stores[code] || (stores[code] = { name: clean(r[C.name]), bu: clean(r[C.bu]), c: {} });
+                const t = st.c[ci] || (st.c[ci] = [0, 0, 0]);
+                t[0] += qty; t[isBroken ? 2 : 1] += qty;
+                if (isBroken) broken.push([code, ci, S(r[C.desc]), S(r[C.st]), qty, S(r[C.sym]), S(r[C.cms]), S(r[C.flt]), S(r[C.lp])]);
+            });
+            return { s: strings, broken: broken, stores: Object.keys(stores).sort().map(function(k) { const v = stores[k]; return [k, v.name, v.bu, Object.keys(v.c).map(Number).sort().map(function(ci) { return [ci].concat(v.c[ci]); })]; }) };
+        }
+        function lpInfoHtml(i) {
+            return '<p>ไฟล์: <b>' + esc(i.file || '-') + '</b></p><p>ข้อมูล ณ <b>' + esc(i.asOf) + '</b> · แหล่ง: ' + (i.source === 'upload' ? 'อัปโหลดโดย Admin' : 'Built-in (ไฟล์แนบอีเมล LP 11/11/2026)') + '</p>' +
+                '<p>สาขาในไฟล์ ' + fmt(i.stores) + ' · สาขาที่มีของเสีย <b>' + fmt(i.brokenStores) + '</b> · รายการเสีย ' + fmt(i.brokenRows) + ' แถว = <b class="text-red-600">' + fmt(i.brokenQty) + '</b> ชิ้น</p>';
+        }
+        function openLpModal() {
+            document.getElementById('lpModal').classList.remove('hidden');
+            const body = document.getElementById('lpBody');
+            body.innerHTML = 'กำลังโหลด...';
+            google.script.run.withSuccessHandler(function(i) {
+                if (!i || !i.success) { body.innerHTML = '<p class="text-red-600">' + esc(i && i.error) + '</p>'; return; }
+                let h = lpInfoHtml(i);
+                if (i.canUpload) h += '<div class="border-t pt-3 space-y-2"><p class="font-semibold">อัปโหลดไฟล์ LP ฉบับใหม่ (.xlsx รูปแบบเดียวกับ "Export_ข้อมูลรายสาขา", ชีต data_รายละเอียด)</p>' +
+                    '<div class="flex flex-wrap gap-2 items-center"><input type="file" id="lpFile" accept=".xlsx,.xls" class="text-sm"><label class="text-xs">ข้อมูล ณ วันที่ <input type="date" id="lpAsOf" class="border rounded p-1"></label></div>' +
+                    '<div id="lpPreview" class="text-xs text-slate-600"></div>' +
+                    '<div class="flex gap-2"><button id="lpUploadBtn" onclick="uploadLp()" class="px-3 py-1.5 text-sm font-bold text-white bg-teal-700 rounded-lg">⬆ อัปโหลด</button>' +
+                    (i.source === 'upload' ? '<button onclick="useBuiltIn()" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg">กลับไปใช้ Built-in</button>' : '') + '</div></div>';
+                else h += '<p class="text-xs text-slate-400">อัปโหลดไฟล์ใหม่ได้เฉพาะ Admin</p>';
+                body.innerHTML = h;
+            }).getCctvLpRegisterInfo(_userEmail);
+        }
+        function uploadLp() {
+            const f = document.getElementById('lpFile').files[0];
+            if (!f) { alert('กรุณาเลือกไฟล์'); return; }
+            const asOf = document.getElementById('lpAsOf').value;
+            if (!asOf) { alert('กรุณาระบุวันที่ของข้อมูล'); return; }
+            const btn = document.getElementById('lpUploadBtn'); btn.disabled = true; btn.textContent = 'กำลังอ่านไฟล์...';
+            const rd = new FileReader();
+            rd.onload = function(ev) {
+                let payload;
+                try { payload = csysParseLpWorkbook(XLSX.read(new Uint8Array(ev.target.result), { type: 'array' })); }
+                catch (err) { btn.disabled = false; btn.textContent = '⬆ อัปโหลด'; alert('อ่านไฟล์ไม่สำเร็จ: ' + err.message); return; }
+                const q = payload.broken.reduce(function(a, b) { return a + b[4]; }, 0);
+                if (!confirm('พบ ' + payload.stores.length + ' สาขา · รายการเสีย ' + payload.broken.length + ' แถว (' + q + ' ชิ้น)\n\nแทนที่ LP Register ปัจจุบัน?')) { btn.disabled = false; btn.textContent = '⬆ อัปโหลด'; return; }
+                btn.textContent = 'กำลังอัปโหลด...';
+                google.script.run.withSuccessHandler(function(i) {
+                    btn.disabled = false; btn.textContent = '⬆ อัปโหลด';
+                    if (!i || !i.success) { alert('อัปโหลดไม่สำเร็จ: ' + (i && i.error)); return; }
+                    alert('อัปโหลดเรียบร้อย'); openLpModal(); loadAll();
+                }).withFailureHandler(function(err) { btn.disabled = false; btn.textContent = '⬆ อัปโหลด'; alert('Server Error: ' + err.message); })
+                  .saveCctvLpRegister(_userEmail, payload, f.name, asOf);
+            };
+            rd.readAsArrayBuffer(f);
+        }
+        function useBuiltIn() {
+            if (!confirm('ลบไฟล์ที่อัปโหลดแล้วกลับไปใช้ข้อมูล Built-in?')) return;
+            google.script.run.withSuccessHandler(function(i) { if (i && i.success) { openLpModal(); loadAll(); } else alert(i && i.error); }).useBuiltInCctvLpRegister(_userEmail);
+        }
+
+        // ─── Excel ───────────────────────────────────────────────────────
+        function downloadToExcel(btn) {
+            const wb = XLSX.utils.book_new();
+            if (OV) {
+                const head = ['รหัส LP/CMS', 'สาขา', 'BU', 'LP เสีย (ชิ้น)', 'LP รอ MTN', 'LP เสียแยกอุปกรณ์', 'CMS ที่ LP อ้าง', 'อ้าง-ค้าง', 'อ้าง-ปิด', 'อ้าง-ยกเลิก', 'อ้าง-ไม่พบ', 'CMS 180 วัน ค้าง', 'CMS 180 วัน ยกเลิก', 'CMS ล่าสุด',
+                    'ตรวจแล้ว', 'วันที่ตรวจ', 'ผู้ตรวจ', 'ใช้ได้แล้ว', 'ซ่อมได้', 'เปลี่ยนใหม่', 'ไม่พบ', 'OPEX ฿', 'CAPEX ฿', 'ต้องเปิด CMS', 'เปิด CMS แล้ว'];
+                const data = filteredX().map(function(r) {
+                    const s = r.survey || {};
+                    return [r.gold, r.name, r.bu, r.lpBroken, r.lpWait, Object.keys(r.lpType).map(function(k) { return k + ':' + r.lpType[k]; }).join(' '), r.lpCited, r.citedOpen, r.citedClosed, r.citedCancelled, r.citedMissing,
+                        r.cmsOpen, r.cmsCancelled, r.cmsLast, r.survey ? 'Yes' : '', r.survey ? fdate(s.at) : '', s.by || '', s.ok || '', s.fix || '', s.neu || '', s.none || '', s.opex || '', s.capex || '', s.cmsNeed || '', s.cmsIn || ''];
+                });
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([head].concat(data)), 'LP x Survey x CMS');
+            }
+            const ih = ['Branch Code', 'รหัส LP/CMS', 'สาขา', 'Format', 'วันที่ตรวจ', 'Survey ID', 'Item', 'อุปกรณ์', 'ตำแหน่ง', 'อาการ', 'สาเหตุ', 'ยี่ห้อ', 'รุ่น', 'จำนวน', 'ใช้ได้แล้ว', 'ซ่อมได้', 'เปลี่ยนใหม่', 'ไม่พบ',
+                'วิธีซ่อม', 'ค่าอุปกรณ์', 'ค่าแรง', 'ค่าปีนป่าย', 'ค่าทดสอบ', 'OPEX ฿', 'ราคา/หน่วย ใหม่', 'ใช้ของสาขาปิด', 'CAPEX ฿', 'ต้องเปิด CMS', 'CMS ใหม่', 'สถานะ CMS ใหม่', 'สถานะ LP', 'CMS เดิม (LP)', 'จาก LP', 'รูป', 'หมายเหตุ'];
+            const idata = items.map(function(r) {
+                return [r.code, r.gold, r.name, r.fmt, r.date, r.id, r.iid, typeLabel(r.type), r.loc, r.sym, r.cause, r.brand, r.model, r.q, r.qOk, r.qFix, r.qNew, r.qNone,
+                    r.fix, r.cEq, r.cLab, r.cClimb, r.cTest, r.repair, r.unitNew, r.reuse ? 'Yes' : '', r.capex, r.needCms ? 'Yes' : '', r.newCms, r.newCmsStatus, r.lpSt, r.lpCms, r.fromLp ? 'Yes' : '', r.photos, r.nt];
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([ih].concat(idata)), 'Items');
+            const rc = ['Timestamp', 'ID', 'Branch Code', 'Gold Code', 'Branch Name', 'Store Format', 'Survey Purpose', 'Reporter Name', 'Reporter Role', 'Vendor Company', 'Base CAM Total', 'Base CAM Working', 'Base CAM Broken',
+                'Base DVR Total', 'Base HDD Total', 'Base MON Total', 'Base UPS Total', 'Base EAS Total', 'Base TAG Total', 'Cam Analog', 'Cam IP', 'Recording Days', 'Online Command Center', 'Checks NG',
+                'Items', 'Qty Checked', 'Qty OK Now', 'Qty Repairable', 'Qty Replace', 'Qty Not Found', 'Repair OPEX (THB)', 'Replace CAPEX (THB)', 'CMS Needed', 'CMS Entered',
+                'Harvest Working Qty', 'Harvest Broken Qty', 'Harvest Destination', 'Removal Date', 'Has Broken', 'Broken Detail', 'Comments'];
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([rc].concat(recs.map(function(r) { return rc.map(function(c) { return c === 'Timestamp' ? fdate(r[c]) : (r[c] == null ? '' : r[c]); }); }))), 'Surveys');
+            XLSX.writeFile(wb, 'cctv_system_survey_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+        }
+    </script>
+</body>
+</html>

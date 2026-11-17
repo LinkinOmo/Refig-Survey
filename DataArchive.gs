@@ -75,6 +75,8 @@ var ARCHIVE_POLICIES = [
     { key: 'hours',    group: 'Surveys', kind: 'survey', sheet: 'Trading_Hours_Survey_Database', keepBy: ['Branch Code', 'Survey Stage'], invalidate: _archInv_('_invalidateTradingHoursSlimCache') },
     { key: 'siteVisit', group: 'Surveys', kind: 'survey', sheet: 'Site_Visit_Database',    keepBy: ['Branch Code'] },
     { key: 'cctv',     group: 'Surveys', kind: 'survey', sheet: 'CCTV_Survey_Database',    keepBy: ['Branch Code'] },
+    { key: 'cctvSys',  group: 'Surveys', kind: 'survey', sheet: 'CCTV_System_Survey_Database', keepBy: ['Branch Code'] },
+    { key: 'ffr',      group: 'Surveys', kind: 'survey', sheet: 'FF_Renovate_Survey_Database', keepBy: ['Branch Code'] },
     { key: 'hyperRef', group: 'Surveys', kind: 'survey', sheet: 'Hyper_Ref_Survey_Database',       keepBy: ['Branch Code'], invalidate: _archInvHyper_ },
     { key: 'hyperAc',  group: 'Surveys', kind: 'survey', sheet: 'Hyper_Aircon_Survey_Database',    keepBy: ['Branch Code'], invalidate: _archInvHyper_ },
     { key: 'hyperEq',  group: 'Surveys', kind: 'survey', sheet: 'Hyper_Equipment_Survey_Database', keepBy: ['Branch Code'], invalidate: _archInvHyper_ },

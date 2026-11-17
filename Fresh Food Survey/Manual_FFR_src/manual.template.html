@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>คู่มือสำรวจก่อน Renovate Fresh Food</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --main:#be123c; --dark:#881337; --ink:#1f2937; --mute:#6b7280; --line:#e5e7eb; --red:#dc2626; --blue:#0369a1; --green:#047857; }
+  * { box-sizing: border-box; }
+  body { font-family: Sarabun, Tahoma, sans-serif; color: var(--ink); background: #f8fafc; margin: 0; line-height: 1.65; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px 60px; }
+  header { background: linear-gradient(135deg, #be123c, #4c0519); color: #fff; padding: 28px 16px 22px; }
+  header .wrap { padding-bottom: 0; }
+  header h1 { margin: 0 0 4px; font-size: 28px; }
+  header p { margin: 0; opacity: .88; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .btn { background: #fff; color: var(--dark); text-decoration: none; font-weight: 700; padding: 8px 14px; border-radius: 10px; font-size: 14px; }
+  nav.toc { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin: 18px 0; columns: 2; font-size: 15px; }
+  nav.toc a { color: var(--dark); text-decoration: none; display: block; padding: 2px 0; }
+  h2 { font-size: 22px; margin: 36px 0 10px; padding-left: 10px; border-left: 5px solid var(--main); }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
+  .lesson { background: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 12px 16px; }
+  .warn { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 12px 16px; margin: 12px 0; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 10px 0; }
+  .steps div { background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--main); border-radius: 12px; padding: 12px; text-align: center; font-size: 15px; }
+  .steps b { display: block; font-size: 17px; margin-bottom: 4px; }
+  .steps .n { display: inline-block; width: 28px; height: 28px; border-radius: 50%; background: var(--main); color: #fff; font-weight: 700; line-height: 28px; margin-bottom: 6px; }
+  figure { margin: 12px 0 18px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  figure img { width: 100%; height: auto; border-radius: 6px; display: block; }
+  figcaption { font-size: 15px; color: var(--mute); margin-top: 8px; }
+  figcaption ol { margin: 4px 0 0; padding-left: 22px; color: var(--ink); }
+  .m { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: #e11d48; color: #fff; font-weight: 700; font-size: 13px; line-height: 22px; text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; background: #fff; margin: 8px 0; }
+  th, td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+  th { background: #fff1f2; }
+  .tbl { overflow-x: auto; }
+  .ok { color: var(--green); font-weight: 700; } .wk { color: var(--blue); font-weight: 700; } .new { color: var(--red); font-weight: 700; } .none { color: #475569; font-weight: 700; }
+  .note { font-size: 14px; color: var(--mute); }
+  .video iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; margin-top: 8px; background: #000; }
+  details { background: #fff; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; padding: 8px 12px; }
+  details summary { cursor: pointer; font-weight: 700; }
+  code { background: #f1f5f9; padding: 0 5px; border-radius: 5px; font-size: 14px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  footer { color: var(--mute); font-size: 13px; text-align: center; margin-top: 40px; }
+  @media (max-width: 720px) { .steps, .two { grid-template-columns: 1fr 1fr; } nav.toc { columns: 1; } header h1 { font-size: 23px; } }
+  @media (max-width: 480px) { .two { grid-template-columns: 1fr; } }
+  @media print { header { background: #be123c !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .btns, .video { display: none; } figure { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>🥩 คู่มือสำรวจก่อน Renovate Fresh Food</h1>
+  <p>MTN Pre-check · สำหรับ M1 / MTN สาขา / Area MTN<!--FULL--> และทีม HO · <b>ฉบับเต็ม — Super Admin เท่านั้น</b><!--/FULL--> · ฉบับ {{DATE}}</p>
+  <div class="btns">
+    <a class="btn" href="{{APP}}" target="_blank" rel="noopener">▶ เปิดแอป (แท็บ 🥩 FF Renovate)</a>
+    <!--FULL--><a class="btn" href="{{APP}}?page=ffr_report" target="_blank" rel="noopener">📊 รายงาน</a><!--/FULL-->
+    {{VIDEO_BTN}}
+  </div>
+</div></header>
+<div class="wrap">
+<!--FULL--><div class="warn" style="margin-top:16px;border-color:#fca5a5;background:#fef2f2"><b>🔒 เอกสารลับ — ฉบับเต็มสำหรับ Super Admin</b> · มีข้อมูลงบประมาณ / BOQ และรายงาน ห้ามส่งต่อ · ผู้ใช้งานทั่วไปใช้ฉบับผู้ใช้ (<code>?page=ffr-manual</code>) ซึ่งไม่มีข้อมูลงบ · ลิงก์นี้หมดอายุภายใน 12 ชั่วโมง</div><!--/FULL-->
+<nav class="toc">
+  <a href="#why">1. <!--USER-->วัตถุประสงค์<!--/USER--><!--FULL-->ทำไมต้องตรวจ<!--/FULL--></a><a href="#flow">2. ภาพรวม 4 ขั้นตอน &amp; กำหนดการ</a><a href="#who">3. ใครกรอก / เตรียมอะไร</a><a href="#fill">4. วิธีกรอกทีละส่วน</a>
+  <a href="#rules">5. กติกาแยกจำนวน Refurbish / Workable / Request New</a><a href="#rack">6. เกณฑ์ Rack / Multiset</a><a href="#site">7. Remote หรือ Plug-in</a><a href="#wo">8. Write-off &amp; ขายซาก</a>
+  <!--FULL--><a href="#report">9. อ่านรายงาน (HO / Area)</a><a href="#admin">10. Super Admin — สิทธิ์ ตั้งค่า &amp; ดูแลระบบ</a><!--/FULL--><a href="#faq">{{FAQN}}. คำถามที่พบบ่อย</a>{{VIDEO_TOC}}
+</nav>
+{{VIDEO_BOX}}
+
+<!--USER-->
+<h2 id="why">1. วัตถุประสงค์</h2>
+<div class="lesson">
+  <p>ก่อนปรับปรุงโซน Fresh Food ของสาขา ทีมโครงการต้องการ<b>ข้อมูลจริงจากหน้างาน</b>จาก MTN เพื่อสรุปว่าตู้แช่แต่ละใบควร <span class="ok">Refurbish</span> / <span class="wk">ใช้ต่อ (Workable)</span> / <span class="new">ซื้อใหม่ (Request New)</span> และ Rack เดิมยังใช้ต่อได้หรือไม่</p>
+</div>
+<div class="card">
+  <p><b>สิ่งที่ MTN ต้องตรวจ (5 ข้อ):</b></p>
+  <ol>
+    <li><b>อุณหภูมิพื้นที่ขาย</b> — ตู้ Plug-in / ตู้ Open ทำงานได้ดีเฉพาะเมื่อพื้นที่ขายไม่ร้อนเกิน</li>
+    <li><b>ตู้แช่ทุกใบตามแผน</b> — สรุปเป็น <span class="ok">Refurbish</span> / <span class="wk">Workable</span> / <span class="new">Request New</span></li>
+    <li><b>Rack / Multiset / Cold room</b> — สภาพ + รูปถ่าย</li>
+    <li><b>ความพร้อมหน้างานสำหรับ Remote / Plug-in</b> — ไฟ ท่อ ห้องเครื่อง จุดระบายน้ำ</li>
+    <li><b>Final Layout</b> — Layout ล่าสุดตรงกับหน้างานหรือไม่</li>
+  </ol>
+  <p><b>หลักการ:</b> ตรวจตามสภาพจริง ไม่ประเมินเกินหรือขาด · ถ่ายรูปทุกการ์ด · ตู้ / Rack ที่จะรื้อออกต้องมี Asset No.</p>
+</div>
+<!--/USER-->
+<!--FULL-->
+<h2 id="why">1. ทำไมต้องตรวจ</h2>
+<div class="lesson">
+  <p><b>โครงการ FF Renovation 2027:</b> ปรับปรุงโซน Fresh Food <b>{{NSTORE}} สาขา</b> ตาม Master BOQ (ณ {{BOQ_AS_OF}}) ประมาณการรวม <b>≈ {{BOQ_M}} MB</b> แต่งบที่ได้รับประมาณ <b>486 MB</b> — ต้องตัดส่วนที่ไม่จำเป็นออกด้วย<b>ข้อมูลจริงจากหน้างาน</b></p>
+  <p>BOQ ทำจากโต๊ะ (Layout + อายุสาขา) ยังไม่มีใครยืนยันว่า ตู้ที่วางแผน Refurbish <b>ทำได้จริงไหม</b> ตู้ที่วางแผนซื้อใหม่ <b>ยังใช้ต่อได้ไหม</b> และ Rack เดิม <b>ต้องเปลี่ยนจริงหรือไม่</b> (Rack Multiset เป็นหนึ่งในรายการที่มีมูลค่าสูงที่สุดใน BOQ)</p>
+</div>
+<div class="card">
+  <p><b>สิ่งที่ทีมจัดซื้อ / ผู้ออกแบบต้องการจาก MTN (5 ข้อ):</b></p>
+  <ol>
+    <li><b>อุณหภูมิพื้นที่ขาย</b> — ตู้ Plug-in / ตู้ Open ทำงานได้ดีเฉพาะเมื่อพื้นที่ขายไม่ร้อนเกิน</li>
+    <li><b>ตู้แช่ทุกใบตาม BOQ</b> — สรุปเป็น Final list: <span class="ok">Refurbish</span> / <span class="wk">Workable</span> / <span class="new">Request New</span></li>
+    <li><b>Rack / Multiset / Cold room</b> — สภาพ + รูปถ่าย เพื่อให้ทีมออกแบบตัดสินใจเปลี่ยน Rack หรือไม่</li>
+    <li><b>ความพร้อมหน้างานสำหรับ Remote / Plug-in</b> — ไฟ ท่อ ห้องเครื่อง จุดระบายน้ำ</li>
+    <li><b>Final Layout</b> — Layout ล่าสุดตรงกับหน้างานหรือไม่</li>
+  </ol>
+  <p><b>หลักการ:</b> ไม่ประเมินเกินหรือขาด · ถ่ายรูปทุกการ์ด · ตู้ / Rack ที่จะรื้อออกต้องมี Asset No. เพื่อเตรียม Write-off และขายซาก</p>
+</div>
+<!--/FULL-->
+
+<h2 id="flow">2. ภาพรวม 4 ขั้นตอน &amp; กำหนดการ</h2>
+<div class="steps">
+  <div><span class="n">1</span><b>เลือกสาขา</b>ระบบดึงแผน BOQ ของสาขา + Final Layout มาให้ และสร้างการ์ดตู้แช่ตาม BOQ อัตโนมัติ</div>
+  <div><span class="n">2</span><b>วัดอุณหภูมิ</b>พื้นที่ขายอย่างน้อย 3 จุด + รูปเครื่องวัด</div>
+  <div><span class="n">3</span><b>ตรวจตู้ + Rack</b>แยกจำนวนทุกการ์ด · ประเมินสภาพ · Rack + Condenser พร้อมรูป</div>
+  <div><span class="n">4</span><b>หน้างาน → ส่ง</b>ตอบ 9 ข้อ Remote / Plug-in (รวมชนิดชุดตู้ High Frozen เดิม) · อุปกรณ์ห้องเตรียม · Submit</div>
+</div>
+<table>
+  <tr><th>วันที่</th><th>กิจกรรม</th></tr>
+  <tr><td>17 พ.ย. 2026</td><td>สื่อสาร Area MTN / M1 (คู่มือนี้)</td></tr>
+  <tr><td><b>18–21 พ.ย. 2026</b></td><td><b>ลงพื้นที่ตรวจ + Submit ในแอป</b></td></tr>
+  <tr><td>22 พ.ย. 2026</td><td>HO รวบรวมผล (รายงาน + Export Excel)</td></tr>
+  <tr><td>23 พ.ย. 2026</td><td>รายงานเข้าที่ประชุม → ปรับ Final BOQ</td></tr>
+</table>
+
+<h2 id="who">3. ใครกรอก / เตรียมอะไร</h2>
+<div class="card">
+  <ul>
+    <li><b>ผู้กรอก:</b> {{ROLES}} — ถ้าเป็นผู้รับเหมาให้ใส่ชื่อบริษัทด้วย</li>
+    <li><b>เตรียม:</b> มือถือที่ล็อกอินแอป · <b>เครื่องวัดอุณหภูมิ + ความชื้น</b> · Final Layout ของสาขา (AMM MTN / ทีม HO เปิดดูในข้อ 2 ของฟอร์ม — MTN สาขาขอดูจาก AMM MTN) · <b>ฟอร์มกระดาษ A4 ของสาขา</b> — กด "🖨️ ฟอร์ม A4" ที่หัวแท็บหลังเลือกสาขา พิมพ์ไปจดหน้างาน แล้ว<b>ให้ SGM ลงนาม</b> (ต้องแนบรูปตอนส่ง) · ประวัติซ่อม CMS 12 เดือนของตู้ / Rack (ถ้ามี) · ทะเบียนทรัพย์สินสาขา (FAS) สำหรับ Asset No.</li>
+    <li><b>ข้อมูลแอร์ / ไฟฟ้า (ข้อ 6.2):</b> หน้าจอ Chiller หรือ BMS ช่วงบ่าย · Nameplate / As-built แอร์ · ขนาดหม้อแปลง · มิเตอร์ MDB หรือแคลมป์มิเตอร์วัดกระแสช่วงพีค — ไม่ทราบเว้นว่างได้ (บังคับเฉพาะชนิดระบบแอร์)</li>
+    <li><b>เวลาที่ควรวัดอุณหภูมิ:</b> ช่วงบ่ายที่ร้อนที่สุด (ประมาณ 13:00–16:00)</li>
+    <li><b>เวลา:</b> ประมาณ 1.5–3 ชม. ต่อสาขา (ขึ้นกับจำนวนตู้) — <b>ไม่ต้องทำให้จบในครั้งเดียว</b>: ทุกข้อ (2–8) มีปุ่ม <b>☁️ บันทึกส่วนนี้</b> กดทีละข้อได้ ระบบส่งรูปของข้อนั้นขึ้นระบบทันที แล้วกลับมาทำต่อทีหลัง (เครื่องเดิมหรือเครื่องอื่น) ได้</li>
+  </ul>
+</div>
+<div class="card"><p><b>🖨️ ฟอร์มกระดาษ A4 — ต้องให้ SGM ลงนาม แล้วแนบรูปในแอป (บังคับ)</b> — กด <b>"🖨️ ฟอร์ม A4"</b> ที่หัวแท็บหลังเลือกสาขา (หรือหน้า <code>?page=ffr-checklist</code>) ระบบใส่ข้อมูลของสาขาให้:</p><ul><li><b>ตู้ตามแผน BOQ</b> ทีละรายการ พร้อม<b>รหัสอุปกรณ์</b> (เช่น <code>FF-FRZ-06</code>) และจำนวนแผน Refurbish / ซื้อใหม่ — มีช่องเขียน ตรวจพบ / Refurbish / Workable / Request New / ไม่พบ · สภาพ · Equipment ID · Asset No.</li><li><b>ตู้ / ระบบเดิมตามข้อมูลสัญญา PM</b> — ตัวเลขที่ผู้รับเหมา PM นับไว้ (น้ำยา · คอมเพรสเซอร์ · ปีติดตั้ง Rack · ห้องเย็น · จำนวนตู้ Remote / Plug-in) พร้อม<b>ช่อง "นับได้จริง"</b> ให้เขียนเทียบ</li><li><b>Rack ใบที่ 1–2</b> พิมพ์ค่าจาก PM ไว้ให้ — ติ๊ก <b>ตรง</b> หรือ <b>ไม่ตรง</b> แล้วเขียนค่าจริง</li><li>คำถามข้อ 6.1 – 6.3 แบบติ๊ก (คำตอบสีแดง = ความเสี่ยง / ข้อจำกัด) · อุปกรณ์ห้องเตรียม · ช่องลงชื่อ</li></ul><p class="note"><b>ขั้นตอน:</b> พิมพ์ฟอร์มของสาขา → จดหน้างาน → ให้ <b>SGM ลงนาม</b>ช่องท้ายฟอร์ม (รับทราบผลตรวจ) → ถ่ายรูปให้ชัด แนบใน <b>ข้อ 8</b> ของแอป — <b>ไม่แนบ ส่งไม่ได้</b> · ข้อมูลที่ใช้ในรายงานคือข้อมูลที่กรอกในแอป · เลือก "Save as PDF" ในหน้าพิมพ์ถ้าต้องการเก็บเป็นไฟล์</p></div>
+
+<h2 id="fill">4. วิธีกรอกทีละส่วน</h2>
+<h3>4.0 อ่านแนวทางก่อนลงพื้นที่</h3>
+<figure><img src="{{IMG:f01_guide}}" alt=""><figcaption>กล่องสีชมพูด้านบนฟอร์ม สรุปสิ่งที่ต้องทำทั้งหมดในหน้าเดียว — กดหัวข้อเพื่อย่อ / ขยาย</figcaption></figure>
+
+<h3>4.1 ผู้ตรวจ &amp; สาขา (ข้อ 1)</h3>
+<figure><img src="{{IMG:f02_store}}" alt=""><figcaption>ช่องค้นหาแสดง <b>เฉพาะสาขาในโครงการ FF Renovation</b> — คลิกช่องโดยไม่ต้องพิมพ์ เพื่อดูรายชื่อทั้งหมด <ol>
+  <li><span class="m">1</span> ตำแหน่ง / หน่วยงาน (ผู้รับเหมาต้องใส่ชื่อบริษัท)</li>
+  <li><span class="m">2</span> วันที่ตรวจจริง</li>
+  <li><span class="m">3</span> พิมพ์รหัส Gold / Oracle หรือชื่อสาขา</li>
+  <li><span class="m">4</span> แต่ละสาขาแสดง Model (S / M / L) · ทีม · <b>✓ ตรวจแล้ว วันที่</b> (ถ้ามีคนส่งแล้ว)</li>
+  <li><span class="m">5</span> ซ่อนสาขาที่ตรวจแล้ว — เหลือเฉพาะที่ยังต้องไป</li>
+</ol>สาขาที่ขึ้นป้าย <b>🏗️ Full Renovate</b> คือสาขาที่จะปรับปรุงทั้งสาขา — ยังต้องตรวจตามปกติ ข้อมูลใช้ประกอบการออกแบบ</figcaption></figure>
+
+<h3>4.2 แผน BOQ &amp; Final Layout ของสาขา (ข้อ 2)</h3>
+<figure><img src="{{IMGU:f03_context}}" alt=""><figcaption>หลังเลือกสาขา ระบบแสดงแผนของสาขา และสร้างการ์ดตู้แช่ให้ในข้อ 4 ทันที <ol>
+  <li><span class="m">1</span> สรุปแผน: จำนวนตู้แผน Refurbish / แผนซื้อใหม่ · Plug-in / Remote<!--FULL--> · งานระบบ + อื่นๆ (พร้อมมูลค่า BOQ)<!--/FULL--></li>
+  <li><span class="m">2</span> <b>Layout ของสาขา</b> — <b>To-Be (Final)</b> = Layout ใหม่หลังปรับปรุง (อยู่บนสุด) · <b>As-Is (ปัจจุบัน)</b> = Layout เดิมตอนนี้ — กด "👁 เปิดดู" เพื่อเปิดในแอป (ซูมได้ · ดูอย่างเดียว ไม่มีลิงก์ / ดาวน์โหลด) · <b>เปิดได้เฉพาะ AMM MTN ของสาขาและทีม HO</b> — MTN สาขาจะเห็นข้อความ 🔒 ให้ขอดู Layout จาก AMM MTN ตอนลงพื้นที่</li>
+  <li><span class="m">3</span> ลิงก์ไปทะเบียนทรัพย์สินสาขา (FAS<!--FULL--> / NBV<!--/FULL-->) และหน้าขอตัดจำหน่ายตาม DOA ในแอป MNC — ใช้หา Asset No. (ดูข้อ 8)</li>
+  <li><span class="m">4</span> สถานะ Final Layout (บังคับ) — ถ้าเลือก "ไม่ตรงกับหน้างาน" ต้องระบุจุดที่ไม่ตรง และแนบรูป Layout ที่ขีดแก้ได้</li>
+</ol>แถบด้านบน (Gold · Model · ทีม) ยืนยันว่าเลือกสาขาถูก · ตัวเลือกสถานะ Layout: {{LAYOUT_ST}}
+สถานะ Final Layout ให้เทียบกับไฟล์ <b>To-Be</b> · ถ้ายังไม่มีไฟล์ Layout ในระบบ ให้เลือก "ยังไม่ได้รับ Final Layout" แล้วตรวจต่อได้ตามปกติ</figcaption></figure>
+<p class="note">กล่องสีฟ้า <b>📋 ตู้ / ระบบเดิมตามข้อมูลสัญญา PM</b> (ใต้ Layout) แสดงสิ่งที่ผู้รับเหมา PM นับไว้ของสาขานี้: น้ำยา · คอมเพรสเซอร์ Rack · ปีติดตั้ง Rack · ห้องเย็น · จำนวนตู้ Remote / Plug-in (High Frozen · Low Frozen · Drum · Stainless) — <b>ใช้เทียบหน้างาน ถ้าไม่ตรงให้กรอกตามที่เห็นจริง</b> · บรรทัดสีส้มคือข้อสังเกต เช่น BOQ วางแผน Refurbish มากกว่าที่ PM นับได้ หรือ Rack R22 อายุเกิน 15 ปี</p>
+
+<h3>4.3 อุณหภูมิพื้นที่ขาย (ข้อ 3)</h3>
+<figure><img src="{{IMG:f04_amb}}" alt=""><figcaption>วัด <b>อย่างน้อย 3 จุด</b> (Produce / Butchery / Frozen …) ช่วงบ่ายที่ร้อนที่สุด สูง 1.5 ม. ห่างตู้อย่างน้อย 1 ม. <ol>
+  <li><span class="m">1</span> แต่ละแถว = 1 จุดวัด: โซน · °C · %RH · เวลา · หมายเหตุ — กด "+ เพิ่มจุดวัด" ได้</li>
+  <li><span class="m">2</span> ช่องเปลี่ยนสีอัตโนมัติ: <span class="ok">เขียว ≤ {{OK}} °C ผ่าน</span> · <b style="color:#b45309">เหลือง ≤ {{MAX}} °C เฝ้าระวัง</b> · <span class="new">แดง &gt; {{MAX}} °C ร้อนเกิน</span> — จุดที่ร้อนให้เขียนสาเหตุ เช่น ใกล้ประตู Loading / แอร์ไม่เย็น</li>
+  <li><span class="m">3</span> สรุปค่าสูงสุด / เฉลี่ย (รายงานใช้ค่าสูงสุดจัดกลุ่มสาขา)</li>
+  <li><span class="m">4</span> รูปหน้าจอเครื่องวัดอย่างน้อย 1 รูป (บังคับ)</li>
+</ol></figcaption></figure>
+<p class="note">เกณฑ์อ้างอิงตู้ Climate Class 3 = {{OK}} °C / {{RH}} %RH · เกณฑ์ "ร้อนเกิน &gt; {{MAX}} °C" เป็นฉบับร่าง รอยืนยันกับผู้ผลิตตู้ — สาขาที่ร้อนเกินควรระวังการเพิ่มตู้ Plug-in / ตู้ Open</p>
+
+<h3>4.4 ตู้แช่ตาม BOQ (ข้อ 4) — หัวใจของแบบสำรวจ</h3>
+<p>ระบบสร้าง <b>1 การ์ดต่อ 1 รายการใน BOQ</b> (เช่น "High Chilled glass door L2500 × 6") ป้ายมุมขวาบอกว่า BOQ วางแผนไว้อย่างไร ตรวจทุกใบในรายการนั้นแล้ว<b>แยกจำนวน</b>ตามผลจริง</p>
+<figure><img src="{{IMGU:f05_card_ref}}" alt=""><figcaption>ตัวอย่าง: การ์ดที่ BOQ วางแผน <b>Refurbish 6 ใบ</b> — หน้างานพบว่าทำ Refurbish ได้ 4 · ใช้ต่อได้เลย 1 · ต้องซื้อใหม่ 1 <ol>
+  <li><span class="m">1</span> แผน BOQ ของการ์ดนี้ (เขียว = Refurbish · แดง = ซื้อใหม่) · ใต้หัวการ์ดมี<b>รหัสอุปกรณ์</b> เช่น <code>FF-CHP-03</code> = รหัสเดียวกับใน BOQ (ใช้อ้างอิงกับทีมจัดซื้อ แม้ชื่อรายการใน BOQ จะเปลี่ยน)<!--FULL--> — บรรทัดใต้หัวการ์ดแสดงราคา Refurbish / ใหม่ต่อใบ<!--/FULL--></li>
+  <li><span class="m">2</span> จำนวนที่ตรวจ (บังคับ) · ระบบ · ตำแหน่ง · ปีที่ติดตั้ง · ยี่ห้อ · อุณหภูมิตู้ · จำนวนครั้งซ่อม CMS 12 เดือน · ค่าซ่อมสะสม</li>
+  <li><span class="m">3</span> ประเมินสภาพ 3 ด้าน (บังคับ): ตัวตู้ (บุบ / สนิม / สี) · ระบบทำความเย็น · ประตู / กระจก / ไฟ — ดี / พอใช้ / แย่</li>
+  <li><span class="m">4</span> <b>ผลสรุปหน้างาน</b>: Refurbish ได้ + Workable + Request New + ไม่พบ <b>ต้องรวมเท่ากับจำนวนที่ตรวจ</b> (ขึ้น ✓ ครบ)<!--FULL--> · ใต้ช่องแสดง "ผลต่างงบเทียบ BOQ" (ติดลบ = ประหยัด)<!--/FULL--></li>
+  <li><span class="m">5</span> มี Request New ในการ์ดที่ BOQ วางแผน Refurbish → ต้องเลือกเหตุผล (บังคับ)</li>
+  <li><span class="m">6</span> ตู้เดิมที่ต้องรื้อออก — Asset No. (FAS) + ประเภทตัดจำหน่าย (บังคับเลือก) ดูข้อ 8</li>
+  <li><span class="m">7</span> รูปตู้ (บังคับ): ภาพรวม + จุดเสียหาย + Nameplate</li>
+  <li><span class="m">8</span> <b>Equipment ID</b> (ไม่บังคับ) — ถ้าตู้มี<b>ป้าย QR</b> จากแบบสำรวจตู้แช่ / อุปกรณ์ Fresh Food ให้ใส่รหัสของตู้ในการ์ดนี้ (เช่น <code>111128-LF03</code> คั่นด้วย , ถ้าหลายตู้) · กด <b>📷 สแกน QR</b> แล้วถ่ายรูปป้าย ระบบอ่านรหัสให้ · หรือเลือกจากรายการ "＋ เลือก Equipment ID จากตู้ของสาขา" — ถ้าตู้นั้นมี Asset No. ระบบเติมในช่อง Asset No. ให้ · รหัสที่ไม่พบในแบบสำรวจของสาขาจะขึ้นสีส้ม (บันทึกได้ ให้ตรวจตัวอักษร)</li>
+</ol></figcaption></figure>
+<figure><img src="{{IMGU:f06_card_new}}" alt=""><figcaption>ตัวอย่าง: การ์ดที่ BOQ วางแผน <b>ซื้อใหม่ 20 ใบ</b> — หน้างานพบว่า 2 ใบยังดี ใช้ต่อได้ <ol>
+  <li><span class="m">1</span> แผน BOQ: ซื้อใหม่ 20</li>
+  <li><span class="m">2</span> Workable 2 + Request New 18 = 20 ✓<!--FULL--> — ระบบคำนวณงบที่ลดได้ให้ (-104,000 ฿)<!--/FULL--></li>
+  <li><span class="m">3</span> ตู้เดิม 18 ใบที่จะรื้อออก → Write-off &amp; ขายซาก — ถ้ายังไม่รู้ Asset No. เว้นว่างได้ แต่ต้องเลือกประเภทตัดจำหน่าย</li>
+</ol>ตู้ที่<b>ไม่อยู่ใน BOQ</b> แต่พบที่หน้างาน ให้กด "＋ เพิ่มตู้ที่พบ" · ถ้าการ์ดหายหรือต้องการเริ่มใหม่ กด "สร้างการ์ดจาก BOQ ใหม่"</figcaption></figure>
+<figure><img src="{{IMGU:f07_bar}}" alt=""><figcaption><span class="m">1</span> แถบสรุปติดด้านบนจอขณะเลื่อน: จำนวนตู้ทั้งหมด · ผลแต่ละกลุ่ม · <b>ยังไม่สรุป</b> (ต้องเป็น 0 ก่อนส่ง)<!--FULL--> · งบเทียบ BOQ ของสาขา<!--/FULL--></figcaption></figure>
+
+<h3>4.5 Rack / Multiset / Cold room (ข้อ 5)</h3>
+<p class="note">การ์ด Rack ใหม่ 2 ใบแรกได้<b>ค่าตั้งต้นจากสัญญา PM</b> (ใบที่ 1 = Positive · ใบที่ 2 = Negative: ยี่ห้อ / รุ่น · ปีติดตั้ง · น้ำยา · จำนวนคอมเพรสเซอร์) มีป้ายสีฟ้าบอกไว้ — ตรวจและแก้ตามที่เห็นจริงทุกช่อง</p>
+<figure><img src="{{IMG:f08_rack}}" alt=""><figcaption>1 การ์ด = 1 ชุด — ถ้า BOQ มีแผนติดตั้ง Multiset ใหม่ ระบบจะเตือนให้ยืนยันว่าจำเป็นต้องเปลี่ยนจริง <ol>
+  <li><span class="m">1</span> ประเภท (บังคับ): Multiset Positive / Negative · CDU · Cold Room</li>
+  <li><span class="m">2</span> คอมเพรสเซอร์ทั้งหมด / ที่ทำงานปกติ — ตัวที่ทำงานต้องไม่มากกว่าจำนวนทั้งหมด</li>
+  <li><span class="m">3</span> <b>ข้อเสนอ MTN</b> (บังคับ): ใช้ต่อได้ / Overhaul / เปลี่ยน Rack ใหม่ — ดูเกณฑ์ข้อ 6</li>
+  <li><span class="m">4</span> Asset No. (FAS) ของ Rack / Condenser + ประเภทตัดจำหน่าย (ถ้าเสนอเปลี่ยน)</li>
+  <li><span class="m">5</span> รูป Rack ทั้งชุด + Nameplate + ตู้คอนโทรล (บังคับ)</li>
+  <li><span class="m">6</span> รูป Condenser ภาพรวม + Nameplate (บังคับ ยกเว้น Cold Room)</li>
+  <li><span class="m">7</span> <b>กำลังสำรอง</b> — HP / kW โดยประมาณ · วงจร / วาล์วว่าง · <b>รองรับตู้ Remote ใหม่ตามแผนได้หรือไม่</b> (ตู้ Remote ใหม่จะใช้เฉพาะสาขาที่ Rack เดิมยังใช้ต่อและรับได้)</li>
+</ol>บันทึก "จ่ายให้ตู้ / พื้นที่ไหน" และ "กำลังสำรองรับตู้เพิ่ม" ด้วย — ใช้ตัดสินว่าตู้ Remote ใหม่ต่อกับ Rack เดิมได้หรือไม่ · ถ้าสาขาไม่มี Rack เลย ตอน Submit ระบบจะให้ยืนยัน</figcaption></figure>
+
+<h3>4.6 ความพร้อมหน้างาน — 6.1 ระบบรองรับ</h3>
+<figure><img src="{{IMG:f09_site}}" alt=""><figcaption>ตอบให้ครบทั้ง 9 ข้อ (บังคับ) — ใช้แบ่งสาขาเป็นกลุ่ม "Remote + Plug-in" หรือ "Plug-in ทั้งหมด" <ol>
+  <li><span class="m">1</span> แตะเลือกคำตอบแต่ละข้อ (รายละเอียดข้อ 7)</li>
+  <li><span class="m">2</span> คำตอบที่เป็นความเสี่ยงจะเป็นสีแดง และนับเป็น "ข้อเสี่ยง" ในรายงาน</li>
+  <li><span class="m">3</span> ระยะเดินท่อโดยประมาณ ห้องเครื่อง → ตู้ไกลสุด (เมตร)</li>
+  <li><span class="m">4</span> <b>ข้อเสนอระบบของ MTN</b> (บังคับ)</li>
+</ol></figcaption></figure>
+
+<h3>4.6.2 กำลังแอร์ &amp; ไฟฟ้า (ข้อ 6.2)</h3>
+<figure><img src="{{IMG:f11_cap}}" alt=""><figcaption>ตู้ Plug-in ปล่อยความร้อนเข้าพื้นที่ขายและใช้ไฟหน้างาน — ข้อมูลนี้ใช้ตัดสินว่าแอร์เดิมรับได้ / ใช้ Chiller สำรอง / ต้องเพิ่มแอร์ <ol>
+  <li><span class="m">1</span> ชนิดระบบแอร์พื้นที่ขาย (บังคับ)</li>
+  <li><span class="m">2</span> Chiller ทั้งหมด / ที่เดินช่วงบ่าย — ถ้าเดินไม่ครบแปลว่ามี <b>Chiller สำรอง</b></li>
+  <li><span class="m">3</span> โหลดแอร์ช่วงบ่าย (%) จากหน้าจอ Chiller / BMS</li>
+  <li><span class="m">4</span> Main Breaker MDB กับกระแสสูงสุดช่วงพีค → ระบบคำนวณ "ไฟ MDB เหลือ %"</li>
+  <li><span class="m">5</span> 💡 ข้อความแนะนำขึ้นอัตโนมัติจากตัวเลข (แนวทางเบื้องต้น ทีมออกแบบเป็นผู้ตัดสินขั้นสุดท้าย)</li>
+</ol></figcaption></figure>
+{{CAP}}
+
+<h3>4.6.3 ข้อจำกัดการติดตั้ง (ข้อ 6.3)</h3>
+<figure><img src="{{IMG:f12_inst}}" alt=""><figcaption>ต้องติดตั้ง<b>โดยไม่ปิดขาย</b> — ตอบทุกข้อ (บังคับ) เพื่อวางแผนการขนตู้และเวลาทำงานของผู้รับเหมา <ol>
+  <li><span class="m">1</span> 6 คำถาม: ทางขนตู้ · Loading · ทำงานกลางคืน · พื้นที่พักตู้ · ปิดโซนชั่วคราว · อยู่ในห้าง/อาคารเช่า</li>
+  <li><span class="m">2</span> คำตอบสีแดง = ข้อจำกัด (นับเป็น "ติดตั้ง N ข้อ" ในรายงาน)</li>
+  <li><span class="m">3</span> หมายเหตุ เช่น ความกว้างประตูจริง · เวลาที่ห้างอนุญาตให้ทำงาน</li>
+</ol></figcaption></figure>
+
+<h3>4.7 อุปกรณ์ห้องเตรียม &amp; ส่ง (ข้อ 7–8)</h3>
+<div class="card"><p><b>☁️ บันทึกทีละข้อ แล้วกลับมาทำต่อ</b></p><ul><li>ท้ายข้อ 2–8 มีแถบสถานะ + ปุ่ม <b>☁️ บันทึกส่วนนี้ (ข้อ N)</b> — ✅ บันทึกแล้ว · ⚠️ มีแก้ไข/รูปใหม่ที่ยังไม่บันทึก · ⬜ ยังไม่บันทึก · รูปที่ขึ้นระบบแล้วมีเครื่องหมาย ☁️</li><li>กดบันทึกทีละข้อระหว่างเดินตรวจ — รูปทยอยส่งขึ้นระบบ ตอนกด Submit จะเร็วขึ้นและไม่เสี่ยงหลุด</li><li><b>กลับมาทำต่อ:</b> เปิดแท็บ 🥩 FF Renovate → เลือกสาขาเดิม (ล็อกอินบัญชีเดิม หรือใส่เบอร์โทรเดิม) → แถบสีเขียว "พบแบบสำรวจที่บันทึกไว้" → กด <b>📂 โหลดทำต่อ</b> — ข้อมูลและรูปกลับมาครบ (เก็บไว้ 45 วัน)</li><li><b>หลังกด Submit</b> ระบบสร้าง<b>รหัสตู้ + QR อัตโนมัติ 1 รหัสต่อ 1 ตู้</b> (Refurbish / Workable / Request New — ตู้ "ไม่พบ" ไม่มีรหัส) เช่น <code>FFR-111128-FRZ01-03</code> · HO พิมพ์ป้าย QR ไปติดตู้ ใช้ต่อในขั้นจัดซื้อ ส่งของ ติดตั้ง และตรวจรับงาน — สแกนแล้วเห็นข้อมูลตู้และสถานะงาน</li>
+<li>ถ้ามีคนใช้งานพร้อมกันมาก ระบบจะ<b>ลองบันทึก / ส่งซ้ำให้อัตโนมัติ</b> (ขึ้นข้อความ "กำลังลองอีกครั้ง") — ถ้ายังไม่สำเร็จ ข้อมูลยังอยู่ในฟอร์ม รอสักครู่แล้วกดใหม่</li></ul></div>
+<figure><img src="{{IMG:f10_submit}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> อุปกรณ์ห้องเตรียม (แผน Hub &amp; Spoke) — นับเฉพาะที่มี: ใช้ได้ / ต้องซ่อม / ขอใหม่ · ไม่มีให้เว้นว่าง</li>
+  <li><span class="m">2</span> สรุป / ข้อเสนอของ MTN · ถ้ามีตู้ / Rack เสียที่กระทบการขายตอนนี้ ให้ตอบ "มี" และระบุรายละเอียด</li>
+  <li><span class="m">3</span> <b>Save Draft</b> — บันทึกทั้งฟอร์มขึ้นระบบ เปิดทำต่อจากมือถือ / คอมเครื่องอื่นได้ (ใช้อีเมลล็อกอินหรือเบอร์โทรเดียวกัน)</li>
+  <li><span class="m">4</span> <b>Submit</b> — ระบบตรวจช่องบังคับให้ก่อนส่ง (ข้อที่ขาดจะเลื่อนไปและกระพริบกรอบแดง) แล้วอัปโหลดรูปและส่งอีเมลสรุปถึง CC</li>
+</ol>ถ้าอัปโหลดรูปไม่สำเร็จ (สัญญาณไม่ดี) ข้อมูลยังอยู่ในฟอร์ม — กด Submit ซ้ำได้ รูปที่ขึ้นแล้วจะไม่ส่งซ้ำ</figcaption></figure>
+<div class="warn"><b>ช่องบังคับก่อน Submit:</b> <b>รูปฟอร์มกระดาษที่ SGM ลงนาม</b> (ข้อ 8) · ผู้ตรวจ / เบอร์ / ตำแหน่ง / วันที่ / สาขา · สถานะ Final Layout · อุณหภูมิ ≥ 3 จุด + รูป · <b>ทุกการ์ดตู้</b>: จำนวน, แยกจำนวนครบ, สภาพ 3 ด้าน, เหตุผล (ถ้าซื้อใหม่นอกแผน), ประเภทตัดจำหน่าย (ถ้ามี Request New), รูป · <b>ทุกการ์ด Rack</b>: ข้อเสนอ MTN + รูป Rack + รูป Condenser · คำถามหน้างาน 9 ข้อ + ข้อเสนอระบบ · <b>6.2</b> ชนิดระบบแอร์ · <b>6.3</b> ข้อจำกัดการติดตั้งครบ 6 ข้อ</div>
+
+<h2 id="rules">5. กติกาแยกจำนวน Refurbish / Workable / Request New</h2>
+<div class="tbl"><table>
+  <tr><th>ผลสรุป</th><th>ความหมาย</th><th>ตัวอย่าง</th><!--FULL--><th>ผลต่องบ</th><!--/FULL--></tr>
+  <tr><td class="ok">🛠️ Refurbish ได้</td><td>ปรับปรุงแล้วใช้ต่อได้จริง (เปลี่ยนคอยล์ / ฉนวน / ประตู / ไฟ / ทำสี)</td><td>โครงสร้างแข็งแรง ระบบทำความเย็นยังทำอุณหภูมิได้ ขนาดตรง Layout ใหม่</td><!--FULL--><td>คิดราคา Refurbish ต่อใบ</td><!--/FULL--></tr>
+  <tr><td class="wk">✅ Workable (ใช้ต่อ)</td><td>ใช้ต่อได้เลย <b>ไม่ต้องทำอะไร</b></td><td>ตู้ค่อนข้างใหม่ สภาพดี ทั้ง 3 ด้าน</td><!--FULL--><td>0 ฿ — ลดงบได้มากที่สุด</td><!--/FULL--></tr>
+  <tr><td class="new">🆕 Request New</td><td>ต้องซื้อใหม่ · ตู้เดิมรื้อออก → Write-off / ขายซาก</td><td>สนิมทะลุ คอยล์รั่ว อะไหล่เลิกผลิต หรือขนาดไม่ตรง Layout</td><!--FULL--><td>คิดราคาใหม่ต่อใบ</td><!--/FULL--></tr>
+  <tr><td class="none">⛔ ไม่พบ / ไม่มีตู้เดิม</td><td>แผนระบุ แต่หน้างานไม่มีตู้นี้ (ถูกย้าย / ถอดไปแล้ว / เป็นจุดติดตั้งใหม่)</td><td>— ใส่หมายเหตุ</td><!--FULL--><td>ไม่คิดงบ</td><!--/FULL--></tr>
+</table></div>
+<div class="two">
+  <div class="card"><b>เหตุผลที่ต้องซื้อใหม่ / Refurbish ไม่ได้</b>{{WHY}}</div>
+  <div class="card"><b>เคล็ดลับ</b><ul>
+    <li>อย่าเลือก Request New เพราะ "BOQ บอกให้ซื้อ" — ถ้าตู้ยังดี ให้เลือก Workable หรือ Refurbish</li>
+    <li>ตู้ซ่อมบ่อย (ซ่อม CMS หลายครั้ง / ค่าซ่อมสูง) ใส่ตัวเลขไว้ — ช่วยยืนยันการซื้อใหม่</li>
+    <li>ตู้ใบที่เสียต่างจากใบอื่น ให้เขียนในหมายเหตุ เช่น "ตู้ 3 ใน 8 ตัวคอยล์รั่ว"</li>
+  </ul></div>
+</div>
+
+<h2 id="rack">6. เกณฑ์ Rack / Multiset</h2>
+<div class="two">
+  <div class="card"><b>ประเภทที่เลือกได้</b>{{RACK_TYPES}}</div>
+  <div class="card"><b>ข้อมูลที่ทีมออกแบบใช้ตัดสินใจ</b><ul><li>อายุ + ชนิดน้ำยา</li><li>คอมเพรสเซอร์ทำงาน / ทั้งหมด</li><li>คราบน้ำมัน / รั่ว · สภาพ Condenser</li><li>ซ่อม CMS 12 เดือน + ค่าซ่อม</li><li>กำลังสำรองรับตู้เพิ่ม</li><li>รูป Rack + Nameplate + Condenser</li></ul></div>
+</div>
+{{RACK_REC}}
+<p class="note">เกณฑ์ด้านบนเป็นแนวทางให้ MTN — การตัดสินใจเปลี่ยน Rack ขั้นสุดท้ายเป็นของทีมออกแบบ / จัดซื้อ จากรูปและข้อมูลในรายงาน</p>
+
+<h2 id="site">7. Remote หรือ Plug-in — ความพร้อมหน้างาน</h2>
+<div class="card"><b>หลักการจากที่ประชุม:</b> ตู้กลางฟลอร์ / ตู้เกาะ = <b>Plug-in</b> · ตู้ริมผนัง Upright ที่ระบบเดิมรองรับ = <b>Remote</b> · ตู้ Plug-in ปล่อยความร้อนเข้าพื้นที่ขาย จึงต้องดูอุณหภูมิ (ข้อ 3) และแอร์ประกอบกัน</div>
+<div class="tbl">{{SITE}}</div>
+<div class="card"><b>ข้อเสนอระบบของ MTN (เลือก 1)</b>{{SYS_REC}}</div>
+<h3>ข้อจำกัดการติดตั้ง (ข้อ 6.3)</h3>
+<div class="tbl">{{INSTALL}}</div>
+
+<h2 id="wo">8. Write-off &amp; ขายซาก</h2>
+<div class="card">
+  <p>ตู้ที่ใส่ <b>Request New</b> และ Rack ที่เสนอ <b>เปลี่ยน</b> = ของเดิมต้องรื้อออก แบบสำรวจนี้เก็บเฉพาะข้อมูลที่ต้องใช้ — <b>การขอตัดจำหน่ายจริงทำในแอป MNC</b></p>
+  <ol>
+    <li><b>Asset No. (FAS)</b> — ดูจากปุ่ม 📦 ทะเบียนทรัพย์สินสาขา (ในข้อ 2 ของฟอร์ม) · หลายเลขคั่นด้วย , · ไม่ทราบให้เว้นว่าง</li>
+    <li><b>ประเภทตัดจำหน่าย</b> (บังคับเมื่อมี Request New): {{WO}}</li>
+    <li><b>รูปทุกใบ</b> (ตู้ · Rack Multiset · Condenser Multiset)<!--USER--> — ใช้ประกอบการตัดจำหน่ายและขายซาก<!--/USER--><!--FULL--> — GCP ใช้แจ้ง Supplier เสนอราคาซาก · FAD ใช้ประกอบการขออนุมัติ CAPEX (Partial write-off ใช้ราคา NBV ปัจจุบัน)<!--/FULL--></li>
+  </ol>
+  <p class="note">ปุ่ม 📝 ขอตัดจำหน่ายตาม DOA เปิดหน้าขอ Write-off ในแอป MNC — <b>ไม่ต้องทำระหว่างสำรวจ</b><!--FULL--> (ทำหลังสรุป Final BOQ แล้ว)<!--/FULL--></p>
+</div>
+<!--FULL-->
+
+<h2 id="report">9. อ่านรายงาน (HO / Area)</h2>
+<figure><img src="{{IMG:r01_stores}}" alt=""><figcaption>แท็บ <b>สาขา</b> — 1 แถว = 1 สาขาในโครงการ (ใช้ผลสำรวจล่าสุดของแต่ละสาขา) <ol>
+  <li><span class="m">1</span> KPI: สาขาที่ตรวจแล้ว · BOQ รวม · Refurbish ที่ยืนยัน · Workable / New · <b>งบเทียบ BOQ</b> (+ ต้องเพิ่ม / − ประหยัด) · สาขาร้อนเกิน / Rack ที่เสนอเปลี่ยน — <b>ตัวเลขเงินเห็นเฉพาะ Super Admin</b> ผู้ใช้อื่นเห็นจำนวนตู้แทน (ดูข้อ 10.1)</li>
+  <li><span class="m">2</span> กรอง: ทุกทีม · ตรวจแล้ว / ยังไม่ตรวจ / ยังไม่มี Layout / <b>Full Renovate</b> / <b>มีข้อจำกัดการติดตั้ง</b> · ค้นหาสาขาหรือตู้</li>
+  <li><span class="m">3</span> คลิกแถวเพื่อดูรายละเอียดผลตรวจ — สาขาที่ยังไม่ตรวจใช้ติดตามกับ Area MTN · ใต้วันที่ตรวจมีป้าย <b>BOQ R0 / R1…</b> = BOQ ที่ใช้ตอนตรวจ (สีส้ม ⚠ = เก่ากว่า BOQ ปัจจุบัน ดูข้อ 10.4) · คอลัมน์ <b>แอร์ / ไฟ / ติดตั้ง</b>: ระบบแอร์ + TR + โหลด · ไฟ MDB เหลือ % (แดง &lt; 20%) · แนวทางระบายความร้อนตู้ Plug-in · จำนวนข้อจำกัดการติดตั้ง</li>
+  <li><span class="m">4</span> เปิดโฟลเดอร์ Layout ใน Drive · Admin กด "⟳ สแกน Layout" เมื่อเพิ่มไฟล์ใหม่ (รายละเอียดข้อ 10.3)</li>
+</ol></figcaption></figure>
+<figure><img src="{{IMG:r02_items}}" alt=""><figcaption>แท็บ <b>ตู้แช่ (รวมทุกสาขา)</b> — ใช้เป็น <b>Final list</b> สำหรับปรับ BOQ <ol>
+  <li><span class="m">1</span> สลับแท็บ</li>
+  <li><span class="m">2</span> แผน BOQ (Refurbish / New) เทียบกับ…</li>
+  <li><span class="m">3</span> <span class="m">4</span> ผลตรวจจริง Refurbish / Workable / Request New / ไม่พบ</li>
+  <li><span class="m">5</span> งบตามผลตรวจ (ใช้ราคาต่อหน่วยจาก BOQ)</li>
+</ol></figcaption></figure>
+<figure><img src="{{IMG:r03_racks}}" alt=""><figcaption>แท็บ <b>Rack (รูปสำหรับตัดสินใจ)</b> — การ์ดละ 1 ชุด พร้อมข้อมูลหลักและรูป <ol>
+  <li><span class="m">1</span> ข้อเสนอของ MTN</li><li><span class="m">2</span> รูป Rack / Nameplate / Condenser — คลิกเพื่อเปิดภาพเต็ม</li>
+</ol></figcaption></figure>
+<figure><img src="{{IMG:r04_record}}" alt=""><figcaption>รายละเอียดผลตรวจของสาขา <ol>
+  <li><span class="m">1</span> ผู้ตรวจ · วันที่ · สถานะ Final Layout · ระบบที่แนะนำ + ระยะท่อ</li>
+  <li><span class="m">2</span> อุณหภูมิทุกจุด + รูปเครื่องวัด</li>
+  <li><span class="m">3</span> การ์ดตู้แต่ละใบ: ผลแยกจำนวน · สภาพ · รูป</li>
+  <li><span class="m">4</span> ข้อมูลรื้อออก / Write-off</li>
+</ol>ปุ่ม <b>⬇ Export Excel</b> ได้ 3 ชีต: <code>Stores</code> · <code>Cabinets</code> (ทุกการ์ด รวม Equipment IDs) · <code>Racks</code> — ใช้ส่งต่อทีมออกแบบ / จัดซื้อ / FAD · คอลัมน์ราคา (THB) มีเฉพาะไฟล์ที่ Super Admin export</figcaption></figure>
+<p><b>พิมพ์รายงาน:</b> ปุ่ม <b>🖨️ พิมพ์รายงาน</b> = KPI + แท็บที่เปิดอยู่ ตามตัวกรองบนจอ (A4 แนวนอน มีหัวกระดาษ วันที่ ตัวกรอง และเลขหน้า) · ปุ่ม <b>🖨️ พิมพ์</b> ในหน้ารายละเอียด = เฉพาะสาขานั้น · เลือก "Save as PDF" เพื่อได้ไฟล์ · เปิด "Background graphics" เพื่อให้สีออก · ถ้า Super Admin พิมพ์ หัวกระดาษระบุว่ามีข้อมูลงบประมาณ</p>
+
+<h2 id="admin">10. Super Admin — สิทธิ์ ตั้งค่า &amp; ดูแลระบบ</h2>
+<div class="warn"><b>หลักการ:</b> ข้อมูลงบ / ราคา BOQ เห็นได้เฉพาะ Super Admin · ระบบตัดตัวเลขเงินออก<b>ที่ฝั่งเซิร์ฟเวอร์</b>ก่อนส่งให้ผู้ใช้อื่น (ไม่ใช่แค่ซ่อนบนจอ) · อีเมลสรุปหลังส่งแบบสำรวจ คู่มือผู้ใช้ และฟอร์มกระดาษ A4 <b>ไม่มีตัวเลขงบ</b></div>
+
+<h3>10.1 ใครเห็นอะไรในรายงาน</h3>
+<div class="tbl"><table>
+  <tr><th>ผู้ใช้ (บทบาทในฐานข้อมูลพนักงาน)</th><th>สาขาที่เห็น</th><th>ราคา / งบ</th><th>อื่นๆ</th></tr>
+  <tr><td><b>Super Admin</b> (User Type = admin / Super Admin)</td><td>ทั้ง 64 สาขา</td><td class="ok">เห็น</td><td>ปุ่ม 🔒 คู่มือฉบับเต็ม · ลบรายการ · สแกน Layout</td></tr>
+  <tr><td>System Admin · Schedule / Survey Admin · ทีม SMF</td><td>ทั้ง 64 สาขา</td><td class="new">ไม่เห็น</td><td>Schedule Admin ลบรายการได้ · ผู้มีสิทธิ์แก้ไขกดสแกน Layout ได้</td></tr>
+  <tr><td><b>AMM MTN</b></td><td>เฉพาะสาขาที่ตนเป็น AMM MTN</td><td class="new">ไม่เห็น</td><td>เปิดรายการของสาขาอื่นไม่ได้ (แม้มีลิงก์) · มีแถบแจ้ง "แสดงเฉพาะสาขาที่คุณรับผิดชอบ"</td></tr>
+  <tr><td>ผู้ใช้อื่น / ไม่ได้เข้าสู่ระบบ</td><td>ไม่เห็นสาขาใด</td><td class="new">ไม่เห็น</td><td>มีข้อความแนะนำให้เข้าสู่ระบบ / แจ้ง Admin</td></tr>
+</table></div>
+<p class="note">ตัวตนผู้ใช้มาจากการเข้าสู่ระบบในแอปหลัก (เหมือนหน้าอื่นของแอป) · ผลการจับคู่สาขาของ AMM จำไว้ 10 นาที — หลังแก้ข้อมูลให้รอ 10 นาทีแล้วเปิดรายงานใหม่</p>
+
+<h3>10.2 AMM MTN เห็นสาขาไม่ครบ / ไม่เห็นเลย</h3>
+<ol>
+  <li>ระบบจับคู่จากคอลัมน์ <b>ID AMM</b> ในฐานข้อมูลสาขา → หาอีเมลจากรหัสพนักงาน (ฐานข้อมูลพนักงานของแอปนี้ แล้วจึงรายชื่อพนักงานแอป MNC) → ต้องตรงกับอีเมลที่ AMM ใช้เข้าสู่ระบบ</li>
+  <li>ถ้าอีเมลไม่ตรง (เช่น ระบบเจอ Gmail ส่วนตัว แต่ AMM เข้าสู่ระบบด้วยอีเมลบริษัท) → เปิดหน้า <b>ติดตามทางอีเมล</b> (ปุ่ม 📧 ในหน้า Hyper Upload Schedule หรือหน้า Follow-up email ใน Access Console) แล้วกด <b>แก้</b> อีเมลของ AMM คนนั้น — ค่าที่แก้ใช้ร่วมกันทั้งอีเมลติดตามงานและรายงานนี้</li>
+  <li>ถ้าสาขาไม่มี ID AMM ในฐานข้อมูลสาขา → แก้ที่ฐานข้อมูลสาขาก่อน</li>
+</ol>
+
+<h3>10.3 ไฟล์ Layout (To-Be / As-Is)</h3>
+<ul>
+  <li>วางไฟล์ในโฟลเดอร์ Drive <b>Fresh Food Survey → Layout</b> เท่านั้น: <code>Layout/To-Be</code> = Final Layout (แสดงเป็นป้ายเขียว อยู่บนสุด) · <code>Layout/As-Is</code> = Layout ปัจจุบัน · ระบบไม่อ่านไฟล์นอกโฟลเดอร์ Layout (โฟลเดอร์หลักมี BOQ / งบ จึงไม่ลิงก์ให้ใคร)</li>
+  <li>ตั้งชื่อไฟล์: ขึ้นต้นด้วยเลขสาขา — Gold 5 หลัก / Oracle 6 หลัก / 3 หลักท้ายของ Gold แล้วตามด้วย <code>_</code> (เช่น <code>128_SUKSAWAT_AS IS_(07-09-26).pdf</code>) <b>หรือ</b> ใช้ชื่อสาขาอย่างเดียว (เช่น <code>Suksawat.pdf</code>) · ชื่อที่สะกดต่างจากรายชื่อสาขา (เช่น <code>Kallapaphuk</code>) ต้องเพิ่มในตารางจับคู่ของระบบ — ระบบ<b>ไม่เดา</b>ชื่อที่ใกล้เคียง เพื่อไม่ให้ไฟล์ไปผิดสาขา</li>
+  <li>เพิ่ม / เปลี่ยนไฟล์แล้วกด <b>⟳ สแกน Layout</b> ในรายงาน (ไม่กด ระบบสแกนเองทุก 30 นาที) · สแกนครั้งแรกหลังเพิ่มไฟล์จำนวนมากอาจใช้ ~1 นาที</li>
+  <li><b>ไฟล์เป็นส่วนตัว — เปิดได้ในแอปเท่านั้น:</b> ทุกครั้งที่สแกน ระบบปิดการแชร์ลิงก์ของไฟล์ Layout (ลิงก์ Drive ที่เคยส่งต่อจะเปิดไม่ได้) · แอปส่งไฟล์ให้เฉพาะผู้มีสิทธิ์และแสดงในตัวดูภายในแอป (ซูมได้ ไม่มีปุ่มดาวน์โหลด / ลิงก์) · <b>ใครเปิดได้:</b> Super Admin / Admin / System Admin / Schedule Admin / SMF = ทุกสาขา · AMM MTN = เฉพาะสาขาของตน (ใช้การจับคู่เดียวกับรายงาน ข้อ 10.1–10.2) · MTN สาขา / ผู้อื่น = เปิดไม่ได้ (ขึ้น 🔒) · การแชร์รายบุคคลที่ตั้งเองใน Drive ไม่ถูกแตะ · ป้องกันการถ่ายภาพหน้าจอไม่ได้ — มีข้อความเตือนในตัวดู · ไฟล์ .dwg ไม่แสดงในแอป (ใช้ PDF / รูป)</li>
+  <li>ไฟล์รวมหลายสาขา (เช่น <code>ALL FF Renovate.pdf</code>) ระบบไม่ผูกกับสาขาใด</li>
+</ul>
+
+<h3>10.4 เมื่อ BOQ เปลี่ยน (R1, R2…)</h3>
+<ol>
+  <li>รับไฟล์ Master BOQ ฉบับใหม่ ตั้งชื่อให้มี <code>_R1</code> (หรือ R2…) — ระบบใช้ส่วนนี้เป็นชื่อรุ่น BOQ</li>
+  <li>ผู้ดูแลระบบรันตัวแปลง BOQ แบบ<b>ทดลองก่อน</b> ได้ <b>รายงานการเปลี่ยนแปลง</b>: ประเภทตู้ที่เพิ่ม / หายไป · สาขาที่เพิ่ม / ถูกตัด · รายการที่เปลี่ยนจำนวนรายสาขา (เช่น "Suksawat · Low frozen L2500 Refurbish/New (12, 23) → (10, 25)")</li>
+  <li>ตรวจรายงานแล้วจึงอนุมัติให้ใช้จริง → Deploy</li>
+  <li>หลัง Deploy รายงานแสดงป้าย <b>BOQ R0 ⚠</b> สีส้ม ที่สาขาซึ่งตรวจด้วย BOQ เก่า → ให้ Area MTN ตรวจเฉพาะรายการที่เปลี่ยน แล้วส่งสาขานั้นใหม่</li>
+</ol>
+<p class="note">ผลตรวจที่ส่งแล้ว<b>ไม่เสียหาย</b>เมื่อ BOQ เปลี่ยน: ประเภทตู้เดิมคงรหัสเดิมเสมอ ประเภทใหม่ต่อท้าย ประเภทที่ถูกตัดยังอยู่ให้รายการเก่าอ้างถึงได้ · การ์ดแต่ละใบจำชื่อตู้ไว้ด้วย — ถ้ารหัสกับชื่อไม่ตรงกัน ระบบหาตามชื่อ · ถ้าประเภทนั้นไม่มีใน BOQ แล้ว การ์ดยังคงชื่อเดิม (ไม่มีราคา) ไม่ถูกเปลี่ยนเป็นตู้ชนิดอื่น · ทุกรายการบันทึกคอลัมน์ <b>BOQ Rev</b> (เช่น <code>R0 · 2026-11-15</code>) — ดูได้ใน Export Excel</p>
+
+<h3>10.4.1 รหัสอุปกรณ์จัดซื้อ (Purchasing code)</h3>
+<ul>
+  <li>ทุกประเภทตู้ / ระบบใน BOQ มี <b>รหัสจัดซื้อ</b> เช่น <code>FF-CHP-03</code> — ไฟล์ <code>Fresh Food Survey/FF_Equipment_Codes.xlsx</code> (1 รหัส = 1 รายการจัดซื้อ) · รหัสคือตัวเชื่อม BOQ ↔ แอป ชื่อเปลี่ยนได้ รหัสห้ามเปลี่ยน</li>
+  <li><b>แนะนำ:</b> ให้คุณเต้ยเพิ่มคอลัมน์ <b>Item Code</b> ในชีต <code>Detail K.TOEY</code> แล้วใส่รหัสจากไฟล์นี้ — เมื่อเปลี่ยนชื่อรายการใน BOQ แต่รหัสเดิม ระบบถือเป็นอุปกรณ์เดิมทันที · ถ้าไม่มีคอลัมน์ ระบบจับคู่จากชื่อปัจจุบัน / ชื่อเดิม (คอลัมน์ Previous names)</li>
+  <li>รายการใหม่ที่ยังไม่มีรหัส ระบบออกรหัสถัดไปให้ตอนอัปเดต BOQ (เช่น <code>FF-FRZ-10</code>) และเพิ่มแถวในไฟล์ · รายงานการเปลี่ยนแปลงแสดงรหัสใหม่ / การเปลี่ยนชื่อ / รหัสขัดแย้ง</li>
+  <li>รหัสแสดงบนการ์ดตู้ ฟอร์มกระดาษ รายละเอียดในรายงาน และคอลัมน์ <code>Equip Code</code> ใน Export · แท็บ "ตู้แช่ (รวมทุกสาขา)" <b>รวมตามรหัส</b> — ผลตรวจที่ใช้ชื่อ BOQ เก่ารวมกับชื่อใหม่ (แสดง "รวมชื่อเดิม")</li>
+  <li>ไฟล์รหัสชุดแรก (17 พ.ย. 69) เชื่อมชื่อ R0 → R1 ที่เป็นรายการจัดซื้อเดียวกัน (Plug-in → Plug-in, Remote → Remote) — หมายเหตุ "proposed, please confirm" ให้ตรวจยืนยัน</li>
+</ul>
+
+<h3>10.4.2 ข้อมูลสัญญา PM ตู้แช่ (baseline ของตู้เดิม)</h3>
+<ul>
+  <li>มาจากไฟล์ <code>20-01-2026_Group Store Refrigerator PM ( Hyper _ BMK ) 2 Y.xlsx</code> (ชีต Refrigerator PM option 2 yr + HYP_OLD) — ครอบคลุม 61 / 64 สาขา (3 สาขา Full Renovate ไม่มีในไฟล์) · นำเข้าเฉพาะข้อมูลอุปกรณ์ / Rack / สัญญาเช่า / ระยะสัญญา PM — <b>ไม่นำเข้าราคา และไม่นำเข้าชื่อ / เบอร์โทรพนักงาน</b> (ชีต HYP_New)</li>
+  <li><b>ในแบบสำรวจ</b> (ทุกคนที่เปิดฟอร์ม): เห็นเฉพาะข้อมูลอุปกรณ์ + ข้อสังเกตด้านอุปกรณ์ · การ์ด Rack ใหม่ได้ค่าตั้งต้นจาก PM · <b>ไม่แสดง</b> สัญญาเช่า / กรรมสิทธิ์ / ระยะสัญญา PM / หมายเหตุ</li>
+  <li><b>ในรายงาน</b> (Admin / HO / AMM ตามสิทธิ์): คอลัมน์ <b>ข้อมูล PM / สัญญา</b> = น้ำยา · อายุ Rack · สัญญาเช่าที่เหลือ (แดงถ้า &lt; 5 ปี) · ⚠ จำนวนข้อสังเกต (ชี้เมาส์เพื่อดูรายการ) · ตัวกรอง <b>"มีข้อสังเกตจาก PM"</b> · กล่อง PM ในหน้ารายละเอียด · Export มีคอลัมน์ PM Ownership / Lease Left / Contract End / Refrigerant / Rack Install Year / Rack Age / High Frozen / Flags</li>
+  <li><b>ข้อสังเกตที่ระบบตรวจ:</b> BOQ วางแผน Refurbish มากกว่าที่ PM นับได้ (Low Frozen · High Frozen Remote / Plug-in · ตู้แช่เย็น Remote · Stainless) · Rack R22 อายุเกิน 15 ปี · สัญญาเช่าเหลือ &lt; 5 ปี · คำตอบ High Frozen ของ MTN ไม่ตรงกับ PM · หมายเหตุใน PM — <b>เป็นจุดให้ตรวจ ไม่ใช่ข้อผิดพลาดเสมอไป</b> (สัญญา PM อาจไม่นับตู้ Plug-in บางส่วน)</li>
+  <li>ไฟล์ PM ฉบับใหม่: วางในโฟลเดอร์ Fresh Food Survey แล้วผู้ดูแลระบบรันตัวแปลงข้อมูล PM แล้ว Deploy</li>
+</ul>
+
+<h3>10.4.3 รหัสตู้ + QR สำหรับจัดซื้อ / ตรวจรับงาน</h3>
+<ul>
+  <li><b>สร้างอัตโนมัติเมื่อส่งแบบสำรวจ</b> — 1 รหัสต่อ 1 ตู้จริงในผลสำรวจล่าสุดของสาขา (Refurbish / Workable / Request New) · ชีต <code>FF_Renovate_Units</code> · รหัส <code>FFR-&lt;Oracle&gt;-&lt;รหัสจัดซื้อ&gt;-&lt;ลำดับ&gt;</code> เช่น <code>FFR-111128-FRZ01-03</code> (ตู้นอกแผนที่ไม่มีรหัสจัดซื้อ = <code>X&lt;การ์ด&gt;</code>)</li>
+  <li><b>รหัสไม่เปลี่ยน</b> เมื่อสำรวจซ้ำ / แก้ไข — ผลอัปเดต · ตู้เพิ่มได้รหัสใหม่ต่อท้าย · ตู้ที่หายไปเป็น <b>Cancelled</b> (ไม่ลบ เพราะอาจพิมพ์ป้ายไปแล้ว) · ถ้าตู้ไปถึงขั้นสั่งซื้อแล้ว จะไม่ยกเลิกเอง แต่มีหมายเหตุให้ตรวจ</li>
+  <li><b>พิมพ์ป้าย:</b> ปุ่ม <b>🏷️ QR ตู้</b> ในรายงาน หรือ "พิมพ์ QR ตู้ของสาขานี้" ในหน้ารายละเอียด → เลือกสาขา / กรองตามผล (Request New / Refurbish / Workable) → กระดาษสติกเกอร์ A4 24 ดวง (3 × 8, 70 × 37 มม.) พิมพ์ขนาดจริง 100% · เห็นเฉพาะสาขาตามสิทธิ์</li>
+  <li><b>สแกน QR</b> → หน้า <code>?page=ffr-unit</code> แสดงสาขา ตู้ ผลสำรวจ Equipment ID เดิม Asset No. และแถบสถานะ <b>สำรวจแล้ว → สั่งซื้อ / PO → ส่งของ → ติดตั้ง → ตรวจรับแล้ว</b> (เปิดได้โดยไม่ต้องล็อกอิน — ไม่มีราคา / ข้อมูลสัญญา) · ชีตมีคอลัมน์ PO No / Vendor / Delivered / Installed / Accepted / Accepted By รอเฟสจัดซื้อและตรวจรับ</li>
+  <li>แบบสำรวจที่ส่งก่อนมีระบบนี้: Admin กด <b>⟳ สร้าง/อัปเดต QR</b> ในรายงานครั้งเดียว · Export Excel มีชีต <b>Units (QR)</b></li>
+</ul>
+
+<h3>10.5 Equipment ID &amp; ป้าย QR</h3>
+<ul>
+  <li>Equipment ID มาจากแบบสำรวจตู้แช่ Hyper และอุปกรณ์ Fresh Food Hyper (รูปแบบ <code>&lt;รหัสสาขา&gt;-&lt;ประเภท&gt;&lt;ลำดับ&gt;</code> เช่น <code>111128-LF03</code>) · ดู / พิมพ์ป้าย QR / ประวัติ PM-CM ได้ที่หน้า <b>🔎 อุปกรณ์ / QR</b> (<code>?page=equip</code>)</li>
+  <li>ในแบบสำรวจ FF Renovate ช่อง Equipment ID <b>ไม่บังคับ</b> · รายการให้เลือกมาจากแบบสำรวจตู้แช่ / อุปกรณ์ FF ล่าสุดของสาขา — สาขาที่ยังไม่เคยทำแบบสำรวจนั้นจะไม่มีรายการ (ยังพิมพ์ / สแกนได้)</li>
+  <li>รายงาน: แสดง Equipment ID ในรายละเอียดการ์ด และคอลัมน์ <code>Equipment IDs</code> ในชีต Cabinets</li>
+</ul>
+
+<h3>10.6 เครื่องมืออื่นของ Super Admin</h3>
+<ul>
+  <li><b>🖨️ ฟอร์มกระดาษ A4</b> (<code>?page=ffr-checklist</code>) — เลือกสาขาแล้วระบบใส่รายการตู้ตามแผน BOQ ให้ (ไม่มีราคา) หรือพิมพ์ฟอร์มเปล่า · หัวแท็บแบบสำรวจมีปุ่ม 🖨️ ฟอร์ม A4 ของสาขาที่เลือก</li>
+  <li><b>🔒 คู่มือฉบับเต็ม</b> — ลิงก์เปิดได้ 12 ชั่วโมงต่อครั้ง ห้ามส่งต่อ · ผู้ใช้ทั่วไปใช้ <code>?page=ffr-manual</code></li>
+  <li><b>📦 รวมข้อมูล Archive</b> (ปุ่มมุมซ้ายล่าง) — รวมรายการเก่าที่ย้ายไปเก็บใน Drive แล้ว</li>
+  <li><b>ลบรายการ</b> — ในหน้ารายละเอียด (Super Admin / Schedule Admin) ใช้กับรายการที่ส่งผิด · รายงานใช้รายการล่าสุดของแต่ละสาขาเสมอ</li>
+  <li><b>อีเมลติดตามงาน</b> — ระบบติดตามทางอีเมล (SGM / AMM MTN) ปัจจุบันครอบคลุมแบบสำรวจ Hyper 8 แบบ + Fixed Asset · <b>ยังไม่รวม FF Renovate</b></li>
+</ul>
+
+<!--/FULL-->
+<h2 id="faq">{{FAQN}}. คำถามที่พบบ่อย</h2>
+<details open><summary>BOQ บอก 8 ใบ แต่หน้างานมี 6 ใบ?</summary>ใส่จำนวนที่ตรวจ = 8 แล้วแยก 2 ใบเป็น "ไม่พบ" (เขียนหมายเหตุ) — หรือถ้าตู้จริงต่างรุ่น ให้เพิ่มการ์ด "ตู้ที่พบ" แยก</details>
+<details><summary>ตู้เดียวกันแต่สภาพต่างกัน ทำอย่างไร?</summary>การ์ดเดียวแยกจำนวนได้ เช่น 6 ใบ = Refurbish 4 + Workable 1 + Request New 1 · ประเมินสภาพตามภาพรวมของรายการ และเขียนใบที่แย่ในหมายเหตุ</details>
+<details><summary>ไม่มีเครื่องวัดความชื้น?</summary>ใส่เฉพาะ °C ได้ (%RH เว้นว่าง) แต่ต้องวัดอย่างน้อย 3 จุดและแนบรูปเครื่องวัด</details>
+<details><summary>ไม่รู้ Asset No.?</summary>เว้นว่างได้ — แต่ต้องเลือกประเภทตัดจำหน่าย และถ่ายรูปตู้ / Nameplate ไว้ ทีม HO จับคู่กับทะเบียน FAS ภายหลัง</details>
+<details><summary>สาขานี้ไม่มี Rack (ตู้ Plug-in ทั้งหมด)?</summary>ไม่ต้องเพิ่มการ์ด Rack — ตอน Submit ระบบจะถามยืนยันว่าสาขาไม่มี Rack / Multiset / Cold room</details>
+<details><summary>ส่งไปแล้ว อยากแก้ไข?</summary>ส่งแบบสำรวจของสาขาเดิมใหม่ได้ — รายงานใช้รายการล่าสุดของแต่ละสาขาเสมอ · รายการเก่าที่ส่งผิดให้แจ้ง Admin ลบ</details>
+<details><summary>ขึ้น 🔒 "เปิดได้เฉพาะ AMM MTN ของสาขาและทีม HO"?</summary>ไฟล์ Layout เป็นความลับของโครงการ — ขอดูจาก AMM MTN ตอนลงพื้นที่ แล้วเลือกสถานะ Final Layout ตามที่เห็น · ถ้าคุณเป็น AMM MTN ของสาขานั้นแต่ยังขึ้น 🔒 ให้แจ้ง HO ตรวจอีเมลในฐานข้อมูล</details>
+<details><summary>SGM ไม่อยู่สาขาวันที่ตรวจ ยังไม่ได้ลายเซ็น?</summary>กรอกทุกข้อแล้วกด <b>Save Draft</b> ไว้ก่อน — เมื่อ SGM ลงนามแล้วจึงถ่ายรูปฟอร์ม แนบในข้อ 8 แล้วกด Submit (ทำต่อจากเครื่องอื่นได้)</details>
+<details><summary>ไม่เห็นไฟล์ Final Layout ของสาขา?</summary>เลือก "ยังไม่ได้รับ Final Layout" แล้วตรวจต่อ · แจ้ง HO ให้วางไฟล์ในโฟลเดอร์ Layout และกดสแกน</details>
+
+<footer>ฝ่ายบริหารอาคาร (Building Management) · Big C Supercenter · คู่มือสร้างจากหน้าจอจริงของแอป ข้อมูลในภาพเป็นสาขาตัวอย่าง (Demo)</footer>
+</div>
+</body>
+</html>

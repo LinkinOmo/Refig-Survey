@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Renovate QR Labels</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        /* A4 sheet of 24 labels (3 × 8, 70 × 37 mm — common sticker sheet). One label = one FF Renovate cabinet unit.
+           The QR opens ?page=ffr-unit&id=<Unit ID> — used in procurement, delivery and job acceptance. Data: getFfrUnits (store-scoped). */
+        @page { size: A4 portrait; margin: 0; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; background: #e5e7eb; color: #111; }
+        .toolbar { position: sticky; top: 0; z-index: 5; background: #881337; color: #fff; padding: 8px 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 14px; }
+        .toolbar select, .toolbar button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; }
+        .toolbar select { color: #111; max-width: 320px; }
+        .toolbar button { background: #fff; color: #881337; font-weight: 700; cursor: pointer; }
+        #msg { font-size: 12px; opacity: .9; }
+        .page { width: 210mm; height: 297mm; margin: 8mm auto; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.15);
+                padding: 0.5mm 0 0 0; overflow: hidden; display: grid; grid-template-columns: repeat(3, 70mm); grid-template-rows: repeat(8, 37mm); justify-content: center; }   /* 8 × 37 = 296 mm of 297 */
+        .lab { border: 1px dashed #cbd5e1; padding: 2mm 2.5mm; display: flex; gap: 2.5mm; align-items: center; overflow: hidden; }
+        .qr { flex: 0 0 26mm; width: 26mm; height: 26mm; }
+        .qr img, .qr canvas { width: 26mm !important; height: 26mm !important; }
+        .qr canvas { display: none !important; }
+        .t { flex: 1; min-width: 0; line-height: 1.2; }
+        .id { font-family: monospace; font-weight: 700; font-size: 8.6pt; word-break: break-all; }
+        .st { font-size: 7.4pt; color: #334155; }
+        .cab { font-size: 7.4pt; margin-top: .8mm; max-height: 7.6mm; overflow: hidden; }
+        .res { display: inline-block; margin-top: .8mm; padding: 0 1.6mm; border-radius: 2mm; font-size: 7.2pt; font-weight: 700; color: #fff; }
+        .r-new { background: #dc2626; } .r-ref { background: #059669; } .r-work { background: #0284c7; }
+        .brand { font-size: 6.4pt; color: #64748b; margin-top: .6mm; }
+        @media print { body { background: #fff; } .toolbar { display: none; } .page { margin: 0; box-shadow: none; page-break-after: always; } .page:last-child { page-break-after: auto; } .lab { border-color: #fff; } }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <b>🏷️ QR ตู้ — FF Renovate</b>
+        <select id="storeSel" onchange="load(this.value)"><option value="">— เลือกสาขา —</option></select>
+        <select id="resSel" onchange="render()"><option value="">ทุกผล</option><option>Request New</option><option>Refurbish</option><option>Workable</option></select>
+        <button onclick="window.print()">พิมพ์ / Save PDF</button>
+        <span id="msg">กระดาษสติกเกอร์ A4 24 ดวง (3 × 8, 70 × 37 มม.) · พิมพ์ขนาดจริง 100%</span>
+    </div>
+    <div id="pages"></div>
+<script>
+const PRESET = <?!= JSON.stringify(storeCode || '') ?>;
+let UNITS = [], APP = '';
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function email() { try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); return (u && u.email) || ''; } catch (e) { return ''; } }
+function msg(t) { document.getElementById('msg').textContent = t; }
+function load(code) {
+    msg('⏳ กำลังโหลด...');
+    google.script.run.withSuccessHandler(function(r) {
+        if (!r || !r.success) { msg('❌ ' + ((r && r.error) || 'โหลดไม่สำเร็จ')); document.getElementById('pages').innerHTML = ''; return; }
+        APP = r.appUrl || APP;
+        const sel = document.getElementById('storeSel');
+        if (sel.options.length <= 1) (r.stores || []).sort((a, b) => (a.t + a.n).localeCompare(b.t + b.n)).forEach(s => { const o = document.createElement('option'); o.value = s.o; o.textContent = 'ทีม ' + s.t + ' · ' + s.c + ' ' + s.n; sel.appendChild(o); });
+        if (!(r.stores || []).length) { msg(email() ? 'ไม่มีสาขาที่คุณมีสิทธิ์' : 'กรุณาเข้าสู่ระบบในแอปหลักก่อน'); return; }
+        sel.value = code || '';
+        UNITS = code ? (r.units || []) : [];
+        render();
+    }).withFailureHandler(function(e) { msg('❌ ' + e.message); }).getFfrUnits(email(), code || '', false);
+}
+function render() {
+    const res = document.getElementById('resSel').value, list = UNITS.filter(u => !res || u.Result === res);
+    const host = document.getElementById('pages'); host.innerHTML = '';
+    if (!document.getElementById('storeSel').value) { msg('เลือกสาขาเพื่อพิมพ์ QR'); return; }
+    if (!list.length) { msg('สาขานี้ยังไม่มีผลสำรวจ FF Renovate — รหัสตู้ / QR จะสร้างอัตโนมัติเมื่อส่งแบบสำรวจ'); return; }
+    const cls = { 'Request New': 'r-new', 'Refurbish': 'r-ref', 'Workable': 'r-work' };
+    for (let p = 0; p < list.length; p += 24) {
+        const pg = document.createElement('div'); pg.className = 'page';
+        list.slice(p, p + 24).forEach((u, i) => {
+            const d = document.createElement('div'); d.className = 'lab';
+            d.innerHTML = '<div class="qr" id="q' + (p + i) + '"></div><div class="t"><div class="id">' + esc(u['Unit ID']) + '</div>' +
+                '<div class="st">' + esc(u['Gold Code'] + ' ' + u['Branch Name']) + '</div>' +
+                '<div class="cab">' + esc((u['Equip Code'] ? u['Equip Code'] + ' · ' : '') + u['Cabinet']) + '</div>' +
+                '<span class="res ' + (cls[u.Result] || '') + '">' + esc(u.Result) + '</span>' + (u['Equipment ID'] ? ' <span class="st">' + esc(u['Equipment ID']) + '</span>' : '') +
+                '<div class="brand">Big C · FF Renovation 2027 · สแกนเพื่อตรวจรับ</div></div>';
+            pg.appendChild(d);
+        });
+        host.appendChild(pg);
+    }
+    list.forEach((u, i) => new QRCode(document.getElementById('q' + i), { text: APP + '?page=ffr-unit&id=' + encodeURIComponent(u['Unit ID']), width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M }));
+    msg(list.length + ' ดวง · ' + Math.ceil(list.length / 24) + ' แผ่น A4 · พิมพ์ขนาดจริง 100%');
+}
+load(PRESET);
+</script>
+</body>
+</html>

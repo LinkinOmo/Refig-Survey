@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Renovate Paper Form</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* A4 paper form for the 🥩 FF Renovate (MTN Pre-check) survey. Server data: getFfrPaperData() — no prices / budget. */
+        @page { size: A4 portrait; margin: 9mm 8mm 10mm 8mm; @bottom-right { content: counter(page) " / " counter(pages); font-size: 8pt; color: #64748b; } }
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', Tahoma, sans-serif; font-size: 9.5pt; color: #111; margin: 0; background: #e5e7eb; }
+        .sheet { width: 194mm; margin: 8mm auto; background: #fff; padding: 7mm 7mm; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+        @media print { body { background: #fff; } .sheet { margin: 0; box-shadow: none; padding: 0; width: auto; } .noprint { display: none !important; } }
+        h1 { font-size: 14pt; margin: 0; color: #881337; }
+        h2 { font-size: 10.5pt; margin: 3mm 0 1.2mm; padding: 1mm 2mm; background: #ffe4e6; border-left: 4px solid #be123c; break-after: avoid; }
+        .hdr { display: flex; justify-content: space-between; align-items: flex-end; gap: 4mm; border-bottom: 2px solid #be123c; padding-bottom: 1.5mm; }
+        .muted { color: #555; font-size: 8pt; }
+        table { width: 100%; border-collapse: collapse; }
+        td, th { border: 1px solid #555; padding: .8mm 1.3mm; vertical-align: middle; }
+        th { background: #f3f4f6; font-size: 8.3pt; }
+        .box { display: inline-block; width: 3.3mm; height: 3.3mm; border: 1.2px solid #111; vertical-align: -0.6mm; margin-right: .8mm; }
+        .opt { white-space: nowrap; margin-right: 2.6mm; display: inline-block; }
+        .bad { color: #be123c; font-weight: 700; }
+        .fill { border-bottom: 1px dotted #333; display: inline-block; min-width: 30mm; height: 4.2mm; vertical-align: bottom; }
+        .w12 { min-width: 12mm; } .w18 { min-width: 18mm; } .w25 { min-width: 25mm; } .w45 { min-width: 45mm; } .w60 { min-width: 60mm; }
+        .store td { font-size: 9pt; }
+        .cabt thead { display: table-header-group; }
+        tbody.cab { break-inside: avoid; }
+        .cab td { font-size: 8.4pt; }
+        .cab td.n { width: 7mm; text-align: center; font-weight: 700; background: #fff1f2; }
+        .cab td.q { width: 13mm; height: 8mm; }
+        .cab th.q { width: 13mm; font-size: 7.6pt; line-height: 1.1; }
+        .cab td.plan { width: 23mm; font-size: 8pt; text-align: center; background: #fafafa; }
+        .cab tr.d td { font-size: 7.9pt; background: #fcfcfc; line-height: 1.75; }
+        .tag { display: inline-block; padding: 0 1.6mm; border-radius: 2mm; font-size: 7.4pt; font-weight: 700; border: 1px solid #999; margin-left: 1mm; }
+        .tag.plug { background: #ecfeff; border-color: #0891b2; color: #155e75; }
+        .tag.remote { background: #eef2ff; border-color: #4f46e5; color: #3730a3; }
+        .q td.lbl { width: 62mm; font-size: 8.4pt; }
+        .q td { font-size: 8.4pt; height: 6.6mm; }
+        .q td.no { width: 6mm; text-align: center; }
+        .amb td { height: 7mm; }
+        .rack { break-inside: avoid; margin-bottom: 1.6mm; }
+        .rack td { font-size: 8.3pt; line-height: 1.8; }
+        .legend { font-size: 7.8pt; line-height: 1.45; }
+        .sign td { height: 15mm; vertical-align: bottom; text-align: center; font-size: 8.5pt; }
+        .keep { break-inside: avoid; }
+        .note { border: 1px solid #555; height: 16mm; }
+        .pmt td, .pmt th { font-size: 8.3pt; height: 6mm; } .pmt td.c { text-align: center; background: #f0f9ff; font-weight: 600; }
+        .pmv { color: #075985; }
+        .toolbar { position: sticky; top: 0; background: #881337; color: #fff; padding: 8px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; z-index: 5; font-size: 14px; }
+        .toolbar select, .toolbar button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; }
+        .toolbar select { min-width: 260px; color: #111; }
+        .toolbar button { background: #fff; color: #881337; font-weight: 700; cursor: pointer; }
+        #msg { font-size: 12px; opacity: .9; }
+    </style>
+</head>
+<body>
+    <div class="toolbar noprint">
+        <b>🖨️ แบบฟอร์มกระดาษ A4 — 🥩 FF Renovate (MTN Pre-check)</b>
+        <select id="storeSel" onchange="loadStore(this.value)"><option value="">— ฟอร์มเปล่า (ไม่ระบุสาขา) —</option></select>
+        <button onclick="window.print()">พิมพ์ / Save PDF</button>
+        <span id="msg">A4 แนวตั้ง · เปิด "Background graphics" ตอนพิมพ์</span>
+    </div>
+    <div class="sheet" id="sheet"></div>
+
+<script>
+const CFG = <?!= JSON.stringify(getFfrConfig_()) ?>;
+let DATA = <?!= JSON.stringify(getFfrPaperData(storeCode)) ?>;
+const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const box = '<span class="box"></span>';
+const opts = (list, bad) => list.map(v => '<span class="opt' + (bad && bad.indexOf(v) > -1 ? ' bad' : '') + '">' + box + esc(v) + '</span>').join('');
+const fill = (cls) => '<span class="fill ' + (cls || '') + '"></span>';
+const GRADE = ['ดี', 'พอใช้', 'แย่'];
+
+function fillStores() {
+    const sel = document.getElementById('storeSel');
+    (DATA.stores || []).forEach(s => { const o = document.createElement('option'); o.value = s.o; o.textContent = 'ทีม ' + s.t + ' · ' + s.c + ' ' + s.n; sel.appendChild(o); });
+    if (DATA.store) sel.value = DATA.store.o;
+}
+function loadStore(code) {
+    document.getElementById('msg').textContent = '⏳ กำลังโหลด...';
+    google.script.run.withSuccessHandler(function(r) {
+        if (!r || !r.success) { document.getElementById('msg').textContent = '❌ ' + ((r && r.error) || 'โหลดไม่สำเร็จ'); return; }
+        DATA = r; render(); document.getElementById('msg').textContent = 'A4 แนวตั้ง · เปิด "Background graphics" ตอนพิมพ์';
+    }).withFailureHandler(function(e) { document.getElementById('msg').textContent = '❌ ' + e.message; }).getFfrPaperData(code);
+}
+
+function cabBlock(no, c) {
+    const plan = c ? ('Refurbish <b>' + c.ref + '</b><br>ซื้อใหม่ <b>' + c.nw + '</b>') : 'นอกแผน';
+    const title = c ? (c.ec ? '<span style="font-family:monospace;font-weight:700;color:#881337">' + esc(c.ec) + '</span> ' : '') + '<b>' + esc(c.name) + '</b><span class="tag ' + c.kind + '">' + (c.kind === 'plug' ? 'Plug-in' : 'Remote') + '</span><div class="muted">' + esc(c.cat) + '</div>'
+                    : '<span class="muted">ชื่อตู้ / ขนาด:</span> ' + fill('w60') + ' <span class="opt">' + box + 'Plug-in</span><span class="opt">' + box + 'Remote</span>';
+    return '<tbody class="cab"><tr><td class="n" rowspan="2">' + no + '</td><td>' + title + '</td><td class="plan">' + plan + '</td>' +
+        '<td class="q"></td><td class="q"></td><td class="q"></td><td class="q"></td><td class="q"></td></tr>' +
+        '<tr class="d"><td colspan="7">' +
+        '<b>สภาพ</b> ตัวตู้ ' + opts(GRADE) + ' · ระบบเย็น ' + opts(GRADE) + ' · ประตู/กระจก/ไฟ ' + opts(GRADE) + '<br>' +
+        'ตำแหน่ง ' + fill('w25') + ' ปีติดตั้ง ' + fill('w12') + ' ยี่ห้อ ' + fill('w18') + ' อุณหภูมิตู้ ' + fill('w12') + '°C · ซ่อม CMS 12 ด. ' + fill('w12') + ' ครั้ง<br>' +
+        'Equipment ID (ป้าย QR ถ้ามี) ' + fill('w60') + fill('w45') + '<br>' +
+        '<b>ถ้ามี Request New:</b> เหตุผล (เลข) ' + fill('w18') + ' · Asset No. (FAS) ' + fill('w45') + ' · ' + opts(CFG.wo) + ' · <span class="opt">' + box + 'ถ่ายรูปแล้ว</span>' +
+        '</td></tr></tbody>';
+}
+const cabHead = '<table class="cabt"><thead class="cab"><tr><th style="width:7mm">#</th><th>ตู้ตามแผน BOQ</th><th style="width:23mm">แผน (ใบ)</th>' +
+    '<th class="q">ตรวจพบ<br>(ใบ)</th><th class="q">Refurbish<br>ได้</th><th class="q">Workable<br>ใช้ต่อ</th><th class="q">Request<br>New</th><th class="q">ไม่พบ</th></tr></thead>';
+
+// PM contract values for rack 1 (Positive) / rack 2 (Negative) — printed so MTN only ticks or corrects
+function rackPmLine(no) {
+    const pm = DATA.pm;
+    if (!pm || no > 2) return '';
+    const pos = no === 1, model = pos ? pm.rackChill : pm.rackFrz, comp = pos ? (pm.posC || pm.rackChillU) : (pm.negC || pm.rackFrzU);
+    const bits = [CFG.rackTypes[pos ? 0 : 1], model, pm.rackYr ? 'ติดตั้ง ' + pm.rackYr : '', pm.refg, comp ? 'คอม ' + comp + ' ตัว' : ''].filter(Boolean);
+    return '<span class="pmv">ค่าจากสัญญา PM: <b>' + esc(bits.join(' · ')) + '</b></span> <span class="opt">' + box + 'ตรง</span><span class="opt">' + box + 'ไม่ตรง (เขียนค่าจริงด้านล่าง)</span><br>';
+}
+// existing equipment per the PM contract + a blank "actual" column (equipment only — no lease / contract data)
+function pmTable() {
+    const pm = DATA.pm;
+    if (!pm) return '<div class="legend">ไม่มีข้อมูลสาขานี้ในสัญญา PM ตู้แช่ — นับตามที่พบหน้างาน</div>';
+    const n = v => (v === undefined || v === '' || v === null) ? '-' : v;
+    const rows = [
+        ['Rack — น้ำยา', n(pm.refg)], ['Rack — คอมเพรสเซอร์ Positive / Negative (ตัว)', n(pm.posC) + ' / ' + n(pm.negC)],
+        ['CDU Positive / Negative (ชุด)', n(pm.cduP) + ' / ' + n(pm.cduN)], ['Rack — ปีที่ติดตั้ง', pm.rackYr ? pm.rackYr + ' (อายุ ' + (new Date().getFullYear() - pm.rackYr) + ' ปี)' : '-'],
+        ['ห้องเย็น Chill / Frozen (ห้อง)', n(pm.chillRoom) + ' / ' + n(pm.frzRoom)],
+        ['ตู้ Remote แช่เย็น (Showcase)', n(pm.remChill)], ['ตู้ Remote แช่แข็ง (High Frozen)', n(pm.remFrz)],
+        ['ตู้ Plug-in แช่เย็น', n(pm.plugChill)], ['ตู้ Drum', n(pm.drum)], ['ตู้ Plug-in แช่แข็ง (High Frozen)', n(pm.plugFrz)],
+        ['ตู้ Low Frozen', n(pm.lowFrz)], ['ตู้ Stainless (Service Counter)', n(pm.stain)]];
+    let h = '<table class="pmt"><tr><th>รายการ</th><th style="width:34mm">ตามสัญญา PM</th><th style="width:34mm">นับได้จริง</th></tr>' +
+        rows.map(r => '<tr><td>' + esc(r[0]) + '</td><td class="c">' + esc(r[1]) + '</td><td></td></tr>').join('') + '</table>';
+    if ((DATA.pmFlags || []).length) h += '<div class="legend">⚠ ' + DATA.pmFlags.map(f => esc(f.m)).join(' · ') + '</div>';
+    return h;
+}
+function rackBlock(no, r) {
+    return '<table class="rack"><tr><td style="width:7mm;text-align:center;font-weight:700;background:#fff1f2">R' + no + '</td><td>' +
+        (r ? '<span class="muted">แผน BOQ:</span> <b>' + esc(r.name) + '</b> (ใหม่ ' + r.nw + ')<br>' : '') + rackPmLine(no) +
+        '<b>ประเภท</b> ' + opts(CFG.rackTypes) + '<br>' +
+        'ยี่ห้อ / รุ่น ' + fill('w25') + ' ปีติดตั้ง ' + fill('w12') + ' น้ำยา ' + fill('w12') + ' คอมเพรสเซอร์ทั้งหมด ' + fill('w12') + ' ทำงานปกติ ' + fill('w12') + '<br>' +
+        '<b>ข้อเสนอ MTN</b> ' + opts(CFG.rackRec) + ' · กำลังสำรอง HP/kW ' + fill('w12') + ' วงจร/วาล์วว่าง ' + fill('w12') + '<br>' +
+        'รองรับตู้ Remote ใหม่ ' + opts(CFG.rackFit) + '<br>' +
+        'Asset No. Rack / Condenser ' + fill('w45') + ' · ' + opts(CFG.wo) + '<br>' +
+        '<span class="opt">' + box + 'รูป Rack + Nameplate + ตู้คอนโทรล</span><span class="opt">' + box + 'รูป Condenser + Nameplate</span>' +
+        '</td></tr></table>';
+}
+function qTable(list, badHead) {
+    return '<table class="q"><tr><th style="width:6mm">#</th><th>คำถาม</th><th>ตัวเลือก (สีแดง = ' + badHead + ')</th></tr>' +
+        list.map((c, i) => '<tr><td class="no">' + (i + 1) + '</td><td class="lbl">' + esc(c.l) + '</td><td>' + opts(c.v, c.bad) + '</td></tr>').join('') + '</table>';
+}
+
+function render() {
+    const s = DATA.store, cabs = DATA.cabs || [], racks = DATA.racks || [];
+    let h = '<div class="hdr"><div><h1>แบบสำรวจก่อน Renovate Fresh Food — MTN Pre-check</h1>' +
+        '<div class="muted">FF Renovation 2027 · ฟอร์มกระดาษสำหรับจดหน้างาน → นำไปกรอกในแอป แท็บ 🥩 FF Renovate (ข้อมูลที่ส่งในแอปคือข้อมูลจริง)</div></div>' +
+        '<div class="muted" style="text-align:right">พิมพ์ ' + new Date().toLocaleDateString('th-TH') + '</div></div>';
+
+    // 1. Store + inspector
+    h += '<h2>1. สาขา &amp; ผู้ตรวจ</h2><table class="store"><tr>' +
+        '<td style="width:50%"><b>สาขา</b> ' + (s ? esc(s.c) + ' · ' + esc(s.n) + ' <span class="muted">(Oracle ' + esc(s.o) + ' · ทีม ' + esc(s.t) + (s.m ? ' · Model ' + esc(s.m) : '') + ')</span>' + (s.full ? ' <span class="bad">🏗️ Full Renovate</span>' : '') : fill('w60')) + '</td>' +
+        '<td><b>วันที่ตรวจ</b> ' + fill('w25') + ' <b>เวลา</b> ' + fill('w18') + '</td></tr>' +
+        '<tr><td><b>ชื่อผู้ตรวจ</b> ' + fill('w60') + '</td><td><b>เบอร์โทร</b> ' + fill('w45') + '</td></tr>' +
+        '<tr><td colspan="2"><b>ตำแหน่ง</b> ' + opts(CFG.roles) + ' · บริษัท (ถ้าเป็นผู้รับเหมา) ' + fill('w45') + '</td></tr></table>';
+
+    // 2. Layout
+    const lay = (DATA.layouts || []);
+    h += '<h2>2. Final Layout</h2><table><tr><td><b>สถานะ</b> ' + opts(CFG.layoutSt) + '<br>' +
+        'จุดที่ไม่ตรงกับหน้างาน ' + fill('w60') + fill('w60') + '<br>' +
+        '<span class="muted">ไฟล์ในระบบ: ' + (lay.length ? lay.map(l => (l.kind ? '<b>' + esc(l.kind) + '</b> ' : '') + esc(l.name)).join(' · ') : 'ยังไม่มี') + ' · เทียบกับไฟล์ To-Be (Final) · <span class="opt">' + box + 'ถ่ายรูป Layout ที่ขีดแก้</span></span>' +
+        '</td></tr></table>';
+
+    // PM baseline (equipment the PM contractor counted) — MTN writes the real count next to it
+    h += '<div class="keep"><h2>ตู้ / ระบบเดิมตามข้อมูลสัญญา PM' + (DATA.pmAsOf ? ' (' + esc(DATA.pmAsOf) + ')' : '') + ' — เขียนจำนวนที่นับได้จริงช่องขวา</h2>' + pmTable() + '</div>';
+
+    // 3. Ambient
+    h += '<h2>3. อุณหภูมิพื้นที่ขาย (อย่างน้อย 3 จุด · ช่วงบ่ายที่ร้อนที่สุด · สูง 1.5 ม. · ห่างตู้ ≥ 1 ม.)</h2>' +
+        '<table class="amb"><tr><th style="width:6mm">#</th><th style="width:48mm">โซน</th><th style="width:16mm">°C</th><th style="width:16mm">%RH</th><th style="width:18mm">เวลา</th><th>หมายเหตุ (เช่น ใกล้ประตู Loading)</th></tr>' +
+        [1, 2, 3, 4, 5].map(i => '<tr><td style="text-align:center">' + i + '</td><td></td><td></td><td></td><td></td><td></td></tr>').join('') + '</table>' +
+        '<div class="legend">เกณฑ์: ≤ ' + CFG.ambOk + ' °C ผ่าน · ≤ ' + CFG.ambMax + ' °C เฝ้าระวัง · > ' + CFG.ambMax + ' °C ร้อนเกิน (ฉบับร่าง) · <span class="opt">' + box + 'ถ่ายรูปหน้าจอเครื่องวัด (บังคับ)</span></div>';
+
+    // 4. Cabinets
+    h += '<h2>4. ตู้แช่ตามแผน — 1 ช่อง = 1 รายการในแผน · Refurbish + Workable + Request New + ไม่พบ ต้องรวม = ตรวจพบ</h2>' + cabHead;
+    cabs.forEach((c, i) => { h += cabBlock(i + 1, c); });
+    const extra = cabs.length ? 2 : 8;
+    for (let i = 0; i < extra; i++) h += cabBlock(cabs.length + i + 1, null);
+    h += '</table>';
+    h += '<div class="legend keep"><b>เหตุผลที่ต้องซื้อใหม่ (ใส่เลข):</b> ' + CFG.why.map((w, i) => (i + 1) + '. ' + esc(w)).join(' · ') +
+        '<br><b>Refurbish</b> = ปรับปรุงแล้วใช้ต่อได้ · <b>Workable</b> = ใช้ต่อได้เลย · <b>Request New</b> = ต้องซื้อใหม่ ตู้เดิมรื้อ → Write-off / ขายซาก · <b>ไม่พบ</b> = แผนมีแต่หน้างานไม่มี · ถ่ายรูปตู้ทุกรายการ (ภาพรวม + จุดเสียหาย + Nameplate)</div>';
+
+    // 5. Racks
+    h += '<h2>5. Rack / Multiset / Cold room (1 ช่อง = 1 ชุด)</h2>';
+    const nR = Math.max(racks.length, 0) + 2;
+    for (let i = 0; i < nR; i++) h += rackBlock(i + 1, racks[i] || null);
+
+    // 6.1 Site readiness
+    h += '<div class="keep"><h2>6.1 ความพร้อมหน้างาน — Remote / Plug-in (ตอบครบ ' + CFG.site.length + ' ข้อ)</h2>' + qTable(CFG.site, 'นับเป็นความเสี่ยง') +
+        '<table><tr><td>ระยะเดินท่อ ห้องเครื่อง → ตู้ไกลสุด ' + fill('w18') + ' ม. · <b>ข้อเสนอระบบของ MTN</b> ' + opts(CFG.sysRec) + '</td></tr></table></div>';
+
+    // 6.2 AC + electrical
+    h += '<div class="keep"><h2>6.2 กำลังแอร์ &amp; ไฟฟ้า</h2><table class="q">' +
+        CFG.cap.map(c => '<tr><td class="lbl">' + esc(c.l) + '</td><td>' + (c.v ? opts(c.v) : fill('w25') + (c.ph ? ' <span class="muted">' + esc(c.ph) + '</span>' : '')) + '</td></tr>').join('') +
+        '</table><div class="legend">ไม่ทราบให้เว้นว่าง (บังคับเฉพาะระบบแอร์) · ดูจากหน้าจอ Chiller / BMS ช่วงบ่าย · Nameplate / As-built · มิเตอร์ MDB หรือแคลมป์มิเตอร์ช่วงพีค</div></div>';
+
+    // 6.3 Install constraints
+    h += '<div class="keep"><h2>6.3 ข้อจำกัดการติดตั้ง — ต้องติดตั้งโดยไม่ปิดขาย (ตอบครบ 6 ข้อ)</h2>' + qTable(CFG.install, 'ข้อจำกัด') +
+        '<table><tr><td>หมายเหตุ (ความกว้างประตูจริง · เวลาที่ห้างอนุญาต) ' + fill('w60') + fill('w60') + '</td></tr></table></div>';
+
+    // 7. Prep-room equipment
+    h += '<div class="keep"><h2>7. อุปกรณ์ห้องเตรียม (Hub &amp; Spoke) — นับเฉพาะที่มี</h2><table class="q"><tr><th>อุปกรณ์</th><th style="width:20mm">มี (เครื่อง)</th><th style="width:20mm">ใช้ได้</th><th style="width:20mm">ต้องซ่อม</th><th style="width:20mm">ขอใหม่</th></tr>' +
+        CFG.equip.map(e => '<tr><td>' + esc(e.l) + '</td><td></td><td></td><td></td><td></td></tr>').join('') + '</table></div>';
+
+    // 8. Summary + sign-off
+    h += '<div class="keep"><h2>8. สรุป / ข้อเสนอ MTN</h2><table><tr><td>มีตู้ / Rack เสียที่กระทบการขายตอนนี้ ' + opts(['มี', 'ไม่มี']) + ' ระบุ ' + fill('w60') + '</td></tr></table>' +
+        '<div class="note"></div>' +
+        '<table class="sign" style="margin-top:2mm"><tr><td>ลงชื่อ ผู้ตรวจ<br>(' + fill('w45') + ')</td><td><b>ลงชื่อ SGM (ผู้จัดการสาขา)</b> — รับทราบผลตรวจ<br>(' + fill('w45') + ')<br>วันที่ ' + fill('w18') + '</td><td>ลงชื่อ AMM / Area MTN<br>(' + fill('w45') + ')</td><td>กรอกในแอปแล้ว<br>' + box + ' วันที่ ' + fill('w18') + '</td></tr></table>' +
+        '<div class="legend">✍️ ต้องให้ <b>SGM ลงนาม</b> แล้วถ่ายรูปฟอร์มนี้แนบในแอป (ข้อ 8 — บังคับ ส่งไม่ได้ถ้าไม่แนบ)</div></div>';
+
+    document.getElementById('sheet').innerHTML = h;
+    document.title = 'FF Renovate Paper Form' + (s ? ' — ' + s.c + ' ' + s.n : '');
+}
+fillStores(); render();
+</script>
+</body>
+</html>

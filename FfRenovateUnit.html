@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Renovate Unit</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* QR scan target for one FF Renovate cabinet unit. Anyone can view (getFfrUnit: no prices / lease / emails).
+           Logged-in people in the store's scope can move the status forward (updateFfrUnits): Ordered (PO + vendor) →
+           Delivered → Installed → Accepted (date, accepted by, optional photo). Admin can also move back / cancel. */
+        * { box-sizing: border-box; }
+        body { font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+        header { background: #881337; color: #fff; padding: 14px 16px; }
+        header .id { font-family: monospace; font-size: 18px; font-weight: 700; word-break: break-all; }
+        main { padding: 14px 16px 28px; max-width: 640px; margin: 0 auto; }
+        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+        .row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+        .row:last-child { border-bottom: 0; }
+        .row span:first-child { color: #64748b; flex: 0 0 auto; }
+        .row span:last-child { text-align: right; font-weight: 600; word-break: break-word; }
+        .res { display: inline-block; padding: 2px 10px; border-radius: 999px; color: #fff; font-weight: 700; font-size: 14px; }
+        .r-new { background: #dc2626; } .r-ref { background: #059669; } .r-work { background: #0284c7; } .r-x { background: #64748b; }
+        .flow { display: flex; flex-wrap: wrap; gap: 6px; }
+        .step { padding: 4px 10px; border-radius: 999px; border: 1px solid #cbd5e1; font-size: 13px; color: #64748b; }
+        .step.done { background: #ecfdf5; border-color: #10b981; color: #047857; font-weight: 700; }
+        .step.now { background: #881337; border-color: #881337; color: #fff; font-weight: 700; }
+        .muted { color: #64748b; font-size: 12px; }
+        .err { color: #b91c1c; font-weight: 600; }
+        label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin: 10px 0 4px; }
+        input, select, textarea { width: 100%; font: inherit; font-size: 16px; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; }
+        .btn { display: block; width: 100%; font: inherit; font-size: 17px; font-weight: 700; padding: 13px; border: 0; border-radius: 10px; background: #881337; color: #fff; cursor: pointer; margin-top: 12px; }
+        .btn:disabled { opacity: .6; }
+        .next { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .next button { font: inherit; font-size: 15px; font-weight: 700; padding: 12px 6px; border-radius: 10px; border: 2px solid #881337; background: #fff; color: #881337; cursor: pointer; }
+        .next button.on { background: #881337; color: #fff; }
+        .log { font-size: 13px; border-left: 3px solid #e2e8f0; padding: 2px 0 2px 10px; margin: 6px 0; }
+        img.ph { max-width: 100%; border-radius: 8px; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <header><div class="muted" style="color:#fecdd3">Big C · FF Renovation 2027 · ทะเบียนตู้</div><div class="id" id="uid">…</div></header>
+    <main id="main"><div class="card">⏳ กำลังโหลด...</div></main>
+<script>
+const UID = <?!= JSON.stringify(unitId || '') ?>;
+const esc = s => String(s == null || s === '' ? '-' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const TH = { Surveyed: 'สำรวจแล้ว', Ordered: 'สั่งซื้อ / PO', Delivered: 'ส่งของ', Installed: 'ติดตั้ง', Accepted: 'ตรวจรับแล้ว', Cancelled: 'ยกเลิก' };
+const FLOW = ['Surveyed', 'Ordered', 'Delivered', 'Installed', 'Accepted'];
+let R = null, PICK = '', PHOTO = null;
+document.getElementById('uid').textContent = UID || '—';
+function user() { try { return JSON.parse(localStorage.getItem('app_user_data') || 'null') || {}; } catch (e) { return {}; } }
+const row = (k, v) => '<div class="row"><span>' + k + '</span><span>' + v + '</span></div>';
+const today = () => new Date(Date.now() + 7 * 3600e3).toISOString().substring(0, 10);
+
+function load() {
+    google.script.run.withSuccessHandler(function(r) { R = r; render(); })
+        .withFailureHandler(function(e) { document.getElementById('main').innerHTML = '<div class="card err">' + esc(e.message) + '</div>'; })
+        .getFfrUnit(UID, user().email || '');
+}
+function render() {
+    const m = document.getElementById('main'), r = R;
+    if (!r || !r.success) { m.innerHTML = '<div class="card err">' + esc((r && r.error) || 'ไม่พบข้อมูล') + '</div>'; return; }
+    const u = r.unit, cls = { 'Request New': 'r-new', 'Refurbish': 'r-ref', 'Workable': 'r-work' }[u.Result] || 'r-x';
+    const cur = u.Status, ci = FLOW.indexOf(cur);
+    let h = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+            '<b style="font-size:16px">' + esc(u['Cabinet']) + '</b><span class="res ' + cls + '">' + esc(u.Result) + '</span></div>' +
+            '<div class="muted">' + esc(u['Category']) + ' · ' + esc(u['System']) + (u['Equip Code'] ? ' · รหัสจัดซื้อ <b>' + esc(u['Equip Code']) + '</b>' : '') + '</div></div>';
+    h += '<div class="card"><b>สถานะงาน</b>' + (cur === 'Cancelled' ? ' <span class="err">— ยกเลิก</span>' : '') +
+            '<div class="flow" style="margin-top:8px">' + FLOW.map((s, i) => '<span class="step ' + (i < ci ? 'done' : i === ci ? 'now' : '') + '">' + esc(TH[s]) + '</span>').join('') + '</div>' +
+            '<div style="margin-top:8px">' + row('PO', esc(u['PO No'])) + row('ผู้ขาย', esc(u['Vendor'])) + row('ส่งของ', esc(u['Delivered'])) + row('ติดตั้ง', esc(u['Installed'])) +
+            row('ตรวจรับ', esc(u['Accepted']) + (u['Accepted By'] ? ' · ' + esc(u['Accepted By']) : '')) + '</div>' +
+            (u['Accept Photo'] ? '<img class="ph" src="' + esc(u['Accept Photo']) + '" alt="รูปตรวจรับ">' : '') + '</div>';
+    h += updateBox(u);
+    h += '<div class="card">' + row('สาขา', esc(u['Gold Code'] + ' · ' + u['Branch Name'])) + row('ทีม', esc(u['Team'])) + row('การ์ดในแบบสำรวจ', esc(u['Card']) + ' · ตู้ที่ ' + esc(u['Seq'])) +
+            row('Equipment ID (ป้ายเดิม)', esc(u['Equipment ID'])) + row('Asset No. (ตู้เดิมที่รื้อ)', esc(u['Asset No'])) + row('แบบสำรวจ', esc(u['Survey ID'])) + '</div>';
+    if (r.log && r.log.length) h += '<div class="card"><b>ประวัติ</b>' + r.log.slice().reverse().map(l => '<div class="log"><b>' + esc(l.t) + '</b> · ' + esc(l.by) + '<br>' + esc(l.f) + '</div>').join('') + '</div>';
+    if (r.canEdit && u.Note) h += '<div class="card"><b>หมายเหตุ</b><div class="muted" style="white-space:pre-wrap;font-size:13px">' + esc(u.Note) + '</div></div>';
+    m.innerHTML = h;
+    syncFields();
+}
+function updateBox(u) {
+    const r = R;
+    if (!r.loggedIn) return '<div class="card"><b>บันทึกสถานะ (สั่งซื้อ / ส่งของ / ติดตั้ง / ตรวจรับ)</b><p class="muted">เข้าสู่ระบบด้วยบัญชีแอป MTN เพื่อบันทึก — ผู้ขาย / บุคคลทั่วไปดูได้อย่างเดียว</p>' +
+        '<label>อีเมล / รหัสพนักงาน</label><input id="lgE" autocomplete="username"><label>รหัสผ่าน</label><input id="lgP" type="password" autocomplete="current-password">' +
+        '<p id="lgErr" class="err"></p><button class="btn" onclick="login(this)">เข้าสู่ระบบ</button></div>';
+    if (!r.canEdit) return '<div class="card muted">🔒 คุณดูได้อย่างเดียว — บันทึกได้เฉพาะ AMM MTN ของสาขานี้ และทีม HO / Admin</div>';
+    const cur = u.Status, ci = FLOW.indexOf(cur);
+    if (cur === 'Cancelled' && !r.canFix) return '<div class="card muted">ตู้นี้ถูกยกเลิก — ติดต่อ Admin ถ้าต้องการใช้ต่อ</div>';
+    let opts = FLOW.filter((s, i) => i > ci);
+    if (r.canFix) opts = FLOW.filter(s => s !== cur).concat(cur !== 'Cancelled' ? ['Cancelled'] : []);
+    if (!PICK || opts.indexOf(PICK) < 0) PICK = opts[0] || '';
+    return '<div class="card"><b>บันทึกสถานะ</b> <span class="muted">· ' + esc(user().name || user().email) + '</span>' +
+        (opts.length ? '<div class="next">' + opts.map(s => '<button type="button" class="' + (s === PICK ? 'on' : '') + '" onclick="pick(\'' + s + '\')">' + (FLOW.indexOf(s) > ci ? '→ ' : '↩ ') + esc(TH[s]) + '</button>').join('') + '</div>'
+            : '<p class="muted">✅ ตรวจรับครบแล้ว — แก้ไขได้เฉพาะ PO / ผู้ขาย / หมายเหตุ</p>') +
+        '<div id="fPo"><label>เลข PO *</label><input id="po" value="' + (u['PO No'] ? esc(u['PO No']) : '') + '"><label>ผู้ขาย / ผู้รับเหมา *</label><input id="vendor" value="' + (u['Vendor'] ? esc(u['Vendor']) : '') + '"></div>' +
+        '<div id="fDate"><label id="dateLb">วันที่</label><input id="date" type="date" value="' + today() + '"></div>' +
+        '<div id="fPhoto"><label>รูปตรวจรับ (แนะนำ)</label><input id="photo" type="file" accept="image/*" capture="environment" onchange="readPhoto(this)"><div id="phPrev"></div></div>' +
+        '<label>หมายเหตุ</label><textarea id="note" rows="2" placeholder="เช่น ส่งของไม่ครบ, ติดตั้งแล้วรอทดสอบ"></textarea>' +
+        '<p id="upMsg" class="err"></p><button class="btn" id="saveBtn" onclick="save(this)">บันทึก</button></div>';
+}
+function pick(s) { PICK = s; render(); }
+function syncFields() {
+    const po = document.getElementById('fPo'); if (!po) return;
+    const ti = FLOW.indexOf(PICK), u = R.unit;
+    po.style.display = PICK === 'Ordered' || !PICK || u['PO No'] ? '' : 'none';
+    document.getElementById('fDate').style.display = ti >= 2 ? '' : 'none';
+    document.getElementById('dateLb').textContent = 'วันที่' + (TH[PICK] || '');
+    document.getElementById('fPhoto').style.display = PICK === 'Accepted' || PICK === 'Installed' ? '' : 'none';
+    document.getElementById('saveBtn').textContent = PICK ? 'บันทึก → ' + TH[PICK] : 'บันทึก';
+}
+function readPhoto(inp) {
+    const f = inp.files && inp.files[0]; PHOTO = null; if (!f) return;
+    const img = new Image(), rd = new FileReader();
+    rd.onload = e => { img.onload = () => {
+        const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        const d = c.toDataURL('image/jpeg', 0.82); PHOTO = { name: 'accept.jpg', mimeType: 'image/jpeg', data: d.split(',')[1] };
+        document.getElementById('phPrev').innerHTML = '<img class="ph" src="' + d + '">';
+    }; img.src = e.target.result; };
+    rd.readAsDataURL(f);
+}
+function save(btn) {
+    const msg = document.getElementById('upMsg'), u = R.unit, me = user();
+    const g = id => { const el = document.getElementById(id); return el && el.offsetParent !== null ? el.value.trim() : ''; };
+    const patch = { status: PICK, po: g('po'), vendor: g('vendor'), date: g('date'), note: g('note') };
+    if (PICK === 'Ordered' && (!patch.po || !patch.vendor)) { msg.textContent = 'ใส่เลข PO และผู้ขายก่อนบันทึก'; return; }
+    if (PICK === 'Cancelled' && !patch.note) { msg.textContent = 'ใส่เหตุผลที่ยกเลิกในหมายเหตุ'; return; }
+    if (FLOW.indexOf(PICK) > -1 && FLOW.indexOf(PICK) < FLOW.indexOf(u.Status) && !confirm('ย้อนสถานะเป็น "' + TH[PICK] + '"? วันที่ของขั้นที่ย้อนจะถูกล้าง')) return;
+    btn.disabled = true; msg.textContent = '';
+    const send = url => {
+        if (url) patch.photo = url;
+        btn.textContent = '⏳ กำลังบันทึก...';
+        google.script.run.withSuccessHandler(function(res) {
+            btn.disabled = false;
+            if (!res || !res.success) { msg.textContent = (res && res.error) || 'บันทึกไม่สำเร็จ'; syncFields(); return; }
+            if (!res.updated) { msg.textContent = (res.skipped[0] && res.skipped[0].why) || 'ไม่มีอะไรเปลี่ยน'; syncFields(); return; }
+            PICK = ''; PHOTO = null; load();
+        }).withFailureHandler(function(e) { btn.disabled = false; msg.textContent = e.message; syncFields(); })
+          .updateFfrUnits(me.email, me.name || '', [UID], patch);
+    };
+    if (PHOTO && document.getElementById('fPhoto').offsetParent !== null) {
+        btn.textContent = '⏳ กำลังอัปโหลดรูป...';
+        google.script.run.withSuccessHandler(function(r) {
+            if (!r || !r.success) { btn.disabled = false; msg.textContent = 'อัปโหลดรูปไม่สำเร็จ: ' + ((r && r.error) || ''); syncFields(); return; }
+            send(r.url);
+        }).withFailureHandler(function(e) { btn.disabled = false; msg.textContent = e.message; syncFields(); }).uploadFfrUnitPhoto(me.email, UID, PHOTO);
+    } else send('');
+}
+function login(btn) {
+    const e = document.getElementById('lgE').value.trim(), p = document.getElementById('lgP').value, err = document.getElementById('lgErr');
+    if (!e || !p) { err.textContent = 'ใส่อีเมลและรหัสผ่าน'; return; }
+    btn.disabled = true; err.textContent = '';
+    google.script.run.withSuccessHandler(function(res) {
+        btn.disabled = false;
+        if (!res || !res.success) { err.textContent = (res && res.error) || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
+        try { localStorage.setItem('app_user_data', JSON.stringify(res.user)); localStorage.setItem('app_auth_token', 'valid'); } catch (x) {}
+        load();
+    }).withFailureHandler(function(x) { btn.disabled = false; err.textContent = x.message; }).loginUser(e, p);
+}
+load();
+</script>
+</body>
+</html>

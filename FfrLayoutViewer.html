@@ -1,0 +1,164 @@
+<!-- FF Renovate in-app layout viewer (include once per page). Layout files are private in Drive; the server streams a file
+     only to users allowed for that store (getFfrLayoutFile) and it is drawn here — PDF pages on <canvas> via PDF.js
+     (Android Chrome has no inline PDF viewer and would download a blob PDF), images as <img>. No Drive link, no download button; 🖨️ print / Save as PDF re-renders the pages as images with a "ลับ · printed by" footer (user 2026-11-17).
+     Open: any element with data-ffr-layout data-gold="11128" data-fid="<Drive file id>" data-name="…" (delegated click). -->
+<style>
+    #ffrLv { position: fixed; inset: 0; z-index: 10000; background: rgba(15, 23, 42, .92); display: none; flex-direction: column; font-family: inherit; }
+    #ffrLv.on { display: flex; }
+    #ffrLvBar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #881337; color: #fff; font-size: 14px; flex-wrap: wrap; }
+    #ffrLvBar b { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ffrLvBar button { font: inherit; padding: 4px 12px; border-radius: 6px; border: 0; background: #fff; color: #881337; font-weight: 700; cursor: pointer; }
+    #ffrLvBody { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 10px; text-align: center; }
+    #ffrLvBody canvas, #ffrLvBody img { display: block; margin: 0 auto 10px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.4); max-width: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    #ffrLvMsg { color: #e2e8f0; padding: 40px 12px; font-size: 14px; }
+    #ffrLvNote { color: #cbd5e1; font-size: 11px; padding: 4px 12px 8px; text-align: center; }
+    @media print { #ffrLv { display: none !important; } }
+    /* Print / Save as PDF (user 2026-11-17): pages are rendered to images into #ffrLvPrint, everything else is hidden */
+    #ffrLvPrint { display: none; }
+    @media print {
+        body.ffr-lv-printing > *:not(#ffrLvPrint) { display: none !important; }
+        body.ffr-lv-printing #ffrLvPrint { display: block; }
+        #ffrLvPrint .pg { page-break-after: always; break-after: page; text-align: center; }
+        #ffrLvPrint .pg:last-child { page-break-after: auto; break-after: auto; }
+        #ffrLvPrint img { max-width: 100%; max-height: 93vh; object-fit: contain; display: block; margin: 0 auto; }
+        #ffrLvPrint .ft { font: 8pt Tahoma, sans-serif; color: #555; text-align: center; margin-top: 1mm; }
+    }
+</style>
+<div id="ffrLv" role="dialog" aria-modal="true">
+    <div id="ffrLvBar"><b id="ffrLvTitle">Layout</b>
+        <button type="button" onclick="ffrLvZoom(-1)" title="ย่อ">－</button><span id="ffrLvPct">100%</span><button type="button" onclick="ffrLvZoom(1)" title="ขยาย">＋</button>
+        <button type="button" onclick="ffrLvZoom(0)">พอดีจอ</button><button type="button" id="ffrLvPrintBtn" onclick="ffrLvPrint()" title="พิมพ์ หรือเลือกเครื่องพิมพ์ 'Save as PDF'">🖨️ พิมพ์ / PDF</button><button type="button" onclick="ffrLvClose()">✕ ปิด</button></div>
+    <div id="ffrLvBody" oncontextmenu="return false"><div id="ffrLvMsg"></div></div>
+    <div id="ffrLvNote">ไฟล์ Layout เป็นความลับของโครงการ · พิมพ์ / PDF ใช้ในงานหน้าสาขาเท่านั้น ห้ามส่งต่อ</div>
+</div>
+<script>
+(function() {
+    const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    let lib = null, doc = null, img = null, zoom = 1, gen = 0;
+    const $ = function(id) { return document.getElementById(id); };
+    function email() { try { const u = JSON.parse(localStorage.getItem('app_user_data') || 'null'); return (u && u.email) || ''; } catch (e) { return ''; } }
+    function msg(t) { $('ffrLvBody').innerHTML = '<div id="ffrLvMsg">' + t + '</div>'; }
+    function loadPdfJs() {
+        if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+        if (lib) return lib;
+        lib = new Promise(function(ok, bad) {
+            const sc = document.createElement('script'); sc.src = PDFJS + 'pdf.min.js';
+            sc.onload = function() {
+                // a cross-origin worker URL is blocked in the Apps Script frame → load it as a same-origin blob
+                fetch(PDFJS + 'pdf.worker.min.js').then(function(r) { return r.text(); }).then(function(t) {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([t], { type: 'text/javascript' }));
+                    ok(window.pdfjsLib);
+                }).catch(function() { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; ok(window.pdfjsLib); });
+            };
+            sc.onerror = function() { lib = null; bad(new Error('โหลดตัวแสดง PDF ไม่สำเร็จ (ตรวจอินเทอร์เน็ต)')); };
+            document.head.appendChild(sc);
+        });
+        return lib;
+    }
+    function render() {
+        const g = ++gen, body = $('ffrLvBody'), w = Math.max(body.clientWidth - 20, 200);
+        $('ffrLvPct').textContent = Math.round(zoom * 100) + '%';
+        if (img) { body.innerHTML = ''; img.style.width = Math.round(w * zoom) + 'px'; body.appendChild(img); return; }
+        if (!doc) return;
+        body.innerHTML = '';
+        const n = Math.min(doc.numPages, 20), dpr = Math.min(window.devicePixelRatio || 1, 2);
+        (function page(i) {
+            if (i > n || g !== gen) return;
+            doc.getPage(i).then(function(pg) {
+                if (g !== gen) return;
+                const base = pg.getViewport({ scale: 1 });
+                let scale = w / base.width * zoom;
+                // keep each canvas under ~16 M pixels (mobile browsers refuse bigger canvases)
+                const maxPx = 16e6, px = base.width * base.height * scale * scale * dpr * dpr;
+                const s2 = px > maxPx ? Math.sqrt(maxPx / (base.width * base.height)) / dpr : scale;
+                const vp = pg.getViewport({ scale: s2 * dpr });
+                const cv = document.createElement('canvas');
+                cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+                cv.style.width = Math.round(base.width * scale) + 'px'; cv.style.height = Math.round(base.height * scale) + 'px';
+                body.appendChild(cv);
+                pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(function() { page(i + 1); });
+            });
+        })(1);
+        if (doc.numPages > n) body.insertAdjacentHTML('beforeend', '<div id="ffrLvMsg">แสดง ' + n + ' จาก ' + doc.numPages + ' หน้า</div>');
+    }
+    // Print / Save as PDF: each page → image (long side ~3300 px ≈ 280 dpi on A4, 200 dpi on A3), page orientation from page 1,
+    // footer "ลับ · file · printed by · time" on every page for traceability.
+    let lvName = '';
+    function printImages(urls, landscape) {
+        const old = $('ffrLvPrint'); if (old) old.remove();
+        const box = document.createElement('div'); box.id = 'ffrLvPrint';
+        const st = document.createElement('style'); st.textContent = '@page { size: ' + (landscape ? 'landscape' : 'portrait') + '; margin: 6mm; }';
+        box.appendChild(st);
+        const who = email() || '-', at = new Date().toLocaleString('en-GB');
+        let left = urls.length;
+        const done = function() {
+            if (--left > 0) return;
+            document.body.classList.add('ffr-lv-printing');
+            const clean = function() { document.body.classList.remove('ffr-lv-printing'); window.removeEventListener('afterprint', clean); setTimeout(function() { const b = $('ffrLvPrint'); if (b) b.remove(); urls.forEach(function(u) { if (/^blob:/.test(u) && (!img || img.src !== u)) URL.revokeObjectURL(u); }); }, 500); };
+            window.addEventListener('afterprint', clean);
+            setTimeout(function() { window.print(); setPrintBtn(false); }, 100);
+        };
+        urls.forEach(function(u, i) {
+            const pg = document.createElement('div'); pg.className = 'pg';
+            const im = new Image(); im.onload = done; im.onerror = done; im.src = u;
+            pg.appendChild(im);
+            pg.insertAdjacentHTML('beforeend', '<div class="ft">ลับ — FF Renovation 2027 · ' + lvName.replace(/[<>&]/g, '') + ' · หน้า ' + (i + 1) + '/' + urls.length + ' · พิมพ์โดย ' + who.replace(/[<>&]/g, '') + ' ' + at + '</div>');
+            box.appendChild(pg);
+        });
+        document.body.appendChild(box);
+    }
+    function setPrintBtn(busy, t) { const b = $('ffrLvPrintBtn'); if (!b) return; b.disabled = busy; b.textContent = busy ? (t || '⏳ เตรียมพิมพ์...') : '🖨️ พิมพ์ / PDF'; }
+    window.ffrLvPrint = function() {
+        if (img) { printImages([img.src], img.naturalWidth > img.naturalHeight); return; }
+        if (!doc) return;
+        const n = Math.min(doc.numPages, 20), urls = [], g = gen;
+        let landscape = false;
+        setPrintBtn(true);
+        (function page(i) {
+            if (g !== gen) { setPrintBtn(false); return; }
+            if (i > n) { printImages(urls, landscape); return; }
+            setPrintBtn(true, '⏳ หน้า ' + i + '/' + n);
+            doc.getPage(i).then(function(pg) {
+                const base = pg.getViewport({ scale: 1 });
+                if (i === 1) landscape = base.width > base.height;
+                const vp = pg.getViewport({ scale: Math.min(3300 / Math.max(base.width, base.height), 6) });
+                const cv = document.createElement('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+                const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+                return pg.render({ canvasContext: ctx, viewport: vp }).promise.then(function() {
+                    return new Promise(function(ok) { cv.toBlob(function(b) { urls.push(URL.createObjectURL(b)); cv.width = cv.height = 0; ok(); }, 'image/png'); });
+                });
+            }).then(function() { page(i + 1); }).catch(function(e) { setPrintBtn(false); alert('เตรียมพิมพ์ไม่สำเร็จ: ' + (e && e.message || e)); });
+        })(1);
+    };
+    window.ffrLvZoom = function(d) { zoom = d === 0 ? 1 : Math.min(Math.max(zoom * (d > 0 ? 1.4 : 1 / 1.4), 0.5), 8); render(); };
+    window.ffrLvClose = function() { gen++; $('ffrLv').classList.remove('on'); $('ffrLvBody').innerHTML = ''; if (doc) { try { doc.destroy(); } catch (e) {} } doc = null; if (img && img.src) URL.revokeObjectURL(img.src); img = null; };
+    window.ffrOpenLayout = function(gold, fid, name) {
+        $('ffrLvTitle').textContent = '📐 ' + (name || 'Layout'); zoom = 1; doc = null; img = null; lvName = name || 'Layout'; setPrintBtn(false);
+        $('ffrLv').classList.add('on'); msg('⏳ กำลังเปิด Layout... (ไฟล์ใหญ่อาจใช้เวลาหลายวินาที)');
+        const g = ++gen;
+        google.script.run.withSuccessHandler(function(r) {
+            if (g !== gen) return;
+            if (!r || !r.success) { msg('❌ ' + ((r && r.error) || 'เปิดไม่สำเร็จ')); return; }
+            const bin = atob(r.b64), bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            if (/^image\//.test(r.mime)) {
+                img = new Image(); img.alt = r.name; img.draggable = false;
+                img.onload = function() { if (g === gen) render(); };
+                img.src = URL.createObjectURL(new Blob([bytes], { type: r.mime }));
+                return;
+            }
+            loadPdfJs().then(function(pdfjs) { return pdfjs.getDocument({ data: bytes }).promise; })
+                .then(function(d) { if (g !== gen) { d.destroy(); return; } doc = d; render(); })
+                .catch(function(e) { if (g === gen) msg('❌ เปิด PDF ไม่ได้: ' + (e && e.message || e)); });
+        }).withFailureHandler(function(e) { if (g === gen) msg('❌ ' + (e && e.message || e)); }).getFfrLayoutFile(email(), String(gold), String(fid));
+    };
+    document.addEventListener('click', function(e) {
+        const b = e.target.closest && e.target.closest('[data-ffr-layout]');
+        if (!b) return;
+        e.preventDefault();
+        ffrOpenLayout(b.dataset.gold, b.dataset.fid, b.dataset.name);
+    });
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && $('ffrLv') && $('ffrLv').classList.contains('on')) ffrLvClose(); });
+    window.addEventListener('resize', function() { if ($('ffrLv').classList.contains('on')) render(); });
+})();
+</script>

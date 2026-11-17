@@ -11,7 +11,7 @@
 // into Ref_Survey_Database as a Status=Draft row (processRefSurveyForm surveyId).
 
 var SURVEY_DRAFT_SHEET = 'Survey_Drafts';
-var SURVEY_DRAFT_TYPES = { aircon: 1, np: 1, hyperRef: 1, hyperAc: 1, hyperEq: 1, hyperFo: 1, hyperLi: 1, hyperTo: 1, hyperPk: 1, hyperFa: 1, hyperHb: 1, hyperFi: 1, hyperSc: 1, cctv: 1 };
+var SURVEY_DRAFT_TYPES = { aircon: 1, np: 1, hyperRef: 1, hyperAc: 1, hyperEq: 1, hyperFo: 1, hyperLi: 1, hyperTo: 1, hyperPk: 1, hyperFa: 1, hyperHb: 1, hyperFi: 1, hyperSc: 1, cctv: 1, cctvSys: 1, ffr: 1 };
 var SURVEY_DRAFT_BASE_COLS = ['Draft ID', 'Type', 'Status', 'Branch Code', 'Branch Name', 'Reporter Email',
                               'Reporter Phone', 'Created', 'Updated', 'Photos_JSON'];
 var SURVEY_DRAFT_CHUNK = 40000;   // a Sheets cell holds max 50,000 chars; big Hyper stores exceed one cell
@@ -127,12 +127,16 @@ function getSurveyDraft(type, branchCode, reporterEmail, reporterPhone) {
         var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SURVEY_DRAFT_SHEET);
         if (!sheet || sheet.getLastRow() < 2) return { success: true, draft: null };
 
-        var data = sheet.getDataRange().getValues();
-        var headers = data[0].map(function(h) { return String(h).trim(); });
+        // Read only the base columns (ID, type, status, branch, reporter, dates) — the draft JSON chunks are large and
+        // every store pick runs this; the one matching row's data is fetched afterwards.
+        var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+        var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
         var ix = {};
         headers.forEach(function(h, k) { ix[h] = k; });
+        var baseN = Math.min(SURVEY_DRAFT_BASE_COLS.length, lastCol);
+        var data = [headers.slice(0, baseN)].concat(sheet.getRange(2, 1, lastRow - 1, baseN).getValues());
         var cutoff = new Date().getTime() - SURVEY_DRAFT_MAX_DAYS * 24 * 3600 * 1000;
-        var best = null, bestTs = 0;
+        var best = null, bestTs = 0, bestRow = -1;
         for (var i = 1; i < data.length; i++) {
             var r = data[i];
             if (String(r[ix['Type']]) !== type || String(r[ix['Status']]).trim() !== 'Open') continue;
@@ -142,9 +146,10 @@ function getSurveyDraft(type, branchCode, reporterEmail, reporterPhone) {
             if (!mine) continue;
             var ts = r[ix['Updated']] instanceof Date ? r[ix['Updated']].getTime() : 0;
             if (ts && ts < cutoff) continue;
-            if (!best || ts >= bestTs) { best = r; bestTs = ts; }
+            if (!best || ts >= bestTs) { best = r; bestTs = ts; bestRow = i + 1; }
         }
         if (!best) return { success: true, draft: null };
+        best = sheet.getRange(bestRow, 1, 1, lastCol).getValues()[0];   // full row (draft JSON + photos) of the match only
 
         var json = '';
         for (var n = 1; ix['Data_JSON_' + n] !== undefined; n++) json += String(best[ix['Data_JSON_' + n]] || '');

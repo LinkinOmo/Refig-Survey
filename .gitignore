@@ -21,3 +21,7 @@ SRD Layout Porject/
 Asset Inventory CMS/
 Asset Count/
 Safety and Protection/
+
+# Shared secret for signed Super Admin manual links (pushed by clasp, never committed)
+ManualSecret.gs
+Manuals App/ManualSecret.gs

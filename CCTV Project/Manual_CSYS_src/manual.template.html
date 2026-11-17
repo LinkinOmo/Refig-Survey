@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>คู่มือตรวจระบบกล้องวงจรปิด & อุปกรณ์ LP</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --main:#0f766e; --dark:#134e4a; --ink:#1f2937; --mute:#6b7280; --line:#e5e7eb; --red:#dc2626; --blue:#1d4ed8; --green:#15803d; }
+  * { box-sizing: border-box; }
+  body { font-family: Sarabun, Tahoma, sans-serif; color: var(--ink); background: #f8fafc; margin: 0; line-height: 1.65; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px 60px; }
+  header { background: linear-gradient(135deg, #0f766e, #042f2e); color: #fff; padding: 28px 16px 22px; }
+  header .wrap { padding-bottom: 0; }
+  header h1 { margin: 0 0 4px; font-size: 28px; }
+  header p { margin: 0; opacity: .88; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .btn { background: #fff; color: var(--dark); text-decoration: none; font-weight: 700; padding: 8px 14px; border-radius: 10px; font-size: 14px; }
+  nav.toc { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin: 18px 0; columns: 2; font-size: 15px; }
+  nav.toc a { color: var(--dark); text-decoration: none; display: block; padding: 2px 0; }
+  h2 { font-size: 22px; margin: 36px 0 10px; padding-left: 10px; border-left: 5px solid var(--main); }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
+  .lesson { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 12px; padding: 12px 16px; }
+  .warn { background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px 16px; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 10px 0; }
+  .steps div { background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--main); border-radius: 12px; padding: 12px; text-align: center; font-size: 15px; }
+  .steps b { display: block; font-size: 17px; margin-bottom: 4px; }
+  .steps .n { display: inline-block; width: 28px; height: 28px; border-radius: 50%; background: var(--main); color: #fff; font-weight: 700; line-height: 28px; margin-bottom: 6px; }
+  figure { margin: 12px 0 18px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+  figure img { width: 100%; height: auto; border-radius: 6px; display: block; }
+  figcaption { font-size: 15px; color: var(--mute); margin-top: 8px; }
+  figcaption ol { margin: 4px 0 0; padding-left: 22px; color: var(--ink); }
+  .m { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: #e11d48; color: #fff; font-weight: 700; font-size: 13px; line-height: 22px; text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; background: #fff; }
+  th, td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+  th { background: #f0fdfa; }
+  .ok { color: var(--green); font-weight: 700; } .fix { color: var(--blue); font-weight: 700; } .new { color: var(--red); font-weight: 700; } .none { color: #475569; font-weight: 700; }
+  .note { font-size: 14px; color: var(--mute); }
+  .video iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 10px; margin-top: 8px; background: #000; }
+  details { background: #fff; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; padding: 8px 12px; }
+  details summary { cursor: pointer; font-weight: 700; }
+  code { background: #f1f5f9; padding: 0 5px; border-radius: 5px; font-size: 14px; }
+  footer { color: var(--mute); font-size: 13px; text-align: center; margin-top: 40px; }
+  @media (max-width: 720px) { .steps { grid-template-columns: 1fr 1fr; } nav.toc { columns: 1; } header h1 { font-size: 23px; } }
+  @media print { header { background: #0f766e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .btns, .video { display: none; } figure { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>🎥 คู่มือตรวจระบบกล้องวงจรปิด &amp; อุปกรณ์ LP</h1>
+  <p>CCTV System Survey · สำหรับ MTN สาขา / AMM / ผู้รับเหมา และทีม HO · ฉบับ {{DATE}}</p>
+  <div class="btns">
+    <a class="btn" href="{{APP}}" target="_blank" rel="noopener">▶ เปิดแอป (แท็บ 🎥 ตรวจระบบ CCTV)</a>
+    <a class="btn" href="{{APP}}?page=cctv_system_report" target="_blank" rel="noopener">📊 รายงาน</a>
+    {{VIDEO_BTN}}
+  </div>
+</div></header>
+<div class="wrap">
+<nav class="toc">
+  <a href="#why">1. ทำไมต้องตรวจ</a><a href="#flow">2. ภาพรวม 4 ขั้นตอน</a><a href="#who">3. ใครกรอก / เตรียมอะไร</a><a href="#fill">4. วิธีกรอกทีละส่วน</a>
+  <a href="#rules">5. กติกาแยกผล &amp; งบ OPEX / CAPEX</a><a href="#checks">6. เกณฑ์ตรวจเช็กระบบ</a><a href="#close">7. สาขาปิด — เก็บกู้อุปกรณ์</a><a href="#cms">8. เปิด CMS ใหม่ &amp; ใส่เลข</a>
+  <a href="#report">9. อ่านรายงาน (HO / AMM)</a><a href="#lp">10. อัปโหลดไฟล์ LP (Admin)</a><a href="#faq">11. คำถามที่พบบ่อย</a>{{VIDEO_TOC}}
+</nav>
+{{VIDEO_BOX}}
+
+<h2 id="why">1. ทำไมต้องตรวจ</h2>
+<div class="lesson">
+  <p><b>สถานะวันนี้ (ไฟล์ LP ณ 10/11/2026):</b> อุปกรณ์กลุ่ม <b>"เสีย / รอซ่อม" 1,544 รายการ</b> — กล้องวงจรปิด 738 · เครื่องทำลาย TAG 248 · เสา EAS 224 · UPS 187 · TV/Monitor 96 · Hard Disk 51</p>
+  <p>กล้อง <b>628 รายการ</b> และเสา EAS อีกจำนวนมาก ติดสถานะ <b>"รอยืนยัน — ให้ MTN สรุปว่าซ่อมได้หรือไม่ได้"</b> ถ้า MTN สรุปได้ งานจะเดินต่อเข้า <b>OPEX (ซ่อม)</b> หรือ <b>CAPEX ของ LP (ซื้อใหม่)</b> ได้ทันที</p>
+</div>
+<div class="card">
+  <p><b>ปัญหาที่พบจากการประชุม 10/11/2026:</b></p>
+  <ul>
+    <li>ใบแจ้งซ่อมจำนวนมาก <b>ถูกยกเลิกอัตโนมัติ</b> เมื่อไม่อัปเดตภายใน 7 วัน — สถานะ "ยกเลิก" <u>ไม่ได้แปลว่าซ่อมแล้ว</u></li>
+    <li>ข้อมูลสำรวจเดิมอาศัย LP ยืนยันฝ่ายเดียว ยังไม่มีใครยืนยันที่หน้างานว่า "ซ่อมได้" หรือ "ต้องซื้อใหม่"</li>
+    <li>ใบเสนอราคาไม่แยกค่าอุปกรณ์ออกจากค่าแรง / ค่าปีนป่าย / ค่าทดสอบ ทำให้จำแนก OPEX / CAPEX ยาก</li>
+  </ul>
+  <p><b>หลักการ:</b> ใช้แบบสำรวจนี้เป็น <b>ฐานข้อมูลเดียว</b> · ตรวจทุกรายการที่หน้างาน · <b>เปิด CMS ใหม่เฉพาะรายการที่ต้องซ่อม / เปลี่ยนจริง</b> (ไม่ใช้ CMS ชุดเดิมเป็นฐาน)</p>
+</div>
+
+<h2 id="flow">2. ภาพรวม 4 ขั้นตอน</h2>
+<div class="steps">
+  <div><span class="n">1</span><b>เลือกสาขา</b>ระบบดึงรายการเสียจาก LP + งาน CMS (CCTV / EAS) มาให้ และสร้างการ์ดอัตโนมัติ</div>
+  <div><span class="n">2</span><b>นับจริง + ตรวจเกณฑ์</b>นับอุปกรณ์ที่หน้างาน · ตรวจ 11 ข้อ OK / NG</div>
+  <div><span class="n">3</span><b>แยกผลทุกการ์ด</b>ใช้ได้แล้ว / ซ่อมได้ / ต้องเปลี่ยนใหม่ / ไม่พบ + ค่าใช้จ่าย + รูป</div>
+  <div><span class="n">4</span><b>ส่ง → เปิด CMS</b>เปิด CMS ใหม่เฉพาะที่ซ่อม/เปลี่ยน แล้วใส่เลข CMS ในรายงาน</div>
+</div>
+
+<h2 id="who">3. ใครกรอก / เตรียมอะไร</h2>
+<div class="card">
+  <ul>
+    <li><b>ผู้กรอก:</b> MTN สาขา, AMM / ทีม MTN หรือผู้รับเหมาที่เข้าตรวจ (เลือก "ผู้รับเหมา" แล้วใส่ชื่อบริษัท) — LP / Area LP ร่วมเดินตรวจได้</li>
+    <li><b>เตรียม:</b> มือถือที่ล็อกอินแอป · เข้าห้อง CCTV ได้ · บันไดหรืออุปกรณ์ขึ้นที่สูง (ถ้าต้องดูตัวกล้อง) · Tag ทดสอบเสา EAS</li>
+    <li><b>เวลา:</b> สาขา Hyper ประมาณ 1–2 ชม. · มินิบิ๊กซี 20–30 นาที · กด <b>Save Draft</b> ระหว่างทางได้ แล้วทำต่อจากเครื่องอื่น</li>
+    <li>ทุกสาขาที่มีรายการเสียในไฟล์ LP ต้องตรวจ · สาขาที่ไม่มีในไฟล์ LP แต่พบปัญหา ก็ส่งได้ (เพิ่มการ์ดเอง)</li>
+  </ul>
+</div>
+
+<h2 id="fill">4. วิธีกรอกทีละส่วน</h2>
+<h3>4.1 ผู้ตรวจ &amp; สาขา</h3>
+<figure><img src="{{IMG:f00_scope}}" alt=""><figcaption>ช่องค้นหาสาขา <b>กรองเฉพาะสาขาที่ LP แจ้งเสียให้อัตโนมัติ</b> (ข้อมูลจากไฟล์ LP ในอีเมล) — คลิกช่องค้นหาโดยไม่ต้องพิมพ์ จะเห็นรายชื่อเรียงจากสาขาที่เสียมากที่สุด <ol>
+  <li><span class="m">1</span> 🔴 เฉพาะสาขาที่ LP แจ้งเสีย (เปิดไว้เป็นค่าเริ่มต้น) — เอาติ๊กออกเพื่อค้นหาทุกสาขา</li>
+  <li><span class="m">2</span> แต่ละสาขาแสดงป้าย <b>🔴 LP เสีย N</b> และ <b>✓ ตรวจแล้ว วันที่</b> (ถ้าเคยส่งแล้ว)</li>
+  <li><span class="m">3</span> ซ่อนสาขาที่ตรวจแล้ว — เหลือเฉพาะสาขาที่ยังต้องไปตรวจ</li>
+</ol></figcaption></figure>
+<figure><img src="{{IMG:f01_store}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> ตำแหน่ง / หน่วยงาน — ถ้าเป็นผู้รับเหมาให้ใส่ชื่อบริษัทด้วย</li>
+  <li><span class="m">2</span> พิมพ์รหัสหรือชื่อสาขา แล้วเลือกจากรายการ (ทุก Format: Hyper / Market / Mini)</li>
+  <li><span class="m">3</span> วัตถุประสงค์ — "ตรวจซ่อม" สำหรับสาขาเปิดปกติ · "สาขาปิด" ดูข้อ 7</li>
+</ol></figcaption></figure>
+
+<h3>4.2 ข้อมูลอ้างอิง LP + CMS (ระบบดึงให้อัตโนมัติ)</h3>
+<figure><img src="{{IMG:f02_context}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> จำนวนอุปกรณ์ของสาขาตามไฟล์ LP — สีแดง = มีรายการเสีย</li>
+  <li><span class="m">2</span> รายการเสียถูกจัดกลุ่ม (อุปกรณ์ + อาการ + สถานะ LP เดียวกัน) แล้วสร้างเป็นการ์ดในข้อ 4 ให้แล้ว</li>
+  <li><span class="m">3</span> กดเพื่อดูงาน CMS หมวด CCTV / EAS ของสาขาย้อนหลัง 12 เดือน</li>
+  <li><span class="m">4</span> งานที่ <b>ยกเลิก</b> ส่วนใหญ่ยังไม่ได้ซ่อม — ต้องตรวจที่หน้างานเสมอ</li>
+</ol></figcaption></figure>
+
+<h3>4.3 นับอุปกรณ์จริง (ข้อ 2)</h3>
+<figure><img src="{{IMG:f03_base}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> ใส่จำนวนที่นับได้จริง: ทั้งหมด / ใช้งานได้ / เสีย (ใส่ 0 ถ้าไม่มี) — กล้องทั้งหมดเป็นช่องบังคับ</li>
+  <li><span class="m">2</span> ตัวเลขสีเทา = ข้อมูลจาก LP (ทั้งหมด / ใช้ได้ / เสีย) ไว้เทียบ ถ้าต่างกันมากให้เขียนหมายเหตุ</li>
+  <li><span class="m">3</span> จำนวนวันที่เปิดดูภาพย้อนหลังได้จริง — ระบบติ๊กเกณฑ์ "≥ 30 วัน" ให้อัตโนมัติ</li>
+  <li><span class="m">4</span> การเชื่อมต่อศูนย์ควบคุม / Command Center</li>
+</ol></figcaption></figure>
+
+<h3>4.4 เกณฑ์ตรวจเช็ก (ข้อ 3)</h3>
+<figure><img src="{{IMG:f04_checks}}" alt=""><figcaption>ตรวจครบทุกข้อ เลือก <b>OK</b> / <b>NG</b> (ไม่ผ่าน) / <b>ไม่มี</b> (สาขาไม่มีอุปกรณ์นั้น) <ol>
+  <li><span class="m">1</span> <span class="m">2</span> ข้อที่ NG ต้องมีการ์ดแก้ไขในข้อ 4 ด้วย (เช่น UPS ไม่สำรองไฟ → การ์ด UPS "ซ่อมได้: เปลี่ยนแบตเตอรี่")</li>
+</ol></figcaption></figure>
+
+<h3>4.5 การ์ดผลตรวจ (ข้อ 4) — หัวใจของแบบสำรวจ</h3>
+<figure><img src="{{IMG:f05_card}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> ข้อมูลจาก LP: จำนวน · สถานะ LP · อาการ · เลข CMS เดิม (พร้อมสถานะจริงใน CMS)</li>
+  <li><span class="m">2</span> <b>แยกจำนวนให้ครบ</b> ใช้งานได้แล้ว + ซ่อมได้ + ต้องเปลี่ยนใหม่ + ไม่พบ = จำนวนทั้งหมด (ขึ้น ✔ ครบ)</li>
+  <li><span class="m">3</span> ถ้ามี "ซ่อมได้" — ใส่วิธีซ่อม (บังคับ) และประมาณการแยก <b>ค่าอุปกรณ์ / ค่าแรง / ค่าปีนป่าย / ค่าทดสอบ</b> รวมของทุกตัวที่ซ่อม · เกิน 5,000 ฿ ระบบเตือน</li>
+  <li><span class="m">4</span> ถ้ามี "ต้องเปลี่ยนใหม่" — ราคาต่อหน่วยประมาณ (CAPEX ของ LP)</li>
+  <li><span class="m">5</span> เลข CMS ใหม่ — ถ้ายังไม่ได้เปิด เว้นไว้ แล้วใส่ภายหลังในรายงาน (ข้อ 8)</li>
+</ol>การ์ดที่มี ซ่อม / เปลี่ยน <b>ต้องแนบรูปอุปกรณ์หรืออาการอย่างน้อย 1 รูป</b> · ตำแหน่ง / ช่อง (CH) ช่วยให้ผู้รับเหมาหาเจอเร็ว</figcaption></figure>
+<figure><img src="{{IMG:f06_reuse}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> ติ๊ก "ใช้ของจากสาขาปิด / คลังตลาดนิมิต" เมื่อใช้อุปกรณ์ที่เก็บกลับมาแทนการซื้อ (ไม่คิดเป็น CAPEX)</li>
+  <li><span class="m">2</span> สถานะการแยกจำนวน — ต้องเป็น ✔ ครบ ก่อนส่ง</li>
+</ol>อุปกรณ์เสียที่<b>ไม่อยู่ในไฟล์ LP</b> ให้กด "＋ เพิ่มอุปกรณ์ที่พบเสีย" · การ์ดที่ไม่เกี่ยวข้องกดลบได้</figcaption></figure>
+<figure><img src="{{IMG:f07_bar}}" alt=""><figcaption><span class="m">1</span> แถบสรุปติดด้านบนจอ: จำนวนรายการ · ผลแต่ละกลุ่ม · ยังไม่สรุป · ประมาณการ OPEX / CAPEX ของสาขา</figcaption></figure>
+
+<h3>4.6 บันทึก &amp; ส่ง</h3>
+<figure><img src="{{IMG:f08_submit}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> Save Draft — บันทึกขึ้นระบบ เปิดทำต่อจากมือถือ/คอมเครื่องอื่นได้ (ใช้เบอร์โทรเดียวกัน)</li>
+  <li><span class="m">2</span> Submit — ระบบตรวจช่องบังคับให้ก่อนส่ง และส่งอีเมลสรุปถึงผู้ที่ CC</li>
+  <li><span class="m">3</span> เพิ่มอุปกรณ์ที่พบเสียเอง (ไม่อยู่ในไฟล์ LP)</li>
+</ol>ถ้า <b>ระบบล่มทั้งชุด / ไม่มีภาพบันทึกเลย</b> ให้ติ๊ก "ปัญหาเร่งด่วน" ในข้อ 6 และแจ้ง AMM ทันที</figcaption></figure>
+
+<h2 id="rules">5. กติกาแยกผล &amp; งบ OPEX / CAPEX</h2>
+<table>
+  <tr><th>ผลตรวจ</th><th>ความหมาย</th><th>ต้องกรอก</th><th>งบ / การดำเนินการ</th></tr>
+  <tr><td class="ok">✅ ใช้งานได้แล้ว</td><td>ตรวจแล้วใช้งานได้ (ไม่เสีย / สาขาแก้เองแล้ว)</td><td>-</td><td>LP ปิดรายการได้</td></tr>
+  <tr><td class="fix">🔧 ซ่อมได้</td><td>แก้ได้โดยไม่ต้องเปลี่ยนตัวเครื่อง เช่น Adapter, สาย, หัว BNC, แบตเตอรี่ UPS, บอร์ด</td><td>วิธีซ่อม + ค่าใช้จ่ายแยก 4 ช่อง + รูป</td><td><b>OPEX</b> ไม่เกิน {{OPEX}} ฿ ต่อการ์ด · เกินให้ขออนุมัติ / พิจารณา CAPEX · เปิด CMS ใหม่</td></tr>
+  <tr><td class="new">🆕 ต้องเปลี่ยนใหม่</td><td>ซ่อมไม่ได้ / ไม่คุ้มซ่อม / ตกรุ่น — ต้องซื้อตัวใหม่ (กล้อง DVR UPS จอ เสา)</td><td>ราคาต่อหน่วย + รูป</td><td><b>CAPEX ของ LP</b> (ทำ TOR) · หรือใช้ของจากสาขาปิด</td></tr>
+  <tr><td class="none">⛔ ไม่พบ / ยกเลิกใช้งาน</td><td>หาอุปกรณ์ไม่พบ ถูกถอดไปแล้ว หรือยกเลิกจุดนั้น (เช่น จอหน้าทางเข้าตาม PDPA)</td><td>หมายเหตุ</td><td>LP ตัดออกจากทะเบียน</td></tr>
+</table>
+<p class="note">เกณฑ์ OPEX ≤ {{OPEX}} ฿ สำหรับงานซ่อมที่ไม่เพิ่มทรัพย์สิน มาจากการประชุม 10/11/2026 — ยังรอยืนยันกับหลักเกณฑ์บัญชีของบริษัท · ค่าแรง ค่าปีนป่าย ค่าติดตั้ง และค่าทดสอบ ต้องแยกจากค่าอุปกรณ์ทุกครั้งเพื่อใช้ตรวจใบเสนอราคา</p>
+<h3>ประเภทอุปกรณ์ในการ์ด</h3>
+{{TYPES}}
+
+<h2 id="checks">6. เกณฑ์ตรวจเช็กระบบ (ฉบับร่าง v1)</h2>
+{{CHECKS}}
+<p class="note">เกณฑ์ชุดนี้ร่างตามมติประชุม "กำหนดเกณฑ์ตรวจเช็กอุปกรณ์ซ้ำให้เป็นมาตรฐานเดียวกัน" — ผู้รับผิดชอบเกณฑ์สามารถปรับเพิ่ม/ลดได้</p>
+
+<h2 id="close">7. สาขาปิด — เก็บกู้อุปกรณ์</h2>
+<div class="card">
+  <p>สาขาที่อยู่ในแผนปิด (เช่น 12 สาขา วันขายวันสุดท้าย 15/12/2026) ให้เลือกวัตถุประสงค์ <b>"สาขาปิด — เก็บกู้อุปกรณ์"</b> ระบบจะซ่อนข้อ 2–3 และแสดงตารางเก็บกู้แทน</p>
+  <ul><li>ถอดเก็บของที่ยังใช้ได้ <b>ก่อนผู้ซื้อซากเข้าพื้นที่</b> · สาขา Hyper มีประมาณ 100 ตัว · Market 30–40 ตัว</li>
+  <li>ส่งกลับ <b>Warehouse ตลาดนิมิต</b> เพื่อคัดแยกไปซ่อม/ขยายระบบสาขาอื่น · ของเสียนับแยก</li></ul>
+</div>
+<figure><img src="{{IMG:f09_closing}}" alt=""><figcaption><ol><li><span class="m">1</span> จำนวนต่ออุปกรณ์: ใช้งานได้ (เก็บกลับ) / เสีย / ตกรุ่น</li><li><span class="m">2</span> ปลายทางของอุปกรณ์ + วันที่กำหนดถอด</li></ol></figcaption></figure>
+
+<h2 id="cms">8. เปิด CMS ใหม่ &amp; ใส่เลข</h2>
+<div class="card"><ol>
+  <li>หลังส่งแบบสำรวจ เปิด CMS ใหม่ <b>เฉพาะการ์ดที่มี "ซ่อมได้" หรือ "ต้องเปลี่ยนใหม่"</b> (ระบุในรายละเอียด: เลขแบบสำรวจ CSYS + เลขการ์ด เช่น I01)</li>
+  <li>เข้า <b>รายงาน → คลิกสาขา</b> → ใส่เลข CMS 9 หลักในแต่ละการ์ด → กด <b>✔ บันทึกเลข CMS</b></li>
+  <li>ระบบจับคู่เลขกับ CMS Dashboard ให้อัตโนมัติ และแสดงสถานะ (ค้าง / ปิดงาน / ยกเลิก) — ถ้างานถูกยกเลิกแต่ยังไม่ซ่อม ให้เปิดเคสใหม่ตามขั้นตอนเดิมและบันทึกหมายเหตุ</li>
+  <li>อัปเดตงานใน CMS อย่างน้อยทุก 7 วัน เพื่อไม่ให้ระบบยกเลิกอัตโนมัติ</li>
+</ol></div>
+<figure><img src="{{IMG:r04_modal}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> ข้อมูล LP เดิมของการ์ด</li>
+  <li><span class="m">2</span> ช่องใส่เลข CMS ใหม่ + สถานะที่ระบบจับคู่ได้ ("ไม่พบใน CMS Dashboard" = ยังไม่เข้าระบบ / ข้อมูล CMS ยังไม่อัปเดต รอบอัปโหลด 5 ครั้ง/วัน)</li>
+  <li><span class="m">3</span> บันทึกเลข CMS</li>
+</ol></figcaption></figure>
+
+<h2 id="report">9. อ่านรายงาน (HO / AMM)</h2>
+<figure><img src="{{IMG:r01_kpi}}" alt=""><figcaption><ol>
+  <li><span class="m">1</span> รายการเสีย / รอซ่อมตามไฟล์ LP (และจำนวนที่รอ MTN สรุป)</li>
+  <li><span class="m">2</span> สาขาที่ MTN ตรวจแล้ว เทียบกับสาขาที่ LP แจ้ง</li>
+  <li><span class="m">3</span> <span class="m">4</span> ประมาณการ OPEX ซ่อม และ CAPEX เปลี่ยนใหม่ จากผลตรวจล่าสุดของแต่ละสาขา</li>
+  <li><span class="m">5</span> CMS ใหม่ที่เปิดแล้ว / ที่ต้องเปิด</li>
+</ol></figcaption></figure>
+<figure><img src="{{IMG:r02_cross}}" alt=""><figcaption>แท็บ <b>🔀 LP × สำรวจ × CMS</b> — 1 แถว = 1 สาขา (รหัส LP/CMS) <ol>
+  <li><span class="m">1</span> ตัวกรองสำคัญ: LP แจ้งเสียแต่ยังไม่ตรวจ · รอ MTN สรุป · ตรวจแล้วแต่ยังไม่มีเลข CMS · CMS ที่ LP อ้างถูกยกเลิก · มีงาน CMS ค้างแต่ไม่อยู่ในไฟล์ LP</li>
+  <li><span class="m">2</span> เลข CMS ที่ LP อ้างในไฟล์ แยกตามสถานะจริงใน CMS: ค้าง / ปิด / <b>ยกเลิก</b> / ไม่พบ</li>
+  <li><span class="m">3</span> ผลตรวจ MTN ล่าสุด: ได้ / ซ่อม / ใหม่ / ไม่พบ — คลิกแถวเพื่อดูรายละเอียด</li>
+  <li><span class="m">4</span> สาขาที่ยังไม่ตรวจ — ใช้ติดตามกับ AMM</li>
+</ol></figcaption></figure>
+<figure><img src="{{IMG:r03_items}}" alt=""><figcaption>แท็บ <b>🔧 รายการซ่อม / เปลี่ยน</b> — มุมมองเฉพาะอุปกรณ์ที่ต้องดำเนินการ (ฐานข้อมูลเต็มยังอยู่ครบ) <ol>
+  <li><span class="m">1</span> กรอง: ต้องซ่อม/เปลี่ยน · OPEX · CAPEX · OPEX เกิน 5,000 ฿ · ยังไม่มีเลข CMS</li>
+  <li><span class="m">2</span> ผลแยกจำนวน</li><li><span class="m">3</span> เลข CMS ใหม่ + สถานะใน CMS</li>
+</ol>ปุ่ม <b>⬇ Export Excel</b> ได้ 3 ชีต: LP × Survey × CMS · Items (ทุกการ์ด พร้อมค่าใช้จ่ายแยก) · Surveys — ใช้แชร์ให้ LP / ผู้รับเหมา / จัดซื้อ กรองต่อได้</figcaption></figure>
+
+<h2 id="lp">10. อัปโหลดไฟล์ LP (Admin)</h2>
+<figure><img src="{{IMG:r05_lp}}" alt=""><figcaption>รายงาน → ปุ่ม <b>📋 LP Register</b> — Admin อัปโหลดไฟล์ LP ฉบับใหม่ (รูปแบบเดียวกับ "Export_ข้อมูลรายสาขา", ชีต <code>data_รายละเอียด</code>) <ol>
+  <li><span class="m">1</span> เลือกไฟล์ .xlsx</li><li><span class="m">2</span> วันที่ของข้อมูล</li><li><span class="m">3</span> อัปโหลด — ระบบอ่านไฟล์ในเครื่อง แสดงจำนวนสาขา/รายการให้ยืนยันก่อนแทนที่</li>
+</ol>กดยกเลิกการอัปโหลดได้ด้วยปุ่ม "กลับไปใช้ Built-in" (ข้อมูล ณ 10/11/2026)</figcaption></figure>
+
+<h2 id="faq">11. คำถามที่พบบ่อย</h2>
+<details open><summary>LP ระบุกล้องเสีย 22 ตัว แต่หน้างานเจอเสีย 15 ตัว ทำอย่างไร?</summary>ใส่ในการ์ดเดิม: ใช้งานได้แล้ว 7 + แยกที่เหลือเป็น ซ่อมได้ / เปลี่ยนใหม่ ให้ครบ 22 · ถ้าเจอเสียเพิ่มนอกรายการ LP ให้กด "＋ เพิ่มอุปกรณ์ที่พบเสีย"</details>
+<details><summary>ยังไม่รู้ราคาซ่อม จะกรอกอย่างไร?</summary>ใส่วิธีซ่อมไว้ก่อน (บังคับ) ช่องราคาเว้นได้ · เมื่อผู้รับเหมาเสนอราคา ให้ส่งแบบสำรวจใหม่ของสาขา (รายงานใช้รายการล่าสุด) หรือแจ้ง AMM</details>
+<details><summary>การ์ดเดียวทั้งซ่อมและเปลี่ยนได้ไหม?</summary>ได้ — เช่น กล้อง 22 ตัว ซ่อม 12 (OPEX) เปลี่ยน 4 (CAPEX) ระบบคำนวณแยกให้</details>
+<details><summary>ทำไมต้องแยกค่าแรง ค่าปีนป่าย ค่าทดสอบ?</summary>เพื่อจำแนก OPEX / CAPEX ตามหลักบัญชี และตรวจใบเสนอราคาได้ — ค่าอุปกรณ์ที่เป็นทรัพย์สินใหม่อาจเป็น CAPEX แต่ค่าแรงไม่ใช่</details>
+<details><summary>CMS เดิมที่ LP อ้างขึ้น "ยกเลิก" ต้องทำอะไร?</summary>ถ้าตรวจแล้วอุปกรณ์ยังเสีย ให้เลือก ซ่อมได้ / เปลี่ยนใหม่ และเปิด CMS ใหม่ (ไม่ต้องพยายามเปิดเคสเดิม) แล้วใส่เลขใหม่ในรายงาน</details>
+<details><summary>สาขาของฉันไม่มีในไฟล์ LP?</summary>ยังส่งได้ — ไม่มีการ์ดอัตโนมัติ ให้เพิ่มการ์ดเองเฉพาะอุปกรณ์ที่เสีย หรือส่งโดยไม่มีการ์ดเพื่อยืนยันว่าระบบปกติ</details>
+
+<footer>ฝ่ายบริหารอาคาร (Building Management) · Big C Supercenter · คู่มือสร้างจากหน้าจอจริงของแอป ข้อมูลในภาพเป็นสาขาตัวอย่าง (Demo)</footer>
+</div>
+</body>
+</html>

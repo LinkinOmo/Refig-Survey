@@ -9,6 +9,8 @@
                     <div class="flex items-center gap-3">
                         <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper-fi-checklist" target="_blank" class="text-red-600 hover:underline text-sm font-medium">🖨️ แบบฟอร์มกระดาษ</a>
                         <a href="<?= MANUALS_URL ?>?page=fi-manual" target="_blank" class="text-red-600 hover:underline text-sm font-medium">📖 คู่มือ</a>
+                        <a href="https://drive.google.com/file/d/1KhPprjCJwCixMyfchtFxNbW_fLH5EW1B/view" target="_blank" title="วิดีโอ 3D สถานการณ์จริง (ไม่มีเสียงพากย์ · ซับไทย)" class="text-red-600 hover:underline text-sm font-medium">🎬 วิดีโอสอน</a>
+                        <a href="https://drive.google.com/file/d/1V_L6lQ0ofzcZ9WxkkA_kbFCC40XOuDDp/view" target="_blank" title="วิดีโอ 3D แนวทาง v5: ใครตรวจอะไร เมื่อไร · M1 เจ้าของกระบวนการ · Thermoscan บังคับ (ไม่มีเสียงพากย์ · ซับไทย)" class="text-red-600 hover:underline text-sm font-medium">🎬 แนวทาง v5</a>
                         <a href="<?= ScriptApp.getService().getUrl() ?>?page=hyper_fi_survey_report" target="_blank" class="report-view-link hidden text-red-700 hover:underline text-sm font-medium">View All Reports</a>
                     </div>
                 </div>
@@ -144,7 +146,7 @@
                 const items = z.items.map(function(x) {
                     const a = it[x.k] || {};
                     return '<div class="border-b border-gray-100 py-2" data-item="' + x.k + '" data-r="' + (a.r || '') + '"' + (x.crit ? ' data-crit="1"' : '') + '>' +
-                        '<div class="flex flex-wrap items-center gap-2"><span class="text-xs text-gray-800 flex-1 min-w-[180px]">' + (x.crit ? '<b class="text-red-600">●</b> ' : '') + hfiEsc(x.l) + '</span>' +
+                        '<div class="flex flex-wrap items-center gap-2"><span class="text-xs text-gray-800 flex-1 min-w-[180px]">' + (x.crit ? '<b class="text-red-600">●</b> ' : '') + hfiEsc(x.l) + (x.nw ? ' <span class="text-[10px] font-bold bg-yellow-200 text-yellow-900 rounded px-1">🆕 v5</span>' : '') + '</span>' +
                         '<span class="flex gap-1">' + ['ok', 'risk', 'na'].map(function(r) {
                             return '<button type="button" data-res="' + r + '" onclick="hfiSetRes(this)" class="text-[11px] border rounded px-2 py-1 font-semibold ' + (a.r === r ? HFI_RES_BTN[r][1] : 'bg-white text-gray-500 border-gray-300') + '">' + HFI_RES_BTN[r][0] + '</button>';
                         }).join('') + '</span></div>' +
@@ -230,7 +232,8 @@
                     const input = f.t === 'sel' ? '<select data-p="' + f.k + '" onchange="hfiRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _hfiOpts(f.o, v) + '</select>'
                         : f.t === 'num' ? '<input data-p="' + f.k + '" type="number" min="0" inputmode="numeric" value="' + hfiEsc(v) + '" oninput="hfiRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm">'
                         : '<input data-p="' + f.k + '" type="date" value="' + hfiEsc(v) + '" class="w-full border border-gray-300 rounded p-2 text-sm">';
-                    return '<div><label class="block text-xs font-semibold text-gray-600 mb-1">' + hfiEsc(f.l) + ' *</label>' + input + '</div>';
+                    return '<div><label class="block text-xs font-semibold text-gray-600 mb-1">' + hfiEsc(f.l) + (f.t === 'date' ? '' : ' *') +
+                        (f.nw ? ' <span class="text-[10px] font-bold bg-yellow-200 text-yellow-900 rounded px-1">🆕 v5</span>' : '') + '</label>' + input + '</div>';
                 }).join('');
             }
             // Mirrors _hfiRisks_ / _hfiProtBad_ / _hfiRating_ in HyperFireSurvey.gs — keep in sync.

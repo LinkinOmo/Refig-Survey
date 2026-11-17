@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>แบบสำรวจ New Product</title>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: "Prompt", sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f1f5f9; }
         .input-field { transition: border-color .15s, box-shadow .15s; }
@@ -20,6 +19,7 @@
         @keyframes fadeUp { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:none;} }
         select, input, textarea { font-family: "Prompt", sans-serif; }
     </style>
+    <?!= includeTailwindCss_() ?>
 </head>
 <body class="min-h-screen text-gray-800">
 

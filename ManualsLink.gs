@@ -2,7 +2,7 @@
 // screenshots pushed this project past the Apps Script size limit. Links use MANUALS_URL; old ?page=xxx-manual links
 // (bookmarks, PDFs, the MNC project's flood manual link) land on manualMovedPage_() which points to the new address.
 var MANUALS_URL = 'https://script.google.com/macros/s/AKfycbx2LKuwYTg9R5U_1MRSZB_UZvL-FGCLKxNcMe42kr_uBTEsistAelM8i_YlVMJzzw3geQ/exec';
-var MANUAL_PAGES_ = ["flood-recovery-manual", "hyper-manual", "sc-manual", "hb-manual", "fa-manual", "admin-manual", "cctv-manual", "survey-manual", "aircon-manual", "ref-manual", "np-manual", "layout-manual", "hours-manual", "edmi-manual"];
+var MANUAL_PAGES_ = ["flood-recovery-manual", "hyper-manual", "sc-manual", "hb-manual", "fa-manual", "admin-manual", "cctv-manual", "csys-manual", "ffr-manual", "survey-manual", "aircon-manual", "ref-manual", "np-manual", "layout-manual", "hours-manual", "edmi-manual"];
 
 function manualMovedPage_(e) {
   var q = Object.keys(e.parameter || {}).map(function(k) { return encodeURIComponent(k) + '=' + encodeURIComponent(e.parameter[k]); }).join('&');

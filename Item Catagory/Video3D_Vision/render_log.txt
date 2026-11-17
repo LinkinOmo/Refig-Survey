@@ -1,0 +1,22 @@
+timeline 16 segments, 188.9 s
+CONSOLE Failed to load resource: the server responded with a status of 404 (Not Found)
+frame 0/4722  0.0%  eta 3871s
+frame 250/4722  5.3%  eta 476s
+frame 500/4722  10.6%  eta 479s
+frame 750/4722  15.9%  eta 461s
+frame 1000/4722  21.2%  eta 440s
+frame 1250/4722  26.5%  eta 413s
+frame 1500/4722  31.8%  eta 385s
+frame 1750/4722  37.1%  eta 356s
+frame 2000/4722  42.4%  eta 325s
+frame 2250/4722  47.7%  eta 295s
+frame 2500/4722  53.0%  eta 265s
+frame 2750/4722  58.3%  eta 235s
+frame 3000/4722  63.6%  eta 206s
+frame 3250/4722  68.8%  eta 176s
+frame 3500/4722  74.1%  eta 146s
+frame 3750/4722  79.4%  eta 116s
+frame 4000/4722  84.7%  eta 86s
+frame 4250/4722  90.0%  eta 56s
+frame 4500/4722  95.3%  eta 26s
+DONE → G:\My Drive\00. Web Projects\Air_Ref_Servey\Item Catagory\BOQ_App_Vision_3D_2026-11-12.mp4 55.6 MB 9.5 min

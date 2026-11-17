@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8"><title>CCTV System Survey 3D</title>
+<style>
+  html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#0b1220;font-family:'Leelawadee UI','Segoe UI',Tahoma,sans-serif}
+  canvas{position:absolute;inset:0;width:1280px;height:720px}
+  #callouts{position:absolute;inset:0;pointer-events:none}
+  .co{position:absolute;transform:translate(-50%,-100%);white-space:nowrap;font-weight:700;font-size:20px;color:#fff;padding:7px 14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .co::after{content:'';position:absolute;left:50%;bottom:-9px;margin-left:-8px;border:8px solid transparent;border-bottom:0;border-top-color:inherit}
+  .co small{display:block;font-size:14px;font-weight:600;opacity:.92}
+  .co.bad{background:#b91c1c;border-color:#b91c1c}.co.good{background:#15803d;border-color:#15803d}.co.info{background:#1e293b;border-color:#1e293b}
+  .co.fix{background:#1d4ed8;border-color:#1d4ed8}.co.new{background:#be123c;border-color:#be123c}.co.none{background:#475569;border-color:#475569}
+  .co.teal{background:#0f766e;border-color:#0f766e}.co.amber{background:#b45309;border-color:#b45309}
+  .co.big{font-size:26px;padding:10px 18px}
+  #chap{position:absolute;left:24px;top:20px;padding:8px 18px;border-radius:12px;background:rgba(15,23,42,.85);color:#fff;font-size:22px;font-weight:700;border-left:6px solid #0f766e}
+  #brand{position:absolute;right:24px;top:22px;color:#fff;font-size:15px;font-weight:700;background:rgba(15,23,42,.7);padding:6px 12px;border-radius:999px}
+  #sub{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;bottom:24px;max-width:1160px;text-align:center;background:rgba(0,0,0,.78);color:#fff;font-size:24px;line-height:1.5;padding:9px 24px;border-radius:12px}
+  #fade{position:absolute;inset:0;background:#000;pointer-events:none}
+  #ov{position:absolute;inset:0;display:none}
+  .ovbg{position:absolute;inset:0;background:radial-gradient(1000px 620px at 50% 42%,rgba(8,60,58,.9),rgba(3,18,22,.96))}
+  .ovw{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;padding:0 50px 100px}
+  .ovw h1{font-size:48px;margin:0 0 10px}.ovw h2{font-size:28px;margin:0 0 8px;font-weight:600;opacity:.95}.ovw p{font-size:21px;margin:4px 0;opacity:.9}
+  .tiles{display:flex;gap:16px;margin-top:22px}
+  .tile{width:240px;border-radius:16px;padding:16px 12px;background:rgba(255,255,255,.09);border:3px solid;display:flex;flex-direction:column;gap:6px;align-items:center}
+  .tile .ic{font-size:44px;line-height:1.1}.tile b{font-size:34px}.tile span{font-size:16px;opacity:.92;line-height:1.45}
+  .flow{display:flex;gap:12px;align-items:center;margin-top:26px;font-size:21px;font-weight:700}
+  .flow .k{padding:14px 16px;border-radius:14px;color:#fff;width:200px;line-height:1.35}.flow .k i{display:block;font-style:normal;font-size:40px}
+  .flow .k span{display:block;font-size:15px;font-weight:600;opacity:.9}
+  .shot{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 14px 30px rgba(0,0,0,.45);border:3px solid #0f172a}
+  .shot img{display:block;width:100%}
+  #pip{position:absolute;right:20px;top:76px;width:600px;display:none;filter:drop-shadow(0 14px 30px rgba(0,0,0,.45))}
+  #pip .cap{background:#0f172a;color:#fff;font-size:17px;font-weight:700;padding:7px 14px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between}
+  #pip .cap span{color:#5eead4;font-weight:600}
+  #pip .im{position:relative;width:600px;background:#fff;border:3px solid #0f172a;border-top:0;border-radius:0 0 12px 12px;overflow:hidden}
+  #pip .im img{position:absolute;left:0;top:0;width:600px}
+</style></head>
+<body>
+<canvas id="c" width="1280" height="720"></canvas>
+<div id="callouts"></div>
+<div id="chap"></div><div id="brand">🎥 CCTV System Survey · MTN</div>
+<div id="pip"><div class="cap"><b id="pipT"></b><span>หน้าจอจริงในแอป</span></div><div class="im" id="pipBox"><img id="pipI"></div></div>
+<div id="ov"></div><div id="sub"></div>
+<div id="fade"></div>
+<script src="timeline.js"></script>
+<script type="module">
+import * as THREE from './three.module.js';
+const W = 1280, H = 720, $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ss = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const eio = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const back = x => { x = clamp(x); const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, k) => a + (b - a) * k;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+const TL = window.TL, SEG = {}; TL.forEach((e, i) => { e.i = i; SEG[e.ph] = e; });
+let T = 0;
+const S0 = ph => SEG[ph].start;
+const F = (ph, fr) => (SEG[ph].audio - SEG[ph].start) + fr * SEG[ph].nd;     // seconds into the scene at a fraction of the subtitle
+const A = (ph, off, dur = 1) => ss((T - S0(ph) - off) / dur);
+const IN = ph => T >= S0(ph) && T < S0(ph) + SEG[ph].dur;
+const L = ph => T - S0(ph);
+
+// ── renderer ──
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(window.devicePixelRatio || 1); renderer.setSize(W, H, false);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1e2a3a); scene.fog = new THREE.Fog(0x1e2a3a, 45, 110);
+const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 300);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 1.25));
+const sun = new THREE.DirectionalLight(0xfff6e6, 1.5); sun.position.set(14, 30, 18); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 90 }); sun.shadow.bias = -0.0005; scene.add(sun);
+
+const MC = {};
+function mat(c, o) { const k = c + JSON.stringify(o || {}); return MC[k] || (MC[k] = new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .75, metalness: .05 }, o || {}))); }
+function grp(parent, x = 0, y = 0, z = 0, ry = 0) { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; parent.add(g); return g; }
+function box(g, w, h, d, c, x = 0, y = 0, z = 0, o) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), o && o.isMaterial ? o : mat(c, o)); m.position.set(x, y + h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function cyl(g, r, h, c, x = 0, y = 0, z = 0, o, seg = 24, r2) { const m = new THREE.Mesh(new THREE.CylinderGeometry(r2 == null ? r : r2, r, h, seg), o && o.isMaterial ? o : mat(c, o)); m.position.set(x, y + h / 2, z); m.castShadow = m.receiveShadow = true; g.add(m); return m; }
+function tex(w, h, draw) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+const FONT = '"Leelawadee UI","Segoe UI",Tahoma,sans-serif';
+function planeTex(g, w, h, t, x, y, z, o = {}) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: t, roughness: .6, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: o.glow == null ? .35 : o.glow, side: THREE.DoubleSide, transparent: !!o.transparent }));
+  m.position.set(x, y, z); if (o.ry) m.rotation.y = o.ry; if (o.rx) m.rotation.x = o.rx; g.add(m); return m;
+}
+function person(g, x, z, shirt, ry = 0) {
+  const p = grp(g, x, 0, z, ry);
+  cyl(p, .17, .8, 0x1f2937, -.09, 0, 0, null, 10); cyl(p, .17, .8, 0x1f2937, .09, 0, 0, null, 10);
+  const b = new THREE.Mesh(new THREE.CapsuleGeometry(.28, .55, 4, 10), mat(shirt)); b.position.y = 1.15; b.castShadow = true; p.add(b);
+  const h = new THREE.Mesh(new THREE.SphereGeometry(.22, 16, 12), mat(0xe0b48c)); h.position.y = 1.72; h.castShadow = true; p.add(h);
+  const ph = box(p, .1, .18, .02, 0x0f172a, .26, 1.18, .22); ph.rotation.x = -.6; p.userData.phone = ph;
+  return p;
+}
+
+// ───────────── store (cutaway) ─────────────
+const STORE = grp(scene);
+box(STORE, 38, .1, 24, 0xd6d3d1, 0, -.1, 0);
+{ const t = tex(512, 512, (c) => { c.fillStyle = '#e7e5e4'; c.fillRect(0, 0, 512, 512); c.strokeStyle = '#d6d3d1'; c.lineWidth = 3; for (let i = 0; i <= 512; i += 64) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 512); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(512, i); c.stroke(); } });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(9, 6);
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(38, 24), new THREE.MeshStandardMaterial({ map: t, roughness: .9 })); fl.rotation.x = -Math.PI / 2; fl.position.y = .01; fl.receiveShadow = true; STORE.add(fl); }
+const WALL = 0xf1f5f9;
+box(STORE, 38, 4, .3, WALL, 0, 0, -12); box(STORE, .3, 4, 24, WALL, -19, 0, 0); box(STORE, .3, 4, 24, WALL, 19, 0, 0);
+box(STORE, 3.2, 3, .1, 0x64748b, -15, 0, -11.8);                                     // receiving door
+// logo band on back wall
+planeTex(STORE, 12, 1.3, tex(1024, 110, (c, w, h) => { c.fillStyle = '#16a34a'; c.fillRect(0, 0, w, h); c.fillStyle = '#fff'; c.font = 'bold 70px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('Big C  สาขาตัวอย่าง', w / 2, h / 2); }), -3, 3.2, -11.83);
+// gondolas
+const prodTex = tex(512, 128, (c, w, h) => { const cols = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#14b8a6']; for (let r = 0; r < 4; r++) for (let i = 0; i < 24; i++) { c.fillStyle = cols[(i * 3 + r * 5) % 7]; c.fillRect(i * 21 + 2, r * 32 + 4, 18, 24); } });
+prodTex.wrapS = THREE.RepeatWrapping; prodTex.repeat.set(4, 1);
+[-7.5, -4.5, -1.5, 1.5].forEach(z => { const g = grp(STORE, -5, 0, z); box(g, 18, 1.8, 1.1, 0xcbd5e1); const m = new THREE.Mesh(new THREE.PlaneGeometry(17.6, 1.6), new THREE.MeshStandardMaterial({ map: prodTex, roughness: .8 })); m.position.set(0, .95, .56); g.add(m); const m2 = m.clone(); m2.position.z = -.56; m2.rotation.y = Math.PI; g.add(m2); });
+// cashiers + TAG deactivator pads
+const TAGS = [];
+[-13, -9, -5, -1].forEach((x, i) => { const g = grp(STORE, x, 0, 6); box(g, 1.8, .9, .8, 0x334155); box(g, .5, .25, .4, 0x0f172a, .5, .9, 0); const pad = box(g, .42, .04, .32, 0x0d9488, -.4, .9, 0, { emissive: 0x14b8a6, emissiveIntensity: .8 }); TAGS.push({ g, pad, bad: i === 1 || i === 3 }); });
+// EAS gates at the exit
+const EAS = [];
+[4.5, 6.6, 8.7, 10.8].forEach((x, i) => { const g = grp(STORE, x, 0, 9); box(g, .14, 1.65, .55, 0xf8fafc); const strip = box(g, .16, 1.4, .08, 0x22c55e, 0, .12, .24, { emissive: 0x22c55e, emissiveIntensity: .9 }); EAS.push({ g, strip, bad: i === 2 }); });
+// entrance glass (low)
+box(STORE, 16, 1.0, .08, 0x93c5fd, -8, 0, 11.8, { transparent: true, opacity: .45 });
+// ── CCTV room ──
+const ROOM = grp(STORE, 0, 0, 0);
+box(ROOM, .2, 2.8, 7, 0xe2e8f0, 10, 0, -8.3); box(ROOM, 2, 2.8, .2, 0xe2e8f0, 11, 0, -4.8); box(ROOM, 5.2, 2.8, .2, 0xe2e8f0, 16.4, 0, -4.8);
+planeTex(ROOM, 2.6, .5, tex(512, 100, (c, w, h) => { c.fillStyle = '#0f766e'; c.fillRect(0, 0, w, h); c.fillStyle = '#fff'; c.font = 'bold 58px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('ห้อง CCTV (LP)', w / 2, h / 2); }), 16.4, 3.0, -4.68);
+const RACK = grp(ROOM, 17.9, 0, -9); box(RACK, .8, 2.1, .7, 0x111827);
+const DVRS = [0, 1, 2, 3].map(i => box(RACK, .72, .12, .66, 0x1f2937, 0, .5 + i * .38, .03, { emissive: i === 2 ? 0xdc2626 : 0x22c55e, emissiveIntensity: .25 }));
+const UPS = grp(ROOM, 17.9, 0, -6.9); box(UPS, .5, .95, .7, 0x0f172a); const UPSLED = box(UPS, .3, .06, .02, 0x22c55e, 0, .75, .36, { emissive: 0x22c55e, emissiveIntensity: 1 });
+const PLUG = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(17.9, .2, -6.5), V(17.6, .05, -6.1), V(18.6, .05, -5.6), V(18.8, .3, -5.4)]), 20, .03, 6), mat(0x0f172a)); STORE.add(PLUG);
+box(ROOM, 2.6, .75, .9, 0x78716c, 13.4, 0, -9.6); box(ROOM, .7, .05, .25, 0x111827, 13.4, .75, -9.5);
+// monitor wall (6 screens)
+const NOSIG = new Set([4, 9, 14, 19, 22, 30]);
+function camViewTex(seed) {
+  return tex(480, 280, (c, w, h) => {
+    c.fillStyle = '#020617'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 9; i++) {
+      const x = (i % 3) * 160, y = Math.floor(i / 3) * 93, id = seed * 9 + i;
+      if (NOSIG.has(id)) { c.fillStyle = '#111827'; c.fillRect(x + 3, y + 3, 154, 87); c.fillStyle = '#ef4444'; c.font = 'bold 18px ' + FONT; c.fillText('NO SIGNAL', x + 30, y + 52); continue; }
+      const g = c.createLinearGradient(x, y, x, y + 90); g.addColorStop(0, '#64748b'); g.addColorStop(1, '#334155'); c.fillStyle = g; c.fillRect(x + 3, y + 3, 154, 87);
+      c.fillStyle = '#94a3b8'; for (let k = 0; k < 3; k++) c.fillRect(x + 12 + k * 46, y + 40, 30, 46);
+      c.fillStyle = '#e2e8f0'; c.font = '13px monospace'; c.fillText('CH' + (id + 1), x + 8, y + 18);
+    }
+  });
+}
+const SCREENS = [];
+for (let i = 0; i < 6; i++) { const x = 11.4 + (i % 3) * 1.45, y = 1.45 + Math.floor(i / 3) * .9; box(ROOM, 1.4, .85, .06, 0x020617, x, y - .42, -11.8); SCREENS.push(planeTex(ROOM, 1.3, .76, camViewTex(i), x, y, -11.76, { glow: .9 })); }
+// cameras
+const CAMS = [];
+function camera3d(x, y, z, ry, dome, status) {
+  const g = grp(STORE, x, y, z, ry);
+  if (dome) { cyl(g, .06, .6, 0x94a3b8, 0, 0, 0); const d = new THREE.Mesh(new THREE.SphereGeometry(.26, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xf8fafc)); d.rotation.x = Math.PI; d.position.y = 0; g.add(d); }
+  else { box(g, .08, .08, .35, 0x94a3b8, 0, 0, .1); const b = box(g, .26, .24, .55, 0xf8fafc, 0, -.12, .45); }
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(dome ? .2 : .12, .035, 8, 24), new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 1.2 }));
+  if (dome) { ring.rotation.x = Math.PI / 2; ring.position.y = -.1; } else ring.position.set(0, 0, .73);
+  g.add(ring);
+  const c = { g, ring, status, pos: V(x, y, z) }; CAMS.push(c); return c;
+}
+[[-14, -11.7, 0], [-8, -11.7, 0], [-2, -11.7, 0], [4, -11.7, 0]].forEach(([x, z, ry], i) => camera3d(x, 3.4, z, ry, false, ['ok', 'bad', 'ok', 'bad'][i]));
+[[-6], [0], [6]].forEach(([z], i) => camera3d(-18.7, 3.4, z, Math.PI / 2, false, ['bad', 'ok', 'bad'][i]));
+[[0], [6]].forEach(([z], i) => camera3d(18.7, 3.4, z, -Math.PI / 2, false, ['ok', 'bad'][i]));
+[[-11, 'bad'], [-3, 'ok'], [7.6, 'bad']].forEach(([x, s]) => camera3d(x, 3.6, 9.8, Math.PI, true, s));
+[[-6, 4, 'bad'], [0, -3, 'ok'], [6, 3, 'bad']].forEach(([x, z, s]) => camera3d(x, 3.6, z, 0, true, s));
+const BAD_CAMS = CAMS.filter(c => c.status === 'bad');
+// split outcome of the 8 broken cameras (shown in 'split'): ok, fix ×4, new ×2, none
+const OUTC = ['ok', 'fix', 'fix', 'new', 'fix', 'fix', 'new', 'none'];
+
+// MTN person
+const MTN = person(STORE, 0, 10.5, 0x0f766e, Math.PI);
+
+// ── LP sheet + item cards ──
+const TYPE_COL = { cam: '#0f766e', mon: '#7c3aed', ups: '#b45309', eas: '#2563eb', tag: '#db2777', hdd: '#475569' };
+const CARDS_DEF = [
+  ['cam', 'กล้องวงจรปิด × 22', 'LP: รอยืนยัน · ไม่มีสัญญาณภาพ', 'CMS เดิม: —'],
+  ['cam', 'กล้องวงจรปิด × 10', 'LP: รอยืนยัน', 'CMS เดิม: ยกเลิก'],
+  ['mon', 'จอ TV / Monitor × 1', 'LP: รอจัดซื้อ Award', 'CMS เดิม: ยกเลิก'],
+  ['ups', 'UPS × 1', 'LP: รอ MTN ยืนยัน · เปิดไม่ติด', 'CMS เดิม: ยกเลิก'],
+  ['eas', 'เสา EAS × 4', 'LP: รอ LP+MTN สรุป', 'CMS เดิม: ยกเลิก'],
+  ['tag', 'เครื่องทำลาย TAG × 4', 'LP: รับโอนจากสาขาปิด', 'CMS เดิม: ยกเลิก']];
+function cardTex(d, stamp) {
+  return tex(560, 340, (c, w, h) => {
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = TYPE_COL[d[0]]; c.fillRect(0, 0, w, 76);
+    c.fillStyle = '#fff'; c.font = 'bold 38px ' + FONT; c.textBaseline = 'middle'; c.fillText('🔧 ' + d[1], 22, 40, w - 40);
+    c.fillStyle = '#334155'; c.font = '600 28px ' + FONT; c.fillText(d[2], 22, 128, w - 40);
+    c.fillStyle = /ยกเลิก/.test(d[3]) ? '#dc2626' : '#64748b'; c.font = 'bold 28px ' + FONT; c.fillText(d[3], 22, 180, w - 40);
+    const cols = ['#16a34a', '#2563eb', '#dc2626', '#64748b'], lab = ['ได้', 'ซ่อม', 'ใหม่', 'ไม่พบ'];
+    lab.forEach((l, i) => { c.fillStyle = cols[i]; c.globalAlpha = .14; c.fillRect(22 + i * 130, 230, 118, 80); c.globalAlpha = 1; c.fillStyle = cols[i]; c.font = 'bold 26px ' + FONT; c.textAlign = 'center'; c.fillText(l, 81 + i * 130, 270); c.textAlign = 'left'; });
+    c.strokeStyle = '#cbd5e1'; c.lineWidth = 4; c.strokeRect(2, 2, w - 4, h - 4);
+  });
+}
+const CARDS = CARDS_DEF.map((d, i) => { const m = planeTex(scene, 2.8, 1.7, cardTex(d), 0, -50, 0, { glow: .55 }); return m; });
+const SHEET = planeTex(scene, 2.2, 3, tex(440, 600, (c, w, h) => { c.fillStyle = '#fff'; c.fillRect(0, 0, w, h); c.fillStyle = '#16a34a'; c.fillRect(0, 0, w, 70); c.fillStyle = '#fff'; c.font = 'bold 30px ' + FONT; c.fillText('ไฟล์ LP · เสีย / รอซ่อม', 18, 46);
+  c.fillStyle = '#334155'; c.font = '20px ' + FONT; for (let i = 0; i < 16; i++) { c.fillStyle = i % 2 ? '#f1f5f9' : '#fff'; c.fillRect(10, 86 + i * 31, w - 20, 29); c.fillStyle = '#334155'; c.fillText(['กล้องวงจรปิด · ชำรุด', 'เสาสัญญาณ · รอสรุป', 'UPS · ไม่เก็บไฟ', 'จอ · จอไม่ติด'][i % 4], 20, 107 + i * 31); } }), 0, -50, 0, { glow: .55 });
+const STAMP = planeTex(scene, 2.2, .8, tex(440, 160, (c, w, h) => { c.strokeStyle = '#dc2626'; c.lineWidth = 12; c.strokeRect(8, 8, w - 16, h - 16); c.fillStyle = '#dc2626'; c.font = 'bold 82px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('ยกเลิก', w / 2, h / 2 + 4); }), 0, -50, 0, { glow: .6, transparent: true });
+// split: 22 mini cameras + 4 trays
+const TRAY_COL = [0x16a34a, 0x2563eb, 0xdc2626, 0x64748b], TRAY_N = [4, 12, 4, 2];
+const TRAYS = TRAY_COL.map((c, i) => { const g = grp(scene, -3.3 + i * 2.2, -50, 2); box(g, 1.9, .3, 1.3, c, 0, 0, 0, { emissive: c, emissiveIntensity: .25 }); return g; });
+const MINI = []; { let k = 0; TRAY_N.forEach((n, t) => { for (let j = 0; j < n; j++) { const g = grp(scene, 0, -50, 0); box(g, .22, .16, .3, 0xf8fafc); box(g, .1, .1, .04, 0x0f172a, 0, .03, .16); MINI.push({ g, t, j, k: k++ }); } }); }
+// cost coins
+const COIN_DEF = [[2160, 'ค่าอุปกรณ์'], [1500, 'ค่าแรง'], [1200, 'ค่าปีนป่าย'], [500, 'ค่าทดสอบ']];
+const COINS = COIN_DEF.map(([v], i) => { const g = grp(scene, -3.3 + i * 2.2, -50, 2); const n = Math.max(1, Math.round(v / 180)); for (let k = 0; k < n; k++) cyl(g, .42, .1, 0xeab308, 0, k * .11, 0, { metalness: .6, roughness: .35 }); g.userData.n = n; return g; });
+const NEWBOX = [0, 1, 2, 3].map(i => { const g = grp(scene, 5.6 + (i % 2) * .9, -50, 1.5 + Math.floor(i / 2) * .9); box(g, .8, .6, .8, 0xd97706); box(g, .82, .08, .82, 0xbe123c, 0, .3, 0); return g; });
+// photo flash + new CMS ticket
+const FLASH = new THREE.PointLight(0xffffff, 0, 8); scene.add(FLASH);
+const TICKET = planeTex(scene, 2.6, 1.1, tex(520, 220, (c, w, h) => { c.fillStyle = '#fffbeb'; c.fillRect(0, 0, w, h); c.fillStyle = '#b45309'; c.fillRect(0, 0, w, 56); c.fillStyle = '#fff'; c.font = 'bold 30px ' + FONT; c.fillText('CMS ใหม่ (เปิดเฉพาะที่ต้องทำ)', 16, 38);
+  c.fillStyle = '#0f172a'; c.font = 'bold 64px monospace'; c.fillText('261116000', 30, 150); c.fillStyle = '#16a34a'; c.font = 'bold 26px ' + FONT; c.fillText('ใส่ในการ์ด I01 ✓', 30, 200); }), 0, -50, 0, { glow: .55 });
+
+// ── camera poses per scene: [pos, target] as a function of local time ──
+const POSE = {
+  title: () => [V(-24, 22, 30), V(0, 0, 0)],
+  problem: () => [V(-24, 22, 30), V(0, 0, 0)],
+  store: lt => { const k = eio(lt / 12); return [V(lerp(-22, 26, k), lerp(20, 15, k), lerp(26, 20, k)), V(lerp(-2, 6, k), 1, lerp(-1, -3, k))]; },
+  open: lt => [V(-2.5, 3.2, 15.5), V(.5, 1.2, 10)],
+  cards: lt => [V(-1, 7, 17), V(-1, 4.8, 4)],
+  cancel: lt => [V(.6, 5.6, 12.6), V(.6, 5.0, 5)],
+  count: lt => { const k = eio(lt / 9); return [V(lerp(11.2, 12.2, k), lerp(2.6, 2.3, k), lerp(-2.5, -4.2, k)), V(16, 1.3, -9.5)]; },
+  checks: lt => [V(12.6, 2.0, -6.0), V(13.6, 1.8, -11.5)],
+  split: lt => [V(.2, 5.5, 10.5), V(.2, 2.6, 2)],
+  cost: lt => [V(1, 4.8, 10.5), V(1, 1.6, 2)],
+  reuse: () => [V(1, 4.8, 10.5), V(1, 1.6, 2)],
+  photo: lt => [V(-6.5, 3.4, -2.6), V(-2.2, 2.4, -10.5)],
+  submit: lt => { const k = eio(lt / 8); return [V(lerp(-3.2, -10, k), lerp(3, 26, k), lerp(-6.8, 24, k)), V(0, 1, 0)]; },
+  report: () => [V(-10, 26, 24), V(0, 1, 0)],
+  closing: () => [V(-10, 26, 24), V(0, 1, 0)],
+  recap: () => [V(-24, 22, 30), V(0, 0, 0)],
+  outro: () => [V(-24, 22, 30), V(0, 0, 0)]
+};
+// ── callouts ──
+const CO = [];
+function co(html, cls, p, a, dx = 0, dy = 0) { if (a > .01) CO.push([html, cls, p, a, dx, dy]); }
+function project(p) { const v = (p.isVector3 ? p.clone() : V(p[0], p[1], p[2])).project(camera); return { x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H, front: v.z < 1 }; }
+// ── PIP: real app screenshots, panned when taller than the box ──
+const PIPDEF = {
+  open: [['f01_store', 'ข้อ 1 · ผู้ตรวจ & สาขา', 0], ['f02_context', 'ข้อมูลอ้างอิง LP + CMS', .5]],
+  cards: [['f05_card', 'การ์ดจาก LP', .35]],
+  cancel: [['f02_context', 'งาน CMS ของสาขา', 0]],
+  count: [['f03_base', 'ข้อ 2 · นับจริงหน้างาน', .3]],
+  checks: [['f04_checks', 'ข้อ 3 · เกณฑ์ตรวจเช็ก', .3]],
+  split: [['f05_card', 'ข้อ 4 · แยกผลในการ์ด', .55]],
+  cost: [['f05_card', 'งานซ่อม (OPEX) / เปลี่ยนใหม่ (CAPEX)', .45]],
+  photo: [['r04_modal', 'รายงาน · ใส่เลข CMS ใหม่', .3]],
+  submit: [['f08_submit', 'Save Draft / Submit', .2]]
+};
+const PIPH = {};
+function drawPip(seg, lt) {
+  const list = PIPDEF[seg.ph], el = $('pip');
+  if (!list) { el.style.display = 'none'; return 0; }
+  let idx = 0; list.forEach((x, i) => { if (lt >= F(seg.ph, x[2]) - .3 || i === 0) idx = i; });
+  const [n, cap, fr] = list[idx];
+  const start = idx === 0 ? Math.min(F(seg.ph, fr), 2.2) : F(seg.ph, fr), end = idx < list.length - 1 ? F(seg.ph, list[idx + 1][2]) : seg.dur - .4;
+  const a = ss((lt - start) / .5) * ss((end - lt) / .4) * (idx === 0 ? 1 : 1);
+  el.style.display = a > .01 ? 'block' : 'none'; el.style.opacity = a; el.style.transform = `translateX(${((1 - a) * 40).toFixed(1)}px)`;
+  const ih = PIPH[n] || 400, boxH = Math.min(ih, 400);
+  $('pipT').textContent = cap; $('pipBox').style.height = boxH + 'px';
+  if ($('pipI').dataset.n !== n) { $('pipI').src = 'shots/pip/' + n + '.png'; $('pipI').dataset.n = n; }
+  const pan = ih > boxH ? (ih - boxH) * eio((lt - start - 1.2) / Math.max(end - start - 2.4, 1)) : 0;
+  $('pipI').style.transform = `translateY(${-pan.toFixed(1)}px)`;
+  return a;
+}
+
+window.renderAt = function (t) {
+  T = t; CO.length = 0;
+  let seg = TL[0]; TL.forEach(e => { if (t >= e.start) seg = e; });
+  const ph = seg.ph, lt = t - seg.start;
+  // camera with a 1.4 s blend from the previous scene's final pose
+  let [p, q] = POSE[ph](lt);
+  if (seg.i > 0 && lt < 1.4) { const pr = TL[seg.i - 1], [p0, q0] = POSE[pr.ph](pr.dur); const k = eio(lt / 1.4); p = p0.clone().lerp(p, k); q = q0.clone().lerp(q, k); }
+  camera.position.copy(p); camera.lookAt(q);
+  const pipA = drawPip(seg, lt), off = 300 * pipA;
+  if (off > .5) camera.setViewOffset(W, H, off, 0, W, H); else camera.clearViewOffset();
+  camera.updateMatrixWorld();
+
+  // camera LEDs: red blink for broken until the split decides
+  const decided = t >= S0('split') + F('split', .45);
+  const OUTCOL = { ok: 0x22c55e, fix: 0x2563eb, new: 0xdc2626, none: 0x64748b };
+  CAMS.forEach(c => {
+    let col = 0x22c55e, inten = 1.2;
+    if (c.status === 'bad') { const bi = BAD_CAMS.indexOf(c), o = OUTC[bi]; if (decided) { col = OUTCOL[o]; inten = 1.4; } else { col = 0xef4444; inten = .6 + .9 * (Math.sin(t * 6 + bi) > 0 ? 1 : 0); } }
+    c.ring.material.color.setHex(col); c.ring.material.emissive.setHex(col); c.ring.material.emissiveIntensity = inten;
+  });
+  EAS.forEach(e => { const c = e.bad ? 0xef4444 : 0x22c55e; e.strip.material = mat(c, { emissive: c, emissiveIntensity: e.bad ? .5 + .5 * Math.sin(t * 5) : .9 }); });
+  TAGS.forEach(e => { const c = e.bad ? 0xef4444 : 0x14b8a6; e.pad.material = mat(c, { emissive: c, emissiveIntensity: .8 }); });
+  // UPS unplug test during checks
+  const unplug = IN('checks') ? A('checks', F('checks', .62), .6) : (t > S0('checks') + SEG.checks.dur ? 1 : 0);
+  PLUG.visible = unplug < .5; UPSLED.material = mat(unplug > .5 ? 0xef4444 : 0x22c55e, { emissive: unplug > .5 ? 0xef4444 : 0x22c55e, emissiveIntensity: unplug > .5 ? .6 + .6 * Math.sin(t * 7) : 1 });
+  // monitor wall pulse during checks
+  SCREENS.forEach((s, i) => { s.material.emissiveIntensity = IN('checks') && lt > F('checks', .1) ? .9 + .25 * Math.sin(t * 4 + i) : .9; });
+
+  // MTN person: entrance → phone → walks to the CCTV room
+  { let x = 0, z = 10.5, ry = Math.PI;
+    if (t >= S0('count')) { const k = IN('count') ? eio(L('count') / 4) : 1; x = lerp(1, 15.6, k); z = lerp(9, -7.9, k); ry = lerp(Math.PI * .8, Math.PI * 1.5, k); }
+    else if (t >= S0('cards')) { x = 1; z = 9; ry = Math.PI; }
+    if (t >= S0('photo')) { x = -2.6; z = -9.8; ry = Math.PI; }
+    MTN.position.set(x, 0, z); MTN.rotation.y = ry + (t >= S0('photo') ? 0 : 0);
+    MTN.visible = !(t >= S0('submit')); }
+
+  // LP sheet → cards
+  const CARD_POS = CARDS_DEF.map((d, i) => V(-4.2 + (i % 3) * 3.1, 6.4 - Math.floor(i / 3) * 2.0, 4));
+  const sheetA = IN('cards') ? ss(L('cards') / .6) * (1 - A('cards', F('cards', .25) + .6, .5)) : 0;
+  SHEET.position.set(-1, 4.8, 8); SHEET.scale.setScalar(Math.max(sheetA, .001)); SHEET.visible = sheetA > .01; SHEET.rotation.set(0, 0, 0);
+  CARDS.forEach((m, i) => {
+    let vis = false;
+    if (IN('cards')) { const k = eio((L('cards') - F('cards', .2) - i * .25) / 1.1); vis = k > 0; m.position.copy(V(-1, 4.8, 8).lerp(CARD_POS[i], k)); m.scale.setScalar(Math.max(lerp(.3, 1, k), .001)); m.rotation.set(0, 0, 0); }
+    else if (IN('cancel')) { vis = i === 1 || A('cancel', 0, .1) < 1; const focus = i === 1; const k = eio(L('cancel') / 1.2); m.position.copy(focus ? CARD_POS[1].clone().lerp(V(.6, 5.0, 7.2), k) : CARD_POS[i]); m.scale.setScalar(focus ? 1 : Math.max(1 - k, .001)); vis = focus || k < 1; m.rotation.set(0, 0, 0); }
+    m.visible = vis;
+  });
+  { const a = IN('cancel') ? back(A('cancel', F('cancel', .12), .5)) : 0; STAMP.position.set(1.0, 4.85, 7.3); STAMP.scale.setScalar(Math.max(a * (1 - A('cancel', SEG.cancel.dur - .6, .5)), .001)); STAMP.rotation.set(0, 0, -.18); STAMP.visible = a > .01; }
+
+  // split: card → 22 minis → trays
+  const sOn = IN('split');
+  TRAYS.forEach((g, i) => { const a = sOn ? back(A('split', F('split', .2) + i * .12, .5)) : 0; g.position.y = sOn ? 0 : -50; g.scale.setScalar(Math.max(a, .001)); });
+  MINI.forEach(m => {
+    if (!sOn) { m.g.position.y = -50; return; }
+    const start = V(-2 + (m.k % 11) * .4, 4.6 + Math.floor(m.k / 11) * .4, 3), tray = TRAYS[m.t].position, end = V(tray.x - .6 + (m.j % 4) * .4, .45 + Math.floor(m.j / 4) * .22, tray.z - .3 + ((m.j >> 2) % 2) * .3);
+    const appear = A('split', F('split', .12) + m.k * .03, .3), k = eio((L('split') - F('split', .4) - m.k * .06) / 1.2);
+    const pos = start.clone().lerp(end, k); pos.y += Math.sin(k * Math.PI) * 1.2;
+    m.g.position.copy(pos); m.g.scale.setScalar(Math.max(appear, .001)); m.g.rotation.y = k * Math.PI * 2;
+  });
+  // cost: coin stacks grow, new boxes
+  const cOn = IN('cost') || IN('reuse');
+  COINS.forEach((g, i) => { g.position.y = cOn ? 0 : -50; const grow = IN('cost') ? A('cost', F('cost', .1) + i * .35, .8) : 1; g.children.forEach((c, k) => { c.visible = k < Math.ceil(grow * g.userData.n); }); });
+  NEWBOX.forEach((g, i) => { const a = IN('cost') ? back(A('cost', F('cost', .62) + i * .15, .5)) : IN('reuse') ? 1 : 0; g.position.y = cOn ? 0 : -50; g.scale.setScalar(Math.max(a, .001)); });
+  // photo flash + ticket
+  { const fl = IN('photo') ? Math.max(0, 1 - Math.abs(L('photo') - F('photo', .15)) / .15) : 0; FLASH.position.set(-2.2, 2.6, -10.6); FLASH.intensity = 30 * fl;
+    const a = IN('photo') ? back(A('photo', F('photo', .4), .6)) * (1 - A('photo', SEG.photo.dur - .6, .5)) : 0; TICKET.position.set(-1.0, 2.9, -8.6); TICKET.scale.setScalar(Math.max(a, .001)); TICKET.visible = a > .01; TICKET.rotation.set(0, .25, 0); }
+
+  // ── callouts ──
+  if (ph === 'store') {
+    co('ห้อง CCTV <small>DVR · จอ · UPS · HDD</small>', 'teal', [15, 3.3, -6.5], A('store', F('store', .2), .4));
+    co('กล้องรอบสาขา <small>ไฟแดงกะพริบ = LP แจ้งเสีย</small>', 'bad', [-8, 4.0, -11.7], A('store', F('store', .1), .4));
+    co('เสา EAS <small>ทางออก</small>', 'info', [7.6, 2.0, 9], A('store', F('store', .55), .4));
+    co('เครื่องทำลาย TAG <small>แคชเชียร์</small>', 'info', [-9, 1.3, 6], A('store', F('store', .8), .4));
+  }
+  if (ph === 'open') co('📱 เลือกสาขา', 'teal', [.6, 2.2, 10.3], A('open', F('open', .1), .4), -120, 0);
+  if (ph === 'cards') { co('ไฟล์ LP', 'good', [-1, 6.5, 8], ss(L('cards') / .6) * (1 - A('cards', F('cards', .25) + .5, .4))); co('6 กลุ่ม → 6 การ์ด', 'teal big', [-1, 8.1, 4], A('cards', F('cards', .55), .4)); }
+  if (ph === 'cancel') { co('ยกเลิก ≠ ซ่อมแล้ว', 'bad big', [.6, 6.1, 7.2], A('cancel', F('cancel', .3), .4), -170, 0); co('ไม่อัปเดตใน 7 วัน → ระบบยกเลิกเอง', 'amber', [.6, 3.9, 7.2], A('cancel', F('cancel', .55), .4), -170, 60); }
+  if (ph === 'count') {
+    co('DVR 4 <small>LP: -</small>', 'info', [17.9, 2.3, -9], A('count', F('count', .35), .4));
+    co('UPS 2', 'info', [17.9, 1.15, -6.9], A('count', F('count', .5), .4));
+    co('จอ 6', 'info', [12.85, 2.45, -11.7], A('count', F('count', .45), .4));
+    co('กล้อง 104 · ได้ 76 · เสีย 28 <small>LP: 104 / 72 / 32</small>', 'teal', [13.4, 1.0, -9.6], A('count', F('count', .7), .4));
+  }
+  if (ph === 'checks') {
+    co('ภาพทุกช่อง <small>NO SIGNAL = NG</small>', 'bad', [12.8, 2.5, -11.7], A('checks', F('checks', .2), .4));
+    co('เก็บภาพ 21 วัน < 30 ✗', 'bad', [14.2, 1.0, -11.7], A('checks', F('checks', .45), .4));
+    co('ถอดปลั๊ก → UPS ไม่สำรองไฟ ✗', 'bad', [17.9, 1.2, -6.9], A('checks', F('checks', .7), .4), -140, 0);
+  }
+  if (ph === 'split') {
+    co('กล้อง 22 ตัว (การ์ด I01)', 'teal', [0, 5.5, 3], A('split', F('split', .1), .4) * (1 - A('split', F('split', .5), .4)));
+    ['✅ ใช้ได้แล้ว 4', '🔧 ซ่อมได้ 12', '🆕 เปลี่ยนใหม่ 4', '⛔ ไม่พบ 2'].forEach((s, i) => co(s, ['good', 'fix', 'new', 'none'][i], [-3.3 + i * 2.2, .9, 2], A('split', F('split', .75) + i * .15, .4)));
+    co('รวม = 22 ✓ ครบ', 'good big', [0, 3.4, 2], A('split', F('split', .95) + .6, .4));
+  }
+  if (ph === 'cost') {
+    COIN_DEF.forEach(([v, l], i) => co(l + ' <small>' + v.toLocaleString() + ' ฿</small>', 'fix', [-3.3 + i * 2.2, COINS[i].userData.n * .11 + .5, 2], A('cost', F('cost', .1) + i * .35 + .6, .4)));
+    co('OPEX = 5,360 ฿ ⚠ เกิน 5,000', 'bad big', [-1, 3.6, 2], A('cost', F('cost', .5), .4), -60, 0);
+    co('CAPEX LP <small>3,500 × 4 = 14,000 ฿</small>', 'new', [6.05, 1.9, 2], A('cost', F('cost', .8), .4));
+  }
+  if (ph === 'photo') { co('📷 รูปอุปกรณ์ / อาการ', 'teal', [-2, 3.8, -11.4], A('photo', F('photo', .1), .4), -80, 0); }
+  if (ph === 'submit') co('☁️ ส่งผล → รายงาน HO', 'teal big', [0, 6, 0], A('submit', F('submit', .4), .5));
+  $('callouts').innerHTML = CO.map(([h, cls, p, a, dx, dy]) => { const s = project(p); if (!s.front) return ''; return `<div class="co ${cls}" style="left:${(s.x + dx).toFixed(1)}px;top:${(s.y + dy).toFixed(1)}px;opacity:${a.toFixed(3)}">${h}</div>`; }).join('');
+
+  $('chap').style.display = seg.chapter ? 'block' : 'none'; $('chap').textContent = seg.chapter;
+  $('chap').style.borderLeftColor = /ระวัง/.test(seg.chapter) ? '#dc2626' : '#14b8a6';
+  drawOverlay(seg, lt);
+  $('sub').textContent = seg.say; $('sub').style.opacity = ss(lt / .4) * ss((seg.dur - lt) / .3);
+  const total = TL[TL.length - 1].start + TL[TL.length - 1].dur;
+  $('fade').style.opacity = Math.max(1 - ss(t / .8), ss((t - (total - 1.2)) / 1.0));
+  renderer.render(scene, camera);
+};
+
+function drawOverlay(seg, lt) {
+  const ov = $('ov'), ph = seg.ph, a = ss(lt / .5) * ss((seg.dur - lt) / .5);
+  const show = n => ss((lt - n) / .4), tr = n => `opacity:${show(n).toFixed(3)};transform:translateY(${((1 - show(n)) * 24).toFixed(1)}px)`;
+  let h = '';
+  if (ph === 'title') h = `<h1>🎥 ตรวจระบบกล้องวงจรปิด &amp; อุปกรณ์ LP</h1><h2>CCTV System Survey · คู่มือ 3D สำหรับ MTN สาขา / AMM / ผู้รับเหมา</h2><p>ยืนยันที่หน้างาน: ซ่อมได้ หรือ ต้องซื้อใหม่</p><p style="font-size:16px;opacity:.7;margin-top:14px">ฝ่ายบริหารอาคาร · Big C</p>`;
+  else if (ph === 'problem') {
+    const tl = [['📋', '1,544', 'รายการ เสีย / รอซ่อม<br>ในไฟล์ LP', '#16a34a', .05], ['🎥', '628', 'กล้องรอ MTN สรุป<br>ซ่อมได้หรือไม่ได้', '#0f766e', .3], ['🚨', '224', 'เสา EAS<br>รอสรุปซ่อม / CAPEX', '#2563eb', .5], ['⏱️', '7 วัน', 'ไม่อัปเดต → CMS<br>ถูกยกเลิกอัตโนมัติ', '#dc2626', .75]];
+    h = `<h2>ทำไมต้องตรวจ</h2><div class="tiles">` + tl.map(([ic, b, s, c, f]) => `<div class="tile" style="border-color:${c};${tr(F(ph, f))}"><div class="ic">${ic}</div><b>${b}</b><span>${s}</span></div>`).join('') + `</div>`;
+  } else if (ph === 'reuse') {
+    const st = [['🏬', 'สาขาปิด', 'ถอดของที่ยังใช้ได้<br>ก่อนผู้ซื้อซากเข้า', '#b45309', .05], ['🚚', 'ขนกลับ', 'กล้อง DVR จอ UPS HDD', '#475569', .3], ['🏭', 'คลังตลาดนิมิต', 'คัดแยก ใช้ได้ / เสีย / ตกรุ่น', '#0f766e', .5], ['🔧', 'สาขาที่ต้องซ่อม', '☑ ใช้ของจากสาขาปิด<br>ไม่คิด CAPEX', '#15803d', .75]];
+    h = `<h2>ใช้ของจากสาขาปิดแทนการซื้อใหม่</h2><div class="flow">` + st.map(([ic, b, s, c, f], i) => (i ? `<span style="opacity:.7;${tr(F(ph, f))}">→</span>` : '') + `<div class="k" style="background:${c};${tr(F(ph, f))}"><i>${ic}</i>${b}<span>${s}</span></div>`).join('') + `</div>`;
+  } else if (ph === 'report') {
+    h = `<h2 style="margin-bottom:14px">📊 รายงาน: LP × ผลตรวจ MTN × CMS</h2><div style="display:flex;flex-direction:column;gap:12px;width:1000px">
+      <div class="shot" style="${tr(.4)}"><img src="shots/pip/r01_kpi.png"></div><div class="shot" style="height:300px;${tr(F(ph, .25))}"><img src="shots/pip/r02_cross.png" style="transform:translateY(${(-120 * eio((lt - F(ph, .5)) / 4)).toFixed(1)}px)"></div></div>`;
+  } else if (ph === 'closing') {
+    h = `<h2 style="margin-bottom:14px">🏁 สาขาปิด — เก็บกู้อุปกรณ์</h2><div style="display:flex;gap:22px;align-items:center"><div class="shot" style="width:640px;${tr(.4)}"><img src="shots/pip/f09_closing.png"></div>
+      <div style="text-align:left;font-size:21px;line-height:1.8;${tr(F(ph, .35))}">① เลือก "สาขาปิด"<br>② นับ ใช้ได้ / เสีย / ตกรุ่น<br>③ ปลายทาง: คลังตลาดนิมิต<br>④ วันถอด (เช่น 15/12/2026)</div></div>`;
+  } else if (ph === 'recap') {
+    const st = [['📍', '1 · เลือกสาขา', 'LP + CMS → การ์ดอัตโนมัติ', '#0f766e', .1], ['🔢', '2 · นับ + ตรวจเกณฑ์', 'นับจริง · 11 ข้อ OK / NG', '#2563eb', .3], ['🔧', '3 · แยกผลทุกการ์ด', 'ได้ / ซ่อม / ใหม่ / ไม่พบ + งบ + รูป', '#be123c', .5], ['📨', '4 · ส่ง + CMS ใหม่', 'เปิดเฉพาะที่ต้องทำ ใส่เลขในรายงาน', '#b45309', .7]];
+    h = `<h2>สรุป 4 ขั้นตอน</h2><div class="flow">` + st.map(([ic, b, s, c, f], i) => (i ? `<span style="opacity:.7;${tr(F(ph, f))}">→</span>` : '') + `<div class="k" style="background:${c};${tr(F(ph, f))}"><i>${ic}</i>${b}<span>${s}</span></div>`).join('') + `</div>`;
+  } else if (ph === 'outro') h = `<h1>📖 คู่มือฉบับเต็ม</h1><h2>แอป → แท็บ 🎥 ตรวจระบบ CCTV → ปุ่ม "คู่มือ"</h2><p style="margin-top:14px">ฝ่ายบริหารอาคาร (Building Management) · Big C</p>`;
+  if (!h) { ov.style.display = 'none'; return; }
+  ov.style.display = 'block'; ov.style.opacity = a; ov.innerHTML = `<div class="ovbg"></div><div class="ovw">${h}</div>`;
+}
+{ const names = new Set(); Object.values(PIPDEF).flat().forEach(x => names.add(x[0])); ['r01_kpi', 'r02_cross', 'f09_closing'].forEach(n => names.add(n));
+  Promise.all([...names].map(n => new Promise(res => { const im = new Image(); im.onload = () => { PIPH[n] = im.naturalHeight * 600 / im.naturalWidth; res(); }; im.onerror = res; im.src = 'shots/pip/' + n + '.png'; }))).then(() => { window.READY = true; }); }
+</script>
+</body></html>

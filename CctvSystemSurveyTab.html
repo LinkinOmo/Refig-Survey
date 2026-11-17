@@ -1,0 +1,545 @@
+        <!-- CONTENT: CCTV SYSTEM SURVEY — MTN on-site check of LP's broken CCTV / LP equipment list.
+             Server: CctvSystemSurvey.gs. Store list = _cctvStores() from CctvSurveyTab.html (all formats).
+             On store pick: LP register (grouped broken items) + CMS Dashboard jobs → item cards. -->
+        <div id="content-cctv-sys-survey" class="tab-content hidden">
+            <form id="csys-form" onsubmit="handleCsysSubmit(event)" class="space-y-6 mb-8 border-b pb-8" novalidate onkeydown="if(event.key==='Enter'&&event.target.tagName!=='TEXTAREA'&&event.target.type!=='submit'){event.preventDefault();event.stopPropagation();}">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">🎥 ตรวจสอบระบบกล้องวงจรปิด &amp; อุปกรณ์ LP (CCTV System)</h2>
+                    <div class="flex items-center gap-3">
+                        <a href="<?= MANUALS_URL ?>?page=csys-manual" target="_blank" class="text-emerald-600 hover:underline text-sm font-medium">📖 คู่มือ</a>
+                        <? if (CSYS_VIDEO_ID) { ?><a href="https://drive.google.com/file/d/<?= CSYS_VIDEO_ID ?>/view" target="_blank" class="text-rose-600 hover:underline text-sm font-medium">🎬 วิดีโอ 3D</a><? } ?>
+                        <a href="<?= ScriptApp.getService().getUrl() ?>?page=cctv_system_report" target="_blank" class="report-view-link hidden text-blue-600 hover:underline text-sm font-medium">View All Reports</a>
+                    </div>
+                </div>
+                <div class="text-xs text-teal-900 bg-teal-50 border border-teal-200 rounded px-3 py-2 space-y-1">
+                    <p>🎯 LP แจ้งอุปกรณ์ <b>เสีย / รอซ่อม</b> ไว้ — ส่วนใหญ่รอ <b>MTN สรุปว่า "ซ่อมได้" หรือ "ต้องซื้อใหม่"</b> แบบสำรวจนี้ใช้ยืนยันที่หน้างานทีละกลุ่มอุปกรณ์ แล้วงานจะเข้า <b>OPEX (ซ่อม)</b> หรือ <b>CAPEX LP (ซื้อใหม่)</b> ได้ทันที</p>
+                    <p>📋 เลือกสาขาแล้วระบบจะดึง <b>รายการเสียจาก LP</b> + <b>งาน CMS (CCTV / EAS)</b> ของสาขามาให้ · เปิด <b>CMS ใหม่</b> เฉพาะรายการที่ต้องซ่อม/เปลี่ยนจริง แล้วกลับมาใส่เลข CMS ในรายงาน</p>
+                    <p>💰 ซ่อมทั่วไปไม่เพิ่มทรัพย์สิน ≤ <b>5,000 ฿</b> = OPEX · ซื้ออุปกรณ์ใหม่ (กล้อง / DVR / UPS / จอ) = CAPEX — แยก <b>ค่าอุปกรณ์ / ค่าแรง / ค่าปีนป่าย / ค่าทดสอบ</b></p>
+                </div>
+                <div id="csys-draft-banner" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-3 flex flex-wrap items-center gap-2 text-sm text-amber-800">
+                    <span class="flex-1">📝 มีแบบร่างที่บันทึกไว้ในเครื่อง (<span id="csys-draft-info"></span>)</span>
+                    <button type="button" onclick="restoreCsysDraft()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">กู้คืนแบบร่าง</button>
+                    <button type="button" onclick="discardCsysDraft()" class="text-red-600 text-xs font-medium hover:underline">ลบแบบร่าง</button>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">1. ข้อมูลผู้ตรวจ &amp; สาขา</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อผู้ตรวจ (Inspector) *</label><input type="text" name="reporterName" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">เบอร์โทรศัพท์ *</label><input type="tel" name="reporterPhone" inputmode="tel" maxlength="20" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div><label class="block text-xs font-semibold text-gray-500 mb-1">ตำแหน่ง / หน่วยงาน *</label><select name="reporterRole" onchange="csysRoleChange()" class="input-field w-full border p-2 rounded text-sm bg-white"></select></div>
+                        <div id="csys-vendor-wrap" class="hidden"><label class="block text-xs font-semibold text-gray-500 mb-1">ชื่อบริษัทผู้รับเหมา *</label><input type="text" name="vendorCompany" class="input-field w-full border p-2 rounded text-sm"></div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">ค้นหาสาขา (Search Branch) *</label>
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 mb-1.5 text-xs text-gray-600">
+                                <label class="inline-flex items-center gap-1.5"><input type="checkbox" id="csys-only-lp" checked onchange="csysScopeChange()"> 🔴 เฉพาะสาขาที่ LP แจ้งเสีย <span id="csys-scope-n" class="text-gray-400"></span></label>
+                                <label class="inline-flex items-center gap-1.5"><input type="checkbox" id="csys-hide-done" onchange="csysScopeChange()"> ซ่อนสาขาที่ตรวจแล้ว</label>
+                            </div>
+                            <div class="relative">
+                                <input type="text" id="csys-station-search" autocomplete="off" class="input-field w-full border p-2 rounded text-sm bg-blue-50" placeholder="พิมพ์รหัสสาขา หรือชื่อสาขา — หรือคลิกเพื่อดูสาขาที่ LP แจ้งเสีย" oninput="handleCsysStationInput(this)" onfocus="handleCsysStationInput(this)">
+                                <div id="csys-station-dropdown" class="hidden absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-72 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                        <div id="csys-store-badge" class="hidden self-end text-xs"></div>
+                        <div class="md:col-span-2"><p class="text-xs font-semibold text-gray-500 mb-1">วัตถุประสงค์การตรวจ *</p><div id="csys-purpose" class="flex flex-wrap gap-4"></div></div>
+                        <div class="hidden">
+                            <input type="text" name="branchCode" readonly><input type="text" name="branchName" readonly>
+                            <input type="hidden" name="storeFormat"><input type="hidden" name="region"><input type="hidden" name="ammMtn"><input type="hidden" name="dmArea"><input type="hidden" name="cmArea">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="csys-rest-form" class="hidden">
+                    <div class="sticky top-0 z-30 bg-white/95 backdrop-blur border border-teal-300 rounded-lg shadow-sm px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span>รายการ <b id="csys-sum-items">0</b></span>
+                        <span>ตรวจ <b id="csys-sum-q">0</b> ชิ้น</span>
+                        <span class="text-emerald-700">ใช้ได้แล้ว <b id="csys-sum-ok">0</b></span>
+                        <span class="text-blue-700">ซ่อมได้ <b id="csys-sum-fix">0</b></span>
+                        <span class="text-red-700">เปลี่ยนใหม่ <b id="csys-sum-new">0</b></span>
+                        <span class="text-slate-500">ไม่พบ <b id="csys-sum-none">0</b></span>
+                        <span id="csys-sum-left-wrap" class="text-amber-700 hidden">ยังไม่สรุป <b id="csys-sum-left">0</b></span>
+                        <span class="ml-auto font-bold text-teal-900">OPEX <span id="csys-sum-opex">0</span> ฿ · CAPEX <span id="csys-sum-capex">0</span> ฿</span>
+                    </div>
+
+                    <!-- LP + CMS context for this store -->
+                    <div class="bg-white p-4 rounded-lg border border-teal-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">📋 ข้อมูลอ้างอิง: LP Register + CMS Dashboard</h3>
+                        <div id="csys-context" class="text-sm text-gray-500">กำลังโหลด...</div>
+                    </div>
+
+                    <div id="csys-open-sections">
+                        <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                            <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">2. จำนวนอุปกรณ์ที่หน้างาน (นับจริง)</h3>
+                            <p class="text-xs text-gray-500 mb-3">ใส่ตัวเลขที่นับได้จริง — ตัวเลขสีเทาคือข้อมูลจาก LP (ทั้งหมด / ใช้ได้ / เสีย) เพื่อเทียบ · ใส่ 0 ถ้าไม่มี</p>
+                            <div class="overflow-x-auto"><table class="min-w-full text-sm"><thead><tr class="text-xs text-gray-500"><th class="text-left py-1 pr-2">อุปกรณ์</th><th class="px-1">ทั้งหมด *</th><th class="px-1">ใช้งานได้</th><th class="px-1">เสีย</th><th class="text-left px-2">LP</th></tr></thead><tbody id="csys-base"></tbody></table></div>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                                <div><label class="block text-xs font-semibold text-gray-600 mb-1">กล้อง Analog (ตัว)</label><input type="number" min="0" name="camAnalog" class="w-full border border-gray-300 rounded p-2 text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-gray-600 mb-1">กล้อง IP / Online (ตัว)</label><input type="number" min="0" name="camIp" class="w-full border border-gray-300 rounded p-2 text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-gray-600 mb-1">เก็บภาพย้อนหลังได้ (วัน) *</label><input type="number" min="0" name="recDays" oninput="csysRecDays()" class="w-full border border-gray-300 rounded p-2 text-sm"></div>
+                                <div><label class="block text-xs font-semibold text-gray-600 mb-1">เชื่อมต่อศูนย์ควบคุม *</label><select name="online" class="w-full border border-gray-300 rounded p-2 text-sm bg-white"></select></div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                            <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">3. เกณฑ์ตรวจเช็กระบบ (OK / NG / ไม่มี)</h3>
+                            <p class="text-xs text-gray-500 mb-2">ตรวจทุกข้อ · NG = ไม่ผ่าน ให้เพิ่มเป็นการ์ดในข้อ 4 ด้วย · ไม่มี = สาขาไม่มีอุปกรณ์นั้น</p>
+                            <div id="csys-checks" class="divide-y divide-gray-100"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-1 border-b pb-2">4. ผลตรวจอุปกรณ์เสีย (การ์ดทีละกลุ่ม)</h3>
+                        <p class="text-xs text-gray-500 mb-1">1 การ์ด = อุปกรณ์ชนิดเดียวกัน อาการเดียวกัน — แยกจำนวนเป็น <b class="text-emerald-700">ใช้งานได้แล้ว</b> / <b class="text-blue-700">ซ่อมได้</b> / <b class="text-red-700">ต้องเปลี่ยนใหม่</b> / <b>ไม่พบ-ยกเลิกใช้งาน</b> ให้ครบจำนวน · การ์ดที่ <b>ซ่อม / เปลี่ยน</b> ต้องมีรูป</p>
+                        <div id="csys-items" class="space-y-4 mt-3"></div>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button type="button" onclick="csysAddItem()" class="flex-1 border-2 border-dashed border-teal-400 text-teal-800 bg-teal-50 hover:bg-teal-100 rounded-lg py-2 text-sm font-semibold">＋ เพิ่มอุปกรณ์ที่พบเสีย (ไม่อยู่ในรายการ LP)</button>
+                            <button type="button" id="csys-import-btn" onclick="csysImportLp(true)" class="hidden border border-teal-500 text-teal-800 bg-white hover:bg-teal-50 rounded-lg px-3 py-2 text-sm font-semibold">⟳ ดึงรายการจาก LP อีกครั้ง</button>
+                        </div>
+                    </div>
+
+                    <div id="csys-harvest-section" class="hidden bg-white p-4 rounded-lg border border-orange-300 shadow-sm mt-6">
+                        <h3 class="font-bold text-orange-800 mb-1 border-b pb-2">5. สาขาปิด — อุปกรณ์ที่ต้องเก็บกู้</h3>
+                        <p class="text-xs text-gray-500 mb-3">ถอดเก็บก่อนผู้ซื้อซากเข้า · ของที่ยังใช้ได้ส่งกลับคลังเพื่อนำไปซ่อม/ขยายระบบสาขาอื่น · ของเสียนับแยก</p>
+                        <div class="overflow-x-auto"><table class="min-w-full text-sm"><thead><tr class="text-xs text-gray-500"><th class="text-left py-1 pr-2">อุปกรณ์</th><th class="px-1">ใช้งานได้ (เก็บกลับ)</th><th class="px-1">เสีย</th><th class="px-1">ตกรุ่น</th></tr></thead><tbody id="csys-harvest"></tbody></table></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">ปลายทาง *</label><select name="harvestDest" class="w-full border border-gray-300 rounded p-2 text-sm bg-white"></select></div>
+                            <div><label class="block text-xs font-semibold text-gray-600 mb-1">วันที่กำหนดถอด / รื้อถอน</label><input type="date" name="removalDate" class="w-full border border-gray-300 rounded p-2 text-sm"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm mt-6">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">6. ปัญหาเร่งด่วน &amp; สรุป</h3>
+                        <div class="flex gap-4 mb-3 text-sm">
+                            <span class="text-xs font-semibold text-gray-600 self-center">ระบบล่มทั้งชุด / ไม่มีภาพบันทึกเลย?</span>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="Yes" onchange="document.getElementById('csys-urgent').classList.remove('hidden')"> มี</label>
+                            <label class="flex items-center gap-2"><input type="radio" name="hasBroken" value="No" checked onchange="document.getElementById('csys-urgent').classList.add('hidden')"> ไม่มี</label>
+                        </div>
+                        <div id="csys-urgent" class="hidden mb-3"><textarea name="brokenDetail" rows="2" class="input-field w-full border border-red-300 p-2 rounded text-sm" placeholder="เช่น DVR ดับทั้งเครื่อง ไม่มีภาพบันทึกตั้งแต่ 3 วันก่อน"></textarea></div>
+                        <textarea name="comments" rows="3" class="input-field w-full border border-gray-300 p-3 rounded-lg text-sm bg-gray-50" placeholder="สรุปภาพรวม / ข้อเสนอแนะ (Optional) เช่น ควรเปลี่ยน DVR ทั้งชุดเป็น NVR เพราะกล้อง Analog เสียหลายตัว"></textarea>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 1</label><input type="email" name="ccEmail1" class="input-field w-full border p-2 rounded text-sm"></div>
+                            <div><label class="block text-xs font-semibold text-gray-500 mb-1">CC Email 2</label><input type="email" name="ccEmail2" class="input-field w-full border p-2 rounded text-sm"></div>
+                        </div>
+                    </div>
+                    <div class="pt-4 flex justify-between items-center gap-2">
+                        <button type="button" onclick="resetCsysForm(true)" class="text-red-600 text-sm font-medium hover:underline">Clear form</button>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveCsysDraft()" class="bg-slate-500 text-white font-semibold py-2 px-4 rounded-lg shadow hover:bg-slate-600 text-sm">&#128190; Save Draft</button>
+                            <button type="submit" class="bg-teal-700 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-teal-800">Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div> <!-- End content-cctv-sys-survey -->
+
+        <script>
+            const CSYS_CONFIG = <?!= JSON.stringify(getCctvSysConfig_()) ?>;
+            const CSYS_DRAFT_KEY = 'cctv_sys_survey_draft_v1';
+            const CSYS = { seq: 0, ctx: null, ctxFor: '' };
+            function csysEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+            function _csysOpts(list, sel, ph) { return '<option value="">' + (ph || '-- เลือก --') + '</option>' + list.map(function(o) { return '<option' + (o === sel ? ' selected' : '') + '>' + csysEsc(o) + '</option>'; }).join(''); }
+            function _csysTypeOpts(sel) { return CSYS_CONFIG.types.map(function(t) { return '<option value="' + t.k + '"' + (t.k === sel ? ' selected' : '') + '>' + csysEsc(t.l) + '</option>'; }).join(''); }
+            function csysTypeLabel(k) { const t = CSYS_CONFIG.types.find(function(x) { return x.k === k; }); return t ? t.l : (k || '-'); }
+            function _csysN(v) { const n = parseFloat(v); return isNaN(n) || n < 0 ? 0 : n; }
+            function _csysMoney(n) { return Math.round(n).toLocaleString(); }
+            (function() {
+                const f = document.getElementById('csys-form');
+                f.reporterRole.innerHTML = _csysOpts(CSYS_CONFIG.roles, '');
+                f.online.innerHTML = _csysOpts(CSYS_CONFIG.online, '');
+                f.harvestDest.innerHTML = _csysOpts(CSYS_CONFIG.dest, '');
+                document.getElementById('csys-purpose').innerHTML = CSYS_CONFIG.purposes.map(function(p, i) {
+                    return '<label class="inline-flex items-center gap-2 text-sm"><input type="radio" name="purpose" value="' + csysEsc(p) + '"' + (i === 0 ? ' checked' : '') + ' onchange="csysPurposeChange()"> ' + csysEsc(p) + '</label>';
+                }).join('');
+                const base = CSYS_CONFIG.types.filter(function(t) { return t.base; });
+                const num = function(n) { return '<input type="number" min="0" name="' + n + '" class="w-20 border border-gray-300 rounded p-1.5 text-sm">'; };
+                document.getElementById('csys-base').innerHTML = base.map(function(t) {
+                    return '<tr class="border-t border-gray-100"><td class="py-1 pr-2 text-xs font-semibold text-gray-700">' + csysEsc(t.l) + '</td><td class="px-1 text-center">' + num('base_' + t.k + '_total') + '</td><td class="px-1 text-center">' + num('base_' + t.k + '_ok') +
+                        '</td><td class="px-1 text-center">' + num('base_' + t.k + '_bad') + '</td><td class="px-2 text-xs text-gray-400 whitespace-nowrap" data-lpbase="' + t.k + '">-</td></tr>';
+                }).join('');
+                document.getElementById('csys-harvest').innerHTML = base.map(function(t) {
+                    const h = function(k) { return '<input type="number" min="0" data-hv="' + t.k + '" data-hk="' + k + '" class="w-20 border border-gray-300 rounded p-1.5 text-sm">'; };
+                    return '<tr class="border-t border-gray-100"><td class="py-1 pr-2 text-xs font-semibold text-gray-700">' + csysEsc(t.l) + '</td><td class="px-1 text-center">' + h('ok') + '</td><td class="px-1 text-center">' + h('bad') + '</td><td class="px-1 text-center">' + h('old') + '</td></tr>';
+                }).join('');
+                document.getElementById('csys-checks').innerHTML = CSYS_CONFIG.checks.map(function(c) {
+                    return '<div class="py-2 flex flex-wrap items-center gap-2"><span class="flex-1 min-w-[200px] text-sm text-gray-700">' + csysEsc(c.l) + '</span><span class="flex gap-1">' +
+                        CSYS_CONFIG.checkVals.map(function(v) {
+                            const cls = v === 'OK' ? 'peer-checked:bg-emerald-600' : v === 'NG' ? 'peer-checked:bg-red-600' : 'peer-checked:bg-slate-500';
+                            return '<label class="cursor-pointer"><input type="radio" class="peer sr-only" name="csys_chk_' + c.k + '" data-chk="' + c.k + '" value="' + v + '"><span class="block px-3 py-1 rounded-full border border-gray-300 text-xs font-semibold text-gray-600 peer-checked:text-white peer-checked:border-transparent ' + cls + '">' + (v === 'NA' ? 'ไม่มี' : v) + '</span></label>';
+                        }).join('') + '</span></div>';
+                }).join('');
+            })();
+            function csysRoleChange() { const f = document.getElementById('csys-form'); document.getElementById('csys-vendor-wrap').classList.toggle('hidden', f.reporterRole.value !== CSYS_CONFIG.roles[2]); }
+            function csysPurpose() { const r = document.querySelector('#csys-form input[name="purpose"]:checked'); return r ? r.value : CSYS_CONFIG.purposes[0]; }
+            function csysIsClosing() { return csysPurpose() === CSYS_CONFIG.purposes[1]; }
+            function csysPurposeChange() {
+                document.getElementById('csys-harvest-section').classList.toggle('hidden', !csysIsClosing());
+                document.getElementById('csys-open-sections').classList.toggle('hidden', csysIsClosing());
+            }
+            function csysRecDays() {
+                const f = document.getElementById('csys-form'), v = f.recDays.value;
+                if (v === '') return;
+                const r = document.querySelector('#csys-checks input[data-chk="days"][value="' + (parseInt(v, 10) >= CSYS_CONFIG.recDaysMin ? 'OK' : 'NG') + '"]');
+                if (r) r.checked = true;
+            }
+
+            // ─── LP + CMS context ────────────────────────────────────────────────
+            function _csysCmsBadge(no, row) {
+                if (!row) return '<span class="px-1.5 rounded bg-slate-100 text-slate-500" title="ไม่พบเลขนี้ในข้อมูล CMS Dashboard">' + csysEsc(no) + ' · ไม่พบใน CMS</span>';
+                const st = String(row.status || ''), c = /ยกเลิก/.test(st) ? 'bg-red-100 text-red-700' : /ปิดงาน/.test(st) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800';
+                return '<span class="px-1.5 rounded ' + c + '" title="' + csysEsc((row.date || '') + ' · ' + (row.vendor || '') + ' · ' + (row.sym || '')) + '">' + csysEsc(no) + ' · ' + csysEsc(st || '-') + '</span>';
+            }
+            function csysLoadContext(code) {
+                CSYS.ctx = null; CSYS.ctxFor = code;
+                document.getElementById('csys-context').innerHTML = '<p class="text-gray-400 py-2">⏳ กำลังโหลดข้อมูล LP + CMS ของสาขา...</p>';
+                google.script.run.withSuccessHandler(function(res) {
+                    if (CSYS.ctxFor !== code) return;
+                    if (!res || !res.success) { document.getElementById('csys-context').innerHTML = '<p class="text-red-600">โหลดข้อมูลอ้างอิงไม่สำเร็จ: ' + csysEsc(res && res.error) + ' — ยังกรอกแบบสำรวจได้ตามปกติ</p>'; return; }
+                    CSYS.ctx = res;
+                    csysRenderContext();
+                    if (!document.querySelector('#csys-items [data-item]')) csysImportLp(false);
+                }).withFailureHandler(function(err) {
+                    if (CSYS.ctxFor === code) document.getElementById('csys-context').innerHTML = '<p class="text-red-600">โหลดข้อมูลอ้างอิงไม่สำเร็จ: ' + csysEsc(err.message) + '</p>';
+                }).getCctvSysStoreContext(code);
+            }
+            function csysRenderContext() {
+                const c = CSYS.ctx, lp = c.lp, st = lp.store, cards = lp.cards || [];
+                let h = '';
+                if (c.prev) h += '<p class="mb-2 text-xs bg-amber-50 border border-amber-200 rounded px-2 py-1 text-amber-800">ℹ️ สาขานี้เคยส่งแบบสำรวจแล้วเมื่อ ' + csysEsc(c.prev.at) + ' (' + csysEsc(c.prev.id) + ') — ส่งใหม่ได้ รายงานจะใช้รายการล่าสุด</p>';
+                h += '<p class="text-xs text-gray-500 mb-1"><b>LP Register</b> ข้อมูล ณ ' + csysEsc(lp.asOf) + (lp.source === 'upload' ? ' (อัปโหลดล่าสุด)' : '') + ' · รหัส LP/CMS ' + csysEsc(c.gold) + '</p>';
+                if (!st) h += '<p class="text-xs text-gray-500 mb-2">ไม่พบสาขานี้ในไฟล์ LP — เพิ่มการ์ดเองได้</p>';
+                else {
+                    h += '<div class="flex flex-wrap gap-1.5 mb-2">' + CSYS_CONFIG.lpCats.map(function(k) {
+                        const t = st.c[k]; if (!t) return '';
+                        return '<span class="text-xs px-2 py-0.5 rounded-full border ' + (t[2] ? 'border-red-300 bg-red-50 text-red-800' : 'border-gray-200 bg-gray-50 text-gray-600') + '">' + csysEsc(csysTypeLabel(k)) + ' ' + t[0] + (t[2] ? ' · เสีย <b>' + t[2] + '</b>' : '') + '</span>';
+                    }).join('') + '</div>';
+                    document.querySelectorAll('#csys-base [data-lpbase]').forEach(function(td) { const t = st.c[td.dataset.lpbase]; td.textContent = t ? t[0] + ' / ' + t[1] + ' / ' + t[2] : '-'; });
+                }
+                h += '<p class="text-xs text-gray-600 mb-2">LP แจ้งเสีย <b>' + cards.reduce(function(a, x) { return a + x.q; }, 0) + '</b> ชิ้น ใน <b>' + cards.length + '</b> กลุ่ม → สร้างเป็นการ์ดในข้อ 4 ให้แล้ว</p>';
+                const jobs = c.cms.jobs || [];
+                h += '<details class="mt-2"' + (jobs.length ? '' : '') + '><summary class="cursor-pointer text-xs font-semibold text-gray-700">🛠️ งาน CMS หมวด CCTV / EAS ของสาขา (12 เดือน): ' + jobs.length + ' งาน' +
+                    (jobs.filter(function(j) { return /ยกเลิก/.test(j.status); }).length ? ' · <span class="text-red-600">ยกเลิก ' + jobs.filter(function(j) { return /ยกเลิก/.test(j.status); }).length + '</span>' : '') +
+                    (c.cms.error ? ' · <span class="text-red-600">' + csysEsc(c.cms.error) + '</span>' : '') + '</summary>';
+                if (jobs.length) h += '<div class="overflow-x-auto mt-1"><table class="min-w-full text-xs"><thead class="bg-gray-50 text-gray-500"><tr><th class="px-2 py-1 text-left">CMS</th><th class="px-2 py-1 text-left">วันที่</th><th class="px-2 py-1 text-left">หมวด</th><th class="px-2 py-1 text-left">อาการ</th><th class="px-2 py-1 text-left">สถานะ</th><th class="px-2 py-1 text-left">ผู้รับเหมา</th></tr></thead><tbody>' +
+                    jobs.map(function(j) {
+                        const cls = /ยกเลิก/.test(j.status) ? 'text-red-600' : /ปิดงาน/.test(j.status) ? 'text-emerald-700' : 'text-amber-700';
+                        return '<tr class="border-t border-gray-100"><td class="px-2 py-1 font-mono">' + csysEsc(j.no) + '</td><td class="px-2 py-1">' + csysEsc(j.date) + '</td><td class="px-2 py-1">' + csysEsc(j.cat) + '</td><td class="px-2 py-1">' + csysEsc([j.sym, j.det].filter(Boolean).join(' · ')) + '</td><td class="px-2 py-1 font-semibold ' + cls + '">' + csysEsc(j.status) + '</td><td class="px-2 py-1">' + csysEsc(j.vendor) + '</td></tr>';
+                    }).join('') + '</tbody></table></div>';
+                h += '<p class="text-[11px] text-gray-400 mt-1">ข้อมูล CMS Dashboard ณ ' + csysEsc(c.cms.asOf) + ' · งานที่ "ยกเลิก" ไม่ได้แปลว่าซ่อมแล้ว — ตรวจที่หน้างานเสมอ</p></details>';
+                document.getElementById('csys-context').innerHTML = h;
+                document.getElementById('csys-import-btn').classList.toggle('hidden', !cards.length);
+            }
+            function csysImportLp(ask) {
+                const cards = CSYS.ctx && CSYS.ctx.lp ? CSYS.ctx.lp.cards : [];
+                if (!cards.length) return;
+                const existing = document.querySelectorAll('#csys-items [data-item][data-lp="1"]');
+                if (ask && existing.length && !confirm('ลบการ์ดที่ดึงจาก LP เดิม ' + existing.length + ' ใบ แล้วดึงใหม่? (การ์ดที่เพิ่มเองจะยังอยู่)')) return;
+                existing.forEach(function(el) { delete _accumulatedFiles['csys_it_' + el.dataset.item]; el.remove(); });
+                cards.forEach(function(g) {
+                    csysAddItem({ type: g.type, q: g.q, sym: g.sym && g.sym !== 'ชำรุด' ? g.sym : '', loc: (g.descs || []).join(', '),
+                        cmsOld: g.cmsText, lp: { st: g.st, flt: g.flt, sym: g.sym, q: g.q, cms: g.cms } });
+                });
+            }
+
+            // ─── Item cards ─────────────────────────────────────────────────────
+            function csysAddItem(p) {
+                p = p || {};
+                const iid = p.iid || ('I' + String(++CSYS.seq).padStart(2, '0'));
+                const n = parseInt(iid.replace(/\D/g, ''), 10); if (n > CSYS.seq) CSYS.seq = n;
+                const lp = p.lp, cited = CSYS.ctx && CSYS.ctx.cms ? CSYS.ctx.cms.cited || {} : {};
+                const v = function(k) { return p[k] === undefined || p[k] === 0 && k.charAt(0) === 'c' ? '' : p[k]; };
+                const numIn = function(k, cls, ph) { return '<input data-i="' + k + '" type="number" min="0" value="' + csysEsc(v(k)) + '" oninput="csysRecalc()" class="w-full border ' + (cls || 'border-gray-300') + ' rounded p-2 text-sm"' + (ph ? ' placeholder="' + ph + '"' : '') + '>'; };
+                const lpHtml = lp ? '<div class="text-[11px] bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-600">📋 จาก LP: ' + lp.q + ' ชิ้น · ' + csysEsc(lp.st || '-') + (lp.flt ? ' · ' + csysEsc(lp.flt) : '') + (lp.sym ? ' · อาการ LP: ' + csysEsc(lp.sym) : '') +
+                    ((lp.cms || []).length ? '<div class="mt-0.5 flex flex-wrap gap-1">CMS เดิม: ' + lp.cms.map(function(no) { return _csysCmsBadge(no, cited[no]); }).join('') + '</div>' : (p.cmsOld ? ' · CMS: ' + csysEsc(p.cmsOld) : '')) + '</div>' : '';
+                const html = '<div class="border border-teal-300 rounded-lg overflow-hidden" data-item="' + iid + '"' + (lp ? ' data-lp="1"' : '') + ' data-lpjson="' + csysEsc(JSON.stringify(lp || null)) + '">' +
+                    '<div class="bg-teal-800 text-white px-3 py-2 flex items-center justify-between"><b class="text-sm">🔧 ' + iid + ' <span data-out="title" class="font-normal"></span> <span data-out="tag" class="ml-1 text-[11px] font-normal"></span></b><button type="button" onclick="csysRemove(\'' + iid + '\')" class="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5">ลบ</button></div>' +
+                    '<div class="p-3 space-y-3 bg-white">' + lpHtml +
+                        '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' +
+                            '<div class="col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">อุปกรณ์ *</label><select data-i="type" onchange="csysRecalc()" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _csysTypeOpts(p.type || 'cam') + '</select></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">จำนวน *</label>' + numIn('q') + '</div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">สาเหตุ</label><select data-i="cause" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">' + _csysOpts(CSYS_CONFIG.causes, p.cause) + '</select></div>' +
+                            '<div class="col-span-2 sm:col-span-4"><label class="block text-xs font-semibold text-gray-600 mb-1">ตำแหน่ง / ช่อง (CH)</label><input data-i="loc" value="' + csysEsc(p.loc || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น CH3, CH7 หน้า Receiving · ห้อง CCTV LP"></div>' +
+                            '<div class="col-span-2"><label class="block text-xs font-semibold text-gray-600 mb-1">อาการที่พบจริง</label><input data-i="sym" value="' + csysEsc(p.sym || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="เช่น ภาพไม่ขึ้น / ไฟไม่เข้า / ไม่เก็บไฟ"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">ยี่ห้อ</label><input data-i="brand" value="' + csysEsc(p.brand || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm"></div>' +
+                            '<div><label class="block text-xs font-semibold text-gray-600 mb-1">รุ่น</label><input data-i="model" value="' + csysEsc(p.model || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm"></div>' +
+                        '</div>' +
+                        '<div class="border border-gray-200 rounded-lg p-2"><p class="text-xs font-bold text-gray-700 mb-1">ผลตรวจหน้างาน (แยกจำนวน) * <span data-out="left" class="ml-1 font-semibold"></span></p><div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' +
+                            '<div><label class="block text-[11px] font-semibold text-emerald-700 mb-1">✅ ใช้งานได้แล้ว</label>' + numIn('qOk', 'border-emerald-300') + '</div>' +
+                            '<div><label class="block text-[11px] font-semibold text-blue-700 mb-1">🔧 ซ่อมได้</label>' + numIn('qFix', 'border-blue-300') + '</div>' +
+                            '<div><label class="block text-[11px] font-semibold text-red-700 mb-1">🆕 ต้องเปลี่ยนใหม่</label>' + numIn('qNew', 'border-red-300') + '</div>' +
+                            '<div><label class="block text-[11px] font-semibold text-slate-600 mb-1">⛔ ไม่พบ / ยกเลิกใช้งาน</label>' + numIn('qNone') + '</div>' +
+                        '</div></div>' +
+                        '<div data-sec="fix" class="hidden border border-blue-200 bg-blue-50/40 rounded-lg p-2 space-y-2"><p class="text-xs font-bold text-blue-800">🔧 งานซ่อม (OPEX) — ประมาณการรวมของจำนวนที่ซ่อมได้ <span data-out="fixTotal" class="ml-1"></span></p>' +
+                            '<input data-i="fix" value="' + csysEsc(p.fix || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="วิธีซ่อม * เช่น เปลี่ยน Adapter 12V / เดินสายใหม่ / เปลี่ยนแบตเตอรี่ UPS">' +
+                            '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' +
+                                '<div><label class="block text-[11px] font-semibold text-gray-600">ค่าอุปกรณ์/อะไหล่ ฿</label>' + numIn('cEq') + '</div>' +
+                                '<div><label class="block text-[11px] font-semibold text-gray-600">ค่าแรง/ติดตั้ง ฿</label>' + numIn('cLab') + '</div>' +
+                                '<div><label class="block text-[11px] font-semibold text-gray-600">ค่าปีนป่าย/กระเช้า ฿</label>' + numIn('cClimb') + '</div>' +
+                                '<div><label class="block text-[11px] font-semibold text-gray-600">ค่าทดสอบระบบ ฿</label>' + numIn('cTest') + '</div>' +
+                            '</div></div>' +
+                        '<div data-sec="new" class="hidden border border-red-200 bg-red-50/40 rounded-lg p-2"><p class="text-xs font-bold text-red-800 mb-1">🆕 เปลี่ยนใหม่ (CAPEX LP) <span data-out="newTotal" class="ml-1"></span></p><div class="grid grid-cols-2 gap-2 items-end">' +
+                            '<div><label class="block text-[11px] font-semibold text-gray-600">ราคาต่อหน่วย (ประมาณ) ฿</label>' + numIn('unitNew') + '</div>' +
+                            '<label class="flex items-center gap-2 text-xs pb-2"><input type="checkbox" data-i="reuse"' + (p.reuse ? ' checked' : '') + ' onchange="csysRecalc()"> ใช้ของจากสาขาปิด / คลังตลาดนิมิต (ไม่ต้องซื้อ)</label></div></div>' +
+                        '<div data-sec="cms" class="hidden grid grid-cols-2 gap-2"><div><label class="block text-[11px] font-semibold text-gray-600">เลข CMS ใหม่ (ถ้าเปิดแล้ว)</label><input data-i="newCms" value="' + csysEsc(p.newCms || '') + '" inputmode="numeric" maxlength="9" class="w-full border border-gray-300 rounded p-2 text-sm font-mono" placeholder="เช่น 261150545"></div>' +
+                            '<p class="text-[11px] text-gray-500 self-end pb-2">ยังไม่มีเลข ใส่ภายหลังได้ในหน้ารายงาน</p></div>' +
+                        '<input type="hidden" data-i="cmsOld" value="' + csysEsc(p.cmsOld || '') + '">' +
+                        '<div><input data-i="nt" value="' + csysEsc(p.nt || '') + '" class="w-full border border-gray-300 rounded p-2 text-sm" placeholder="หมายเหตุ (Optional)"></div>' +
+                        photoUpload(iid + ' — รูปอุปกรณ์ / อาการ (จำเป็นถ้าซ่อมหรือเปลี่ยน)', 'csys_it_' + iid) +
+                    '</div></div>';
+                document.getElementById('csys-items').insertAdjacentHTML('beforeend', html);
+                csysRecalc();
+            }
+            function csysRemove(iid) {
+                if (!confirm('ลบรายการ ' + iid + '?')) return;
+                delete _accumulatedFiles['csys_it_' + iid];
+                document.querySelector('#csys-items [data-item="' + iid + '"]').remove();
+                csysRecalc();
+            }
+            function _csysItem(el) {
+                const g = function(k) { const x = el.querySelector('[data-i="' + k + '"]'); return x ? x.value : ''; };
+                const n = function(k) { return parseInt(g(k), 10) || 0; };
+                let lp = null; try { lp = JSON.parse(el.dataset.lpjson || 'null'); } catch (e) {}
+                return { iid: el.dataset.item, type: g('type'), q: n('q'), loc: g('loc'), sym: g('sym'), cause: g('cause'), brand: g('brand'), model: g('model'),
+                         qOk: n('qOk'), qFix: n('qFix'), qNew: n('qNew'), qNone: n('qNone'), fix: g('fix'),
+                         cEq: _csysN(g('cEq')), cLab: _csysN(g('cLab')), cClimb: _csysN(g('cClimb')), cTest: _csysN(g('cTest')),
+                         unitNew: _csysN(g('unitNew')), reuse: el.querySelector('[data-i="reuse"]').checked, newCms: g('newCms').trim(), cmsOld: g('cmsOld'), nt: g('nt'),
+                         lp: lp, pk: 'csys_it_' + el.dataset.item };
+            }
+            function collectCsysItems() { return Array.from(document.querySelectorAll('#csys-items [data-item]')).map(_csysItem); }
+            function csysRecalc() {
+                let items = 0, q = 0, ok = 0, fix = 0, nw = 0, none = 0, left = 0, opex = 0, capex = 0;
+                document.querySelectorAll('#csys-items [data-item]').forEach(function(el) {
+                    const it = _csysItem(el), done = it.qOk + it.qFix + it.qNew + it.qNone, rest = it.q - done;
+                    items++; q += it.q; ok += it.qOk; fix += it.qFix; nw += it.qNew; none += it.qNone; left += Math.max(rest, 0);
+                    const rc = it.qFix ? it.cEq + it.cLab + it.cClimb + it.cTest : 0, nc = it.qNew && !it.reuse ? it.unitNew * it.qNew : 0;
+                    opex += rc; capex += nc;
+                    el.querySelector('[data-out="title"]').textContent = '· ' + csysTypeLabel(it.type) + ' × ' + it.q;
+                    const lo = el.querySelector('[data-out="left"]');
+                    lo.textContent = rest > 0 ? 'ยังไม่สรุป ' + rest : rest < 0 ? '⚠️ เกินจำนวน ' + (-rest) : '✔ ครบ';
+                    lo.className = 'ml-1 font-semibold ' + (rest === 0 ? 'text-emerald-700' : 'text-red-600');
+                    el.querySelector('[data-sec="fix"]').classList.toggle('hidden', !it.qFix);
+                    el.querySelector('[data-sec="new"]').classList.toggle('hidden', !it.qNew);
+                    el.querySelector('[data-sec="cms"]').classList.toggle('hidden', !(it.qFix + it.qNew));
+                    el.querySelector('[data-out="fixTotal"]').innerHTML = rc ? '= <b>' + _csysMoney(rc) + ' ฿</b>' + (rc > CSYS_CONFIG.opexLimit ? ' <span class="text-red-600">⚠️ เกิน ' + _csysMoney(CSYS_CONFIG.opexLimit) + ' ฿ — ต้องขออนุมัติ / พิจารณา CAPEX</span>' : ' <span class="text-emerald-700">OPEX</span>') : '';
+                    el.querySelector('[data-out="newTotal"]').innerHTML = it.reuse ? '<span class="text-emerald-700">ใช้ของจากสาขาปิด</span>' : nc ? '= <b>' + _csysMoney(nc) + ' ฿</b>' : '';
+                    el.querySelector('[data-out="tag"]').textContent = [it.qFix ? 'ซ่อม ' + it.qFix : '', it.qNew ? 'ใหม่ ' + it.qNew : '', it.lp ? 'LP' : 'เพิ่มเอง'].filter(Boolean).join(' · ');
+                });
+                const set = function(id, v) { document.getElementById(id).textContent = v; };
+                set('csys-sum-items', items); set('csys-sum-q', q); set('csys-sum-ok', ok); set('csys-sum-fix', fix); set('csys-sum-new', nw); set('csys-sum-none', none); set('csys-sum-left', left);
+                document.getElementById('csys-sum-left-wrap').classList.toggle('hidden', !left);
+                set('csys-sum-opex', _csysMoney(opex)); set('csys-sum-capex', _csysMoney(capex));
+            }
+            function _csysChecks() { const o = {}; document.querySelectorAll('#csys-checks input[data-chk]:checked').forEach(function(r) { o[r.dataset.chk] = r.value; }); return o; }
+            function _csysSetChecks(o) { document.querySelectorAll('#csys-checks input[data-chk]').forEach(function(r) { r.checked = !!o && o[r.dataset.chk] === r.value; }); }
+            function _csysHarvest() {
+                const o = {};
+                document.querySelectorAll('#csys-harvest [data-hv]').forEach(function(i) { if (i.value === '') return; (o[i.dataset.hv] = o[i.dataset.hv] || {})[i.dataset.hk] = parseInt(i.value, 10) || 0; });
+                return o;
+            }
+            function _csysSetHarvest(o) { document.querySelectorAll('#csys-harvest [data-hv]').forEach(function(i) { const h = o && o[i.dataset.hv]; i.value = h && h[i.dataset.hk] !== undefined ? h[i.dataset.hk] : ''; }); }
+
+            // ─── Branch search (shares the all-format list of the CCTV request tab) ─────────
+            function _applyCsysStore(s) {
+                const form = document.getElementById('csys-form');
+                const changed = form.branchCode.value !== s.code;
+                form.branchCode.value = s.code; form.branchName.value = s.name; form.storeFormat.value = s.fmt; form.region.value = s.region;
+                const db = s.db || (typeof _hyperRefFindStoreDb === 'function' ? _hyperRefFindStoreDb(s.code) : null);
+                form.ammMtn.value = db ? (db.ammMtn || '') : ''; form.dmArea.value = db ? (db.dmName || '') : ''; form.cmArea.value = db ? (db.cmName || '') : '';
+                const badge = document.getElementById('csys-store-badge');
+                const tg = csysTag(s.code);
+                badge.innerHTML = '<span class="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 font-semibold">' + csysEsc(s.fmt || '-') + '</span>' + (s.region ? ' <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">' + csysEsc(s.region) + '</span>' : '') +
+                    (tg && tg.lp ? ' <span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">🔴 LP เสีย ' + tg.lp + (tg.wait ? ' · รอ MTN ' + tg.wait : '') + '</span>' : (CSYS.tags ? ' <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">ไม่อยู่ในไฟล์ LP</span>' : '')) +
+                    (tg && tg.done ? ' <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">✓ ตรวจแล้ว ' + csysEsc(tg.done) + '</span>' : '');
+                badge.classList.remove('hidden');
+                document.getElementById('csys-rest-form').classList.remove('hidden');
+                if (changed || !CSYS.ctx) csysLoadContext(s.code);
+                if (typeof sdsCheck === 'function') sdsCheck('cctvSys');
+            }
+            function _clearCsysStore() {
+                const form = document.getElementById('csys-form');
+                ['branchCode', 'branchName', 'storeFormat', 'region', 'ammMtn', 'dmArea', 'cmArea'].forEach(function(n) { form[n].value = ''; });
+                document.getElementById('csys-store-badge').classList.add('hidden');
+                document.getElementById('csys-rest-form').classList.add('hidden');
+            }
+            // ─── Store scope tags: LP broken list + already surveyed (getCctvSysStoreTags, loaded once per page) ──
+            function csysTag(code) { return CSYS.tags ? CSYS.tags[String(code)] || null : null; }
+            function csysLoadTags(force) {
+                if (CSYS.tagsLoading || (CSYS.tags && !force)) return;
+                CSYS.tagsLoading = true;
+                document.getElementById('csys-scope-n').textContent = '(กำลังโหลด...)';
+                google.script.run.withSuccessHandler(function(res) {
+                    CSYS.tagsLoading = false;
+                    if (!res || !res.success) { document.getElementById('csys-scope-n').textContent = '(โหลดไม่ได้)'; document.getElementById('csys-only-lp').checked = false; return; }
+                    CSYS.tags = res.tags;
+                    document.getElementById('csys-scope-n').textContent = '(' + res.lpStores + ' สาขา · ตรวจแล้ว ' + res.lpDone + ' · ข้อมูล LP ' + res.asOf + ')';
+                    const inp = document.getElementById('csys-station-search');
+                    if (document.activeElement === inp) handleCsysStationInput(inp);
+                    const f = document.getElementById('csys-form'); if (f.branchCode.value) { const s = _cctvStores().find(function(x) { return x.code === f.branchCode.value; }); if (s) _applyCsysStore(s); }
+                }).withFailureHandler(function() { CSYS.tagsLoading = false; document.getElementById('csys-scope-n').textContent = ''; document.getElementById('csys-only-lp').checked = false; }).getCctvSysStoreTags();
+            }
+            function csysScopeChange() { const i = document.getElementById('csys-station-search'); i.focus(); handleCsysStationInput(i); }
+            function _csysTagText(s) { const t = csysTag(s.code); if (!t) return ''; return (t.lp ? '  ·  🔴 LP เสีย ' + t.lp : '') + (t.done ? '  ·  ✓ ตรวจแล้ว ' + t.done : ''); }
+            function handleCsysStationInput(input) {
+                csysLoadTags(false);
+                const val = input.value.toLowerCase().trim();
+                const dd = document.getElementById('csys-station-dropdown');
+                const onlyLp = document.getElementById('csys-only-lp').checked && !!CSYS.tags, hideDone = document.getElementById('csys-hide-done').checked && !!CSYS.tags;
+                const stores = _cctvStores();
+                const scoped = stores.filter(function(s) { const t = csysTag(s.code); return (!onlyLp || (t && t.lp)) && (!hideDone || !(t && t.done)); });
+                if (val.length < 1) {
+                    _clearCsysStore();
+                    if (!onlyLp || document.activeElement !== input) { dd.classList.add('hidden'); dd.innerHTML = ''; return; }
+                }
+                const matches = (val ? scoped.filter(function(s) { return s.label.toLowerCase().indexOf(val) !== -1; }) : scoped.slice())
+                    .sort(function(a, b) { return val ? 0 : ((csysTag(b.code) || {}).lp || 0) - ((csysTag(a.code) || {}).lp || 0); }).slice(0, 60);
+                const disp = matches.map(function(s) { return s.label + _csysTagText(s); });
+                renderStationDropdown('csys-station-dropdown', disp, function(sel) {
+                    const s = matches[disp.indexOf(sel)];
+                    if (s) { input.value = s.label; _applyCsysStore(s); }
+                });
+                if (!val) return;
+                const exact = stores.find(function(s) { return s.label.toLowerCase() === val || s.code === val; });
+                if (exact) _applyCsysStore(exact); else _clearCsysStore();
+            }
+            document.addEventListener('click', function(e) { const d = document.getElementById('csys-station-dropdown'); if (d && !d.classList.contains('hidden') && !d.parentElement.contains(e.target)) d.classList.add('hidden'); });
+
+            // ─── Drafts (on-device + server SDS 'cctvSys') ─────────────────────────────
+            function _csysFields(form) {
+                const data = {};
+                Array.from(form.elements).forEach(function(el) {
+                    if (!el.name || el.type === 'file' || el.type === 'submit' || el.type === 'button' || el.name.indexOf('csys_chk_') === 0) return;
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; return; }
+                    data[el.name] = el.value;
+                });
+                return data;
+            }
+            function _clearCsysItems() { document.querySelectorAll('#csys-items [data-item]').forEach(function(r) { delete _accumulatedFiles['csys_it_' + r.dataset.item]; r.remove(); }); CSYS.seq = 0; }
+            function _buildCsysDraft() {
+                const form = document.getElementById('csys-form');
+                return { savedAt: new Date().toISOString(), search: document.getElementById('csys-station-search').value, fields: _csysFields(form), items: collectCsysItems(), checks: _csysChecks(), harvest: _csysHarvest() };
+            }
+            function saveCsysDraft() {
+                const form = document.getElementById('csys-form');
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาก่อนบันทึกแบบร่าง'); return; }
+                try { localStorage.setItem(CSYS_DRAFT_KEY, JSON.stringify(_buildCsysDraft())); if (typeof showDraftToast === 'function') showDraftToast('บันทึกร่างแล้ว (CCTV System)'); }
+                catch (e) { alert('บันทึกแบบร่างไม่สำเร็จ: ' + e.message); }
+                if (typeof sdsSave === 'function') sdsSave('cctvSys', null);
+            }
+            function _readCsysDraft() { try { return JSON.parse(localStorage.getItem(CSYS_DRAFT_KEY) || 'null'); } catch (e) { return null; } }
+            function checkCsysDraft() {
+                csysLoadTags(false);
+                const d = _readCsysDraft(), b = document.getElementById('csys-draft-banner');
+                if (!d || !d.fields) { b.classList.add('hidden'); return; }
+                document.getElementById('csys-draft-info').textContent = (d.fields.branchCode || '') + ' ' + (d.fields.branchName || '') + ' · ' + new Date(d.savedAt).toLocaleString('en-GB');
+                b.classList.remove('hidden');
+            }
+            function restoreCsysDraft(fromServer) {
+                const d = fromServer || _readCsysDraft();
+                if (!d) return;
+                const form = document.getElementById('csys-form');
+                _clearCsysItems();   // before the store pick, so the context load doesn't auto-import LP cards over the draft
+                (d.items || []).forEach(function(it) { csysAddItem(it); });
+                const s = _cctvStores().find(function(x) { return x.code === d.fields.branchCode; });
+                if (s) { document.getElementById('csys-station-search').value = d.search || s.label; _applyCsysStore(s); }
+                Object.keys(d.fields).forEach(function(n) {
+                    const el = form.elements[n];
+                    if (!el) return;
+                    if (el instanceof RadioNodeList) Array.from(el).forEach(function(r) { r.checked = r.value === d.fields[n]; });
+                    else el.value = d.fields[n];
+                });
+                _csysSetChecks(d.checks); _csysSetHarvest(d.harvest);
+                csysRoleChange(); csysPurposeChange();
+                document.getElementById('csys-urgent').classList.toggle('hidden', d.fields.hasBroken !== 'Yes');
+                csysRecalc();
+                document.getElementById('csys-draft-banner').classList.add('hidden');
+            }
+            function discardCsysDraft() { if (!confirm('ลบแบบร่างที่บันทึกไว้?')) return; try { localStorage.removeItem(CSYS_DRAFT_KEY); } catch (e) {} checkCsysDraft(); }
+            function resetCsysForm(ask) {
+                if (ask && !confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+                if (typeof sdsReset === 'function') sdsReset('cctvSys');
+                const form = document.getElementById('csys-form');
+                const keep = { reporterName: form.reporterName.value, reporterPhone: form.reporterPhone.value, reporterRole: form.reporterRole.value, vendorCompany: form.vendorCompany.value };
+                form.reset();
+                Object.keys(keep).forEach(function(k) { form[k].value = keep[k]; });
+                document.querySelectorAll('#content-cctv-sys-survey [id^="preview_"]').forEach(function(el) { el.innerHTML = ''; });
+                _clearCsysItems();
+                document.getElementById('csys-station-search').value = '';
+                document.getElementById('csys-urgent').classList.add('hidden');
+                document.querySelectorAll('#csys-base [data-lpbase]').forEach(function(td) { td.textContent = '-'; });
+                CSYS.ctx = null; CSYS.ctxFor = '';
+                _clearCsysStore(); csysRoleChange(); csysPurposeChange(); csysRecalc();
+            }
+
+            // ─── Submit ───────────────────────────────────────────────────────────
+            async function handleCsysSubmit(e) {
+                e.preventDefault();
+                const form = e.target, closing = csysIsClosing();
+                const req = [['reporterName', 'ชื่อผู้ตรวจ'], ['reporterPhone', 'เบอร์โทรศัพท์'], ['reporterRole', 'ตำแหน่ง / หน่วยงาน']];
+                for (const r of req) if (!String(form[r[0]].value).trim()) { alert('กรุณากรอก ' + r[1]); form[r[0]].focus(); return; }
+                if (form.reporterRole.value === CSYS_CONFIG.roles[2] && !form.vendorCompany.value.trim()) { alert('กรุณากรอกชื่อบริษัทผู้รับเหมา'); form.vendorCompany.focus(); return; }
+                if (!form.branchCode.value) { alert('กรุณาเลือกสาขาให้ถูกต้องก่อนกดยืนยัน'); return; }
+                if (!closing) {
+                    if (form.base_cam_total.value === '') { alert('ข้อ 2: กรุณาใส่จำนวนกล้องทั้งหมดที่นับได้ (ใส่ 0 ถ้าไม่มี)'); form.base_cam_total.focus(); return; }
+                    for (const t of CSYS_CONFIG.types.filter(function(x) { return x.base; })) {
+                        const tot = form['base_' + t.k + '_total'].value, ok = parseInt(form['base_' + t.k + '_ok'].value, 10) || 0, bad = parseInt(form['base_' + t.k + '_bad'].value, 10) || 0;
+                        if (tot !== '' && ok + bad > parseInt(tot, 10)) { alert('ข้อ 2 ' + t.l + ': ใช้งานได้ + เสีย มากกว่าจำนวนทั้งหมด'); form['base_' + t.k + '_total'].focus(); return; }
+                    }
+                    if (form.recDays.value === '') { alert('ข้อ 2: กรุณาใส่จำนวนวันที่เก็บภาพย้อนหลังได้'); form.recDays.focus(); return; }
+                    if (!form.online.value) { alert('ข้อ 2: กรุณาเลือกการเชื่อมต่อศูนย์ควบคุม'); form.online.focus(); return; }
+                    const chk = _csysChecks(), miss = CSYS_CONFIG.checks.filter(function(c) { return !chk[c.k]; });
+                    if (miss.length) { alert('ข้อ 3: ยังไม่ได้ตรวจ ' + miss.length + ' ข้อ — เช่น "' + miss[0].l + '"'); document.getElementById('csys-checks').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+                } else {
+                    const hv = _csysHarvest();
+                    if (!Object.keys(hv).length) { alert('ข้อ 5: กรุณาใส่จำนวนอุปกรณ์ที่ต้องเก็บกู้อย่างน้อย 1 รายการ'); return; }
+                    if (!form.harvestDest.value) { alert('ข้อ 5: กรุณาเลือกปลายทางของอุปกรณ์'); form.harvestDest.focus(); return; }
+                }
+                const els = Array.from(document.querySelectorAll('#csys-items [data-item]'));
+                if (!els.length && !closing && !confirm('ไม่มีการ์ดอุปกรณ์เสียเลย — ยืนยันว่าระบบของสาขานี้ใช้งานได้ปกติทั้งหมด?')) return;
+                for (const el of els) {
+                    const it = _csysItem(el), sum = it.qOk + it.qFix + it.qNew + it.qNone;
+                    const msg = it.q < 1 ? 'ยังไม่ได้ใส่จำนวน' : sum !== it.q ? 'ผลตรวจรวม ' + sum + ' ไม่เท่ากับจำนวน ' + it.q + ' — แยกจำนวนให้ครบ'
+                        : it.qFix && !it.fix.trim() ? 'ยังไม่ได้ระบุวิธีซ่อม' : it.newCms && !/^2\d{8}$/.test(it.newCms) ? 'เลข CMS ต้องเป็นตัวเลข 9 หลัก'
+                        : (it.qFix + it.qNew) && !(_accumulatedFiles[it.pk] || []).filter(Boolean).length ? 'ยังไม่ได้แนบรูป (จำเป็นเมื่อซ่อม / เปลี่ยน)' : '';
+                    if (msg) { alert(it.iid + ' ' + csysTypeLabel(it.type) + ': ' + msg); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('ring-2', 'ring-red-400'); setTimeout(function() { el.classList.remove('ring-2', 'ring-red-400'); }, 2000); return; }
+                }
+                const hasBroken = (form.querySelector('input[name="hasBroken"]:checked') || {}).value === 'Yes';
+                if (hasBroken && !form.brokenDetail.value.trim()) { alert('กรุณาระบุปัญหาเร่งด่วน'); form.brokenDetail.focus(); return; }
+
+                showLoading();
+                const loadingText = document.querySelector('#globalLoading span');
+                try {
+                    const tasks = [], seen = new Set();
+                    form.querySelectorAll('input[type="file"][data-category-upload]').forEach(function(input) {
+                        const cat = input.dataset.categoryUpload;
+                        if (seen.has(cat)) return;
+                        seen.add(cat);
+                        (_accumulatedFiles[cat] || []).filter(Boolean).forEach(function(file) { tasks.push({ cat: cat, file: file }); });
+                    });
+                    const up = await hyperUploadPhotos('CSYS', form.branchCode.value, tasks, function() { return [1024, 1024, 0.65]; }, loadingText);
+                    if (up.failed > 0) {
+                        hideLoading();
+                        if (loadingText) loadingText.textContent = 'Processing...';
+                        alert('⚠️ อัปโหลดรูปไม่สำเร็จ ' + up.failed + ' รูป (สัญญาณอินเทอร์เน็ตอาจไม่เสถียร)\n\nข้อมูลยังอยู่ในฟอร์ม กรุณากด Submit อีกครั้ง — รูปที่อัปโหลดแล้วจะไม่ต้องส่งซ้ำ');
+                        return;
+                    }
+                    if (loadingText) loadingText.textContent = 'กำลังส่งข้อมูล...';
+                    const data = _csysFields(form);
+                    if (closing) Object.keys(data).forEach(function(k) { if (k.indexOf('base_') === 0 || ['camAnalog', 'camIp', 'recDays', 'online'].indexOf(k) > -1) data[k] = ''; });
+                    data.reporterEmail = CURRENT_USER ? CURRENT_USER.email : '';
+                    data.uploadId = up.uploadId;
+                    data.uploadedLinks = up.links;
+                    data.draftId = sdsDraftId('cctvSys');
+                    data.itemsJson = JSON.stringify(collectCsysItems());
+                    data.checksJson = JSON.stringify(closing ? {} : _csysChecks());
+                    data.harvestJson = JSON.stringify(closing ? _csysHarvest() : {});
+                    google.script.run
+                        .withSuccessHandler(function(res) {
+                            hideLoading();
+                            if (loadingText) loadingText.textContent = 'Processing...';
+                            if (res && res.success) { showSuccess(); sdsReset('cctvSys'); csysLoadTags(true); try { localStorage.removeItem(CSYS_DRAFT_KEY); } catch (e2) {} checkCsysDraft(); resetCsysForm(false); }
+                            else alert('Error: ' + (res && res.error));
+                        })
+                        .withFailureHandler(function(err) { hideLoading(); alert('Server Error: ' + err.message); })
+                        .processCctvSysSurveyForm(data);
+                } catch (err) { hideLoading(); alert('Error processing form: ' + err.message); }
+            }
+        </script>
