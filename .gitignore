@@ -25,3 +25,6 @@ Safety and Protection/
 # Shared secret for signed Super Admin manual links (pushed by clasp, never committed)
 ManualSecret.gs
 Manuals App/ManualSecret.gs
+
+# Over GitHub 100 MB file limit (297 MB) - kept on Drive only
+Fresh Food Survey/Layout/To-Be/ALL FF Renovate.pdf
